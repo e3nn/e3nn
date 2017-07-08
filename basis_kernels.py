@@ -14,6 +14,7 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
+from cache_file import cached
 
 ################################################################################
 # Representation functions
@@ -168,20 +169,21 @@ def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
 ################################################################################
 # Constructing kernel basis elements
 ################################################################################
-def transport_kernel(x, f_radial, base0e, R_out, R_in):
+def transport_kernel(x, base0e, R_out, R_in):
     '''
     "Transport" the kernel K(0, e) to K(0, x)
 
     K(0, x) = K(0, g |x| e) = R_out(g) K(0, |x| e) R_in(g)^{-1}
 
-    In this function: K(0, |x| e) = K(0, e) f_radial(|x|)
+    In this function: K(0, |x| e) = K(0, e)
     '''
     alpha, beta = x_to_alpha_beta(x)
     # inv(R_in(alpha, beta, 0)) = inv(R_in(Z(alpha) Y(beta))) = R_in(Y(-beta) Z(-alpha))
-    return np.dot(np.dot(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha)) * f_radial(np.linalg.norm(x))
+    return np.dot(np.dot(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
 
 
-def cube_basis_kernels(size, f_radial, R_out, R_in):
+@cached("kernels_cache.pkl.gz")
+def cube_basis_kernels(size, R_out, R_in):
     dim_in = dim(R_in)
     dim_out = dim(R_out)
 
@@ -202,7 +204,7 @@ def cube_basis_kernels(size, f_radial, R_out, R_in):
                     result[:, :, :, zi, yi, xi] = 0
                 else:
                     for i, K in enumerate(basis):
-                        result[i, :, :, zi, yi, xi] = transport_kernel(point, f_radial, K, R_out, R_in)
+                        result[i, :, :, zi, yi, xi] = transport_kernel(point, K, R_out, R_in)
     return result
 
 

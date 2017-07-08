@@ -1,3 +1,4 @@
 .ipynb_checkpoints
 *.nb
 __pycache__
+*.pkl.gz
