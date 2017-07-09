@@ -2,3 +2,4 @@
 *.nb
 __pycache__
 *.pkl.gz
+*_cache

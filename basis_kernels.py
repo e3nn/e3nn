@@ -14,57 +14,8 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
-from cache_file import cached
-
-################################################################################
-# Representation functions
-################################################################################
-ez = np.array([0, 0, 1])
-
-def rot_z(gamma):
-    '''
-    Rotation around Z axis
-    '''
-    return np.array([[np.cos(gamma), -np.sin(gamma), 0],
-                     [np.sin(gamma), np.cos(gamma), 0],
-                     [0, 0, 1]])
-
-def rot_y(beta):
-    '''
-    Rotation around Y axis
-    '''
-    return np.array([[np.cos(beta), 0, np.sin(beta)],
-                     [0, 1, 0],
-                     [-np.sin(beta), 0, np.cos(beta)]])
-
-def rot(alpha, beta, gamma):
-    '''
-    ZYZ Eurler angles rotation
-    '''
-    return rot_z(alpha).dot(rot_y(beta)).dot(rot_z(gamma))
-
-def x_to_alpha_beta(x):
-    x = x / np.linalg.norm(x)
-    beta = np.arccos(x[2])
-    alpha = np.arctan2(x[1], x[0])
-    return (alpha, beta)
-
-def dim(R):
-    return R(0, 0, 0).shape[0]
-
-# The next functions are example of possibles representations
-
-def scalar_repr(alpha, beta, gamma): #pylint: disable=W0613
-    return np.array([[1]])
-
-
-def vector_repr(alpha, beta, gamma):
-    return rot(alpha, beta, gamma)
-
-
-def tensor_repr(alpha, beta, gamma):
-    r = vector_repr(alpha, beta, gamma)
-    return np.kron(r, r)
+from cache_file import cached_dirpklgz
+from SO3 import dim
 
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
@@ -171,18 +122,19 @@ def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
 ################################################################################
 def transport_kernel(x, base0e, R_out, R_in):
     '''
-    "Transport" the kernel K(0, e) to K(0, x)
+    "Transport" the kernel K(0, ez) to K(0, x)
 
-    K(0, x) = K(0, g |x| e) = R_out(g) K(0, |x| e) R_in(g)^{-1}
+    K(0, x) = K(0, g |x| ez) = R_out(g) K(0, |x| ez) R_in(g)^{-1}
 
-    In this function: K(0, |x| e) = K(0, e)
+    In this function: K(0, |x| ez) = K(0, ez)
     '''
+    from SO3 import x_to_alpha_beta
     alpha, beta = x_to_alpha_beta(x)
     # inv(R_in(alpha, beta, 0)) = inv(R_in(Z(alpha) Y(beta))) = R_in(Y(-beta) Z(-alpha))
     return np.dot(np.dot(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
 
 
-@cached("kernels_cache.pkl.gz")
+@cached_dirpklgz("kernels_cache")
 def cube_basis_kernels(size, R_out, R_in):
     dim_in = dim(R_in)
     dim_out = dim(R_out)
