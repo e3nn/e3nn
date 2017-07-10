@@ -1,7 +1,7 @@
 '''
 Cache in file
 '''
-from functools import wraps
+from functools import wraps, lru_cache
 import pickle
 import gzip
 import os
@@ -15,6 +15,7 @@ def cached_pklgz(filename):
         '''
         The actual decorator
         '''
+        @lru_cache(maxsize=None)
         @wraps(func)
         def wrapper(*args):
             '''
@@ -45,6 +46,7 @@ def cached_dirpklgz(dirname):
         '''
         The actual decorator
         '''
+        @lru_cache(maxsize=None)
         @wraps(func)
         def wrapper(*args):
             '''
