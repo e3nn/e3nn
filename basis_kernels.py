@@ -144,24 +144,20 @@ def cube_basis_kernels(size, R_out, R_in):
 
     result = np.empty((len(basis), dim_out, dim_in, size, size, size))
 
-    for zi in range(size):
+    for xi in range(size):
         for yi in range(size):
-            for xi in range(size):
-                z = zi - size / 2 + 0.5
-                y = yi - size / 2 + 0.5
+            for zi in range(size):
                 x = xi - size / 2 + 0.5
+                y = yi - size / 2 + 0.5
+                z = zi - size / 2 + 0.5
                 point = np.array([x, y, z])
 
                 if x == 0 and y == 0 and z == 0:
-                    result[:, :, :, zi, yi, xi] = 0
+                    result[:, :, :, xi, yi, zi] = 0
                 else:
                     for i, K in enumerate(basis):
-                        result[i, :, :, zi, yi, xi] = transport_kernel(point, K, R_out, R_in)
+                        result[i, :, :, xi, yi, zi] = transport_kernel(point, K, R_out, R_in)
     return result
-
-
-def hat_function(r, rmax, width=1):
-    return np.maximum(1 - np.abs((r - rmax) / width), 0)
 
 ################################################################################
 # Subsampling function

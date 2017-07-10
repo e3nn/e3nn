@@ -5,14 +5,16 @@ from torch.nn.parameter import Parameter
 import basis_kernels
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in):
+    def __init__(self, size, Rs_out, Rs_in, M=15):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
         representation is a function of SO(3) in Euler ZYZ parametrisation alpha, beta, gamma
+
+        :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian 
         '''
         super(SE3Convolution, self).__init__()
-        self.combination = SE3KernelCombination(size, Rs_out, Rs_in)
+        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M)
         self.weight = Parameter(torch.Tensor(self.combination.nweights))
 
     def reset_parameters(self):
@@ -25,9 +27,8 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, Rs_out, Rs_in):
+    def __init__(self, size, Rs_out, Rs_in, M=15):
         super(SE3KernelCombination, self).__init__()
-        M = 15
 
         self.size = size
         Rs_out = [(m, R) for m, R in Rs_out if m >= 1]
