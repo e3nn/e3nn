@@ -72,12 +72,15 @@ def cached_dirpklgz(dirname):
 
             try:
                 with gzip.open(filename, "rb") as file:
-                    return pickle.load(file)
+                    print("load {}...".format(filename))
+                    result = pickle.load(file)
             except FileNotFoundError:
-                print("compute {}".format(filename))
+                print("compute {}...".format(filename))
                 result = func(*args)
+                print("save {}...".format(filename))
                 with gzip.open(filename, "wb") as file:
                     pickle.dump(result, file)
-                return result
+            print("done")
+            return result
         return wrapper
     return decorator

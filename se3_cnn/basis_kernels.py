@@ -135,7 +135,7 @@ def transport_kernel(x, base0e, R_out, R_in):
     from se3_cnn.SO3 import x_to_alpha_beta
     alpha, beta = x_to_alpha_beta(x)
     # inv(R_in(alpha, beta, 0)) = inv(R_in(Z(alpha) Y(beta))) = R_in(Y(-beta) Z(-alpha))
-    return np.dot(np.dot(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
+    return np.matmul(np.matmul(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
 
 
 @cached_dirpklgz("kernels_cache")
@@ -159,8 +159,7 @@ def cube_basis_kernels(size, R_out, R_in):
                 if x == 0 and y == 0 and z == 0:
                     result[:, :, :, xi, yi, zi] = 0
                 else:
-                    for i, K in enumerate(basis):
-                        result[i, :, :, xi, yi, zi] = transport_kernel(point, K, R_out, R_in)
+                    result[:, :, :, xi, yi, zi] = transport_kernel(point, basis, R_out, R_in)
     return result
 
 ################################################################################
