@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 from torch.nn.parameter import Parameter
-import basis_kernels
+from se3_cnn import basis_kernels
 
 class SE3Convolution(torch.nn.Module):
     def __init__(self, size, Rs_out, Rs_in, M=15, central_base=True):

@@ -14,8 +14,8 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
-from cache_file import cached_dirpklgz
-from SO3 import dim
+from se3_cnn.cache_file import cached_dirpklgz
+from se3_cnn.SO3 import dim
 
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
@@ -132,7 +132,7 @@ def transport_kernel(x, base0e, R_out, R_in):
 
     In this function: K(0, |x| ez) = K(0, ez)
     '''
-    from SO3 import x_to_alpha_beta
+    from se3_cnn.SO3 import x_to_alpha_beta
     alpha, beta = x_to_alpha_beta(x)
     # inv(R_in(alpha, beta, 0)) = inv(R_in(Z(alpha) Y(beta))) = R_in(Y(-beta) Z(-alpha))
     return np.dot(np.dot(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
