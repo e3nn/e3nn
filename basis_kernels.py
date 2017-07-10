@@ -49,6 +49,8 @@ def get_matrices_kernel(As, eps=1e-10):
 
 def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
     '''
+    :return: list of dim(R_out) x dim(R_in) matrices
+
     Computes a basis of the vector space of matrices K such that
         R_out(g) K = K R_in(g) for all g in Z rotations (stabilizer of 0 and ez)
 
@@ -82,6 +84,8 @@ def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
 
 def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
     '''
+    :return: list of dim(R_out) x dim(R_in) matrices
+
     Computes a basis of the vector space of matrices K such that
         R_out(g) K = K R_in(g) for all g in SO(3) (stabilizer of 0)
 

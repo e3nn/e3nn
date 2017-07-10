@@ -5,7 +5,7 @@ from torch.nn.parameter import Parameter
 import basis_kernels
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, M=15):
+    def __init__(self, size, Rs_out, Rs_in, M=15, central_base=True):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -14,7 +14,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super(SE3Convolution, self).__init__()
-        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M)
+        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base)
         self.weight = Parameter(torch.Tensor(self.combination.nweights))
 
     def reset_parameters(self):
@@ -27,7 +27,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, Rs_out, Rs_in, M=15):
+    def __init__(self, size, Rs_out, Rs_in, M=15, central_base=True):
         super(SE3KernelCombination, self).__init__()
 
         self.size = size
@@ -38,18 +38,31 @@ class SE3KernelCombination(torch.autograd.Function):
         self.dims_out = [basis_kernels.dim(R) for _, R in Rs_out]
         self.dims_in = [basis_kernels.dim(R) for _, R in Rs_in]
 
-        #TODO for now, only one parameter radially
+        #TODO this code is a bit crappy
         rng = np.linspace(start=-1, stop=1, num=size * M, endpoint=True)
         z, y, x = np.meshgrid(rng, rng, rng)
         r = np.sqrt(x**2 + y**2 + z**2)
         mask = np.cos((r - 0.5) * 2 * np.pi) + 1
         mask[r > 1] = 0
 
-        self.kernels = [
-            [torch.FloatTensor(
-                basis_kernels.gaussian_subsampling(
-                    basis_kernels.cube_basis_kernels(size * M, R_out, R_in) * mask,
-                    (1, 1, 1, M, M, M)))
+        def generate_basis(R_out, R_in):
+            basis = basis_kernels.gaussian_subsampling(
+                basis_kernels.cube_basis_kernels(size * M, R_out, R_in) * mask,
+                (1, 1, 1, M, M, M))
+
+            if central_base and size % 2 == 1:
+                Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
+                center = np.zeros((len(Ks),) + basis.shape[1:])
+                for k, K in enumerate(Ks):
+                    center[k, :, :, size//2, size//2, size//2] = K
+                basis = np.concatenate((center, basis))
+
+            # normalize each basis element
+            for k in range(len(basis)):
+                basis[k] /= np.linalg.norm(basis[k])
+            return basis
+
+        self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in))
             for _, R_in in Rs_in]
             for _, R_out in Rs_out]
 
@@ -65,10 +78,10 @@ class SE3KernelCombination(torch.autograd.Function):
         n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
         if weight.is_cuda:
-            self.kernels = self.kernels.cuda()
+            self.kernels = [[K.cuda() for K in row] for row in self.kernels]
             kernel = torch.cuda.FloatTensor(n_out, n_in, self.size, self.size, self.size)
         else:
-            self.kernels = self.kernels.cpu()
+            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
             kernel = torch.FloatTensor(n_out, n_in, self.size, self.size, self.size)
 
         weight_index = 0
@@ -91,10 +104,10 @@ class SE3KernelCombination(torch.autograd.Function):
 
     def backward(self, grad_kernel): #pylint: disable=W
         if grad_kernel.is_cuda:
-            self.kernels = self.kernels.cuda()
+            self.kernels = [[K.cuda() for K in row] for row in self.kernels]
             grad_weight = torch.cuda.FloatTensor(self.nweights)
         else:
-            self.kernels = self.kernels.cpu()
+            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
             grad_weight = torch.FloatTensor(self.nweights)
 
         weight_index = 0
