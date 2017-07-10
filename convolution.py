@@ -11,7 +11,7 @@ class SE3Convolution(torch.nn.Module):
         multiplicity is a positive integer
         representation is a function of SO(3) in Euler ZYZ parametrisation alpha, beta, gamma
 
-        :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian 
+        :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super(SE3Convolution, self).__init__()
         self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M)
@@ -64,7 +64,12 @@ class SE3KernelCombination(torch.autograd.Function):
         n_out = sum([self.multiplicites_out[i] * self.dims_out[i] for i in range(len(self.multiplicites_out))])
         n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
-        kernel = torch.FloatTensor(n_out, n_in, self.size, self.size, self.size)
+        if weight.is_cuda:
+            self.kernels = self.kernels.cuda()
+            kernel = torch.cuda.FloatTensor(n_out, n_in, self.size, self.size, self.size)
+        else:
+            self.kernels = self.kernels.cpu()
+            kernel = torch.FloatTensor(n_out, n_in, self.size, self.size, self.size)
 
         weight_index = 0
 
@@ -85,7 +90,12 @@ class SE3KernelCombination(torch.autograd.Function):
         return kernel
 
     def backward(self, grad_kernel): #pylint: disable=W
-        grad_weight = torch.FloatTensor(self.nweights)
+        if grad_kernel.is_cuda:
+            self.kernels = self.kernels.cuda()
+            grad_weight = torch.cuda.FloatTensor(self.nweights)
+        else:
+            self.kernels = self.kernels.cpu()
+            grad_weight = torch.FloatTensor(self.nweights)
 
         weight_index = 0
 
