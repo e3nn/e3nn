@@ -39,16 +39,8 @@ class SE3KernelCombination(torch.autograd.Function):
         self.dims_in = [basis_kernels.dim(R) for _, R in Rs_in]
 
         #TODO this code is a bit crappy
-        rng = np.linspace(start=-1, stop=1, num=size * M, endpoint=True)
-        z, y, x = np.meshgrid(rng, rng, rng)
-        r = np.sqrt(x**2 + y**2 + z**2)
-        mask = np.cos((r - 0.5) * 2 * np.pi) + 1
-        mask[r > 1] = 0
-
         def generate_basis(R_out, R_in):
-            basis = basis_kernels.gaussian_subsampling(
-                basis_kernels.cube_basis_kernels(size * M, R_out, R_in) * mask,
-                (1, 1, 1, M, M, M))
+            basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)

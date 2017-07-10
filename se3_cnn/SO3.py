@@ -56,3 +56,10 @@ def vector_repr(alpha, beta, gamma):
 def tensor_repr(alpha, beta, gamma):
     r = vector_repr(alpha, beta, gamma)
     return np.kron(r, r)
+
+
+def wigner_repr(l):
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    def func(alpha, beta, gamma):
+        return wigner_D_matrix(l, alpha, beta, gamma)
+    return func

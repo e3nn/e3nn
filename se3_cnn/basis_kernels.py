@@ -138,7 +138,6 @@ def transport_kernel(x, base0e, R_out, R_in):
     return np.matmul(np.matmul(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
 
 
-@cached_dirpklgz("kernels_cache")
 def cube_basis_kernels(size, R_out, R_in):
     dim_in = dim(R_in)
     dim_out = dim(R_out)
@@ -181,6 +180,22 @@ def gaussian_subsampling(im, M):
     s = [slice(m // 2, None, m) for m in M]
     return im[s]
 
+
+
+################################################################################
+# Full generation
+################################################################################
+@cached_dirpklgz("cosine_kernels_cache")
+def cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M):
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+
+    rng = np.linspace(start=-1, stop=1, num=size * M, endpoint=True)
+    z, y, x = np.meshgrid(rng, rng, rng)
+    r = np.sqrt(x**2 + y**2 + z**2)
+    mask = np.cos((2 * r - 1) * np.pi) + 1
+    mask[r > 1] = 0
+
+    return gaussian_subsampling(basis * mask, (1, 1, 1, M, M, M))
 
 
 ################################################################################
