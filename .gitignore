@@ -3,3 +3,6 @@
 __pycache__
 *.pkl.gz
 *_cache
+*.egg-info
+build
+dist
