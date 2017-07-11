@@ -58,8 +58,22 @@ def tensor_repr(alpha, beta, gamma):
     return np.kron(r, r)
 
 
-def wigner_repr(l):
+def wigner1_repr(alpha, beta, gamma):
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    def func(alpha, beta, gamma):
-        return wigner_D_matrix(l, alpha, beta, gamma)
-    return func
+    return wigner_D_matrix(1, alpha, beta, gamma)
+
+def wigner2_repr(alpha, beta, gamma):
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    return wigner_D_matrix(2, alpha, beta, gamma)
+
+def wigner3_repr(alpha, beta, gamma):
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    return wigner_D_matrix(3, alpha, beta, gamma)
+
+def wigner4_repr(alpha, beta, gamma):
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    return wigner_D_matrix(4, alpha, beta, gamma)
+
+def wigner5_repr(alpha, beta, gamma):
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    return wigner_D_matrix(5, alpha, beta, gamma)
