@@ -23,9 +23,10 @@ class BiasRelu(torch.nn.Module):
 
         nbias = sum([d for d, on in self.enable if on])
         self.bias = Parameter(torch.FloatTensor(nbias)) if nbias > 0 else None
+        self.reset_parameters()
 
     def reset_parameters(self):
-        if self.bias:
+        if self.bias is not None:
             self.bias.data[:] = 0
 
     def forward(self, input): # pylint: disable=W

@@ -3,9 +3,12 @@ import numpy as np
 import torch
 from torch.nn.parameter import Parameter
 from se3_cnn import basis_kernels
+from se3_cnn import SO3
+from se3_cnn.nonlin import BiasRelu
+from se3_cnn.utils import time_logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, M=15, central_base=True):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=True, M=15, central_base=True):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -16,13 +19,21 @@ class SE3Convolution(torch.nn.Module):
         super(SE3Convolution, self).__init__()
         self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base)
         self.weight = Parameter(torch.Tensor(self.combination.nweights))
+        self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out]) if bias_relu else None
+        self.reset_parameters()
 
     def reset_parameters(self):
         self.weight.data.normal_(0, 1)
 
     def forward(self, input): # pylint: disable=W
+        time = time_logging.start()
         kernel = self.combination(self.weight)
+        time = time_logging.end("kernel combination", time)
         output = torch.nn.functional.conv3d(input, kernel)
+        time = time_logging.end("3d convolutions", time)
+        if self.bias_relu:
+            output = self.bias_relu(output)
+            time = time_logging.end("bias and relu", time)
         return output
 
 
@@ -38,7 +49,6 @@ class SE3KernelCombination(torch.autograd.Function):
         self.dims_out = [basis_kernels.dim(R) for _, R in Rs_out]
         self.dims_in = [basis_kernels.dim(R) for _, R in Rs_in]
 
-        #TODO this code is a bit crappy
         def generate_basis(R_out, R_in):
             basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M)
 
@@ -52,6 +62,8 @@ class SE3KernelCombination(torch.autograd.Function):
             # normalize each basis element
             for k in range(len(basis)):
                 basis[k] /= np.linalg.norm(basis[k])
+                basis[k] *= np.sqrt(SO3.dim(R_out) / len(basis))
+                # such that the weight can be initialized with Normal(0,1)
             return basis
 
         self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in))
@@ -111,7 +123,6 @@ class SE3KernelCombination(torch.autograd.Function):
                 for ii in range(self.multiplicites_out[i]):
                     si = slice(begin_i + ii * self.dims_out[i], begin_i + (ii + 1) * self.dims_out[i])
                     for jj in range(self.multiplicites_in[j]):
-                        print(i, j, ii, jj)
                         sj = slice(begin_j + jj * self.dims_in[j], begin_j + (jj + 1) * self.dims_in[j])
                         for k in range(self.kernels[i][j].size(0)):
                             grad_weight[weight_index] = torch.matmul(self.kernels[i][j][k].view(-1), grad_kernel[si, sj].contiguous().view(-1))
