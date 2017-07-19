@@ -25,3 +25,6 @@ class Model:
         Returns what will be feeded to get_cnn()
         """
         raise NotImplementedError
+
+    def evaluate(self, input):
+        return self.get_cnn()(input)

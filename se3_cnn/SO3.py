@@ -77,3 +77,32 @@ def wigner4_repr(alpha, beta, gamma):
 def wigner5_repr(alpha, beta, gamma):
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
     return wigner_D_matrix(5, alpha, beta, gamma)
+
+
+
+from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+
+def repr1(alpha, beta, gamma):
+    return np.array([[1]])
+
+def repr3(alpha, beta, gamma):
+    return wigner_D_matrix(1, alpha, beta, gamma)
+
+def repr5(alpha, beta, gamma):
+    return wigner_D_matrix(2, alpha, beta, gamma)
+
+def repr7(alpha, beta, gamma):
+    return wigner_D_matrix(3, alpha, beta, gamma)
+
+def repr3x3(alpha, beta, gamma):
+    r = repr3(alpha, beta, gamma)
+    return np.kron(r, r)
+
+def repr5x5(alpha, beta, gamma):
+    r = repr5(alpha, beta, gamma)
+    return np.kron(r, r)
+
+def repr3x5(alpha, beta, gamma):
+    r1 = repr3(alpha, beta, gamma)
+    r2 = repr5(alpha, beta, gamma)
+    return np.kron(r1, r2)

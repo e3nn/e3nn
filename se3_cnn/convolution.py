@@ -4,11 +4,12 @@ import torch
 from torch.nn.parameter import Parameter
 from se3_cnn import basis_kernels
 from se3_cnn import SO3
-from se3_cnn.nonlin import BiasRelu
+from se3_cnn.non_linearities.scalar_activation import BiasRelu
+from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=True, M=15, central_base=True):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, M=15, central_base=True):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -20,10 +21,15 @@ class SE3Convolution(torch.nn.Module):
         self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base)
         self.weight = Parameter(torch.Tensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out]) if bias_relu else None
+        self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
         self.reset_parameters()
 
     def reset_parameters(self):
         self.weight.data.normal_(0, 1)
+        if self.bias_relu is not None:
+            self.bias_relu.reset_parameters()
+        if self.norm_relu is not None:
+            self.norm_relu.reset_parameters()
 
     def forward(self, input): # pylint: disable=W
         time = time_logging.start()
@@ -31,9 +37,12 @@ class SE3Convolution(torch.nn.Module):
         time = time_logging.end("kernel combination", time)
         output = torch.nn.functional.conv3d(input, kernel)
         time = time_logging.end("3d convolutions", time)
-        if self.bias_relu:
+        if self.bias_relu is not None:
             output = self.bias_relu(output)
             time = time_logging.end("bias and relu", time)
+        if self.norm_relu is not None:
+            output = self.norm_relu(output)
+            time = time_logging.end("norm relu", time)
         return output
 
 

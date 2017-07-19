@@ -27,12 +27,13 @@ def load_data(csv_file, files_pattern, classes=None):
     files = glob.glob(files_pattern)
     random.shuffle(files)
 
-    labels = [labels[file.split("/")[-1].split(".")[0]] for file in files]
+    ids = [file.split("/")[-1].split(".")[0] for file in files]
+    labels = [labels[i] for i in ids]
     if classes is None:
         classes = sorted(set(labels))
     labels = [classes.index(x) for x in labels]
 
-    return files, labels, classes
+    return files, ids, labels, classes
 
 
 def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion):
@@ -65,8 +66,43 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         correct = sum(outputs.data.cpu().numpy().argmax(-1) == labels.data.cpu().numpy())
         accuracies.append(correct / bs)
 
-        logger.info("[%d] Loss (Current,Mean) = %.2f, %.2f Training Accuracy (Current,Mean) = %d / %d, %.3f",
-            epoch, loss, np.mean(losses), correct, bs, np.mean(accuracies))
+        logger.info("[%d %d/%d] Loss (Current,Mean) = %.2f, %.2f Training Accuracy (Current,Mean) = %d / %d, %.3f",
+            epoch, i, len(train_files), loss, np.mean(losses), correct, bs, np.mean(accuracies))
+
+
+def evaluate(model, files):
+    cnn = model.get_cnn()
+    bs = model.get_batch_size()
+    logger = logging.getLogger("trainer")
+
+    cnn.eval()
+    cnn.cuda()
+
+    all_outputs = []
+
+    for i in range(0, len(files), bs):
+        j = min(i + bs, len(files))
+        images = model.load_files(files[i:j])
+        images = images.cuda()
+        # images.volatile = True
+
+        outputs = model.evaluate(images)
+
+        all_outputs.append(outputs.data.cpu().numpy())
+
+        logger.info("Evaluation [%d/%d]", i, len(files))
+    return np.concatenate(all_outputs, axis=0)
+
+
+def save_evaluation(eval_ids, logits, labels, log_dir):
+    logits = np.array(logits)
+    labels = np.array(labels)
+
+    with open(os.path.join(log_dir, "eval.csv"), "wt") as file:
+        writer = csv.writer(file)
+
+        for i, label, ilogits in zip(eval_ids, labels, logits):
+            writer.writerow([i, label] + list(ilogits))
 
 
 def main():
@@ -108,10 +144,33 @@ def main():
 
     logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))
 
+    if args.restore_path is not None:
+        checkpoint = torch.load(args.restore_path)
+        args.start_epoch = checkpoint['epoch']
+        cnn.load_state_dict(checkpoint['state_dict'])
+        logger.info("Restoration from file %s", args.restore_path)
+
     ############################################################################
     # Files and labels
-    train_files, train_labels, classes = load_data(args.train_csv_path, args.train_data_path)
-    eval_files, eval_labels, _ = load_data(args.eval_csv_path, args.eval_data_path, classes)
+    classes = None
+    train_files = eval_files = None
+    if args.train_csv_path is not None and args.train_data_path is not None:
+        train_files, train_ids, train_labels, classes = load_data(args.train_csv_path, args.train_data_path, classes)
+        logger.info("%d training files", len(train_files))
+    if args.eval_csv_path is not None and args.eval_data_path is not None:
+        eval_files, eval_ids, eval_labels, classes = load_data(args.eval_csv_path, args.eval_data_path, classes)
+        logger.info("%d evaluation files", len(eval_files))
+
+    ############################################################################
+    # Only evaluation
+    if train_files is None:
+        if args.restore_path is None:
+            logger.info("Evalutation with randomly initialized paramters")
+        outputs = evaluate(model, eval_files)
+        save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
+        correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))
+        logger.info("%d / %d = %.2f%%", correct, len(eval_labels), 100 * correct / len(eval_labels))
+        return
 
     ############################################################################
     # Optimizer
@@ -122,6 +181,12 @@ def main():
     for param_group in optimizer.param_groups:
         param_group['lr'] = model.get_learning_rate(args.start_epoch)
 
+    if args.restore_path is not None:
+        checkpoint = torch.load(args.restore_path)
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
+    ############################################################################
+    # Training
     for epoch in range(args.start_epoch, args.number_of_epochs):
         train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion)
 
@@ -133,6 +198,13 @@ def main():
             'optimizer' : optimizer.state_dict(),
         }, path)
         logger.info("Saved in %s", path)
+
+        if eval_files is not None:
+            outputs = evaluate(model, eval_files)
+            save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
+            correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))
+            logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(eval_labels), 100 * correct / len(eval_labels))
+
 
 if __name__ == '__main__':
     main()
