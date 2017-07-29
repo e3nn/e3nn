@@ -1,4 +1,9 @@
 #pylint: disable=C,R,E1101
+'''
+Based on m1
+
++ only scalar
+'''
 import torch
 import torch.nn as nn
 from se3_cnn.convolution import SE3Convolution
@@ -15,8 +20,8 @@ class CNN(nn.Module):
 
         representations = [
             [(1, SO3.repr1)],
-            [(8, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5)],
-            [(8, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5)],
+            [(16, SO3.repr1)],
+            [(16, SO3.repr1)],
             [(2, SO3.repr1)]]
 
         self.convolutions = []

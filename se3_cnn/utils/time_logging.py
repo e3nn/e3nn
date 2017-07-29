@@ -1,3 +1,4 @@
+#pylint: disable=W0603,W0602
 import torch
 from time import perf_counter
 

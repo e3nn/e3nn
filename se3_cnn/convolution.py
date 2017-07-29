@@ -7,6 +7,7 @@ from se3_cnn import SO3
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
+import logging
 
 class SE3Convolution(torch.nn.Module):
     def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, M=15, central_base=True):
@@ -37,12 +38,18 @@ class SE3Convolution(torch.nn.Module):
         time = time_logging.end("kernel combination", time)
         output = torch.nn.functional.conv3d(input, kernel)
         time = time_logging.end("3d convolutions", time)
+
+        # logger = logging.getLogger("trainer")
+        # logger.info("pre activation %f +- %f", output.data.mean(), output.data.std())
+
         if self.bias_relu is not None:
             output = self.bias_relu(output)
             time = time_logging.end("bias and relu", time)
         if self.norm_relu is not None:
             output = self.norm_relu(output)
             time = time_logging.end("norm relu", time)
+
+        # logger.info("post activation %f +- %f", output.data.mean(), output.data.std())
         return output
 
 

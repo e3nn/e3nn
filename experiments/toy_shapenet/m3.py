@@ -1,4 +1,9 @@
 #pylint: disable=C,R,E1101
+'''
+Based on m1
+
++ norm relu
+'''
 import torch
 import torch.nn as nn
 from se3_cnn.convolution import SE3Convolution
@@ -15,15 +20,15 @@ class CNN(nn.Module):
 
         representations = [
             [(1, SO3.repr1)],
-            [(2, SO3.repr3), (2, SO3.repr5), (2, SO3.repr7)],
-            [(2, SO3.repr3), (2, SO3.repr5), (2, SO3.repr7)],
+            [(8, SO3.repr3), (4, SO3.repr5), (2, SO3.repr7)],
+            [(8, SO3.repr3), (4, SO3.repr5), (2, SO3.repr7)],
             [(2, SO3.repr1)]]
 
         self.convolutions = []
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=non_lin)
+            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=False, norm_relu=non_lin)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
