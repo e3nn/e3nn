@@ -20,7 +20,7 @@ id_ = rows[0].index("id")
 cl_ = rows[0].index("synsetId")
 
 # chair?, trash?, airplane, cars, tables?
-classes = ["04379243", "03001627", "02691156", "02958343", "03001627"]
+classes = ["04379243", "03001627", "02691156", "02958343", "04256520"]
 
 subset = rows[:1] + [row for row in rows[1:] if row[cl_] in [cl for cl in classes]]
 

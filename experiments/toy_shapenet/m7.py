@@ -1,8 +1,8 @@
 #pylint: disable=C,R,E1101
 '''
-Based on m1
+Based on m3
 
-+ norm relu
++ scalar repr
 '''
 import torch
 import torch.nn as nn
@@ -20,17 +20,17 @@ class CNN(nn.Module):
 
         representations = [
             [(1, SO3.repr1)],
-            [(4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
-            [(4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
-            [(4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
-            [(4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
-            [(2, SO3.repr1)]]
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],
+            [(5, SO3.repr1)]]
 
         self.convolutions = []
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=False, norm_relu=non_lin)
+            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=non_lin)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
