@@ -72,7 +72,7 @@ class NormReluFunction(torch.autograd.Function):
         ratio = newnorm / norm
         ratio = ratio.view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x)
 
-        grad_x = grad_out * ratio # this is an appoximation
+        grad_x = grad_out * ratio
         grad_x += torch.sum(grad_out * x, dim=1, keepdim=True).expand_as(x) * x / (norm ** 2).view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x) * (1 - ratio)
         grad_x[ratio <= 0] = 0
 
@@ -81,28 +81,30 @@ class NormReluFunction(torch.autograd.Function):
         grad_b = torch.sum(grad_b.view(-1), dim=0)
         return grad_x, grad_b
 
-def test_norm_relu_gradient():
-    x = torch.autograd.Variable(torch.rand(2, 5, 10, 10, 10), requires_grad=True)
-    b = torch.autograd.Variable(torch.FloatTensor([0.05]), requires_grad=True)
-    y = NormReluFunction()(x, b)
 
+def test_norm_relu_gradient(x=None, b=None):
+    from se3_cnn.utils.test import gradient_approximation
+
+    if x is None:
+        x = torch.autograd.Variable(torch.rand(2, 5, 10, 10, 10), requires_grad=True)
+    if b is None:
+        b = torch.autograd.Variable(torch.rand(1), requires_grad=True)
+
+    # Autograd
+    y = NormReluFunction()(x, b)
     grad_y = torch.rand(2, 5, 10, 10, 10)
     torch.autograd.backward(y, grad_y)
 
-    grad_x_naive = torch.zeros(2, 5, 10, 10, 10)
-    for i in range(2):
-        for j in range(5):
-            for k in range(10):
-                for l in range(10):
-                    for m in range(10):
-                        xx = x.data.clone()
-                        eps = 1e-5
-                        xx[i,j,k,l,m] += eps
-                        yy = NormReluFunction().forward(xx, b.data)
-                        grad_x_naive[i,j,k,l,m] = torch.sum(grad_y * (yy - y.data) / eps)
+    # Approximation
+    grad_x_naive = gradient_approximation(lambda x: NormReluFunction().forward(x, b.data), x.data, grad_y, 1e-5)
+    grad_b_naive = gradient_approximation(lambda b: NormReluFunction().forward(x.data, b), b.data, grad_y, 1e-5)
 
     print("grad_x {}".format(x.grad.data.std()))
     print("grad_x_naive {}".format(grad_x_naive.std()))
     print("grad_x - grad_x_naive {}".format((x.grad.data - grad_x_naive).std()))
+
+    print("grad_b {}".format(b.grad.data))
+    print("grad_b_naive {}".format(grad_b_naive))
+    print("grad_b - grad_b_naive {}".format((b.grad.data - grad_b_naive)))
 
     return x.grad.data, grad_x_naive

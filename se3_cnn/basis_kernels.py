@@ -14,7 +14,7 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
-from se3_cnn.cache_file import cached_dirpklgz
+from se3_cnn.utils.cache_file import cached_dirpklgz
 from se3_cnn.SO3 import dim
 
 ################################################################################

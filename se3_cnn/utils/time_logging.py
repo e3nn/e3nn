@@ -9,13 +9,15 @@ def clear():
     DATA_TIMES = {}
 
 def start():
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     return perf_counter()
 
 def end(name, begin_time):
     global DATA_TIMES
 
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
     end_time = perf_counter()
     delta = end_time - begin_time
 

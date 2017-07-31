@@ -147,3 +147,22 @@ class SE3KernelCombination(torch.autograd.Function):
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
 
         return grad_weight
+
+
+def test_convolution_gradient():
+    from se3_cnn.utils.test import gradient_approximation
+    conv = SE3Convolution(4, [(1, SO3.repr1), (1, SO3.repr3)], [(1, SO3.repr1), (1, SO3.repr3)], bias_relu=True, norm_relu=True)
+
+    x = torch.autograd.Variable(torch.rand(2, 4, 10, 10, 10), requires_grad=True)
+
+    y = conv(x)
+    grad_y = torch.rand(*y.size())
+    torch.autograd.backward(y, grad_y)
+
+    grad_x_approx = gradient_approximation(lambda x: conv(torch.autograd.Variable(x)).data, x.data, grad_y, epsilon=1e-5)
+
+    print("grad_x {}".format(x.grad.data.std()))
+    print("grad_x_approx {}".format(grad_x_approx.std()))
+    print("grad_x - grad_x_approx {}".format((x.grad.data - grad_x_approx).std()))
+
+    return x.grad.data, grad_x_approx
