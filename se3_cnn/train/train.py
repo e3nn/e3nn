@@ -32,6 +32,10 @@ def load_data(csv_file, files_pattern, classes=None):
     random.shuffle(files)
 
     ids = [file.split("/")[-1].split(".")[0] for file in files]
+
+    # keep only files that appears in the csv
+    files, ids = zip(*[(f, i) for f, i in zip(files, ids) if i in labels])
+
     labels = [labels[i] for i in ids]
     if classes is None:
         classes = sorted(set(labels))
@@ -45,8 +49,12 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     bs = model.get_batch_size()
     logger = logging.getLogger("trainer")
 
+    indicies = list(range(len(train_files)))
+    random.shuffle(indicies)
+
     losses = []
-    accuracies = []
+    total_correct = 0
+    total_trained = 0
 
     cnn.train()
     cnn.cuda()
@@ -56,10 +64,10 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         j = min(i + bs, len(train_files))
         gc.collect()
-        images = model.load_files(train_files[i:j])
+        images = model.load_files([train_files[g] for g in indicies[i:j]])
         images = images.cuda()
 
-        labels = train_labels[i:j]
+        labels = [train_labels[g] for g in indicies[i:j]]
         labels = torch.autograd.Variable(torch.LongTensor(labels).cuda())
 
         t = time_logging.start()
@@ -75,10 +83,11 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
         correct = sum(outputs.data.cpu().numpy().argmax(-1) == labels.data.cpu().numpy())
-        accuracies.append(correct / bs)
+        total_correct += correct
+        total_trained += j - i
 
         logger.info("[%d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Memory=%s Time=%.2fs",
-        epoch, i, len(train_files), loss_, np.mean(losses), correct, bs, 100 * np.mean(accuracies), gpu_memory.format_memory(gpu_memory.used_memory()), perf_counter() - t0)
+        epoch, i, len(train_files), loss_, np.mean(losses), correct, j-i, 100 * total_correct / total_trained, gpu_memory.format_memory(gpu_memory.used_memory()), perf_counter() - t0)
 
         del images
         del labels
@@ -136,6 +145,7 @@ def main():
 
     parser.add_argument("--eval_data_path", type=str)
     parser.add_argument("--eval_csv_path", type=str)
+    parser.add_argument("--eval_each", type=int, default=1)
 
     parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--log_dir", type=str)
@@ -157,6 +167,8 @@ def main():
     logger.addHandler(fh)
     logger.addHandler(ch)
 
+    logger.info("Arguments = %s", repr(args))
+
     ############################################################################
     # Import model
     module = import_module(args.model_path)
@@ -166,7 +178,7 @@ def main():
     logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))
 
     if args.restore_path is not None:
-        checkpoint = torch.load(args.restore_path)
+        checkpoint = torch.load(os.path.join(args.restore_path, "model.pkl"))
         args.start_epoch = checkpoint['epoch']
         cnn.load_state_dict(checkpoint['state_dict'])
         logger.info("Restoration from file %s", args.restore_path)
@@ -222,7 +234,7 @@ def main():
         }, path)
         logger.info("Saved in %s", path)
 
-        if eval_files is not None:
+        if eval_files is not None and epoch % args.eval_each == args.eval_each - 1:
             outputs = evaluate(model, eval_files)
             save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
             correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))

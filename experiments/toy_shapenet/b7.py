@@ -1,0 +1,68 @@
+#pylint: disable=C,R,E1101
+'''
+Based on m7
+
++ not equivariant
+'''
+import torch
+import torch.nn as nn
+import math
+from se3_cnn.train.model import Model
+import logging
+import numpy as np
+
+logger = logging.getLogger("trainer")
+
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+
+        self.features = [
+            1,
+            6 + 4 * 3 + 2 * 5 + 1 * 7,
+            6 + 4 * 3 + 2 * 5 + 1 * 7,
+            6 + 4 * 3 + 2 * 5 + 1 * 7,
+            6 + 4 * 3 + 2 * 5 + 1 * 7,
+            5]
+
+        for i in range(len(self.features) - 1):
+            weights = torch.nn.Parameter(torch.FloatTensor(self.features[i+1], self.features[i], 4, 4, 4))
+            weights.data.normal_(0, 1 / math.sqrt(self.features[i] * 4 * 4 * 4))
+            setattr(self, 'weights{}'.format(i), weights)
+
+            bias = torch.nn.Parameter(torch.FloatTensor(self.features[i+1]))
+            bias.data[:] = 0
+            setattr(self, 'bias{}'.format(i), bias)
+
+    def forward(self, x):
+        '''
+        :param x: [batch, features, x, y, z]
+        '''
+        for i in range(len(self.features) - 1):
+            x = torch.nn.functional.conv3d(x, getattr(self, 'weights{}'.format(i)))
+            x = x + getattr(self, 'bias{}'.format(i)).view(1, -1, 1, 1, 1).expand_as(x)
+            if i < len(self.features) - 2:
+                x = torch.nn.functional.relu(x)
+
+        x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
+        return x
+
+class MyModel(Model):
+    def __init__(self):
+        super(MyModel, self).__init__()
+        self.cnn = CNN()
+
+    def get_cnn(self):
+        return self.cnn
+
+    def get_batch_size(self):
+        return 16
+
+    def get_learning_rate(self, epoch):
+        return 1e-3
+
+    def load_files(self, files):
+        images = np.array([np.load(file) for file in files], dtype=np.float32)
+        images = images.reshape((-1, 1, 64, 64, 64))
+        images = torch.autograd.Variable(torch.FloatTensor(images))
+        return images

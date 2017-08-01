@@ -1,3 +1,4 @@
+#pylint: disable=E1101,C
 import csv
 import os
 import numpy as np
@@ -19,8 +20,15 @@ with open(i_csv, "rt") as file:
 id_ = rows[0].index("id")
 cl_ = rows[0].index("synsetId")
 
-# chair?, trash?, airplane, cars, tables?
 classes = ["04379243", "03001627", "02691156", "02958343", "04256520"]
+
+"""
+03001627 = chair
+02958343 = vehicules (cars, autocars)
+02691156 = flying objects (airplanes, spaceships?)
+04379243 = tables, desks, dresser, chair, ...
+"""
+
 
 subset = rows[:1] + [row for row in rows[1:] if row[cl_] in [cl for cl in classes]]
 

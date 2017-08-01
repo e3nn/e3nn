@@ -7,7 +7,7 @@ from se3_cnn import SO3
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
-import logging
+# import logging
 
 class SE3Convolution(torch.nn.Module):
     def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, M=15, central_base=True):
@@ -20,7 +20,7 @@ class SE3Convolution(torch.nn.Module):
         '''
         super(SE3Convolution, self).__init__()
         self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base)
-        self.weight = Parameter(torch.Tensor(self.combination.nweights))
+        self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out]) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
         self.reset_parameters()
@@ -92,6 +92,9 @@ class SE3KernelCombination(torch.autograd.Function):
                 self.nweights += self.multiplicites_out[i] * self.multiplicites_in[j] * self.kernels[i][j].size(0)
 
     def forward(self, weight): # pylint: disable=W
+        """
+        :return: [feature_out, feature_in, x, y, z]
+        """
         assert weight.dim() == 1
         assert weight.size(0) == self.nweights
         n_out = sum([self.multiplicites_out[i] * self.dims_out[i] for i in range(len(self.multiplicites_out))])
