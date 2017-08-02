@@ -1,8 +1,8 @@
 #pylint: disable=C,R,E1101
 '''
-Based on m3
+Based on m7
 
-+ scalar repr
++ no norm relu
 '''
 import torch
 import torch.nn as nn
@@ -32,12 +32,9 @@ class CNN(nn.Module):
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=non_lin)
+            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=False)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
-
-        self.bias = torch.nn.Parameter(torch.FloatTensor(number_of_classes))
-        self.bias.data[:] = 0
 
     def forward(self, x):
         '''
@@ -47,7 +44,6 @@ class CNN(nn.Module):
             x = conv(x)
 
         x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
-        x = x + self.bias.view(1, -1).expand_as(x)
         return x
 
 class MyModel(Model):

@@ -127,12 +127,15 @@ def evaluate(model, files):
 def save_evaluation(eval_ids, logits, labels, log_dir):
     logits = np.array(logits)
     labels = np.array(labels)
+    filename = os.path.join(log_dir, "eval.csv")
 
-    with open(os.path.join(log_dir, "eval.csv"), "wt") as file:
+    with open(filename, "wt") as file:
         writer = csv.writer(file)
 
         for i, label, ilogits in zip(eval_ids, labels, logits):
             writer.writerow([i, label] + list(ilogits))
+
+    logging.getLogger("trainer").info("Evaluation saved into %s", filename)
 
 
 def main():
@@ -170,20 +173,6 @@ def main():
     logger.info("Arguments = %s", repr(args))
 
     ############################################################################
-    # Import model
-    module = import_module(args.model_path)
-    model = module.MyModel()
-    cnn = model.get_cnn()
-
-    logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))
-
-    if args.restore_path is not None:
-        checkpoint = torch.load(os.path.join(args.restore_path, "model.pkl"))
-        args.start_epoch = checkpoint['epoch']
-        cnn.load_state_dict(checkpoint['state_dict'])
-        logger.info("Restoration from file %s", args.restore_path)
-
-    ############################################################################
     # Files and labels
     classes = None
     train_files = eval_files = None
@@ -195,10 +184,25 @@ def main():
         logger.info("%s=%d evaluation files", "+".join([str(eval_labels.count(x)) for x in set(eval_labels)]), len(eval_files))
 
     ############################################################################
+    # Import model
+    module = import_module(args.model_path)
+    model = module.MyModel()
+    model.initialize(len(classes))
+    cnn = model.get_cnn()
+
+    logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))
+
+    if args.restore_path is not None:
+        checkpoint = torch.load(os.path.join(args.restore_path, "model.pkl"))
+        args.start_epoch = checkpoint['epoch']
+        cnn.load_state_dict(checkpoint['state_dict'])
+        logger.info("Restoration from file %s", os.path.join(args.restore_path, "model.pkl"))
+
+    ############################################################################
     # Only evaluation
     if train_files is None:
         if args.restore_path is None:
-            logger.info("Evalutation with randomly initialized paramters")
+            logger.info("Evalutation with randomly initialized parameters")
         outputs = evaluate(model, eval_files)
         save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
         correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))
@@ -215,7 +219,7 @@ def main():
         param_group['lr'] = model.get_learning_rate(args.start_epoch)
 
     if args.restore_path is not None:
-        checkpoint = torch.load(args.restore_path)
+        checkpoint = torch.load(os.path.join(args.restore_path, "model.pkl"))
         optimizer.load_state_dict(checkpoint['optimizer'])
 
     ############################################################################

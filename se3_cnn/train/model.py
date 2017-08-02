@@ -2,6 +2,9 @@
 import torch
 
 class Model:
+    def initialize(self, number_of_classes):
+        pass
+
     def get_cnn(self):
         """
         Returns a torch.nn.Module
