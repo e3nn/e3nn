@@ -7,10 +7,9 @@ from se3_cnn import SO3
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
-# import logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, M=15, central_base=True):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -21,7 +20,7 @@ class SE3Convolution(torch.nn.Module):
         super(SE3Convolution, self).__init__()
         self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base)
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
-        self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out]) if bias_relu else None
+        self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
         self.reset_parameters()
 
@@ -34,13 +33,12 @@ class SE3Convolution(torch.nn.Module):
 
     def forward(self, input): # pylint: disable=W
         time = time_logging.start()
+
         kernel = self.combination(self.weight)
         time = time_logging.end("kernel combination", time)
+
         output = torch.nn.functional.conv3d(input, kernel)
         time = time_logging.end("3d convolutions", time)
-
-        # logger = logging.getLogger("trainer")
-        # logger.info("pre activation %f +- %f", output.data.mean(), output.data.std())
 
         if self.bias_relu is not None:
             output = self.bias_relu(output)
@@ -49,7 +47,6 @@ class SE3Convolution(torch.nn.Module):
             output = self.norm_relu(output)
             time = time_logging.end("norm relu", time)
 
-        # logger.info("post activation %f +- %f", output.data.mean(), output.data.std())
         return output
 
 
@@ -62,10 +59,10 @@ class SE3KernelCombination(torch.autograd.Function):
         Rs_in = [(m, R) for m, R in Rs_in if m >= 1]
         self.multiplicites_out = [m for m, _ in Rs_out]
         self.multiplicites_in = [m for m, _ in Rs_in]
-        self.dims_out = [basis_kernels.dim(R) for _, R in Rs_out]
-        self.dims_in = [basis_kernels.dim(R) for _, R in Rs_in]
+        self.dims_out = [SO3.dim(R) for _, R in Rs_out]
+        self.dims_in = [SO3.dim(R) for _, R in Rs_in]
 
-        def generate_basis(R_out, R_in):
+        def generate_basis(R_out, R_in, m_out, m_in):
             basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M)
 
             if central_base and size % 2 == 1:
@@ -79,12 +76,13 @@ class SE3KernelCombination(torch.autograd.Function):
             for k in range(len(basis)):
                 basis[k] /= np.linalg.norm(basis[k])
                 basis[k] *= np.sqrt(SO3.dim(R_out) / len(basis))
+                basis[k] /= np.sqrt(m_in)
                 # such that the weight can be initialized with Normal(0,1)
             return basis
 
-        self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in))
-            for _, R_in in Rs_in]
-            for _, R_out in Rs_out]
+        self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in, m_out, m_in))
+            for m_in, R_in in Rs_in]
+            for m_out, R_out in Rs_out]
 
         self.nweights = 0
         for i in range(len(Rs_out)):
@@ -150,6 +148,27 @@ class SE3KernelCombination(torch.autograd.Function):
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
 
         return grad_weight
+
+
+def test_normalization(batch, size, Rs_out=None, Rs_in=None):
+    if Rs_out is None:
+        Rs_out = [(1, SO3.repr1), (1, SO3.repr3)]
+    if Rs_in is None:
+        Rs_in = [(1, SO3.repr1), (1, SO3.repr3)]
+    conv = SE3Convolution(4, Rs_out, Rs_in, bias_relu=False, norm_relu=False)
+    print("Weights Amount = {} Mean = {} Std = {}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
+
+    n_out = sum([m * SO3.dim(r) for m, r in Rs_out])
+    n_in = sum([m * SO3.dim(r) for m, r in Rs_in])
+
+    x = torch.autograd.Variable(torch.randn(batch, n_in, size, size, size))
+    print("x Amount = {} Mean = {} Std = {}".format(x.numel(), x.data.mean(), x.data.std()))
+    y = conv(x)
+
+    assert y.size(1) == n_out
+
+    print("y Amount = {} Mean = {} Std = {}".format(y.numel(), y.data.mean(), y.data.std()))
+    return y.data
 
 
 def test_convolution_gradient():

@@ -3,7 +3,7 @@ import torch
 from torch.nn.parameter import Parameter
 
 class BiasRelu(torch.nn.Module):
-    def __init__(self, enable):
+    def __init__(self, enable, batch_norm=False):
         '''
         :param enable: list of tuple (dimension, boolean)
 
@@ -20,6 +20,15 @@ class BiasRelu(torch.nn.Module):
                 self.enable[-1] = (self.enable[-1][0] + d, on)
             else:
                 self.enable.append((d, on))
+
+        self.batch_norms = None
+        if batch_norm:
+            self.batch_norms = []
+            for d, on in self.enable:
+                if on:
+                    bn = torch.nn.BatchNorm3d(d, affine=False)
+                    setattr(self, "bn{}".format(len(self.batch_norms)), bn)
+                    self.batch_norms.append(bn)
 
         nbias = sum([d for d, on in self.enable if on])
         self.bias = Parameter(torch.FloatTensor(nbias)) if nbias > 0 else None
@@ -39,13 +48,19 @@ class BiasRelu(torch.nn.Module):
         xs = []
         begin1 = 0
         begin2 = 0
+        bn_counter = 0
 
         for d, on in self.enable:
             x = input[:, begin1:begin1 + d]
 
             if on:
+                if self.batch_norms is not None:
+                    x = self.batch_norms[bn_counter](x.contiguous())
+                    bn_counter += 1
                 x = x + self.bias[begin2:begin2 + d].view(1, -1, 1, 1, 1).expand_as(x)
                 x = torch.nn.functional.relu(x)
+                x.sub_(0.3989422804014327)
+                x.mul_(1.712858550449663)
                 begin2 += d
 
             xs.append(x)

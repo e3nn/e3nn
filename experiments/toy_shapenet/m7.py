@@ -3,6 +3,7 @@
 Based on m3
 
 + scalar repr
++ batch norm
 '''
 import torch
 import torch.nn as nn
@@ -32,22 +33,35 @@ class CNN(nn.Module):
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=non_lin)
+            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=non_lin, scalar_batch_norm=True)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
-        self.bias = torch.nn.Parameter(torch.FloatTensor(number_of_classes))
-        self.bias.data[:] = 0
+        self.bn_in = nn.BatchNorm3d(1, affine=True)
+        self.bn_out = nn.BatchNorm3d(number_of_classes, affine=True)
+
+        # self.bias = torch.nn.Parameter(torch.FloatTensor(number_of_classes))
+        # self.bias.data[:] = 0
 
     def forward(self, x):
         '''
         :param x: [batch, features, x, y, z]
         '''
+        x = self.bn_in(x.contiguous())
+        logger.info("Mean = %f Std = %f", x.data.mean(), x.data.std())
         for conv in self.convolutions:
+            if x.size(1) == 35:
+                logger.info("R1 Mean = %f Std = %f", x.data[:, :6].mean(), x.data[:, :6].std())
+                logger.info("R3 Mean = %f Std = %f", x.data[:, 6:18].mean(), x.data[:, 6:18].std())
+                logger.info("R5 Mean = %f Std = %f", x.data[:, 18:28].mean(), x.data[:, 18:28].std())
+                logger.info("R7 Mean = %f Std = %f", x.data[:, 28:].mean(), x.data[:, 28:].std())
             x = conv(x)
 
+        logger.info("Mean = %f Std = %f", x.data.mean(), x.data.std())
         x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
-        x = x + self.bias.view(1, -1).expand_as(x)
+        x = self.bn_out(x.contiguous())
+        logger.info("Mean = %f Std = %f", x.data.mean(), x.data.std())
+        # x = x + self.bias.view(1, -1).expand_as(x)
         return x
 
 class MyModel(Model):
