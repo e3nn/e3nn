@@ -21,7 +21,10 @@ parser.add_argument("--repeat", type=int)
 
 main_args = parser.parse_args()
 
-os.mkdir(main_args.log_dir)
+try:
+    os.mkdir(main_args.log_dir)
+except OSError:
+    pass
 
 class Arguments:
     def __init__(self):
@@ -55,7 +58,10 @@ for model in main_args.model_path:
 
     name = os.path.splitext(os.path.basename(model))[0]
     model_dir = os.path.join(main_args.log_dir, name)
-    os.mkdir(model_dir)
+    try:
+        os.mkdir(model_dir)
+    except OSError:
+        pass
 
     xx = []
     yy = []

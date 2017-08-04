@@ -153,9 +153,9 @@ def train(args):
 
     logger = logging.getLogger("trainer")
     logger.setLevel(logging.DEBUG)
-    if len(logger.handlers) == 0:
-        ch = logging.StreamHandler()
-        logger.addHandler(ch)
+    logger.handlers = []
+    ch = logging.StreamHandler()
+    logger.addHandler(ch)
     fh = logging.FileHandler(os.path.join(args.log_dir, "log.txt"))
     logger.addHandler(fh)
 
