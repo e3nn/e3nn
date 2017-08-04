@@ -9,7 +9,7 @@ from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, **kwargs):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, radial_type="cosine", **kwargs):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -18,7 +18,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super(SE3Convolution, self).__init__()
-        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base)
+        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type)
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
@@ -52,7 +52,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, Rs_out, Rs_in, M=15, central_base=True):
+    def __init__(self, size, Rs_out, Rs_in, M, central_base, radial_type):
         super(SE3KernelCombination, self).__init__()
 
         self.size = size
@@ -64,7 +64,10 @@ class SE3KernelCombination(torch.autograd.Function):
         self.dims_in = [SO3.dim(R) for _, R in Rs_in]
 
         def generate_basis(R_out, R_in, m_out, m_in):
-            basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M)
+            if radial_type == "cosine":
+                basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M)
+            if radial_type == "triangles":
+                basis = basis_kernels.cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)

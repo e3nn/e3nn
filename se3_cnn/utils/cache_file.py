@@ -5,7 +5,7 @@ from functools import wraps, lru_cache
 import pickle
 import gzip
 import os
-
+import sys
 
 def cached_pklgz(filename):
     '''
@@ -78,6 +78,7 @@ def cached_dirpklgz(dirname):
                     result = pickle.load(file)
             except FileNotFoundError:
                 print("compute {}... ".format(filename), end="")
+                sys.stdout.flush()
                 result = func(*args)
                 print("save {}... ".format(filename), end="")
                 with gzip.open(filename, "wb") as file:

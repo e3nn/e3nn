@@ -197,6 +197,24 @@ def cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M):
 
     return gaussian_subsampling(basis * mask, (1, 1, 1, M, M, M))
 
+@cached_dirpklgz("triangles_kernels_cache")
+def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M):
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+
+    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
+    z, y, x = np.meshgrid(rng, rng, rng)
+    r = np.sqrt(x**2 + y**2 + z**2)
+
+    kernels = []
+    for i in range(size // 2):
+        mask = 0.5 - np.abs(r - (size / 2 - i - 0.5))
+        mask[r > size / 2 - i] = 0
+        mask[r < size / 2 - i - 1] = 0
+
+        ker = gaussian_subsampling(basis * mask, (1, 1, 1, M, M, M))
+        kernels.append(ker)
+
+    return np.concatenate(kernels)
 
 ################################################################################
 # Testing
