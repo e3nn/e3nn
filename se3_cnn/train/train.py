@@ -19,6 +19,11 @@ def import_module(path):
     module = imp.load_source(model_name, path)
     return module
 
+class Dataset:
+    def __init__(self, files, ids, labels):
+        self.files = files
+        self.ids = ids
+        self.labels = labels
 
 def load_data(csv_file, files_pattern, classes=None):
     labels = {}
@@ -41,7 +46,7 @@ def load_data(csv_file, files_pattern, classes=None):
         classes = sorted(set(labels))
     labels = [classes.index(x) for x in labels]
 
-    return files, ids, labels, classes
+    return Dataset(files, ids, labels), classes
 
 
 def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion):
@@ -124,10 +129,10 @@ def evaluate(model, files):
     return np.concatenate(all_outputs, axis=0)
 
 
-def save_evaluation(eval_ids, logits, labels, log_dir):
+def save_evaluation(eval_ids, logits, labels, log_dir, number):
     logits = np.array(logits)
     labels = np.array(labels)
-    filename = os.path.join(log_dir, "eval.csv")
+    filename = os.path.join(log_dir, "eval{}.csv".format(number))
 
     with open(filename, "wt") as file:
         writer = csv.writer(file)
@@ -149,22 +154,31 @@ def train(args):
     logger = logging.getLogger("trainer")
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler(os.path.join(args.log_dir, "log.txt"))
-    ch = logging.StreamHandler()
     logger.addHandler(fh)
-    logger.addHandler(ch)
+    if len(logger.handlers) == 0:
+        ch = logging.StreamHandler()
+        logger.addHandler(ch)
 
     logger.info("Arguments = %s", repr(args))
 
     ############################################################################
     # Files and labels
     classes = None
-    train_files = eval_files = None
-    if args.train_csv_path is not None and args.train_data_path is not None:
-        train_files, train_ids, train_labels, classes = load_data(args.train_csv_path, args.train_data_path, classes)
-        logger.info("%s=%d training files", "+".join([str(train_labels.count(x)) for x in set(train_labels)]), len(train_files))
-    if args.eval_csv_path is not None and args.eval_data_path is not None:
-        eval_files, eval_ids, eval_labels, classes = load_data(args.eval_csv_path, args.eval_data_path, classes)
-        logger.info("%s=%d evaluation files", "+".join([str(eval_labels.count(x)) for x in set(eval_labels)]), len(eval_files))
+
+    train_data = None
+    eval_datas = []
+
+    if args.train_csv_path is not None or args.train_data_path is not None:
+        train_data, classes = load_data(args.train_csv_path, args.train_data_path, classes)
+        logger.info("%s=%d training files", "+".join([str(train_data.labels.count(x)) for x in set(train_data.labels)]), len(train_data.files))
+
+    if args.eval_data_path is not None or args.eval_csv_path is not None:
+        assert len(args.eval_data_path) == len(args.eval_csv_path)
+
+        for csv_file, pattern in zip(args.eval_csv_path, args.eval_data_path):
+            eval_data, classes = load_data(csv_file, pattern, classes)
+            eval_datas.append(eval_data)
+            logger.info("%s=%d evaluation files", "+".join([str(eval_data.labels.count(x)) for x in set(eval_data.labels)]), len(eval_data.files))
 
     ############################################################################
     # Import model
@@ -183,13 +197,14 @@ def train(args):
 
     ############################################################################
     # Only evaluation
-    if train_files is None:
+    if train_data is None:
         if args.restore_path is None:
             logger.info("Evalutation with randomly initialized parameters")
-        outputs = evaluate(model, eval_files)
-        save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
-        correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))
-        logger.info("%d / %d = %.2f%%", correct, len(eval_labels), 100 * correct / len(eval_labels))
+        for i, data in enumerate(eval_datas):
+            outputs = evaluate(model, data.files)
+            save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
+            correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+            logger.info("%d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
         return
 
     ############################################################################
@@ -208,11 +223,11 @@ def train(args):
     ############################################################################
     # Training
     statistics_train = []
-    statistics_eval = []
+    statistics_eval = [[] for _ in eval_datas]
 
     for epoch in range(args.start_epoch, args.number_of_epochs):
         t = time_logging.start()
-        avg_loss, accuracy = train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion)
+        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion)
         statistics_train.append([epoch, avg_loss, accuracy])
         time_logging.end("training epoch", t)
 
@@ -225,12 +240,13 @@ def train(args):
         }, path)
         logger.info("Saved in %s", path)
 
-        if eval_files is not None and epoch % args.eval_each == args.eval_each - 1:
-            outputs = evaluate(model, eval_files)
-            save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
-            correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))
-            logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(eval_labels), 100 * correct / len(eval_labels))
-            statistics_eval.append([epoch, correct / len(eval_labels)])
+        if epoch % args.eval_each == args.eval_each - 1:
+            for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
+                outputs = evaluate(model, data.files)
+                save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
+                correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
+                stat.append([epoch, correct / len(data.labels)])
 
         logger.info("%s", time_logging.text_statistics())
         time_logging.clear()
@@ -248,8 +264,8 @@ def main():
     parser.add_argument("--train_data_path", type=str)
     parser.add_argument("--train_csv_path", type=str)
 
-    parser.add_argument("--eval_data_path", type=str)
-    parser.add_argument("--eval_csv_path", type=str)
+    parser.add_argument("--eval_data_path", type=str, nargs="+")
+    parser.add_argument("--eval_csv_path", type=str, nargs="+")
     parser.add_argument("--eval_each", type=int, default=1)
 
     parser.add_argument("--gpu", type=int, default=0)
