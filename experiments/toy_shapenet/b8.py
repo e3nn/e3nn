@@ -1,8 +1,9 @@
 #pylint: disable=C,R,E1101
 '''
-Based on m7
+Based on b7
 
-+ not equivariant
++ batch norm
++ stride & padding
 '''
 import torch
 import torch.nn as nn
@@ -30,21 +31,26 @@ class CNN(nn.Module):
             weights.data.normal_(0, 1 / math.sqrt(self.features[i] * 4 * 4 * 4))
             setattr(self, 'weights{}'.format(i), weights)
 
-            bias = torch.nn.Parameter(torch.FloatTensor(self.features[i+1]))
-            bias.data[:] = 0
-            setattr(self, 'bias{}'.format(i), bias)
+            bn = nn.BatchNorm3d(self.features[i+1], affine=True)
+            setattr(self, 'bn_bias{}'.format(i), bn)
+
+        self.bn_in = nn.BatchNorm3d(1, affine=True)
+        self.bn_out = nn.BatchNorm3d(number_of_classes, affine=True)
 
     def forward(self, x):
         '''
         :param x: [batch, features, x, y, z]
         '''
+        x = self.bn_in(x.contiguous())
         for i in range(len(self.features) - 1):
-            x = torch.nn.functional.conv3d(x, getattr(self, 'weights{}'.format(i)))
-            x = x + getattr(self, 'bias{}'.format(i)).view(1, -1, 1, 1, 1).expand_as(x)
+            x = torch.nn.functional.conv3d(x, getattr(self, 'weights{}'.format(i)), stride=2, padding=2)
+            x = getattr(self, 'bn_bias{}'.format(i))(x)
             if i < len(self.features) - 2:
                 x = torch.nn.functional.relu(x)
 
         x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
+        x = self.bn_out(x.contiguous())
+
         return x
 
 class MyModel(Model):

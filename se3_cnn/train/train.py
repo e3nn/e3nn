@@ -93,7 +93,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         del labels
         del outputs
         del loss
-
+    return (np.mean(losses), total_correct / total_trained)
 
 
 def evaluate(model, files):
@@ -138,24 +138,7 @@ def save_evaluation(eval_ids, logits, labels, log_dir):
     logging.getLogger("trainer").info("Evaluation saved into %s", filename)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--number_of_epochs", type=int)
-    parser.add_argument("--start_epoch", type=int, default=0)
-
-    parser.add_argument("--train_data_path", type=str)
-    parser.add_argument("--train_csv_path", type=str)
-
-    parser.add_argument("--eval_data_path", type=str)
-    parser.add_argument("--eval_csv_path", type=str)
-    parser.add_argument("--eval_each", type=int, default=1)
-
-    parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument("--log_dir", type=str)
-    parser.add_argument("--model_path", type=str)
-    parser.add_argument("--restore_path", type=str)
-
-    args = parser.parse_args()
+def train(args):
 
     if os.path.isdir(args.log_dir):
         print("{} exists already".format(args.log_dir))
@@ -224,9 +207,13 @@ def main():
 
     ############################################################################
     # Training
+    statistics_train = []
+    statistics_eval = []
+
     for epoch in range(args.start_epoch, args.number_of_epochs):
         t = time_logging.start()
-        train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion)
+        avg_loss, accuracy = train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion)
+        statistics_train.append([epoch, avg_loss, accuracy])
         time_logging.end("training epoch", t)
 
         cnn.cpu()
@@ -243,9 +230,36 @@ def main():
             save_evaluation(eval_ids, outputs, eval_labels, args.log_dir)
             correct = np.sum(np.argmax(outputs, axis=1) == np.array(eval_labels, np.int64))
             logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(eval_labels), 100 * correct / len(eval_labels))
+            statistics_eval.append([epoch, correct / len(eval_labels)])
 
         logger.info("%s", time_logging.text_statistics())
         time_logging.clear()
+
+    statistics_train = np.array(statistics_train)
+    np.save(os.path.join(args.log_dir, "statistics_train.npy"), statistics_train)
+    statistics_eval = np.array(statistics_eval)
+    np.save(os.path.join(args.log_dir, "statistics_eval.npy"), statistics_eval)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--number_of_epochs", type=int)
+    parser.add_argument("--start_epoch", type=int, default=0)
+
+    parser.add_argument("--train_data_path", type=str)
+    parser.add_argument("--train_csv_path", type=str)
+
+    parser.add_argument("--eval_data_path", type=str)
+    parser.add_argument("--eval_csv_path", type=str)
+    parser.add_argument("--eval_each", type=int, default=1)
+
+    parser.add_argument("--gpu", type=int, default=0)
+    parser.add_argument("--log_dir", type=str)
+    parser.add_argument("--model_path", type=str)
+    parser.add_argument("--restore_path", type=str)
+
+    args = parser.parse_args()
+
+    train(args)
 
 if __name__ == '__main__':
     main()

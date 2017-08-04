@@ -20,13 +20,17 @@ with open(i_csv, "rt") as file:
 id_ = rows[0].index("id")
 cl_ = rows[0].index("synsetId")
 
-classes = ["04379243", "03001627", "02691156", "02958343", "04256520"]
+classes = ["02691156", "02958343", "04256520", "04090263", "03636649", "04530566"]
 
 """
-03001627 = chair
-02958343 = vehicules (cars, autocars)
-02691156 = flying objects (airplanes, spaceships?)
-04379243 = tables, desks, dresser, chair, ...
+04379243 = tables, desks, dresser, chair, ... (5876 objects)
+03001627 = chair (modern style) (4612 objects)
+02691156 = flying objects (airplanes, spaceships?) (2832 objects)
+02958343 = vehicules (cars, autocars) (2502 objects)
+04256520 = chair (simple style) (2198 objects)
+04090263 = gun (1655 objcets)
+03636649 = lamps (1620 objects)
+04530566 = boat (1356 objects)
 """
 
 
@@ -42,7 +46,7 @@ for i, row in enumerate(subset[1:]):
 
     os.system("unzip -p {} {}/{}.obj > tmp.obj".format(i_zip, i_dir, row[id_]))
 
-    os.system("obj2voxel --size 64 --border 3 tmp.obj tmp.npy")
+    os.system("obj2voxel --size 64 tmp.obj tmp.npy")
 
     x = np.load("tmp.npy")
     x = x.astype(np.int8)

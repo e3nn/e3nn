@@ -2,10 +2,10 @@
 import csv
 import random
 
-in_csv = "voxels4/train.csv"
-classes = ["03001627", "02958343", "02691156"]
-how_much = 32
-out_csv = "voxels4/train3_{}.csv".format(how_much)
+in_csv = "../../datasets/shapenet/voxels/val.csv"
+classes = ["02691156", "02958343", "04256520", "04090263", "03636649", "04530566"]
+how_much = 194
+out_csv = "../../datasets/shapenet/voxels/val_{}x{}.csv".format(len(classes), how_much)
 
 with open(in_csv, "rt") as file:
     reader = csv.reader(file)

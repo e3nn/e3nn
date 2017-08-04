@@ -9,7 +9,7 @@ from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, **kwargs):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -22,6 +22,7 @@ class SE3Convolution(torch.nn.Module):
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
+        self.kwargs = kwargs
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -37,7 +38,7 @@ class SE3Convolution(torch.nn.Module):
         kernel = self.combination(self.weight)
         time = time_logging.end("kernel combination", time)
 
-        output = torch.nn.functional.conv3d(input, kernel)
+        output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
         time = time_logging.end("3d convolutions", time)
 
         if self.bias_relu is not None:

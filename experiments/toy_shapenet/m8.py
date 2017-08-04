@@ -1,9 +1,8 @@
 #pylint: disable=C,R,E1101
 '''
-Based on m3
+Based on m7
 
-+ scalar repr
-+ batch norm
++ stride & padding
 '''
 import torch
 import torch.nn as nn
@@ -23,17 +22,18 @@ class CNN(nn.Module):
 
         representations = [
             [(1, SO3.repr1)], # 64
-            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # 61
-            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # 58
-            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # 55
-            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # 52
-            [(number_of_classes, SO3.repr1)]] # 49
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # (64+2*2-(4-1)) / 2 = 32
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # (32 + 1) / 2 = 16
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # 8
+            [(6, SO3.repr1), (4, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)], # 4
+            [(number_of_classes, SO3.repr1)]] # 2
 
         self.convolutions = []
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(4, representations[i + 1], representations[i], bias_relu=non_lin, norm_relu=non_lin, scalar_batch_norm=True)
+            conv = SE3Convolution(4, representations[i + 1], representations[i],
+             bias_relu=non_lin, norm_relu=non_lin, scalar_batch_norm=True, stride=2, padding=2)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
