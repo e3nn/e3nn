@@ -258,7 +258,7 @@ def train(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--number_of_epochs", type=int)
+    parser.add_argument("--number_of_epochs", type=int, required=True)
     parser.add_argument("--start_epoch", type=int, default=0)
 
     parser.add_argument("--train_data_path", type=str)
@@ -269,8 +269,8 @@ def main():
     parser.add_argument("--eval_each", type=int, default=1)
 
     parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument("--log_dir", type=str)
-    parser.add_argument("--model_path", type=str)
+    parser.add_argument("--log_dir", type=str, required=True)
+    parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--restore_path", type=str)
 
     args = parser.parse_args()
