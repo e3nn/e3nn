@@ -1,9 +1,8 @@
 # pylint: disable=C,R,E1101
 '''
-Based on m17
+Based on a1
 
-+ proper learning rate
-+ no affine for the first BN
++ kernel size = 7
 '''
 import torch
 import torch.nn as nn
@@ -25,7 +24,7 @@ class CNN(nn.Module):
 
         representations = [
             [(1, SO3.repr1)],  # 64
-            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (64+2*3-(5-1)) / 2 = 33
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (64+2*4-(7-1)) / 2 = 33
             [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (33 + 2) / 2 = 17
             [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (17 + 2) / 2 = 9
             [(number_of_classes, SO3.repr1)]]  # (9 + 2) / 2 = 5
@@ -34,8 +33,8 @@ class CNN(nn.Module):
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(5, representations[i + 1], representations[i],
-                                  bias_relu=non_lin, norm_relu=False, scalar_batch_norm=True, radial_type="triangles", stride=2, padding=3)
+            conv = SE3Convolution(7, representations[i + 1], representations[i],
+                                  bias_relu=non_lin, norm_relu=False, scalar_batch_norm=True, radial_type="triangles", stride=2, padding=4)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 

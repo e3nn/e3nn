@@ -1,9 +1,8 @@
 # pylint: disable=C,R,E1101
 '''
-Based on m17
+Based on a1
 
-+ proper learning rate
-+ no affine for the first BN
++ one less layer
 '''
 import torch
 import torch.nn as nn
@@ -27,8 +26,7 @@ class CNN(nn.Module):
             [(1, SO3.repr1)],  # 64
             [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (64+2*3-(5-1)) / 2 = 33
             [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (33 + 2) / 2 = 17
-            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (17 + 2) / 2 = 9
-            [(number_of_classes, SO3.repr1)]]  # (9 + 2) / 2 = 5
+            [(number_of_classes, SO3.repr1)]]  # (17 + 2) / 2 = 9
 
         self.convolutions = []
 

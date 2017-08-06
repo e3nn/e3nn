@@ -1,9 +1,8 @@
 # pylint: disable=C,R,E1101
 '''
-Based on m17
+Based on a1
 
-+ proper learning rate
-+ no affine for the first BN
++ norm relu
 '''
 import torch
 import torch.nn as nn
@@ -35,7 +34,7 @@ class CNN(nn.Module):
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
             conv = SE3Convolution(5, representations[i + 1], representations[i],
-                                  bias_relu=non_lin, norm_relu=False, scalar_batch_norm=True, radial_type="triangles", stride=2, padding=3)
+                                  bias_relu=non_lin, norm_relu=non_lin, scalar_batch_norm=True, radial_type="triangles", stride=2, padding=3)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
