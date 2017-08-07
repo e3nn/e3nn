@@ -82,11 +82,15 @@ class SE3KernelCombination(torch.autograd.Function):
                 basis[k] *= np.sqrt(SO3.dim(R_out) / len(basis))
                 basis[k] /= np.sqrt(m_in)
                 # such that the weight can be initialized with Normal(0,1)
+
+            assert basis.shape[0] > 0
             return basis
 
         self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in, m_out, m_in))
             for m_in, R_in in Rs_in]
             for m_out, R_out in Rs_out]
+        # In : [(i,j) for i in range(2) for j in range(2)]
+        # Out: [(0, 0), (0, 1), (1, 0), (1, 1)]
 
         self.nweights = 0
         for i in range(len(Rs_out)):

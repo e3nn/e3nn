@@ -31,5 +31,5 @@ def text_statistics():
     text = ""
 
     for name, times in sorted(DATA_TIMES.items()):
-        text += "[time logging] {:.<30}... {: >8.2} / {: <5} = {:.2}s\n".format(name, sum(times), len(times), sum(times) / len(times))
+        text += "[time logging] {:.<30}... {: >8.3} / {: <5} = {:.2}s\n".format(name, sum(times), len(times), sum(times) / len(times))
     return text

@@ -109,9 +109,8 @@ def main():
         for i, model in enumerate(main_args.model_path):
             name = os.path.splitext(os.path.basename(model))[0]
 
-            print(name)
             for j, trian_name in enumerate(train_names):
-                print(trian_name)
+                print(name, trian_name)
                 for mean, std in zip(eval_accuracies[i][j], eval_accuracies_std[i][j]):
                     print("Accuracy = {} +- {}".format(mean, std))
 
