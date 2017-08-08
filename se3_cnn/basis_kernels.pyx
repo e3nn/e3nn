@@ -14,13 +14,14 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
+cimport numpy as np
 from se3_cnn.utils.cache_file import cached_dirpklgz
 from se3_cnn.SO3 import dim
 
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
 ################################################################################
-def get_matrix_kernel(A, eps=1e-10):
+cdef get_matrix_kernel(np.ndarray[np.float64_t, ndim=2] A, np.float64_t eps=1e-10):
     '''
     Compute an orthonormal basis of the kernel (x_1, x_2, ...)
     A x_i = 0
@@ -40,7 +41,7 @@ def get_matrix_kernel(A, eps=1e-10):
     return kernel
 
 
-def get_matrices_kernel(As, eps=1e-10):
+cdef get_matrices_kernel(As, np.float64_t eps=1e-10):
     '''
     Computes the commun kernel of all the As matrices
     '''
@@ -61,7 +62,7 @@ def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
         (kron(R,1)_(ik)(xy) - kron(1,R.T)_(ik)(xy)) K_(xy) = 0
     We can see the kroneker product simply as regrouping two indices in one
     '''
-    def kron(gamma, R_out, R_in):
+    def kron(np.float64_t gamma, R_out, R_in):
         return np.kron(R_out(0, 0, gamma), np.eye(dim(R_in))) - np.kron(np.eye(dim(R_out)), R_in(0, 0, gamma).T)
 
     some_random_angles = [np.pi, 1, np.pi / 7, 1.54321]
@@ -69,9 +70,10 @@ def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
     kA = get_matrices_kernel(As, 1e-10)
 
     # K_(xy) --> K_xy
-    basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
+    basis_elements = kA.reshape((-1, dim(R_out), dim(R_in)))
+    #basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
 
-    def check(K, gamma):
+    def check(np.ndarray K, np.float64_t gamma):
         '''
         Check that K satifies R_out K = K R_in
         '''
@@ -106,7 +108,8 @@ def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
     kA = get_matrices_kernel(As, 1e-10)
 
     # K_(xy) --> K_xy
-    basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
+    basis_elements = kA.reshape((-1, dim(R_out), dim(R_in)))
+    #basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
 
     def check(K, alpha, beta, gamma):
         '''
@@ -124,7 +127,7 @@ def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
 ################################################################################
 # Constructing kernel basis elements
 ################################################################################
-def transport_kernel(x, base0e, R_out, R_in):
+cdef transport_kernel(np.ndarray[np.float64_t, ndim=1] x, np.ndarray[np.float64_t, ndim=3] base0e, R_out, R_in):
     '''
     "Transport" the kernel K(0, ez) to K(0, x)
 
@@ -138,14 +141,17 @@ def transport_kernel(x, base0e, R_out, R_in):
     return np.matmul(np.matmul(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
 
 
-def cube_basis_kernels(size, R_out, R_in):
-    dim_in = dim(R_in)
-    dim_out = dim(R_out)
+cpdef cube_basis_kernels(int size, R_out, R_in):
+    cdef int dim_in = dim(R_in)
+    cdef int dim_out = dim(R_out)
 
     # compute the basis of K(0, ez)
-    basis = basis_kernels_satisfying_Zrot_constraint(R_out, R_in)
+    cdef np.ndarray[np.float64_t, ndim=3] basis = basis_kernels_satisfying_Zrot_constraint(R_out, R_in)
 
-    result = np.empty((len(basis), dim_out, dim_in, size, size, size))
+    cdef np.ndarray[np.float64_t, ndim=6] result = np.empty((len(basis), dim_out, dim_in, size, size, size))
+
+    cdef np.float64_t x, y, z
+    cdef np.ndarray[np.float64_t, ndim=1] point
 
     for xi in range(size):
         for yi in range(size):
