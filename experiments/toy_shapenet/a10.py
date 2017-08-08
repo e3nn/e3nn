@@ -1,7 +1,8 @@
 # pylint: disable=C,R,E1101
 '''
-Based on a9
+Based on a1
 
++ post gauss orthonormalize basis kernels
 + forest kernels (n = 2 * size)
 '''
 import torch

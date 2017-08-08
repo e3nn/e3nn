@@ -37,9 +37,9 @@ class CNN(nn.Module):
                                   bias_relu=non_lin,
                                   norm_relu=False, scalar_batch_norm=True,
                                   radial_type="triangles", # n = size // 2
+                                  post_gauss_orthonormalize=True
                                   stride=2,
-                                  padding=3,
-                                  post_gauss_orthonormalize=True)
+                                  padding=3)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 

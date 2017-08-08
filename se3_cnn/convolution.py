@@ -18,7 +18,7 @@ class SE3Convolution(torch.nn.Module):
 
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
-        super(SE3Convolution, self).__init__()
+        super().__init__()
         self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type, pre_gauss_orthonormalize=pre_gauss_orthonormalize, post_gauss_orthonormalize=post_gauss_orthonormalize)
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
@@ -71,6 +71,8 @@ class SE3KernelCombination(torch.autograd.Function):
                 basis = basis_kernels.cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M, pre_gauss_orthonormalize)
             if radial_type == "forest":
                 basis = basis_kernels.cube_basis_kernels_subsampled_forest(size, R_out, R_in, M, pre_gauss_orthonormalize)
+            if radial_type == "hat":
+                basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, R_out, R_in, M, pre_gauss_orthonormalize)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
