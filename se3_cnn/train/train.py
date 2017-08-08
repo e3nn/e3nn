@@ -119,7 +119,7 @@ def evaluate(model, files):
         j = min(i + bs, len(files))
         gc.collect()
         images = model.load_eval_files(files[i:j])
-        images = torch.autograd.Variable(images.cuda(), volatile=True)
+        images = images.cuda()
 
         outputs = model.evaluate(images)
 
