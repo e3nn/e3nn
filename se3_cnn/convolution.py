@@ -126,13 +126,20 @@ class SE3KernelCombination(torch.autograd.Function):
         for i in range(len(self.multiplicites_out)):
             begin_j = 0
             for j in range(len(self.multiplicites_in)):
+                b_el = self.kernels[i][j].size(0)
+                b_size = self.kernels[i][j].size()[1:]
+                basis_kernels_ij = self.kernels[i][j].view(b_el, -1)
+
                 for ii in range(self.multiplicites_out[i]):
                     si = slice(begin_i + ii * self.dims_out[i], begin_i + (ii + 1) * self.dims_out[i])
                     for jj in range(self.multiplicites_in[j]):
                         sj = slice(begin_j + jj * self.dims_in[j], begin_j + (jj + 1) * self.dims_in[j])
-                        for k in range(self.kernels[i][j].size(0)):
-                            kernel[si, sj] = self.kernels[i][j][k] * weight[weight_index]
-                            weight_index += 1
+
+                        kernel[si, sj] = torch.mm(
+                            weight[weight_index : weight_index + b_el].view(1, b_el),
+                            basis_kernels_ij).view(*b_size)
+                        weight_index += b_el
+
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
 
