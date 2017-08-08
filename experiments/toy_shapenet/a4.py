@@ -80,5 +80,5 @@ class MyModel(Model):
     def load_files(self, files):
         images = np.array([np.load(file) for file in files], dtype=np.float32)
         images = images.reshape((-1, 1, 64, 64, 64))
-        images = torch.autograd.Variable(torch.FloatTensor(images))
+        images = torch.FloatTensor(images)
         return images

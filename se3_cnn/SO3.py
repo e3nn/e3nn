@@ -48,6 +48,8 @@ def dim(R):
 def scalar_repr(alpha, beta, gamma):  # pylint: disable=W0613
     return np.array([[1]])
 
+def scalar_repr8(alpha, beta, gamma):  # pylint: disable=W0613
+    return np.eye(8)
 
 def vector_repr(alpha, beta, gamma):
     return rot(alpha, beta, gamma)

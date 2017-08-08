@@ -66,11 +66,11 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
     for i in range(0, len(train_files), bs):
         t0 = perf_counter()
-
-        j = min(i + bs, len(train_files))
         gc.collect()
-        images = model.load_files([train_files[g] for g in indicies[i:j]])
-        images = images.cuda()
+        j = min(i + bs, len(train_files))
+
+        images = model.load_train_files([train_files[g] for g in indicies[i:j]])
+        images = torch.autograd.Variable(images.cuda())
 
         labels = [train_labels[g] for g in indicies[i:j]]
         labels = torch.autograd.Variable(torch.LongTensor(labels).cuda())
@@ -92,7 +92,11 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         total_trained += j - i
 
         logger.info("[%d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Memory=%s Time=%.2fs",
-        epoch, i, len(train_files), loss_, np.mean(losses), correct, j-i, 100 * total_correct / total_trained, gpu_memory.format_memory(gpu_memory.used_memory()), perf_counter() - t0)
+            epoch, i, len(train_files),
+            loss_, np.mean(losses),
+            correct, j-i, 100 * total_correct / total_trained,
+            gpu_memory.format_memory(gpu_memory.used_memory()),
+            perf_counter() - t0)
 
         del images
         del labels
@@ -114,15 +118,16 @@ def evaluate(model, files):
     for i in range(0, len(files), bs):
         j = min(i + bs, len(files))
         gc.collect()
-        images = model.load_files(files[i:j])
-        images = images.cuda()
-        # images.volatile = True
+        images = model.load_eval_files(files[i:j])
+        images = torch.autograd.Variable(images.cuda(), volatile=True)
 
         outputs = model.evaluate(images)
 
-        all_outputs.append(outputs.data.cpu().numpy())
+        all_outputs.append(outputs)
 
-        logger.info("Evaluation [%d/%d] Memory=%s", i, len(files), gpu_memory.format_memory(gpu_memory.used_memory()))
+        logger.info("Evaluation [%d/%d] Memory=%s",
+            i, len(files),
+            gpu_memory.format_memory(gpu_memory.used_memory()))
 
         del images
         del outputs
