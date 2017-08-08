@@ -45,47 +45,21 @@ def dim(R):
 # The next functions are some usual representations
 
 
-def scalar_repr(alpha, beta, gamma):  # pylint: disable=W0613
+def scalar_repr(alpha, beta, gamma): # pylint: disable=W0613
     return np.array([[1]])
-
-def scalar_repr8(alpha, beta, gamma):  # pylint: disable=W0613
-    return np.eye(8)
 
 def vector_repr(alpha, beta, gamma):
     return rot(alpha, beta, gamma)
-
 
 def tensor_repr(alpha, beta, gamma):
     r = vector_repr(alpha, beta, gamma)
     return np.kron(r, r)
 
 
-def wigner1_repr(alpha, beta, gamma):
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    return wigner_D_matrix(1, alpha, beta, gamma)
-
-def wigner2_repr(alpha, beta, gamma):
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    return wigner_D_matrix(2, alpha, beta, gamma)
-
-def wigner3_repr(alpha, beta, gamma):
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    return wigner_D_matrix(3, alpha, beta, gamma)
-
-def wigner4_repr(alpha, beta, gamma):
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    return wigner_D_matrix(4, alpha, beta, gamma)
-
-def wigner5_repr(alpha, beta, gamma):
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    return wigner_D_matrix(5, alpha, beta, gamma)
-
-
-
 from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
-def repr1(alpha, beta, gamma):
-    return np.array([[1]])
+def repr1(alpha, beta, gamma): # pylint: disable=W0613
+    return np.eye(1)
 
 def repr3(alpha, beta, gamma):
     return wigner_D_matrix(1, alpha, beta, gamma)
@@ -96,15 +70,26 @@ def repr5(alpha, beta, gamma):
 def repr7(alpha, beta, gamma):
     return wigner_D_matrix(3, alpha, beta, gamma)
 
+def repr9(alpha, beta, gamma):
+    return wigner_D_matrix(4, alpha, beta, gamma)
+
+def repr11(alpha, beta, gamma):
+    return wigner_D_matrix(5, alpha, beta, gamma)
+
 def repr3x3(alpha, beta, gamma):
     r = repr3(alpha, beta, gamma)
-    return np.kron(r, r)
-
-def repr5x5(alpha, beta, gamma):
-    r = repr5(alpha, beta, gamma)
     return np.kron(r, r)
 
 def repr3x5(alpha, beta, gamma):
     r1 = repr3(alpha, beta, gamma)
     r2 = repr5(alpha, beta, gamma)
     return np.kron(r1, r2)
+
+def repr5x3(alpha, beta, gamma):
+    r1 = repr5(alpha, beta, gamma)
+    r2 = repr3(alpha, beta, gamma)
+    return np.kron(r1, r2)
+
+def repr5x5(alpha, beta, gamma):
+    r = repr5(alpha, beta, gamma)
+    return np.kron(r, r)

@@ -2,7 +2,7 @@
 '''
 Based on a1
 
-+ orthonormalize basis kernels
++ post gauss orthonormalize basis kernels
 '''
 import torch
 import torch.nn as nn
@@ -39,7 +39,7 @@ class CNN(nn.Module):
                                   radial_type="triangles",
                                   stride=2,
                                   padding=3,
-                                  orthonormalize=True)
+                                  post_gauss_orthonormalize=True)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 

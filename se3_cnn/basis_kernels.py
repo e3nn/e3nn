@@ -185,25 +185,35 @@ def gaussian_subsampling(im, M):
 ################################################################################
 # Full generation
 ################################################################################
-@cached_dirpklgz("cosine_kernels_cache")
-def cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M):
-    basis = cube_basis_kernels(size * M, R_out, R_in)
-
+def radius(size, M):
     rng = np.linspace(start=-1, stop=1, num=size * M, endpoint=True)
     z, y, x = np.meshgrid(rng, rng, rng)
-    r = np.sqrt(x**2 + y**2 + z**2)
+    return np.sqrt(x**2 + y**2 + z**2)
+
+@cached_dirpklgz("cosine_kernels_cache")
+def cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M, pre_gauss_orthonormalize):
+    import scipy.linalg
+
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+    if pre_gauss_orthonormalize:
+        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((1,) + basis.shape[1:])
+
+    r = radius(size, M)
+
     mask = np.cos((2 * r - 1) * np.pi) + 1
     mask[r > 1] = 0
 
     return gaussian_subsampling(basis * mask, (1, 1, 1, M, M, M))
 
 @cached_dirpklgz("triangles_kernels_cache")
-def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M):
-    basis = cube_basis_kernels(size * M, R_out, R_in)
+def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M, pre_gauss_orthonormalize):
+    import scipy.linalg
 
-    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
-    r = np.sqrt(x**2 + y**2 + z**2)
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+    if pre_gauss_orthonormalize:
+        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((1,) + basis.shape[1:])
+
+    r = radius(size, M)
 
     kernels = []
     for i in range(size // 2):
@@ -217,12 +227,14 @@ def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M):
     return np.concatenate(kernels)
 
 @cached_dirpklgz("forest_kernels_cache")
-def cube_basis_kernels_subsampled_forest(size, R_out, R_in, M):
-    basis = cube_basis_kernels(size * M, R_out, R_in)
+def cube_basis_kernels_subsampled_forest(size, R_out, R_in, M, pre_gauss_orthonormalize):
+    import scipy.linalg
 
-    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
-    r = np.sqrt(x**2 + y**2 + z**2)
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+    if pre_gauss_orthonormalize:
+        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((1,) + basis.shape[1:])
+
+    r = radius(size, M)
 
     kernels = []
     for i in range(0, 2 * size - 1):

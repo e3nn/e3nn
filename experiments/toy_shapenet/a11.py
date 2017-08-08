@@ -1,8 +1,8 @@
 # pylint: disable=C,R,E1101
 '''
-Based on a9
+Based on a1
 
-+ forest kernels
++ pre gauss orthonormalize basis kernels
 '''
 import torch
 import torch.nn as nn
@@ -36,10 +36,10 @@ class CNN(nn.Module):
             conv = SE3Convolution(5, representations[i + 1], representations[i],
                                   bias_relu=non_lin,
                                   norm_relu=False, scalar_batch_norm=True,
-                                  radial_type="forest",
+                                  radial_type="triangles",
+                                  pre_gauss_orthonormalize=True,
                                   stride=2,
-                                  padding=3,
-                                  post_gauss_orthonormalize=True)
+                                  padding=3)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
