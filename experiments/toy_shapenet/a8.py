@@ -2,8 +2,7 @@
 '''
 Based on a7
 
-+ more features
-+ one more layer
++ SGD + momentum 0.9
 '''
 import torch
 import torch.nn as nn
@@ -25,14 +24,13 @@ class CNN(nn.Module):
 
         representations = [
             [(1, SO3.repr1)],  # 64
-            [(8, SO3.repr1), (4, SO3.repr3x3), (1, SO3.repr7)],  # (64+2*3-(5-1)) / 2 = 33
-            [(8, SO3.repr1), (4, SO3.repr3x3), (1, SO3.repr7)],  # 33 + 2 = 35
-            [(16, SO3.repr1), (8, SO3.repr3x3), (2, SO3.repr7)],  # (35 + 2) / 2 = 18
-            [(16, SO3.repr1), (8, SO3.repr3x3), (2, SO3.repr7)],  # 18 + 2 = 20
-            [(32, SO3.repr1), (16, SO3.repr3x3), (4, SO3.repr7)],  # (20 + 2) / 2 = 11
-            [(32, SO3.repr1), (16, SO3.repr3x3), (4, SO3.repr7)],  # 11 + 2 = 13
-            [(64, SO3.repr1)], # (13 + 2) / 2 = 7
-            [(number_of_classes, SO3.repr1)]] # 7 + 2 = 9
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (64+2*3-(5-1)) / 2 = 33
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # 33 + 2 = 35
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (35 + 2) / 2 = 18
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # 18 + 2 = 20
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # (20 + 2) / 2 = 11
+            [(16, SO3.repr1), (6, SO3.repr3), (2, SO3.repr5), (1, SO3.repr7)],  # 11 + 2 = 13
+            [(number_of_classes, SO3.repr1)]]  # (13 + 2) / 2 = 7
 
         self.convolutions = []
 
@@ -73,6 +71,9 @@ class MyModel(Model):
     def initialize(self, number_of_classes):
         self.cnn = CNN(number_of_classes)
 
+    def get_optimizer(self):
+        return torch.optim.SGD(self.get_cnn().parameters(), lr=1e-1, momentum=0.9)
+
     def get_cnn(self):
         if self.cnn is None:
             raise ValueError("Need to call initialize first")
@@ -89,5 +90,5 @@ class MyModel(Model):
     def load_files(self, files):
         images = np.array([np.load(file) for file in files], dtype=np.float32)
         images = images.reshape((-1, 1, 64, 64, 64))
-        images = torch.autograd.Variable(torch.FloatTensor(images))
+        images = torch.FloatTensor(images)
         return images
