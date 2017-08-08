@@ -63,6 +63,8 @@ class SE3KernelCombination(torch.autograd.Function):
         self.multiplicites_in = [m for m, _ in Rs_in]
         self.dims_out = [SO3.dim(R) for _, R in Rs_out]
         self.dims_in = [SO3.dim(R) for _, R in Rs_in]
+        self.n_out = sum([self.multiplicites_out[i] * self.dims_out[i] for i in range(len(self.multiplicites_out))])
+        self.n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
         def generate_basis(R_out, R_in, m_out, m_in):
             if radial_type == "cosine":
@@ -107,15 +109,16 @@ class SE3KernelCombination(torch.autograd.Function):
         """
         assert weight.dim() == 1
         assert weight.size(0) == self.nweights
-        n_out = sum([self.multiplicites_out[i] * self.dims_out[i] for i in range(len(self.multiplicites_out))])
-        n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
+
+        if weight.is_cuda and not self.kernels[0][0].is_cuda:
+            self.kernels = [[K.cuda() for K in row] for row in self.kernels]
+        if not weight.is_cuda and self.kernels[0][0].is_cuda:
+            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
 
         if weight.is_cuda:
-            self.kernels = [[K.cuda() for K in row] for row in self.kernels]
-            kernel = torch.cuda.FloatTensor(n_out, n_in, self.size, self.size, self.size)
+            kernel = torch.cuda.FloatTensor(self.n_out, self.n_in, self.size, self.size, self.size)
         else:
-            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
-            kernel = torch.FloatTensor(n_out, n_in, self.size, self.size, self.size)
+            kernel = torch.FloatTensor(self.n_out, self.n_in, self.size, self.size, self.size)
 
         weight_index = 0
 
