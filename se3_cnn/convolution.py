@@ -34,11 +34,9 @@ class SE3Convolution(torch.nn.Module):
             self.norm_relu.reset_parameters()
 
     def forward(self, input): # pylint: disable=W
-        time = time_logging.start()
-
         kernel = self.combination(self.weight)
-        time = time_logging.end("kernel combination", time)
 
+        time = time_logging.start()
         output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
         time = time_logging.end("3d convolutions", time)
 
@@ -71,6 +69,8 @@ class SE3KernelCombination(torch.autograd.Function):
                 basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M)
             if radial_type == "triangles":
                 basis = basis_kernels.cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M)
+            if radial_type == "forest":
+                basis = basis_kernels.cube_basis_kernels_subsampled_forest(size, R_out, R_in, M)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
@@ -107,6 +107,7 @@ class SE3KernelCombination(torch.autograd.Function):
         """
         :return: [feature_out, feature_in, x, y, z]
         """
+        time = time_logging.start()
         assert weight.dim() == 1
         assert weight.size(0) == self.nweights
 
@@ -143,14 +144,19 @@ class SE3KernelCombination(torch.autograd.Function):
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
 
+        time_logging.end("kernel combination (forward)", time)
         return kernel
 
     def backward(self, grad_kernel): #pylint: disable=W
-        if grad_kernel.is_cuda:
+        time = time_logging.start()
+        if grad_kernel.is_cuda and not self.kernels[0][0].is_cuda:
             self.kernels = [[K.cuda() for K in row] for row in self.kernels]
+        if not grad_kernel.is_cuda and self.kernels[0][0].is_cuda:
+            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
+
+        if grad_kernel.is_cuda:
             grad_weight = torch.cuda.FloatTensor(self.nweights)
         else:
-            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
             grad_weight = torch.FloatTensor(self.nweights)
 
         weight_index = 0
@@ -159,16 +165,21 @@ class SE3KernelCombination(torch.autograd.Function):
         for i in range(len(self.multiplicites_out)):
             begin_j = 0
             for j in range(len(self.multiplicites_in)):
+                b_el = self.kernels[i][j].size(0)
+                basis_kernels_ij = self.kernels[i][j].view(b_el, -1)
+
                 for ii in range(self.multiplicites_out[i]):
                     si = slice(begin_i + ii * self.dims_out[i], begin_i + (ii + 1) * self.dims_out[i])
                     for jj in range(self.multiplicites_in[j]):
                         sj = slice(begin_j + jj * self.dims_in[j], begin_j + (jj + 1) * self.dims_in[j])
-                        for k in range(self.kernels[i][j].size(0)):
-                            grad_weight[weight_index] = torch.matmul(self.kernels[i][j][k].view(-1), grad_kernel[si, sj].contiguous().view(-1))
-                            weight_index += 1
+
+                        grad_weight[weight_index : weight_index + b_el] = torch.mm(basis_kernels_ij, grad_kernel[si, sj].contiguous().view(-1, 1)).view(-1)
+                        weight_index += b_el
+
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
 
+        time_logging.end("kernel combination (backward)", time)
         return grad_weight
 
 

@@ -216,6 +216,25 @@ def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M):
 
     return np.concatenate(kernels)
 
+@cached_dirpklgz("forest_kernels_cache")
+def cube_basis_kernels_subsampled_forest(size, R_out, R_in, M):
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+
+    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
+    z, y, x = np.meshgrid(rng, rng, rng)
+    r = np.sqrt(x**2 + y**2 + z**2)
+
+    kernels = []
+    for i in range(0, 2 * size - 1):
+        mask = 0.1 - np.abs(r - 0.25 * i)
+        mask[r > 0.25 * i + 0.1] = 0
+        mask[r < 0.25 * i - 0.1] = 0
+
+        ker = gaussian_subsampling(basis * mask, (1, 1, 1, M, M, M))
+        kernels.append(ker)
+
+    return np.concatenate(kernels)
+
 ################################################################################
 # Testing
 ################################################################################
