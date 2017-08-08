@@ -80,7 +80,7 @@ class SE3KernelCombination(torch.autograd.Function):
                 basis = np.concatenate((center, basis))
 
             if post_gauss_orthonormalize:
-                basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((1,) + basis.shape[1:])
+                basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
 
             # normalize each basis element
             for k in range(len(basis)):
