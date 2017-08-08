@@ -36,7 +36,7 @@ class CNN(nn.Module):
             conv = SE3Convolution(5, representations[i + 1], representations[i],
                                   bias_relu=non_lin,
                                   norm_relu=False, scalar_batch_norm=True,
-                                  radial_type="triangles",
+                                  radial_type="triangles", # n = size // 2
                                   stride=2,
                                   padding=3,
                                   post_gauss_orthonormalize=True)

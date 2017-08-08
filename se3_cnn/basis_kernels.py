@@ -227,6 +227,27 @@ def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M, pre_gauss_orth
 
     return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
 
+@cached_dirpklgz("hat_kernels_cache")
+def cube_basis_kernels_subsampled_hat(size, R_out, R_in, M, pre_gauss_orthonormalize):
+    import scipy.linalg
+
+    basis = cube_basis_kernels(size * M, R_out, R_in)
+    r = radius(size, M)
+
+    kernels = []
+    for i in range(0, size - 1):
+        mask = 0.4 - np.abs(r - 0.5 * i)
+        mask[r > 0.5 * i + 0.4] = 0
+        mask[r < 0.5 * i - 0.4] = 0
+
+        kernels.append(basis * mask)
+    basis = np.concatenate(kernels)
+
+    if pre_gauss_orthonormalize:
+        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
+
+    return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
+
 @cached_dirpklgz("forest_kernels_cache")
 def cube_basis_kernels_subsampled_forest(size, R_out, R_in, M, pre_gauss_orthonormalize):
     import scipy.linalg
