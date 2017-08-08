@@ -7,9 +7,10 @@ from se3_cnn import SO3
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
+import scipy.linalg
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, radial_type="cosine", **kwargs):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, radial_type="cosine", orthonormalize=False, **kwargs):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -18,7 +19,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super(SE3Convolution, self).__init__()
-        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type)
+        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type, orthonormalize=orthonormalize)
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
@@ -52,7 +53,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, Rs_out, Rs_in, M, central_base, radial_type):
+    def __init__(self, size, Rs_out, Rs_in, M, central_base, radial_type, orthonormalize):
         super(SE3KernelCombination, self).__init__()
 
         self.size = size
@@ -75,6 +76,9 @@ class SE3KernelCombination(torch.autograd.Function):
                 for k, K in enumerate(Ks):
                     center[k, :, :, size//2, size//2, size//2] = K
                 basis = np.concatenate((center, basis))
+
+            if orthonormalize:
+                basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape(basis.shape)
 
             # normalize each basis element
             for k in range(len(basis)):
