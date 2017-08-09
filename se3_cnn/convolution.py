@@ -140,7 +140,7 @@ class SE3KernelCombination(torch.autograd.Function):
                 ker = torch.mm(w, basis_kernels_ij) # [I*J, i*j*x*y*z]
                 ker = ker.view(mi, mj, *b_size) # [I, J, i, j, x, y, z]
                 ker = ker.transpose(1, 2).contiguous() # [I, i, J, j, x, y, z]
-                ker = ker.view(mi * self.dims_out[i], mj * self.dims_out[j], *b_size[2:]) # [I*i, J*j, x, y, z]
+                ker = ker.view(mi * self.dims_out[i], mj * self.dims_in[j], *b_size[2:]) # [I*i, J*j, x, y, z]
                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
                 kernel[si, sj] = ker
@@ -234,9 +234,9 @@ def test_combination_gradient(Rs_out=None, Rs_in=None, epsilon=1e-3):
     from se3_cnn.utils.test import gradient_approximation
 
     if Rs_in is None:
-        Rs_in = [(2, SO3.repr1), (2, SO3.repr3)]
+        Rs_in = [(3, SO3.repr1), (2, SO3.repr3), (1, SO3.repr5)]
     if Rs_out is None:
-        Rs_out = [(2, SO3.repr1), (2, SO3.repr3)]
+        Rs_out = [(2, SO3.repr3), (1, SO3.repr1)]
 
     combination = SE3KernelCombination(4, Rs_out, Rs_in, M=15, central_base=True, radial_type="cosine", pre_gauss_orthonormalize=False, post_gauss_orthonormalize=False)
 
