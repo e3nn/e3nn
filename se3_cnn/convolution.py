@@ -126,22 +126,24 @@ class SE3KernelCombination(torch.autograd.Function):
         weight_index = 0
 
         begin_i = 0
-        for i in range(len(self.multiplicites_out)):
+        for i, mi in enumerate(self.multiplicites_out):
             begin_j = 0
-            for j in range(len(self.multiplicites_in)):
+            for j, mj in enumerate(self.multiplicites_in):
                 b_el = self.kernels[i][j].size(0)
                 b_size = self.kernels[i][j].size()[1:]
-                basis_kernels_ij = self.kernels[i][j].view(b_el, -1)
 
-                for ii in range(self.multiplicites_out[i]):
-                    si = slice(begin_i + ii * self.dims_out[i], begin_i + (ii + 1) * self.dims_out[i])
-                    for jj in range(self.multiplicites_in[j]):
-                        sj = slice(begin_j + jj * self.dims_in[j], begin_j + (jj + 1) * self.dims_in[j])
+                w = weight[weight_index : weight_index + mi * mj * b_el].view(mi * mj, b_el) # [I*J, beta]
+                weight_index += mi * mj * b_el
 
-                        kernel[si, sj] = torch.mm(
-                            weight[weight_index : weight_index + b_el].view(1, b_el),
-                            basis_kernels_ij).view(*b_size)
-                        weight_index += b_el
+                basis_kernels_ij = self.kernels[i][j].view(b_el, -1) # [beta, i*j*x*y*z]
+
+                ker = torch.mm(w, basis_kernels_ij) # [I*J, i*j*x*y*z]
+                ker = ker.view(mi, mj, *b_size) # [I, J, i, j, x, y, z]
+                ker = ker.transpose(1, 2).contiguous() # [I, i, J, j, x, y, z]
+                ker = ker.view(mi * self.dims_out[i], mj * self.dims_out[j], *b_size[2:]) # [I*i, J*j, x, y, z]
+                si = slice(begin_i, begin_i + mi * self.dims_out[i])
+                sj = slice(begin_j, begin_j + mj * self.dims_in[j])
+                kernel[si, sj] = ker
 
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
@@ -164,19 +166,23 @@ class SE3KernelCombination(torch.autograd.Function):
         weight_index = 0
 
         begin_i = 0
-        for i in range(len(self.multiplicites_out)):
+        for i, mi in enumerate(self.multiplicites_out):
             begin_j = 0
-            for j in range(len(self.multiplicites_in)):
+            for j, mj in enumerate(self.multiplicites_in):
                 b_el = self.kernels[i][j].size(0)
-                basis_kernels_ij = self.kernels[i][j].view(b_el, -1)
+                basis_kernels_ij = self.kernels[i][j] # [beta, i, j, x, y, z]
+                basis_kernels_ij = basis_kernels_ij.view(b_el, -1) # [beta, i*j*x*y*z]
 
-                for ii in range(self.multiplicites_out[i]):
-                    si = slice(begin_i + ii * self.dims_out[i], begin_i + (ii + 1) * self.dims_out[i])
-                    for jj in range(self.multiplicites_in[j]):
-                        sj = slice(begin_j + jj * self.dims_in[j], begin_j + (jj + 1) * self.dims_in[j])
+                si = slice(begin_i, begin_i + mi * self.dims_out[i])
+                sj = slice(begin_j, begin_j + mj * self.dims_in[j])
 
-                        grad_weight[weight_index : weight_index + b_el] = torch.mm(basis_kernels_ij, grad_kernel[si, sj].contiguous().view(-1, 1)).view(-1)
-                        weight_index += b_el
+                grad = grad_kernel[si, sj] # [I * i, J * j, x, y, z]
+                grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2) # [I, J, i, j, x*y*z]
+                grad = grad.contiguous().view(mi * mj, -1) # [I*J, i*j*x*y*z]
+                grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1)) # [I*J, beta]
+
+                grad_weight[weight_index : weight_index + mi * mj * b_el] = grad.view(-1) # [I * J * beta]
+                weight_index += mi * mj * b_el
 
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
@@ -223,3 +229,27 @@ def test_convolution_gradient():
     print("grad_x - grad_x_approx {}".format((x.grad.data - grad_x_approx).std()))
 
     return x.grad.data, grad_x_approx
+
+def test_combination_gradient(Rs_out=None, Rs_in=None, epsilon=1e-3):
+    from se3_cnn.utils.test import gradient_approximation
+
+    if Rs_in is None:
+        Rs_in = [(2, SO3.repr1), (2, SO3.repr3)]
+    if Rs_out is None:
+        Rs_out = [(2, SO3.repr1), (2, SO3.repr3)]
+
+    combination = SE3KernelCombination(4, Rs_out, Rs_in, M=15, central_base=True, radial_type="cosine", pre_gauss_orthonormalize=False, post_gauss_orthonormalize=False)
+
+    w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
+
+    k = combination(w)
+    grad_k = torch.rand(*k.size())
+    torch.autograd.backward(k, grad_k)
+
+    grad_w_approx = gradient_approximation(lambda x: combination(torch.autograd.Variable(x)).data, w.data, grad_k, epsilon=epsilon)
+
+    print("grad_w {}".format(w.grad.data.std()))
+    print("grad_w_approx {}".format(grad_w_approx.std()))
+    print("grad_w - grad_w_approx {}".format((w.grad.data - grad_w_approx).std()))
+
+    return w.grad.data, grad_w_approx
