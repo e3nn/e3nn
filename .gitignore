@@ -8,3 +8,5 @@ build
 dist
 *.c
 *.so
+*.zip
+*.7z
