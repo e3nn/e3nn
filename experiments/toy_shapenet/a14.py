@@ -21,12 +21,12 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         logger.info("Create CNN for classify %d classes", number_of_classes)
-        # 16+18+10+7=51 ~ 27+25=52
+        # 16+18+10+7=51 ~ 36+7+9=52
         representations = [
             [(1, SO3.repr1)],  # 64
-            [(3, SO3.repr3x3), (1, SO3.repr5x5)],  # (64+2*3-(5-1)) / 2 = 33
-            [(3, SO3.repr3x3), (1, SO3.repr5x5)],  # (33 + 2) / 2 = 17
-            [(3, SO3.repr3x3), (1, SO3.repr5x5)],  # (17 + 2) / 2 = 9
+            [(4, SO3.repr3x3), (1, SO3.repr7), (1, SO3.repr9)],  # (64+2*3-(5-1)) / 2 = 33
+            [(4, SO3.repr3x3), (1, SO3.repr7), (1, SO3.repr9)],  # (33 + 2) / 2 = 17
+            [(4, SO3.repr3x3), (1, SO3.repr7), (1, SO3.repr9)],  # (17 + 2) / 2 = 9
             [(number_of_classes, SO3.repr1)]]  # (9 + 2) / 2 = 5
 
         self.convolutions = []
