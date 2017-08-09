@@ -1,8 +1,8 @@
 # pylint: disable=C,R,E1101
 '''
-Based on a12
+Based on a15
 
-+ 3x3, 7, 9
++ 3x3 = 1 + 3 + 5  (With non linearitites !)
 '''
 import torch
 import torch.nn as nn
@@ -21,12 +21,12 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         logger.info("Create CNN for classify %d classes", number_of_classes)
-        # 16+18+10+7=51 ~ 36+7+9=52
+        # 16+18+10+7=51 ~ 45
         representations = [
             [(1, SO3.repr1)],  # 64
-            [(4, SO3.repr3x3), (1, SO3.repr7), (1, SO3.repr9)],  # (64+2*3-(5-1)) / 2 = 33
-            [(4, SO3.repr3x3), (1, SO3.repr7), (1, SO3.repr9)],  # (33 + 2) / 2 = 17
-            [(4, SO3.repr3x3), (1, SO3.repr7), (1, SO3.repr9)],  # (17 + 2) / 2 = 9
+            [(5, SO3.repr1), (5, SO3.repr3), (5, SO3.repr5)],  # (64+2*3-(5-1)) / 2 = 33
+            [(5, SO3.repr1), (5, SO3.repr3), (5, SO3.repr5)],  # (33 + 2) / 2 = 17
+            [(5, SO3.repr1), (5, SO3.repr3), (5, SO3.repr5)],  # (17 + 2) / 2 = 9
             [(number_of_classes, SO3.repr1)]]  # (9 + 2) / 2 = 5
 
         self.convolutions = []
@@ -35,7 +35,7 @@ class CNN(nn.Module):
             non_lin = i < len(representations) - 2
             conv = SE3Convolution(5, representations[i + 1], representations[i],
                                   bias_relu=non_lin,
-                                  norm_relu=False, scalar_batch_norm=True,
+                                  norm_relu=non_lin, scalar_batch_norm=True,
                                   radial_type="hat", # n = size
                                   pre_gauss_orthonormalize=True,
                                   post_gauss_orthonormalize=True,
