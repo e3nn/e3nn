@@ -1,8 +1,9 @@
 # pylint: disable=C,R,E1101
 '''
-Based on c1
+Based on c2
 
-+ tensor product
++ radial_amount = 2 (instead of 5)
++ less features
 '''
 import torch
 import torch.nn as nn
@@ -19,14 +20,14 @@ logger = logging.getLogger("trainer")
 class Block(nn.Module):
     def __init__(self, scalar_out, vector, scalar_in, relu):
         super().__init__()
-        self.conv1 = SE3Convolution(5, 5, [(vector, SO3.repr3)], [(scalar_in, SO3.repr1)],
+        self.conv1 = SE3Convolution(5, 2, [(vector, SO3.repr3)], [(scalar_in, SO3.repr1)],
             bias_relu=False,
             norm_relu=False,
             scalar_batch_norm=False,
             stride=2,
             padding=3)
         self.tensor = TensorProduct([(vector, 3, True)])
-        self.conv2 = SE3Convolution(5, 5, [(scalar_out, SO3.repr1)], [(vector, SO3.repr3), (vector, SO3.repr3x3)],
+        self.conv2 = SE3Convolution(5, 2, [(scalar_out, SO3.repr1)], [(vector, SO3.repr3), (vector, SO3.repr3x3)],
             bias_relu=relu,
             norm_relu=False,
             scalar_batch_norm=True,
@@ -47,18 +48,18 @@ class CNN(nn.Module):
 
         logger.info("Create CNN for classify %d classes", number_of_classes)
 
-        features = [1, # 64
-            8, # (64 + 2*3 - 4) / 2 + 2*3 - 4 = (64 + 2) / 2 + 2 = 35
-            16, # (35 + 2)/2+2 = 20
-            16, # (20+2)/2+2 = 13
-            16, # (13+2)/2+2 = 9
-            number_of_classes]  # (9+2)/2+2 = 7
+        features = [(1, 4), # 64
+            (8, 4), # (64 + 2*3 - 4) / 2 + 2*3 - 4 = (64 + 2) / 2 + 2 = 35
+            (16, 4), # (35 + 2)/2+2 = 20
+            (16, 4), # (20+2)/2+2 = 13
+            (16, 4), # (13+2)/2+2 = 9
+            (number_of_classes, )]  # (9+2)/2+2 = 7
 
         self.convolutions = []
 
         for i in range(len(features) - 1):
             relu = i < len(features) - 2
-            conv = Block(features[i + 1], (features[i + 1] + features[i]) // 2, features[i], relu)
+            conv = Block(features[i + 1][0], features[i][1], features[i][0], relu)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 

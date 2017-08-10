@@ -35,11 +35,10 @@ class CNN(nn.Module):
 
         for i in range(len(representations) - 1):
             non_lin = i < len(representations) - 2
-            conv = SE3Convolution(5, representations[i + 1], representations[i],
+            conv = SE3Convolution(5, 5, representations[i + 1], representations[i],
                                   bias_relu=non_lin,
                                   scalar_batch_norm=True,
                                   norm_relu=False,
-                                  radial_type="hat", # n = size
                                   stride=2,
                                   padding=3)
             setattr(self, 'conv{}'.format(i), conv)

@@ -1,8 +1,9 @@
 # pylint: disable=C,R,E1101
 '''
-Based on c1
+Based on c7
 
-+ tensor product
++ less stride
++ more layers
 '''
 import torch
 import torch.nn as nn
@@ -10,6 +11,7 @@ from se3_cnn.convolution import SE3Convolution
 from se3_cnn.non_linearities.tensor_product import TensorProduct
 from se3_cnn import SO3
 from se3_cnn.train.model import Model
+from se3_cnn.utils import time_logging
 import logging
 import numpy as np
 
@@ -19,14 +21,14 @@ logger = logging.getLogger("trainer")
 class Block(nn.Module):
     def __init__(self, scalar_out, vector, scalar_in, relu):
         super().__init__()
-        self.conv1 = SE3Convolution(5, 5, [(vector, SO3.repr3)], [(scalar_in, SO3.repr1)],
-            bias_relu=False,
+        self.conv1 = SE3Convolution(7, 3, [(scalar_out, SO3.repr1), (vector, SO3.repr3)], [(scalar_in, SO3.repr1)],
+            bias_relu=True,
             norm_relu=False,
             scalar_batch_norm=False,
             stride=2,
-            padding=3)
-        self.tensor = TensorProduct([(vector, 3, True)])
-        self.conv2 = SE3Convolution(5, 5, [(scalar_out, SO3.repr1)], [(vector, SO3.repr3), (vector, SO3.repr3x3)],
+            padding=5)
+        self.tensor = TensorProduct([(scalar_out, 1, False), (vector, 3, True)])
+        self.conv2 = SE3Convolution(7, 3, [(scalar_out, SO3.repr1)], [(scalar_out, SO3.repr1), (vector, SO3.repr3), (vector, SO3.repr3x3)],
             bias_relu=relu,
             norm_relu=False,
             scalar_batch_norm=True,
@@ -34,10 +36,10 @@ class Block(nn.Module):
             padding=3)
 
     def forward(self, s): # pylint: disable=W
-        v = self.conv1(s)
-        t = self.tensor(v)
-        vt = torch.cat([v, t], dim=1)
-        s = self.conv2(vt) # BN, bias and relu
+        sv = self.conv1(s) # bias and relu for scalar part
+        t = self.tensor(sv)
+        svt = torch.cat([sv, t], dim=1)
+        s = self.conv2(svt) # BN, bias and relu
         return s
 
 class CNN(nn.Module):
@@ -47,18 +49,17 @@ class CNN(nn.Module):
 
         logger.info("Create CNN for classify %d classes", number_of_classes)
 
-        features = [1, # 64
-            8, # (64 + 2*3 - 4) / 2 + 2*3 - 4 = (64 + 2) / 2 + 2 = 35
-            16, # (35 + 2)/2+2 = 20
-            16, # (20+2)/2+2 = 13
-            16, # (13+2)/2+2 = 9
-            number_of_classes]  # (9+2)/2+2 = 7
+        features = [(1, 2), # 64
+            (4, 4), # (64 + 2*5 - 6) / 2 + 2*3 - 6 = (64+4)/2 = 64/2 + 2 = 34
+            (16, 4), # 34/2 + 2 = 19
+            (32, 4), # 19/2 + 2 = 11
+            (number_of_classes, )]  # 11/2 + 2 = 7
 
         self.convolutions = []
 
         for i in range(len(features) - 1):
             relu = i < len(features) - 2
-            conv = Block(features[i + 1], (features[i + 1] + features[i]) // 2, features[i], relu)
+            conv = Block(features[i + 1][0], features[i][1], features[i][0], relu)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
@@ -70,8 +71,10 @@ class CNN(nn.Module):
         :param x: [batch, features, x, y, z]
         '''
         x = self.bn_in(x.contiguous())
-        for conv in self.convolutions:
+        t = time_logging.start()
+        for i, conv in enumerate(self.convolutions):
             x = conv(x)
+            t = time_logging.end("block {}".format(i), t)
 
         # [batch, features]
         x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1)
