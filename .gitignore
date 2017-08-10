@@ -2,7 +2,7 @@
 *.nb
 __pycache__
 *.pkl.gz
-*_cache
+*_cache*
 *.egg-info
 build
 dist

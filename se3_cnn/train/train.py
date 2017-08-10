@@ -79,8 +79,8 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         optimizer.zero_grad()
         outputs = cnn(images)
-        t = time_logging.end("forward", t)
         loss = criterion(outputs, labels)
+        t = time_logging.end("forward", t)
         loss.backward()
         optimizer.step()
 
@@ -232,10 +232,14 @@ def train(args):
     statistics_eval = [[] for _ in eval_datas]
 
     for epoch in range(args.start_epoch, args.number_of_epochs):
+        time_logging.clear()
         t = time_logging.start()
+
         avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion)
         statistics_train.append([epoch, avg_loss, accuracy])
+
         time_logging.end("training epoch", t)
+        logger.info("%s", time_logging.text_statistics())
 
         cnn.cpu()
         path = os.path.join(args.log_dir, 'model.pkl')
@@ -253,9 +257,6 @@ def train(args):
                 correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
                 logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
                 stat.append([epoch, correct / len(data.labels)])
-
-        logger.info("%s", time_logging.text_statistics())
-        time_logging.clear()
 
     statistics_train = np.array(statistics_train)
     np.save(os.path.join(args.log_dir, "statistics_train.npy"), statistics_train)

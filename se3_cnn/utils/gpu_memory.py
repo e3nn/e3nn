@@ -1,9 +1,4 @@
 #pylint: disable=E,W
-from pycuda import autoinit
-from pycuda.driver import mem_get_info
-import torch
-
-DATA_MEM = mem_get_info()
 
 def format_memory(n):
     sign = 1 if n >= 0 else -1
@@ -16,16 +11,30 @@ def format_memory(n):
         n /= 1024
     return "{:.4}TiB".format(sign * n)
 
-def used_memory():
-    mem = mem_get_info()
-    return mem[1] - mem[0]
+try:
+    from pycuda import autoinit
+    from pycuda.driver import mem_get_info
+    import torch
 
-def measure_gpu_memory(ident=""):
-    global DATA_MEM
-    torch.cuda.synchronize()
-    old = DATA_MEM[1] - DATA_MEM[0]
-    mem = mem_get_info()
-    now = mem[1] - mem[0]
-    text = "[Memory] {} {} + {} = {}".format(ident, format_memory(old), format_memory(now - old), format_memory(now))
-    DATA_MEM = mem
-    return text
+    DATA_MEM = mem_get_info()
+
+    def used_memory():
+        mem = mem_get_info()
+        return mem[1] - mem[0]
+
+    def measure_gpu_memory(ident=""):
+        global DATA_MEM
+        torch.cuda.synchronize()
+        old = DATA_MEM[1] - DATA_MEM[0]
+        mem = mem_get_info()
+        now = mem[1] - mem[0]
+        text = "[Memory] {} {} + {} = {}".format(ident, format_memory(old), format_memory(now - old), format_memory(now))
+        DATA_MEM = mem
+        return text
+
+except ImportError:
+    def used_memory():
+        return 0
+
+    def measure_gpu_memory(ident=""):
+        return "No measure of gpu memory available"

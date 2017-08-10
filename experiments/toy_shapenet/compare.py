@@ -99,8 +99,8 @@ def main():
     xxx = np.array(xxx) # [model, repeat, train_type,           row, column]
     yyy = np.array(yyy) # [model, repeat, train_type, val_type, row, column]
 
-    np.save(os.path.join(main_args.log_dir, "statistics_train.npy"), xxx)
-    np.save(os.path.join(main_args.log_dir, "statistics_eval.npy"), yyy)
+    # np.save(os.path.join(main_args.log_dir, "statistics_train.npy"), xxx)
+    # np.save(os.path.join(main_args.log_dir, "statistics_eval.npy"), yyy)
 
     if yyy.shape[-1] > 0:
         eval_accuracies = np.mean(yyy, axis=1)[:, :, :, -1, 1] # [model, train_type, val_type]
