@@ -14,14 +14,13 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
-cimport numpy as np
 from se3_cnn.utils.cache_file import cached_dirpklgz
 from se3_cnn.SO3 import dim
 
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
 ################################################################################
-cdef get_matrix_kernel(np.ndarray[np.float64_t, ndim=2] A, np.float64_t eps=1e-10):
+def get_matrix_kernel(A, eps=1e-10):
     '''
     Compute an orthonormal basis of the kernel (x_1, x_2, ...)
     A x_i = 0
@@ -41,7 +40,7 @@ cdef get_matrix_kernel(np.ndarray[np.float64_t, ndim=2] A, np.float64_t eps=1e-1
     return kernel
 
 
-cdef get_matrices_kernel(As, np.float64_t eps=1e-10):
+def get_matrices_kernel(As, eps=1e-10):
     '''
     Computes the commun kernel of all the As matrices
     '''
@@ -62,7 +61,7 @@ def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
         (kron(R,1)_(ik)(xy) - kron(1,R.T)_(ik)(xy)) K_(xy) = 0
     We can see the kroneker product simply as regrouping two indices in one
     '''
-    def kron(np.float64_t gamma, R_out, R_in):
+    def kron(gamma, R_out, R_in):
         return np.kron(R_out(0, 0, gamma), np.eye(dim(R_in))) - np.kron(np.eye(dim(R_out)), R_in(0, 0, gamma).T)
 
     some_random_angles = [np.pi, 1, np.pi / 7, 1.54321]
@@ -73,7 +72,7 @@ def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
     basis_elements = kA.reshape((-1, dim(R_out), dim(R_in)))
     #basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
 
-    def check(np.ndarray K, np.float64_t gamma):
+    def check(K, gamma):
         '''
         Check that K satifies R_out K = K R_in
         '''
@@ -127,7 +126,7 @@ def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
 ################################################################################
 # Constructing kernel basis elements
 ################################################################################
-cdef transport_kernel(np.ndarray[np.float64_t, ndim=1] x, np.ndarray[np.float64_t, ndim=3] base0e, R_out, R_in):
+def transport_kernel(x, base0e, R_out, R_in):
     '''
     "Transport" the kernel K(0, ez) to K(0, x)
 
@@ -141,17 +140,14 @@ cdef transport_kernel(np.ndarray[np.float64_t, ndim=1] x, np.ndarray[np.float64_
     return np.matmul(np.matmul(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
 
 
-cpdef cube_basis_kernels(int size, R_out, R_in):
-    cdef int dim_in = dim(R_in)
-    cdef int dim_out = dim(R_out)
+def cube_basis_kernels(size, R_out, R_in):
+    dim_in = dim(R_in)
+    dim_out = dim(R_out)
 
     # compute the basis of K(0, ez)
-    cdef np.ndarray[np.float64_t, ndim=3] basis = basis_kernels_satisfying_Zrot_constraint(R_out, R_in)
+    basis = basis_kernels_satisfying_Zrot_constraint(R_out, R_in)
 
-    cdef np.ndarray[np.float64_t, ndim=6] result = np.empty((len(basis), dim_out, dim_in, size, size, size))
-
-    cdef np.float64_t x, y, z
-    cdef np.ndarray[np.float64_t, ndim=1] point
+    result = np.empty((len(basis), dim_out, dim_in, size, size, size))
 
     for xi in range(size):
         for yi in range(size):
@@ -191,92 +187,31 @@ def gaussian_subsampling(im, M):
 ################################################################################
 # Full generation
 ################################################################################
-@cached_dirpklgz("cosine_kernels_cache")
-def cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M, pre_gauss_orthonormalize):
-    import scipy.linalg
-
-    basis = cube_basis_kernels(size * M, R_out, R_in)
-    rng = np.linspace(start=-1, stop=1, num=size * M, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
-    return np.sqrt(x**2 + y**2 + z**2)
-
-    mask = np.cos((2 * r - 1) * np.pi) + 1
-    mask[r > 1] = 0
-    basis = basis * mask
-
-    if pre_gauss_orthonormalize:
-        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
-
-    return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
-
-@cached_dirpklgz("triangles_kernels_cache")
-def cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M, pre_gauss_orthonormalize):
+@cached_dirpklgz("kernels_cache_hat")
+def cube_basis_kernels_subsampled_hat(size, R_out, R_in, M):
     import scipy.linalg
 
     basis = cube_basis_kernels(size * M, R_out, R_in)
     rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
     z, y, x = np.meshgrid(rng, rng, rng)
-    return np.sqrt(x**2 + y**2 + z**2)
+    r = np.sqrt(x**2 + y**2 + z**2)
 
     kernels = []
-    for i in range(size // 2):
-        mask = 0.5 - np.abs(r - (size / 2 - i - 0.5))
-        mask[r > size / 2 - i] = 0
-        mask[r < size / 2 - i - 1] = 0
 
-        kernels.append(basis * mask)
-    basis = np.concatenate(kernels)
-
-    if pre_gauss_orthonormalize:
-        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
-
-    return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
-
-@cached_dirpklgz("hat_kernels_cache")
-def cube_basis_kernels_subsampled_hat(size, R_out, R_in, M, pre_gauss_orthonormalize):
-    import scipy.linalg
-
-    basis = cube_basis_kernels(size * M, R_out, R_in)
-    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
-    return np.sqrt(x**2 + y**2 + z**2)
-
-    kernels = []
+    step = 0.5
+    w = 0.5
     for i in range(0, size - 1):
-        mask = 0.4 - np.abs(r - 0.5 * i)
-        mask[r > 0.5 * i + 0.4] = 0
-        mask[r < 0.5 * i - 0.4] = 0
+        mask = w - np.abs(r - step * i)
+        mask[r > step * i + w] = 0
+        mask[r < step * i - w] = 0
 
         kernels.append(basis * mask)
     basis = np.concatenate(kernels)
 
-    if pre_gauss_orthonormalize:
-        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
+    basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
 
     return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
 
-@cached_dirpklgz("forest_kernels_cache")
-def cube_basis_kernels_subsampled_forest(size, R_out, R_in, M, pre_gauss_orthonormalize):
-    import scipy.linalg
-
-    basis = cube_basis_kernels(size * M, R_out, R_in)
-    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
-    return np.sqrt(x**2 + y**2 + z**2)
-
-    kernels = []
-    for i in range(0, 2 * size - 1):
-        mask = 0.1 - np.abs(r - 0.25 * i)
-        mask[r > 0.25 * i + 0.1] = 0
-        mask[r < 0.25 * i - 0.1] = 0
-
-        kernels.append(basis * mask)
-    basis = np.concatenate(kernels)
-
-    if pre_gauss_orthonormalize:
-        basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
-
-    return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
 
 ################################################################################
 # Testing

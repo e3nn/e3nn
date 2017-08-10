@@ -10,7 +10,7 @@ from se3_cnn.utils import time_logging
 import scipy.linalg
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, radial_type="cosine", pre_gauss_orthonormalize=False, post_gauss_orthonormalize=False, **kwargs):
+    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, radial_type="cosine", **kwargs):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -19,7 +19,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super().__init__()
-        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type, pre_gauss_orthonormalize=pre_gauss_orthonormalize, post_gauss_orthonormalize=post_gauss_orthonormalize)
+        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type)
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
@@ -51,7 +51,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, Rs_out, Rs_in, M, central_base, radial_type, pre_gauss_orthonormalize, post_gauss_orthonormalize):
+    def __init__(self, size, Rs_out, Rs_in, M, central_base, radial_type):
         super(SE3KernelCombination, self).__init__()
 
         self.size = size
@@ -65,14 +65,8 @@ class SE3KernelCombination(torch.autograd.Function):
         self.n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
         def generate_basis(R_out, R_in, m_out, m_in): # pylint: disable=W0613
-            if radial_type == "cosine":
-                basis = basis_kernels.cube_basis_kernels_subsampled_cosine(size, R_out, R_in, M, pre_gauss_orthonormalize)
-            if radial_type == "triangles":
-                basis = basis_kernels.cube_basis_kernels_subsampled_triangles(size, R_out, R_in, M, pre_gauss_orthonormalize)
-            if radial_type == "forest":
-                basis = basis_kernels.cube_basis_kernels_subsampled_forest(size, R_out, R_in, M, pre_gauss_orthonormalize)
             if radial_type == "hat":
-                basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, R_out, R_in, M, pre_gauss_orthonormalize)
+                basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, R_out, R_in, M)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
@@ -81,8 +75,7 @@ class SE3KernelCombination(torch.autograd.Function):
                     center[k, :, :, size//2, size//2, size//2] = K
                 basis = np.concatenate((center, basis))
 
-            if post_gauss_orthonormalize:
-                basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
+            basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
 
             # normalize each basis element
             for k in range(len(basis)):
@@ -238,7 +231,7 @@ def test_combination_gradient(Rs_out=None, Rs_in=None, epsilon=1e-3):
     if Rs_out is None:
         Rs_out = [(2, SO3.repr3), (1, SO3.repr1)]
 
-    combination = SE3KernelCombination(4, Rs_out, Rs_in, M=15, central_base=True, radial_type="cosine", pre_gauss_orthonormalize=False, post_gauss_orthonormalize=False)
+    combination = SE3KernelCombination(4, Rs_out, Rs_in, M=15, central_base=True, radial_type="cosine")
 
     w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
 
