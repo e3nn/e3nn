@@ -79,11 +79,12 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         optimizer.zero_grad()
         outputs = cnn(images)
+        t = time_logging.end("forward", t)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
-        time_logging.end("gradient step", t)
+        t = time_logging.end("backward", t)
 
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
