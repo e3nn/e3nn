@@ -185,22 +185,34 @@ def gaussian_subsampling(im, M):
 
 
 ################################################################################
+# Orthonormalization
+################################################################################
+def orthonormalize(basis):
+    import scipy.linalg
+
+    shape = basis.shape
+    basis = basis.reshape((shape[0], -1))
+
+    basis = scipy.linalg.orth(basis.T).T
+
+    basis = basis.reshape((-1,) + shape[1:])
+    return basis
+
+################################################################################
 # Full generation
 ################################################################################
 @cached_dirpklgz("kernels_cache_hat")
-def cube_basis_kernels_subsampled_hat(size, R_out, R_in, M):
-    import scipy.linalg
-
-    basis = cube_basis_kernels(size * M, R_out, R_in)
-    rng = np.linspace(start=-size/2, stop=size/2, num=size * M, endpoint=True)
+def cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_in):
+    basis = cube_basis_kernels(size * upsampling, R_out, R_in)
+    rng = np.linspace(start=-1, stop=1, num=size * upsampling, endpoint=True)
     z, y, x = np.meshgrid(rng, rng, rng)
     r = np.sqrt(x**2 + y**2 + z**2)
 
     kernels = []
 
-    step = 0.5
-    w = 0.5
-    for i in range(0, size - 1):
+    step = 1 / radial_amount
+    w = 0.5 / radial_amount
+    for i in range(0, radial_amount):
         mask = w - np.abs(r - step * i)
         mask[r > step * i + w] = 0
         mask[r < step * i - w] = 0
@@ -208,9 +220,9 @@ def cube_basis_kernels_subsampled_hat(size, R_out, R_in, M):
         kernels.append(basis * mask)
     basis = np.concatenate(kernels)
 
-    basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
+    basis = orthonormalize(basis)
 
-    return gaussian_subsampling(basis, (1, 1, 1, M, M, M))
+    return gaussian_subsampling(basis, (1, 1, 1, upsampling, upsampling, upsampling))
 
 
 ################################################################################

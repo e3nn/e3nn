@@ -7,10 +7,9 @@ from se3_cnn import SO3
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.norm_activation import NormRelu
 from se3_cnn.utils import time_logging
-import scipy.linalg
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, M=15, central_base=True, radial_type="cosine", **kwargs):
+    def __init__(self, size, radial_amount, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, upsampling=15, central_base=True, **kwargs):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -19,7 +18,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super().__init__()
-        self.combination = SE3KernelCombination(size, Rs_out, Rs_in, M=M, central_base=central_base, radial_type=radial_type)
+        self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_out, Rs_in, central_base=central_base)
         self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
         self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
         self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
@@ -51,7 +50,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, Rs_out, Rs_in, M, central_base, radial_type):
+    def __init__(self, size, radial_amount, upsampling, Rs_out, Rs_in, central_base):
         super(SE3KernelCombination, self).__init__()
 
         self.size = size
@@ -65,8 +64,7 @@ class SE3KernelCombination(torch.autograd.Function):
         self.n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
         def generate_basis(R_out, R_in, m_out, m_in): # pylint: disable=W0613
-            if radial_type == "hat":
-                basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, R_out, R_in, M)
+            basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_in)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
@@ -75,7 +73,7 @@ class SE3KernelCombination(torch.autograd.Function):
                     center[k, :, :, size//2, size//2, size//2] = K
                 basis = np.concatenate((center, basis))
 
-            basis = scipy.linalg.orth(basis.reshape((basis.shape[0], -1)).T).T.reshape((-1,) + basis.shape[1:])
+            basis = basis_kernels.orthonormalize(basis)
 
             # normalize each basis element
             for k in range(len(basis)):
@@ -103,7 +101,7 @@ class SE3KernelCombination(torch.autograd.Function):
         :return: [feature_out, feature_in, x, y, z]
         """
         time = time_logging.start()
-        assert weight.dim() == 1
+        assert weight.dim() == 1, "size = {}".format(weight.size())
         assert weight.size(0) == self.nweights
 
         if weight.is_cuda and not self.kernels[0][0].is_cuda:
@@ -189,7 +187,7 @@ def test_normalization(batch, size, Rs_out=None, Rs_in=None):
         Rs_out = [(1, SO3.repr1), (1, SO3.repr3)]
     if Rs_in is None:
         Rs_in = [(1, SO3.repr1), (1, SO3.repr3)]
-    conv = SE3Convolution(4, Rs_out, Rs_in, bias_relu=False, norm_relu=False)
+    conv = SE3Convolution(4, 2, Rs_out, Rs_in, bias_relu=False, norm_relu=False)
     print("Weights Amount = {} Mean = {} Std = {}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
 
     n_out = sum([m * SO3.dim(r) for m, r in Rs_out])
@@ -207,7 +205,7 @@ def test_normalization(batch, size, Rs_out=None, Rs_in=None):
 
 def test_convolution_gradient():
     from se3_cnn.utils.test import gradient_approximation
-    conv = SE3Convolution(4, [(1, SO3.repr1), (1, SO3.repr3)], [(1, SO3.repr1), (1, SO3.repr3)], bias_relu=True, norm_relu=True)
+    conv = SE3Convolution(4, 2, [(1, SO3.repr1), (1, SO3.repr3)], [(1, SO3.repr1), (1, SO3.repr3)], bias_relu=True, norm_relu=True)
 
     x = torch.autograd.Variable(torch.rand(2, 4, 10, 10, 10), requires_grad=True)
 
@@ -231,7 +229,7 @@ def test_combination_gradient(Rs_out=None, Rs_in=None, epsilon=1e-3):
     if Rs_out is None:
         Rs_out = [(2, SO3.repr3), (1, SO3.repr1)]
 
-    combination = SE3KernelCombination(4, Rs_out, Rs_in, M=15, central_base=True, radial_type="cosine")
+    combination = SE3KernelCombination(4, 2, 15, Rs_out, Rs_in, central_base=True)
 
     w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
 
