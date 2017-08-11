@@ -47,7 +47,7 @@ class SE3DropoutF(torch.autograd.Function):
 
 
 def test_dropout_gradient():
-    from se3_cnn.utils.test import gradient_approximation
+    from util_cnn.gradient_approximation import gradient_approximation
     do = SE3DropoutF([(2, 1), (1, 3), (1, 5)], p=0.5)
 
     x = torch.autograd.Variable(torch.rand(2, 2 + 3 + 5, 10, 10, 10), requires_grad=True)

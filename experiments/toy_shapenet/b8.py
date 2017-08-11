@@ -8,7 +8,7 @@ Based on b7
 import torch
 import torch.nn as nn
 import math
-from se3_cnn.train.model import Model
+from util_cnn.model import Model
 import logging
 import numpy as np
 

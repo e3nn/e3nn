@@ -10,7 +10,7 @@ import torch.nn as nn
 from se3_cnn.convolution import SE3Convolution
 from se3_cnn.non_linearities.tensor_product import TensorProduct
 from se3_cnn import SO3
-from se3_cnn.train.model import Model
+from util_cnn.model import Model
 import logging
 import numpy as np
 

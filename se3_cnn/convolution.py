@@ -6,7 +6,7 @@ from se3_cnn import basis_kernels
 from se3_cnn import SO3
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.norm_activation import NormRelu
-from se3_cnn.utils import time_logging
+from util_cnn import time_logging
 
 class SE3Convolution(torch.nn.Module):
     def __init__(self, size, radial_amount, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, upsampling=15, central_base=True, **kwargs):
@@ -203,7 +203,7 @@ def test_normalization(batch, size, Rs_out=None, Rs_in=None):
 
 
 def test_convolution_gradient():
-    from se3_cnn.utils.test import gradient_approximation
+    from util_cnn.gradient_approximation import gradient_approximation
     conv = SE3Convolution(4, 2, [(1, SO3.repr1), (1, SO3.repr3)], [(1, SO3.repr1), (1, SO3.repr3)], bias_relu=True, norm_relu=True)
 
     x = torch.autograd.Variable(torch.rand(2, 4, 10, 10, 10), requires_grad=True)
@@ -221,7 +221,7 @@ def test_convolution_gradient():
     return x.grad.data, grad_x_approx
 
 def test_combination_gradient(Rs_out=None, Rs_in=None, epsilon=1e-3):
-    from se3_cnn.utils.test import gradient_approximation
+    from util_cnn.gradient_approximation import gradient_approximation
 
     if Rs_in is None:
         Rs_in = [(3, SO3.repr1), (2, SO3.repr3), (1, SO3.repr5)]

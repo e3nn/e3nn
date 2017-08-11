@@ -1,7 +1,7 @@
 #pylint: disable=C,R,E1101
 import torch
 from torch.nn.parameter import Parameter
-from se3_cnn.utils import time_logging
+from util_cnn import time_logging
 
 class NormRelu(torch.nn.Module):
     def __init__(self, enable):
@@ -89,7 +89,7 @@ class NormReluFunction(torch.autograd.Function):
 
 
 def test_norm_relu_gradient(x=None, b=None):
-    from se3_cnn.utils.test import gradient_approximation
+    from util_cnn.test import gradient_approximation
 
     if x is None:
         x = torch.autograd.Variable(torch.rand(2, 5, 10, 10, 10), requires_grad=True)

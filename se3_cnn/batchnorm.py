@@ -1,6 +1,6 @@
 #pylint: disable=C,R,E1101
 import torch
-from se3_cnn.utils import time_logging
+from util_cnn import time_logging
 
 class SE3BatchNorm(torch.nn.Module):
     def __init__(self, Rs, eps=1e-5, momentum=0.1):

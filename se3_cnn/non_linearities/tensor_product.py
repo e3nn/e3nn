@@ -1,6 +1,6 @@
 #pylint: disable=C,R,E1101
 import torch
-from se3_cnn.utils import time_logging
+from util_cnn import time_logging
 
 class TensorProduct:
     def __init__(self, enabled):
