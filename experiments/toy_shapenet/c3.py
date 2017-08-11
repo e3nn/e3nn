@@ -64,7 +64,7 @@ class CNN(nn.Module):
             self.convolutions.append(conv)
 
         self.bn_in = nn.BatchNorm3d(1, affine=False)
-        self.bn_out = nn.BatchNorm3d(number_of_classes, affine=True)
+        self.bn_out = nn.BatchNorm1d(number_of_classes, affine=True)
 
     def forward(self, x): # pylint: disable=W
         '''

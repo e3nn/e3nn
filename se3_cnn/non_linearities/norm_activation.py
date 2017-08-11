@@ -1,6 +1,7 @@
 #pylint: disable=C,R,E1101
 import torch
 from torch.nn.parameter import Parameter
+from se3_cnn.utils import time_logging
 
 class NormRelu(torch.nn.Module):
     def __init__(self, enable):
@@ -54,6 +55,7 @@ class NormReluFunction(torch.autograd.Function):
         super(NormReluFunction, self).__init__()
 
     def forward(self, x, b): # pylint: disable=W
+        time = time_logging.start()
         norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8 # [batch, x, y, z]
         newnorm = norm - b.expand_as(norm) # [batch, x, y, z]
         newnorm[newnorm < 0] = 0
@@ -61,9 +63,12 @@ class NormReluFunction(torch.autograd.Function):
         ratio = ratio.view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x)
 
         self.save_for_backward(x, b)
-        return x * ratio
+        r = x * ratio
+        time = time_logging.end("norm relu (forward)", time)
+        return r
 
     def backward(self, grad_out): # pylint: disable=W
+        time = time_logging.start()
         x, b = self.saved_tensors
 
         norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8 # [batch, x, y, z]
@@ -79,6 +84,7 @@ class NormReluFunction(torch.autograd.Function):
         grad_b = -torch.sum(grad_out * x, dim=1) / norm
         grad_b[norm < b] = 0
         grad_b = torch.sum(grad_b.view(-1), dim=0)
+        time = time_logging.end("norm relu (backward)", time)
         return grad_x, grad_b
 
 

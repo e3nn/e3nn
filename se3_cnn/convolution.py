@@ -44,7 +44,6 @@ class SE3Convolution(torch.nn.Module):
             time = time_logging.end("bias and relu", time)
         if self.norm_relu is not None:
             output = self.norm_relu(output)
-            time = time_logging.end("norm relu", time)
 
         return output
 
