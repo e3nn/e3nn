@@ -33,7 +33,7 @@ class CNN(nn.Module):
         for conv in self.convolutions:
             x = conv(x)
 
-        x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
+        x = x.mean(-1).mean(-1).mean(-1) # [batch, features]
         return x
 
 class MyModel(Model):

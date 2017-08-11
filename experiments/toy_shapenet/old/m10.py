@@ -58,7 +58,7 @@ class CNN(nn.Module):
             x = conv(x)
 
         # logger.info("Mean = %f Std = %f", x.data.mean(), x.data.std())
-        x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
+        x = x.mean(-1).mean(-1).mean(-1) # [batch, features]
         x = self.bn_out(x.contiguous())
         # logger.info("Mean = %f Std = %f", x.data.mean(), x.data.std())
         # x = x + self.bias.view(1, -1).expand_as(x)

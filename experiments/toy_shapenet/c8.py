@@ -77,7 +77,7 @@ class CNN(nn.Module):
             t = time_logging.end("block {}".format(i), t)
 
         # [batch, features]
-        x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1)
+        x = x.mean(-1).mean(-1).mean(-1)
         x = self.bn_out(x.contiguous())
         return x
 

@@ -44,7 +44,7 @@ class CNN(nn.Module):
             if i < len(self.features) - 2:
                 x = torch.nn.functional.relu(x)
 
-        x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1) # [batch, features]
+        x = x.mean(-1).mean(-1).mean(-1) # [batch, features]
         return x
 
 class MyModel(Model):

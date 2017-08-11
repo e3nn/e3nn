@@ -60,7 +60,7 @@ class CNN(nn.Module):
         x = self.convolutions[-1](x)
 
         # [batch, features]
-        x = x.mean(-1).squeeze(-1).mean(-1).squeeze(-1).mean(-1).squeeze(-1)
+        x = x.mean(-1).mean(-1).mean(-1)
         x = self.bn_out(x.contiguous())
         return x
 
