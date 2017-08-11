@@ -10,3 +10,4 @@ dist
 *.so
 *.zip
 *.7z
+tmp.*
