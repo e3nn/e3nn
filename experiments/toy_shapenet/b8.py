@@ -35,7 +35,7 @@ class CNN(nn.Module):
             setattr(self, 'bn_bias{}'.format(i), bn)
 
         self.bn_in = nn.BatchNorm3d(1, affine=True)
-        self.bn_out = nn.BatchNorm3d(number_of_classes, affine=True)
+        self.bn_out = nn.BatchNorm1d(number_of_classes, affine=True)
 
     def forward(self, x):
         '''
