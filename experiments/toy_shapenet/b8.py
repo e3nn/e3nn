@@ -19,11 +19,11 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         self.features = [
-            1,
-            6 + 4 * 3 + 2 * 5 + 1 * 7,
-            6 + 4 * 3 + 2 * 5 + 1 * 7,
-            6 + 4 * 3 + 2 * 5 + 1 * 7,
-            6 + 4 * 3 + 2 * 5 + 1 * 7,
+            1, # 64
+            6 + 4 * 3 + 2 * 5 + 1 * 7, # =35 # 33
+            6 + 4 * 3 + 2 * 5 + 1 * 7, # 17
+            6 + 4 * 3 + 2 * 5 + 1 * 7, # 9
+            6 + 4 * 3 + 2 * 5 + 1 * 7, # 5
             number_of_classes]
 
         for i in range(len(self.features) - 1):
@@ -66,7 +66,7 @@ class MyModel(Model):
             raise ValueError("Need to call initialize first")
         return self.cnn
 
-    def get_batch_size(self):
+    def get_batch_size(self, epoch=None):
         return 16
 
     def get_learning_rate(self, epoch):

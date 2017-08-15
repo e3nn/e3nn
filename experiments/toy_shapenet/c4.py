@@ -92,7 +92,7 @@ class MyModel(Model):
             raise ValueError("Need to call initialize first")
         return self.cnn
 
-    def get_batch_size(self):
+    def get_batch_size(self, epoch=None):
         return 16
 
     def get_learning_rate(self, epoch):
