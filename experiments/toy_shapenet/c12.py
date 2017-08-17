@@ -2,7 +2,7 @@
 '''
 Based on c10
 
-+ weight normalization
++ initialize weights with randn data
 '''
 import torch
 import torch.nn as nn
@@ -67,11 +67,14 @@ class CNN(nn.Module):
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
+        self.bn_in = nn.BatchNorm3d(1, affine=False)
+        self.bn_out = nn.BatchNorm1d(number_of_classes, affine=True)
 
     def forward(self, x): # pylint: disable=W
         '''
         :param x: [batch, features, x, y, z]
         '''
+        x = self.bn_in(x.contiguous())
         t = time_logging.start()
         for i, conv in enumerate(self.convolutions):
             x = conv(x)
@@ -79,6 +82,7 @@ class CNN(nn.Module):
 
         # [batch, features]
         x = x.mean(-1).mean(-1).mean(-1)
+        x = self.bn_out(x.contiguous())
         return x
 
 
@@ -91,6 +95,18 @@ class MyModel(Model):
     def initialize(self, number_of_classes):
         self.cnn = CNN(number_of_classes)
 
+        if torch.cuda.is_available():
+            self.cnn.cuda()
+
+        logger.info("[Initialize weights]")
+        for i in range(32):
+            x = torch.autograd.Variable(torch.randn(16, 1, 64, 64, 64))
+            if torch.cuda.is_available():
+                x = x.cuda()
+
+            x = self.cnn(x)
+            logger.info("[%d/%d] %.3f %.3f", i, 32, x.data.cpu().mean(), x.data.cpu().std())
+
     def get_cnn(self):
         if self.cnn is None:
             raise ValueError("Need to call initialize first")
@@ -100,23 +116,9 @@ class MyModel(Model):
         return 16
 
     def get_learning_rate(self, epoch):
-        lr = 0
-        momentum = 0
-
-        if epoch < 5:
-            momentum = 0.1
-            lr = 0
-        elif epoch < 10:
-            momentum = 0.1
-            lr = 1e-4
-        else:
-            momentum = 0.01
-            lr = 1e-2
-
-        for module in self.cnn.modules():
-            if isinstance(module, SE3BatchNorm):
-                module.momentum = momentum
-        return lr
+        if epoch < 20:
+            return 1e-1
+        return 1e-2
 
     def load_files(self, files):
         images = np.array([np.load(file) for file in files], dtype=np.float32)

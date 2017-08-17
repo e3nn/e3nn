@@ -25,7 +25,7 @@ class SE3BatchNorm(torch.nn.Module):
         :param x: [batch, feature, x, y, z]
         '''
         time = time_logging.start()
-        if self.training:
+        if self.training and self.momentum > 0:
             begin1 = 0
             begin2 = 0
             for m, d in self.Rs:
