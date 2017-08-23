@@ -72,24 +72,30 @@ class NormReluFunction(torch.autograd.Function):
         x, b = self.saved_tensors
 
         norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8 # [batch, x, y, z]
-        newnorm = norm - b.expand_as(norm) # [batch, x, y, z]
-        newnorm[newnorm < 0] = 0
-        ratio = newnorm / norm
-        ratio = ratio.view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x)
 
-        grad_x = grad_out * ratio
-        grad_x += torch.sum(grad_out * x, dim=1, keepdim=True).expand_as(x) * x / (norm ** 2).view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x) * (1 - ratio)
-        grad_x[ratio <= 0] = 0
+        grad_x = grad_b = None
 
-        grad_b = -torch.sum(grad_out * x, dim=1) / norm
-        grad_b[norm < b] = 0
-        grad_b = torch.sum(grad_b.view(-1), dim=0)
+        if self.needs_input_grad[0]:
+            newnorm = norm - b.expand_as(norm) # [batch, x, y, z]
+            newnorm[newnorm < 0] = 0
+            ratio = newnorm / norm
+            ratio = ratio.view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x)
+
+            grad_x = grad_out * ratio
+            grad_x += torch.sum(grad_out * x, dim=1, keepdim=True).expand_as(x) * x / (norm ** 2).view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x) * (1 - ratio)
+            grad_x[ratio <= 0] = 0
+
+        if self.needs_input_grad[1]:
+            grad_b = -torch.sum(grad_out * x, dim=1) / norm
+            grad_b[norm < b] = 0
+            grad_b = torch.sum(grad_b.view(-1), dim=0)
+
         time = time_logging.end("norm relu (backward)", time)
         return grad_x, grad_b
 
 
 def test_norm_relu_gradient(x=None, b=None):
-    from util_cnn.test import gradient_approximation
+    from util_cnn.gradient_approximation import gradient_approximation
 
     if x is None:
         x = torch.autograd.Variable(torch.rand(2, 5, 10, 10, 10), requires_grad=True)
