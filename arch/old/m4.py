@@ -58,7 +58,7 @@ class MyModel(Model):
         return 1e-3
 
     def load_files(self, files):
-        images = np.array([np.load(file) for file in files], dtype=np.float32)
+        images = np.array([np.load(file)['arr_0'] for file in files], dtype=np.float32)
         images = images.reshape((-1, 1, 64, 64, 64))
         images = torch.FloatTensor(images)
         return images
