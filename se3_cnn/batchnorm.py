@@ -17,6 +17,13 @@ class SE3BatchNorm(torch.nn.Module):
         self.register_buffer('running_var', torch.ones(self.num_features))
         self.reset_parameters()
 
+    def __repr__(self):
+        return "{} (Rs={}, eps={} momentum={})".format(
+            self.__class__.__name__,
+            self.Rs,
+            self.eps,
+            self.momentum)
+
     def reset_parameters(self):
         self.running_var.fill_(1)
 
@@ -64,3 +71,4 @@ def test_batchnorm():
     x = torch.autograd.Variable(torch.randn(16, 3+12+5, 10, 10, 10))
 
     y = bn(x)
+    return y

@@ -25,6 +25,12 @@ class SE3Convolution(torch.nn.Module):
         self.kwargs = kwargs
         self.reset_parameters()
 
+    def __repr__(self):
+        return "{} (size={}, {})".format(
+            self.__class__.__name__,
+            self.combination.size,
+            self.kwargs)
+
     def reset_parameters(self):
         self.weight.data.normal_(0, 1)
         if self.bias_relu is not None:
