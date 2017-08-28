@@ -1,8 +1,7 @@
 # pylint: disable=C,R,E1101
 '''
-Based on c15
-
-+ backup
+Best SE3 equivariant architecture found for shapenet
+classification of 6 classes
 '''
 import torch
 import torch.nn as nn
@@ -21,14 +20,14 @@ logger = logging.getLogger("trainer")
 
 
 class Block(nn.Module):
-    def __init__(self, scalar_out, vector_out, scalar_in, vector_in, relu, size=7, padding=3, stride=1):
+    def __init__(self, scalar_out, vector_out, scalar_in, vector_in, relu, stride):
         super().__init__()
         self.tensor = TensorProduct([(scalar_in, 1, False), (vector_in, 3, True)]) if vector_in > 0 else None
-        self.conv = SE3Convolution(size, 3,
+        self.conv = SE3Convolution(7, 3,
             [(scalar_out, SO3.repr1), (vector_out, SO3.repr3)],
             [(scalar_in, SO3.repr1), (vector_in, SO3.repr3), (vector_in, SO3.repr3x3)],
             stride=stride,
-            padding=padding)
+            padding=3)
         self.bn = SE3BatchNorm([(scalar_out, 1), (vector_out, 3)])
         self.relu = BiasRelu([(scalar_out, True), (vector_out * 3, False)]) if relu else None
 
@@ -51,32 +50,20 @@ class CNN(nn.Module):
 
         logger.info("Create CNN for classify %d classes", number_of_classes)
 
-        # Hout = (Hin+2∗padding−kernel_size) // stride + 1
-
         features = [(1, 0), # 64
-            (4, 2), # 33
-            (10, 5), # 33
-            (10, 5), # 17
-            (12, 6), # 17
-            (12, 6), # 9
-            (14, 7), # 9
-            (number_of_classes, 0)]  # 5
+            (4, 2), # 32
+            (10, 5), # 32
+            (10, 5), # 16
+            (12, 6), # 16
+            (12, 6), # 8
+            (14, 7), # 8
+            (number_of_classes, 0)]  # 4
 
         self.convolutions = []
 
-        s = 64
         for i in range(len(features) - 1):
             relu = i < len(features) - 2
-            stride = 2 if i % 2 == 0 else 1
-            if stride == 2:
-                size = 6 if s % 2 == 0 else 7
-            else:
-                size = 7
-            padding = 3
-
-            assert (s + 2 * padding - size) % stride == 0
-            s = (s + 2 * padding - size) // stride + 1
-            conv = Block(features[i + 1][0], features[i + 1][1], features[i][0], features[i][1], relu, size, padding, stride)
+            conv = Block(features[i + 1][0], features[i + 1][1], features[i][0], features[i][1], relu, 2 if i % 2 == 0 else 1)
             setattr(self, 'conv{}'.format(i), conv)
             self.convolutions.append(conv)
 
@@ -127,13 +114,8 @@ class MyModel(Model):
         return self.optimizer
 
     def get_learning_rate(self, epoch):
-        momentum = 0.5 * 0.5 ** self.true_epoch
-        logger.info("Momentum is %.0e and learning rate is %.0e", momentum, self.learning_rate)
-
-        for module in self.cnn.modules():
-            if isinstance(module, SE3BatchNorm):
-                module.momentum = momentum
-
+        logger.info("Learning rate is %.1e, The objective is %.1e", self.learning_rate,
+            self.previous_loss if self.previous_loss is not None else 0)
         return self.learning_rate
 
     def training_done(self, avg_loss, accuracy):
@@ -141,7 +123,10 @@ class MyModel(Model):
             if avg_loss > 1.3 * self.previous_loss:
                 # reject
                 logger.info("rejected")
-                self.learning_rate = self.good_learning_rate / 1.1414
+                self.previous_loss *= 1.03 # relax a little bit
+                if self.good_learning_rate > 1e-5:
+                    self.good_learning_rate /= 1.414
+                self.learning_rate = self.good_learning_rate
                 self.cnn.load_state_dict(self.saved_state[0])
                 self.optimizer.load_state_dict(self.saved_state[1])
                 return
@@ -167,6 +152,5 @@ class MyModel(Model):
     def load_files(self, files):
         images = np.array([np.load(file)['arr_0'] for file in files], dtype=np.float32)
         images = images.reshape((-1, 1, 64, 64, 64))
-        images = (images - 0.02267) / 0.14885
         images = torch.FloatTensor(images)
         return images
