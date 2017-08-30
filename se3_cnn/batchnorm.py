@@ -38,10 +38,10 @@ class SE3BatchNorm(torch.nn.Module):
             for m, d in self.Rs:
                 y = x.data[:, begin1: begin1 + m * d] # [batch, feature * repr, x, y, z]
                 begin1 += m * d
-                y = y.contiguous().view(x.size(0), m, d, *x.size()[2:]) # [batch, feature, repr, x, y, z]
+                y = y.contiguous().view(x.size(0), m, d, -1) # [batch, feature, repr, x * y * z]
 
-                y = torch.sum(y * y, dim=2) # [batch, feature, x, y, z]
-                y = y.mean(-1).mean(-1).mean(-1).mean(0) # [feature]
+                y = torch.sum(y ** 2, dim=2) # [batch, feature, x * y * z]
+                y = y.mean(-1).mean(0) # [feature]
 
                 self.running_var[begin2: begin2 + m] = (1 - self.momentum) * self.running_var[begin2: begin2 + m] + self.momentum * y
                 begin2 += m

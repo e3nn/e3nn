@@ -4,12 +4,10 @@ import torch
 from torch.nn.parameter import Parameter
 from se3_cnn import basis_kernels
 from se3_cnn import SO3
-from se3_cnn.non_linearities.scalar_activation import BiasRelu
-from se3_cnn.non_linearities.norm_activation import NormRelu
 from util_cnn import time_logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, radial_amount, Rs_out, Rs_in, bias_relu=False, norm_relu=False, scalar_batch_norm=False, upsampling=15, central_base=True, **kwargs):
+    def __init__(self, size, radial_amount, Rs_out, Rs_in, upsampling=15, central_base=True, **kwargs):
         '''
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
@@ -19,11 +17,8 @@ class SE3Convolution(torch.nn.Module):
         '''
         super().__init__()
         self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_out, Rs_in, central_base=central_base)
-        self.weight = Parameter(torch.FloatTensor(self.combination.nweights))
-        self.bias_relu = BiasRelu([(m * SO3.dim(R), SO3.dim(R) == 1) for m, R in Rs_out], batch_norm=scalar_batch_norm) if bias_relu else None
-        self.norm_relu = NormRelu([(SO3.dim(R), SO3.dim(R) > 1) for m, R in Rs_out for _ in range(m)]) if norm_relu else None
+        self.weight = Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
-        self.reset_parameters()
 
     def __repr__(self):
         return "{} (size={}, {})".format(
@@ -31,25 +26,12 @@ class SE3Convolution(torch.nn.Module):
             self.combination.size,
             self.kwargs)
 
-    def reset_parameters(self):
-        self.weight.data.normal_(0, 1)
-        if self.bias_relu is not None:
-            self.bias_relu.reset_parameters()
-        if self.norm_relu is not None:
-            self.norm_relu.reset_parameters()
-
     def forward(self, input): # pylint: disable=W
         kernel = self.combination(self.weight)
 
         time = time_logging.start()
         output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
         time = time_logging.end("3d convolutions", time)
-
-        if self.bias_relu is not None:
-            output = self.bias_relu(output)
-            time = time_logging.end("bias and relu", time)
-        if self.norm_relu is not None:
-            output = self.norm_relu(output)
 
         return output
 

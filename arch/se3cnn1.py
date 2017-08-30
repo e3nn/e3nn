@@ -2,6 +2,8 @@
 '''
 Best SE3 equivariant architecture found for shapenet
 classification of 6 classes
+
+c18
 '''
 import torch
 import torch.nn as nn
@@ -10,11 +12,11 @@ from se3_cnn.batchnorm import SE3BatchNorm
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn.non_linearities.tensor_product import TensorProduct
 from se3_cnn import SO3
-from util_cnn.model import Model
+from util_cnn.model_backup import ModelBackup
+
 from util_cnn import time_logging
 import logging
 import numpy as np
-import copy
 
 logger = logging.getLogger("trainer")
 
@@ -81,76 +83,32 @@ class CNN(nn.Module):
             t = time_logging.end("block {}".format(i), t)
 
         # [batch, features]
-        x = x.mean(-1).mean(-1).mean(-1)
+        x = x.view(x.size(0), x.size(1), -1).max(-1)[0]
         x = self.bn_out(x.contiguous())
         return x
 
 
-class MyModel(Model):
-
+class MyModel(ModelBackup):
     def __init__(self):
-        super(MyModel, self).__init__()
-        self.cnn = None
-        self.optimizer = None
-
-        self.previous_loss = None
-        self.saved_state = None
-        self.good_learning_rate = self.learning_rate = 1e-2
-        self.true_epoch = 0
+        super().__init__(
+            success_factor=2 ** (1/6),
+            decay_factor=2 ** (-1/4 * 1/6),
+            reject_factor=2 ** (-1),
+            reject_ratio=1.5,
+            min_learning_rate=1e-4,
+            max_learning_rate=0.2,
+            initial_learning_rate=1e-2)
 
     def initialize(self, number_of_classes):
         self.cnn = CNN(number_of_classes)
         self.optimizer = torch.optim.Adam(self.cnn.parameters())
 
-    def get_cnn(self):
-        if self.cnn is None:
-            raise ValueError("Need to call initialize first")
-        return self.cnn
-
     def get_batch_size(self, epoch=None):
         return 16
-
-    def get_optimizer(self):
-        return self.optimizer
-
-    def get_learning_rate(self, epoch):
-        logger.info("Learning rate is %.1e, The objective is %.1e", self.learning_rate,
-            self.previous_loss if self.previous_loss is not None else 0)
-        return self.learning_rate
-
-    def training_done(self, avg_loss, accuracy):
-        if self.previous_loss is not None and self.saved_state is not None:
-            if avg_loss > 1.3 * self.previous_loss:
-                # reject
-                logger.info("rejected")
-                self.previous_loss *= 1.03 # relax a little bit
-                if self.good_learning_rate > 1e-5:
-                    self.good_learning_rate /= 1.414
-                self.learning_rate = self.good_learning_rate
-                self.cnn.load_state_dict(self.saved_state[0])
-                self.optimizer.load_state_dict(self.saved_state[1])
-                return
-        # accept
-        self.true_epoch += 1
-
-        if self.previous_loss is None:
-            self.previous_loss = avg_loss
-            self.saved_state = copy.deepcopy((self.cnn.state_dict(), self.optimizer.state_dict()))
-            return
-
-        if avg_loss < self.previous_loss:
-            logger.info("accepted with improvement of %.1e", self.previous_loss - avg_loss)
-            self.previous_loss = avg_loss
-            self.saved_state = copy.deepcopy((self.cnn.state_dict(), self.optimizer.state_dict()))
-            self.good_learning_rate = self.learning_rate
-
-            if self.learning_rate < 0.1:
-                self.learning_rate *= 1.189
-        else:
-            logger.info("accepted but not better")
 
     def load_files(self, files):
         images = np.array([np.load(file)['arr_0'] for file in files], dtype=np.float32)
         images = images.reshape((-1, 1, 64, 64, 64))
+        images = (images - 0.02267) / 0.14885
         images = torch.FloatTensor(images)
         return images
