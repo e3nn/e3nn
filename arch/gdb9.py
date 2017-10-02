@@ -1,6 +1,10 @@
 # pylint: disable=C,R,E1101
 '''
 Architecture to predict molecule energy on database gdb9
+
+Prediction of U0 (unit Hartree)
+
+train RMSE 7e-3
 '''
 import torch
 import torch.nn as nn
@@ -28,7 +32,7 @@ class Block(nn.Module):
             stride=stride,
             padding=3)
         self.bn = SE3BatchNorm([(repr_out[0], 1), (repr_out[1], 3), (repr_out[2], 5)])
-        self.relu = BiasRelu([(repr_out[0], True), (repr_out[1] * 3, False), (repr_out[2] * 5, False)]) if relu else None
+        self.relu = BiasRelu([(repr_out[0], True), (repr_out[1] * 3, False), (repr_out[2] * 5, False)], normalize=False) if relu else None
 
     def forward(self, sv5): # pylint: disable=W
         if self.tensor is not None:
@@ -47,35 +51,36 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        features = [
-            (5+1, 0, 0), # 64
-            (8, 4, 0), # 32
-            (8, 4, 1), # 16
-            (16, 8, 2),
-            (16, 8, 2),
-            (1, 0, 0)
+        self.features = [
+            (5, 0, 0), # 64
+            (10, 3, 0), # 32
+            (10, 3, 1), # 32
+            (16, 8, 1), # 32
+            (16, 8, 1), # 32
+            (16, 8, 1), # 32
+            (1, 0, 0) # 32
         ]
         self.block_params = [
             {'stride': 2, 'relu': True},
-            {'stride': 2, 'relu': True},
+            {'stride': 1, 'relu': True},
+            {'stride': 1, 'relu': True},
             {'stride': 1, 'relu': True},
             {'stride': 1, 'relu': True},
             {'stride': 1, 'relu': False},
         ]
 
-        assert len(self.block_params) + 1 == len(features)
+        assert len(self.block_params) + 1 == len(self.features)
 
         for i in range(len(self.block_params)):
-            block = Block(features[i], features[i + 1], self.block_params[i]['relu'], self.block_params[i]['stride'])
+            block = Block(self.features[i], self.features[i + 1], self.block_params[i]['relu'], self.block_params[i]['stride'])
             setattr(self, 'block{}'.format(i), block)
 
-        self.lin = torch.nn.Linear(5+1, 1)
-        self.lin.weight.data[0, 0] = -0.55
-        self.lin.weight.data[0, 1] = -38
-        self.lin.weight.data[0, 2] = -55
-        self.lin.weight.data[0, 3] = -75
-        self.lin.weight.data[0, 4] = -96
-        self.lin.weight.data[0, 5] = -2.1
+        self.lin = torch.nn.Linear(5, 1)
+        self.lin.weight.data[0, 0] = -0.6031
+        self.lin.weight.data[0, 1] = -38.0531
+        self.lin.weight.data[0, 2] = -54.7281
+        self.lin.weight.data[0, 3] = -75.1976
+        self.lin.weight.data[0, 4] = -99.8347
 
         self.alpha = torch.nn.Parameter(torch.ones(1))
 
@@ -94,29 +99,27 @@ class CNN(nn.Module):
         x = x.view(x.size(0), x.size(1), -1) # [batch, features, x*y*z]
         x = x.mean(-1) # [batch, features]
 
-        x = x * self.alpha
+        x = x * self.alpha * 0.1
 
-        # logger.info("%f", x.data.mean())
+        inp = inp.view(inp.size(0), inp.size(1), -1).sum(-1)
 
-        x = x + self.lin(inp.view(inp.size(0), inp.size(1), -1).sum(-1))
+        y = self.lin(inp)
 
-        # logger.info("%s", repr(self.lin.weight.data))
-
-        return x
+        return x + y
 
 
 class MyModel(ModelBackup):
     def __init__(self):
         super().__init__(
-            success_factor=2 ** (1/6),
+            success_factor=1,
             decay_factor=2 ** (-1/4 * 1/6),
             reject_factor=2 ** (-1),
-            reject_ratio=1.5,
+            reject_ratio=2,
             min_learning_rate=1e-4,
             max_learning_rate=0.2,
-            initial_learning_rate=1e-2)
+            initial_learning_rate=2e-3)
 
-    def initialize(self):
+    def initialize(self, **kargs):
         self.cnn = CNN()
         self.optimizer = torch.optim.Adam(self.cnn.parameters())
 
@@ -133,21 +136,24 @@ class MyModel(ModelBackup):
         n = 64
 
         atom_index = ['H', 'C', 'N', 'O', 'F']
-        voxels = np.zeros((len(files), len(atom_index) + 1, n, n, n), dtype=np.float32)
-        # inp = np.zeros((len(files), len(atom_index) + 1), dtype=np.float32)
+        voxels = np.zeros((len(files), len(atom_index), n, n, n), dtype=np.float32)
+
+        a = np.linspace(start=-n/2*p + p/2, stop=n/2*p - p/2, num=n, endpoint=True)
+        xx, yy, zz = np.meshgrid(a, a, a, indexing="ij")
 
         for i, data in enumerate(datas):
-            for ato, pos, cha in zip(data['atoms'], data['xyz'], data['charges']):
-                x = int(pos[0]/p + 0.5*n)
-                y = int(pos[1]/p + 0.5*n)
-                z = int(pos[2]/p + 0.5*n)
-                voxels[i, ato, x, y, z]  += 1
-                voxels[i, len(atom_index), x, y, z] += cha
-                # inp[i, ato] += 1
-                # inp[i, len(atom_index)] += cha
+            for ato, pos in zip(data['atoms'], data['xyz']):
+                x = pos[0]
+                y = pos[1]
+                z = pos[2]
 
-        inputs = torch.FloatTensor(voxels)
-        targets = torch.FloatTensor(np.array([[data['en']] for data in datas], np.float32))
+                density = np.exp(-((xx-x)**2 + (yy-y)**2 + (zz-z)**2) / (2 * p**2))
+                density /= np.sum(density)
+
+                voxels[i, ato] += density
+
+        inputs = voxels
+        targets = np.array([[data['en']] for data in datas], np.float32)
 
         return inputs, targets
 
