@@ -1,10 +1,9 @@
 # pylint: disable=C,R,E1101
 '''
-Architecture to predict molecule energy on database gdb9
+Architecture to predict molecule energy on database qm7
 
-Prediction of U0 (unit Hartree)
-
-RMSE train = 7e-3
+RMSE train = 7.3
+RMSE test = 8.9 and 7.4
 '''
 import torch
 import torch.nn as nn
@@ -18,6 +17,7 @@ from util_cnn.model_backup import ModelBackup
 from util_cnn import time_logging
 import logging
 import numpy as np
+import pickle
 
 logger = logging.getLogger("trainer")
 
@@ -76,11 +76,11 @@ class CNN(nn.Module):
             setattr(self, 'block{}'.format(i), block)
 
         self.lin = torch.nn.Linear(5, 1)
-        self.lin.weight.data[0, 0] = -0.6031
-        self.lin.weight.data[0, 1] = -38.0531
-        self.lin.weight.data[0, 2] = -54.7281
-        self.lin.weight.data[0, 3] = -75.1976
-        self.lin.weight.data[0, 4] = -99.8347
+        self.lin.weight.data[0, 0] = -69.14
+        self.lin.weight.data[0, 1] = -153.3
+        self.lin.weight.data[0, 2] = -99.04
+        self.lin.weight.data[0, 3] = -97.76
+        self.lin.weight.data[0, 4] = -80.44
 
         self.alpha = torch.nn.Parameter(torch.ones(1))
 
@@ -99,11 +99,13 @@ class CNN(nn.Module):
         x = x.view(x.size(0), x.size(1), -1) # [batch, features, x*y*z]
         x = x.mean(-1) # [batch, features]
 
-        x = x * self.alpha * 0.1
+        x = x * self.alpha * 20
 
         inp = inp.view(inp.size(0), inp.size(1), -1).sum(-1)
 
         y = self.lin(inp)
+
+        # print(repr(x), repr(y))
 
         return x + y
 
@@ -130,19 +132,20 @@ class MyModel(ModelBackup):
         return torch.nn.MSELoss()
 
     def load_files(self, files):
-        datas = [load_file(f) for f in files]
-
-        p = 0.13
+        p = 0.3
         n = 64
 
-        atom_index = ['H', 'C', 'N', 'O', 'F']
-        voxels = np.zeros((len(files), len(atom_index), n, n, n), dtype=np.float32)
+        number_of_atoms_types = 5
+        inputs = np.zeros((len(files), number_of_atoms_types, n, n, n), dtype=np.float32)
 
         a = np.linspace(start=-n/2*p + p/2, stop=n/2*p - p/2, num=n, endpoint=True)
         xx, yy, zz = np.meshgrid(a, a, a, indexing="ij")
 
-        for i, data in enumerate(datas):
-            for ato, pos in zip(data['atoms'], data['xyz']):
+        for i, f in enumerate(files):
+            with open(f, 'rb') as f:
+                content = pickle.load(f)
+
+            for ato, pos in zip(content[0], content[1]):
                 x = pos[0]
                 y = pos[1]
                 z = pos[2]
@@ -150,32 +153,6 @@ class MyModel(ModelBackup):
                 density = np.exp(-((xx-x)**2 + (yy-y)**2 + (zz-z)**2) / (2 * p**2))
                 density /= np.sum(density)
 
-                voxels[i, ato] += density
+                inputs[i, ato] += density
 
-        inputs = voxels
-        targets = np.array([[data['en']] for data in datas], np.float32)
-
-        return inputs, targets
-
-
-def load_file(file):
-    with open(file, 'rt') as f:
-        content = f.read()
-    lines = content.split('\n')
-
-    na = int(lines[0])
-
-    properties = lines[1].split()
-    idx = int(properties[1])
-    en = float(properties[13])
-    data = [l.split() for l in lines[2:2+na]]
-
-    atom_index = ['H', 'C', 'N', 'O', 'F']
-    atoms = [atom_index.index(l[0]) for l in data]
-
-    xyz = np.array([[float(x.replace('*^', 'e')) for x in l[1:4]] for l in data])
-    xyz -= 0.5 * (np.min(xyz, axis=0) + np.max(xyz, axis=0))
-
-    charges = np.array([float(l[4].replace('*^', 'e')) for l in data])
-
-    return {'idx':idx, 'en':en, 'atoms':atoms, 'xyz':xyz, 'charges':charges}
+        return inputs
