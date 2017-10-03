@@ -3,7 +3,7 @@ import torch
 from util_cnn import time_logging
 
 class SE3BatchNorm(torch.nn.Module):
-    def __init__(self, Rs, eps=1e-5, momentum=0.1):
+    def __init__(self, Rs, eps=1e-5, momentum=0.1, mode='normal'):
         '''
         :param Rs: list of tuple (multiplicity, dimension)
         '''
@@ -14,6 +14,7 @@ class SE3BatchNorm(torch.nn.Module):
 
         self.eps = eps
         self.momentum = momentum
+        self.mode = mode
         self.register_buffer('running_var', torch.ones(self.num_features))
         self.reset_parameters()
 
@@ -41,7 +42,18 @@ class SE3BatchNorm(torch.nn.Module):
                 y = y.contiguous().view(x.size(0), m, d, -1) # [batch, feature, repr, x * y * z]
 
                 y = torch.sum(y ** 2, dim=2) # [batch, feature, x * y * z]
-                y = y.mean(-1).mean(0) # [feature]
+
+                if self.mode == 'normal':
+                    y = y.mean(-1).mean(0) # [feature]
+                if self.mode == 'ignore_zeros':
+                    mask = torch.abs(y) > self.eps # [batch, feature, x * y * z]
+                    number = mask.sum(-1).sum(0) # [feature]
+                    y = y.sum(-1).sum(0) # [feature]
+                    y = y / (number.float() + self.eps)
+                if self.mode == 'maximum':
+                    y = y.max(-1)[0].mean(0) # [feature]
+                else:
+                    raise ValueError("no mode named \"{}\"".format(self.mode))
 
                 self.running_var[begin2: begin2 + m] = (1 - self.momentum) * self.running_var[begin2: begin2 + m] + self.momentum * y
                 begin2 += m

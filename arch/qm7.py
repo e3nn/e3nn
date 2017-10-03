@@ -26,12 +26,12 @@ class Block(nn.Module):
     def __init__(self, repr_in, repr_out, relu, stride):
         super().__init__()
         self.tensor = TensorProduct([(repr_in[0], 1, False), (repr_in[1], 3, True), (repr_in[2], 5, False)]) if repr_in[1] > 0 else None
+        self.bn = SE3BatchNorm([(repr_in[0], 1), (repr_in[1], 3), (repr_in[2], 5), (repr_in[1], 9)], momentum=0.01, mode='maximum')
         self.conv = SE3Convolution(size=7, radial_amount=3,
             Rs_out=[(repr_out[0], SO3.repr1), (repr_out[1], SO3.repr3), (repr_out[2], SO3.repr5)],
             Rs_in=[(repr_in[0], SO3.repr1), (repr_in[1], SO3.repr3), (repr_in[2], SO3.repr5), (repr_in[1], SO3.repr3x3)],
             stride=stride,
             padding=3)
-        self.bn = SE3BatchNorm([(repr_out[0], 1), (repr_out[1], 3), (repr_out[2], 5)]) if relu else None
         self.relu = BiasRelu([(repr_out[0], True), (repr_out[1] * 3, False), (repr_out[2] * 5, False)], normalize=False) if relu else None
 
     def forward(self, sv5): # pylint: disable=W
@@ -40,9 +40,9 @@ class Block(nn.Module):
             sv5t = torch.cat([sv5, t], dim=1)
         else:
             sv5t = sv5
+        sv5t = self.bn(sv5t)
         sv5 = self.conv(sv5t) # only convolution
         if self.relu is not None:
-            sv5 = self.bn(sv5)
             sv5 = self.relu(sv5)
         return sv5
 
@@ -99,13 +99,13 @@ class CNN(nn.Module):
         x = x.view(x.size(0), x.size(1), -1) # [batch, features, x*y*z]
         x = x.mean(-1) # [batch, features]
 
-        x = x * self.alpha * 20
+        x = x * self.alpha * 5
 
         inp = inp.view(inp.size(0), inp.size(1), -1).sum(-1)
 
         y = self.lin(inp)
 
-        # print(repr(x), repr(y))
+        # print(repr(x.data.cpu().numpy()), repr(y.data.cpu().numpy()))
 
         return x + y
 
@@ -130,6 +130,13 @@ class MyModel(ModelBackup):
 
     def get_criterion(self):
         return torch.nn.MSELoss()
+
+    def get_learning_rate(self, epoch):
+        for module in self.cnn.modules():
+            if isinstance(module, SE3BatchNorm):
+                module.momentum = 0.01 * (0.1 ** epoch)
+
+        return super().get_learning_rate(epoch)
 
     def load_files(self, files):
         p = 0.3
