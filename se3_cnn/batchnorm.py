@@ -28,16 +28,17 @@ class SE3BatchNorm(torch.nn.Module):
     def reset_parameters(self):
         self.running_var.fill_(1)
 
-    def forward(self, x): # pylint: disable=W
+    def update_statistics(self, x):
         '''
-        :param x: [batch, feature, x, y, z]
+        update self.running_var using x
+
+        :param x: Tensor [batch, feature, x, y, z]
         '''
-        time = time_logging.start()
         if self.training and self.momentum > 0:
             begin1 = 0
             begin2 = 0
             for m, d in self.Rs:
-                y = x.data[:, begin1: begin1 + m * d] # [batch, feature * repr, x, y, z]
+                y = x[:, begin1: begin1 + m * d] # [batch, feature * repr, x, y, z]
                 begin1 += m * d
                 y = y.contiguous().view(x.size(0), m, d, -1) # [batch, feature, repr, x * y * z]
 
@@ -57,6 +58,14 @@ class SE3BatchNorm(torch.nn.Module):
 
                 self.running_var[begin2: begin2 + m] = (1 - self.momentum) * self.running_var[begin2: begin2 + m] + self.momentum * y
                 begin2 += m
+
+    def forward(self, x): # pylint: disable=W
+        '''
+        :param x: [batch, feature, x, y, z]
+        '''
+        time = time_logging.start()
+
+        self.update_statistics(x.data)
 
         ys = []
         begin1 = 0
