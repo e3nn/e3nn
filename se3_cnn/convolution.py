@@ -7,8 +7,9 @@ from se3_cnn import SO3
 from util_cnn import time_logging
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, radial_amount, Rs_out, Rs_in, upsampling=15, central_base=True, **kwargs):
+    def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, **kwargs):
         '''
+        :param Rs_in: list of couple (multiplicity, representation)
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
         representation is a function of SO(3) in Euler ZYZ parametrisation alpha, beta, gamma
@@ -16,7 +17,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super().__init__()
-        self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_out, Rs_in, central_base=central_base)
+        self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_in, Rs_out, central_base=central_base)
         self.weight = Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
 
@@ -37,7 +38,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, radial_amount, upsampling, Rs_out, Rs_in, central_base):
+    def __init__(self, size, radial_amount, upsampling, Rs_in, Rs_out, central_base):
         super(SE3KernelCombination, self).__init__()
 
         self.size = size
@@ -123,8 +124,8 @@ class SE3KernelCombination(torch.autograd.Function):
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
                 kernel[si, sj] = ker
 
-                begin_j += self.multiplicites_in[j] * self.dims_in[j]
-            begin_i += self.multiplicites_out[i] * self.dims_out[i]
+                begin_j += mj * self.dims_in[j]
+            begin_i += mi * self.dims_out[i]
 
         time_logging.end("kernel combination (forward)", time)
         return kernel
