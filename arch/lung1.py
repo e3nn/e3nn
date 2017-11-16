@@ -9,6 +9,8 @@ from se3_cnn.bn_conv import SE3BNConvolution
 from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn import SO3
 from util_cnn.model_backup import ModelBackup
+import glob
+import os
 
 from util_cnn import time_logging
 import logging
@@ -99,15 +101,13 @@ class CNN(nn.Module):
             (16, 8, 1), # 32
             (16, 8, 1), # 32
             (16, 8, 1), # 16
-            (16, 8, 1), # 8
-            (2, 0, 0) # 4
+            (1, 0, 0) # 8
         ]
         self.block_params = [
             {'stride': 2, 'non_linearities': True},
             {'stride': 1, 'non_linearities': True},
             {'stride': 1, 'non_linearities': True},
             {'stride': 1, 'non_linearities': True},
-            {'stride': 2, 'non_linearities': True},
             {'stride': 2, 'non_linearities': True},
             {'stride': 2, 'non_linearities': False},
         ]
@@ -126,7 +126,7 @@ class CNN(nn.Module):
 
         t = time_logging.start()
         for i in range(len(self.block_params)):
-            logger.info("%d: %f +- %f", i, x.data.mean(), x.data.std())
+            #logger.info("%d: %f +- %f", i, x.data.mean(), x.data.std())
 
             block = getattr(self, 'block{}'.format(i))
             x = block(x)
@@ -138,6 +138,8 @@ class CNN(nn.Module):
         return x
 
 
+mhd_files = glob.glob('subset*/*.mhd')
+
 class MyModel(ModelBackup):
     def __init__(self):
         super().__init__(
@@ -145,9 +147,9 @@ class MyModel(ModelBackup):
             decay_factor=2 ** (-1/4 * 1/6),
             reject_factor=2 ** (-1),
             reject_ratio=2,
-            min_learning_rate=1e-4,
-            max_learning_rate=0.2,
-            initial_learning_rate=2e-3)
+            min_learning_rate=1e-5,
+            max_learning_rate=1e-2,
+            initial_learning_rate=1e-3)
 
     def initialize(self, **kargs):
         self.cnn = CNN()
@@ -161,13 +163,25 @@ class MyModel(ModelBackup):
         pos = np.where(labels == 1)[0]
         neg = np.where(labels == 0)[0]
 
+        np.random.shuffle(pos)
+        np.random.shuffle(neg)
+
         batches = []
-        for i in pos:
-            batches.append([i] + list(np.random.choice(neg, size=15, replace=False)))
+        for i in range(len(pos) // 8):
+            batch = list(pos[8*i: 8*i+8]) + list(neg[8*i: 8*i+8])
+            batches.append(batch)
         return batches
 
     def get_criterion(self):
-        return torch.nn.CrossEntropyLoss()
+        class Crit(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self._crit = torch.nn.BCEWithLogitsLoss()
+            def forward(self, logit, target): # pylint: disable=W0221
+                target = target.float().view(target.size(0), 1)
+                return self._crit(logit, target)
+
+        return Crit()
 
     def get_learning_rate(self, epoch):
         for module in self.cnn.modules():
@@ -177,7 +191,6 @@ class MyModel(ModelBackup):
         return super().get_learning_rate(epoch)
 
     def load_files(self, files):
-        import glob
         n = 64
 
         inputs = np.zeros((len(files), 1, n, n, n), dtype=np.float32)
@@ -186,7 +199,7 @@ class MyModel(ModelBackup):
             f = np.load(f)
             name = str(f['name'])
             x, y, z = f['position']
-            raw_file = next(f for f in glob.glob('subset*/*.mhd') if name in f)
+            raw_file = next(f for f in mhd_files if name in f)
             inputs[i] = self.extract(raw_file, x, y, z)
 
         inputs = np.clip(inputs, -1000, 500)
@@ -197,6 +210,11 @@ class MyModel(ModelBackup):
     def extract(self, file, x, y, z):
         import SimpleITK as sitk
         from scipy import ndimage
+
+        cache_file = 'cache/' + file.split('/')[-1][:-4] + '_x{}_y{}_z{}'.format(int(round(x * 1000)), int(round(y * 1000)), int(round(z * 1000))).replace('-', 'm') + '.npy'
+
+        if os.path.isfile(cache_file):
+            return np.load(cache_file)
 
         img = sitk.ReadImage(file)
         nda = sitk.GetArrayFromImage(img)
@@ -229,5 +247,7 @@ class MyModel(ModelBackup):
         assert output.shape[0] == size
         assert output.shape[1] == size
         assert output.shape[2] == size
+
+        np.save(cache_file, output)
 
         return output
