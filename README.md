@@ -1,12 +1,7 @@
 # SE3 CNN
 
+Functions to make SE(3) (3d rotations and translation) equivariant convolutional neural networks.
 This is a *research* repository, not all the classes and function are relevant.
-
-functions to make SE(3) (3d rotations and translation) equivariant convolutional neural networks.
-
-## Dependencies
-
-- [util_cnn](https://github.com/antigol/util_cnn) only for time profiling and file caching
 
 ## Main elements
 

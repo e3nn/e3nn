@@ -4,7 +4,6 @@ import torch
 from torch.nn.parameter import Parameter
 from se3_cnn import basis_kernels
 from se3_cnn import SO3
-from util_cnn import time_logging
 
 class SE3Convolution(torch.nn.Module):
     def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, **kwargs):
@@ -30,16 +29,14 @@ class SE3Convolution(torch.nn.Module):
     def forward(self, input): # pylint: disable=W
         kernel = self.combination(self.weight)
 
-        time = time_logging.start()
         output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
-        time = time_logging.end("3d convolutions", time)
 
         return output
 
 
 class SE3KernelCombination(torch.autograd.Function):
     def __init__(self, size, radial_amount, upsampling, Rs_in, Rs_out, central_base):
-        super(SE3KernelCombination, self).__init__()
+        super().__init__()
 
         self.size = size
         Rs_out = [(m, R) for m, R in Rs_out if m >= 1]
@@ -88,7 +85,6 @@ class SE3KernelCombination(torch.autograd.Function):
         """
         :return: [feature_out, feature_in, x, y, z]
         """
-        time = time_logging.start()
         assert weight.dim() == 1, "size = {}".format(weight.size())
         assert weight.size(0) == self.nweights
 
@@ -127,11 +123,9 @@ class SE3KernelCombination(torch.autograd.Function):
                 begin_j += mj * self.dims_in[j]
             begin_i += mi * self.dims_out[i]
 
-        time_logging.end("kernel combination (forward)", time)
         return kernel
 
     def backward(self, grad_kernel): #pylint: disable=W
-        time = time_logging.start()
         if grad_kernel.is_cuda and not self.kernels[0][0].is_cuda:
             self.kernels = [[K.cuda() for K in row] for row in self.kernels]
         if not grad_kernel.is_cuda and self.kernels[0][0].is_cuda:
@@ -166,7 +160,6 @@ class SE3KernelCombination(torch.autograd.Function):
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
 
-        time_logging.end("kernel combination (backward)", time)
         return grad_weight
 
 
@@ -175,7 +168,7 @@ def test_normalization(batch, size, Rs_out=None, Rs_in=None):
         Rs_out = [(1, SO3.repr1), (1, SO3.repr3)]
     if Rs_in is None:
         Rs_in = [(1, SO3.repr1), (1, SO3.repr3)]
-    conv = SE3Convolution(4, 2, Rs_out, Rs_in, bias_relu=False, norm_relu=False)
+    conv = SE3Convolution(4, 2, Rs_in, Rs_out)
     print("Weights Amount = {} Mean = {} Std = {}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
 
     n_out = sum([m * SO3.dim(r) for m, r in Rs_out])
@@ -191,44 +184,14 @@ def test_normalization(batch, size, Rs_out=None, Rs_in=None):
     return y.data
 
 
-def test_convolution_gradient():
-    from util_cnn.gradient_approximation import gradient_approximation
-    conv = SE3Convolution(4, 2, [(1, SO3.repr1), (1, SO3.repr3)], [(1, SO3.repr1), (1, SO3.repr3)], bias_relu=True, norm_relu=True)
-
-    x = torch.autograd.Variable(torch.rand(2, 4, 10, 10, 10), requires_grad=True)
-
-    y = conv(x)
-    grad_y = torch.rand(*y.size())
-    torch.autograd.backward(y, grad_y)
-
-    grad_x_approx = gradient_approximation(lambda x: conv(torch.autograd.Variable(x)).data, x.data, grad_y, epsilon=1e-5)
-
-    print("grad_x {}".format(x.grad.data.std()))
-    print("grad_x_approx {}".format(grad_x_approx.std()))
-    print("grad_x - grad_x_approx {}".format((x.grad.data - grad_x_approx).std()))
-
-    return x.grad.data, grad_x_approx
-
-def test_combination_gradient(Rs_out=None, Rs_in=None, epsilon=1e-3):
-    from util_cnn.gradient_approximation import gradient_approximation
-
+def test_combination_gradient(Rs_out=None, Rs_in=None):
     if Rs_in is None:
-        Rs_in = [(3, SO3.repr1), (2, SO3.repr3), (1, SO3.repr5)]
+        Rs_in = [(2, SO3.repr1), (1, SO3.repr3), (1, SO3.repr5)]
     if Rs_out is None:
-        Rs_out = [(2, SO3.repr3), (1, SO3.repr1)]
+        Rs_out = [(1, SO3.repr3), (1, SO3.repr1)]
 
     combination = SE3KernelCombination(4, 2, 15, Rs_out, Rs_in, central_base=True)
 
     w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
 
-    k = combination(w)
-    grad_k = torch.rand(*k.size())
-    torch.autograd.backward(k, grad_k)
-
-    grad_w_approx = gradient_approximation(lambda x: combination(torch.autograd.Variable(x)).data, w.data, grad_k, epsilon=epsilon)
-
-    print("grad_w {}".format(w.grad.data.std()))
-    print("grad_w_approx {}".format(grad_w_approx.std()))
-    print("grad_w - grad_w_approx {}".format((w.grad.data - grad_w_approx).std()))
-
-    return w.grad.data, grad_w_approx
+    torch.autograd.gradcheck(combination, (w, ), eps=1)

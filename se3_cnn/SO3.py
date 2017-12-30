@@ -33,6 +33,9 @@ def rot(alpha, beta, gamma):
 
 
 def x_to_alpha_beta(x):
+    '''
+    Convert point (x, y, z) on the sphere into (alpha, beta)
+    '''
     x = x / np.linalg.norm(x)
     beta = np.arccos(x[2])
     alpha = np.arctan2(x[1], x[0])
@@ -40,6 +43,9 @@ def x_to_alpha_beta(x):
 
 
 def dim(R):
+    '''
+    Compute the dimension of a representation function
+    '''
     return R(0, 0, 0).shape[0]
 
 # The next functions are some usual representations

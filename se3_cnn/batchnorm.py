@@ -1,6 +1,5 @@
 #pylint: disable=C,R,E1101
 import torch
-from util_cnn import time_logging
 
 class SE3BatchNorm(torch.nn.Module):
     def __init__(self, Rs, eps=1e-5, momentum=0.1, mode='normal'):
@@ -63,8 +62,6 @@ class SE3BatchNorm(torch.nn.Module):
         '''
         :param x: [batch, feature, x, y, z]
         '''
-        time = time_logging.start()
-
         self.update_statistics(x.data)
 
         ys = []
@@ -82,7 +79,6 @@ class SE3BatchNorm(torch.nn.Module):
             ys.append(y.view(x.size(0), m * d, *x.size()[2:]))
 
         y = torch.cat(ys, dim=1)
-        time_logging.end("batch norm", time)
         return y
 
 

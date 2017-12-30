@@ -9,7 +9,7 @@ class BiasRelu(torch.nn.Module):
 
         If boolean is True a bias and relu will be applied
         '''
-        super(BiasRelu, self).__init__()
+        super().__init__()
 
         self.enable = []
         for d, on in enable:

@@ -1,20 +1,17 @@
 #pylint: disable=C,R,E1101
 import torch
-from util_cnn import time_logging
 
 class TensorProduct:
     def __init__(self, enabled):
         '''
         :param enabled: list of triplets (multiplicity, dimension, bool)
         '''
-        # super(TensorProduct, self).__init__()
         self.enabled = enabled
 
     def __call__(self, x):
         '''
         :param x: [batch, features, x, y, z]
         '''
-        time = time_logging.start()
         nbatch = x.size(0)
         nx = x.size(2)
         ny = x.size(3)
@@ -41,5 +38,4 @@ class TensorProduct:
             begin += m * dim
 
         y = torch.cat(ys, dim=1)
-        time_logging.end("tensor product", time)
         return y
