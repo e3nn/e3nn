@@ -20,7 +20,7 @@ class CNN(torch.nn.Module):
         ]
         self.block_params = [
             {'stride': 2, 'non_linearities': True},
-            {'stride': 1, 'non_linearities': False},
+            {'stride': 2, 'non_linearities': False},
         ]
 
         assert len(self.block_params) + 1 == len(self.features)
@@ -47,14 +47,16 @@ class CNN(torch.nn.Module):
 
 def main():
     cnn = CNN()
-    cnn.cuda()
+
+    if torch.cuda.is_available():
+        cnn.cuda()
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(cnn.parameters())
+    optimizer = torch.optim.Adam(cnn.parameters(), lr=1e-2)
 
 
     batch_size = 64
-    sample_size = 32
+    sample_size = 24
 
     mesh = np.linspace(-1, 1, sample_size)
     mx, my, mz = np.meshgrid(mesh, mesh, mesh)
@@ -64,16 +66,23 @@ def main():
         y = np.random.randint(0, 2, size=(batch_size,))
 
         for j, label in enumerate(y):
-            rx = 0.7
-            ry = 0.7
-            rz = 0.7 if label == 0 else 0.2
+            radius = 0.6 + np.random.rand() * (0.9 - 0.6)
 
-            ellipsoid = (mx / rx)**2 + (my / ry)**2 + (mz / rz)**2 < 1
+            if label == 0:
+                # ball
+                mask = mx ** 2 + my ** 2 + mz ** 2 < radius ** 2
+            if label == 1:
+                # cube
+                mask = abs(mx) + abs(my) + abs(mz) < radius
 
-            x[j, 0, ellipsoid] += np.random.randint(2) * 2 - 1
+            x[j, 0, mask] += np.random.randint(2) * 2 - 1
 
-        x = torch.FloatTensor(x).cuda()
-        y = torch.LongTensor(y).cuda()
+        x = torch.FloatTensor(x)
+        y = torch.LongTensor(y)
+
+        if torch.cuda.is_available():
+            x = x.cuda()
+            y = y.cuda()
 
         x = torch.autograd.Variable(x)
         y = torch.autograd.Variable(y)
