@@ -15,3 +15,17 @@ List of relevant classes defined in this repository.
 ## Example
 
 See file `arch/example.py`
+
+## Hierarchy
+
+- `se3_cnn` contains the library
+- `arch` contains architectures made with the library
+- `notebook` contains [jupyer](http://jupyter.org/) notebooks
+- `toy_dataset` contains scripts to generate a dataset by converting 3D models files (see [ModelNet](http://modelnet.cs.princeton.edu/) or [ShapeNet](https://www.shapenet.org/)) into voxels ugins [obj2voxel](https://github.com/antigol/obj2voxel)
+
+## Usage
+
+Install with
+```
+python setup.py install
+```
