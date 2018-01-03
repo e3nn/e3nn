@@ -13,34 +13,28 @@ class CNN(torch.nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        self.features = [
+        features = [
             (1, 0, 0),
             (10, 10, 2),
             (2, 0, 0)
         ]
-        self.block_params = [
+        block_params = [
             {'stride': 2, 'non_linearities': True},
             {'stride': 2, 'non_linearities': False},
         ]
 
-        assert len(self.block_params) + 1 == len(self.features)
+        assert len(block_params) + 1 == len(features)
 
-        for i in range(len(self.block_params)):
-            block = HighwayBlock(self.features[i], self.features[i + 1], **self.block_params[i])
-            setattr(self, 'block{}'.format(i), block)
+        blocks = [HighwayBlock(features[i], features[i + 1], **block_params[i]) for i in range(len(block_params))]
+        self.blocks = torch.nn.Sequential(*blocks)
 
-    def forward(self, inp): # pylint: disable=W
+    def forward(self, inp):  # pylint: disable=W
         '''
         :param inp: [batch, features, x, y, z]
         '''
-        x = inp
-
-        for i in range(len(self.block_params)):
-            block = getattr(self, 'block{}'.format(i))
-            x = block(x)
-
-        x = x.view(x.size(0), x.size(1), -1) # [batch, features, x*y*z]
-        x = x.mean(-1) # [batch, features]
+        x = self.blocks(inp)  # [batch, features, x, y, z]
+        x = x.view(x.size(0), x.size(1), -1)  # [batch, features, x*y*z]
+        x = x.mean(-1)  # [batch, features]
 
         return x
 
@@ -53,7 +47,6 @@ def main():
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(cnn.parameters(), lr=1e-2)
-
 
     batch_size = 64
     sample_size = 24
@@ -103,6 +96,7 @@ def main():
 
     for i in range(1000):
         step(i)
+
 
 if __name__ == '__main__':
     main()
