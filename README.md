@@ -23,6 +23,11 @@ See file `arch/example.py`
 - `notebook` contains [jupyer](http://jupyter.org/) notebooks
 - `toy_dataset` contains scripts to generate a dataset by converting 3D models files (see [ModelNet](http://modelnet.cs.princeton.edu/) or [ShapeNet](https://www.shapenet.org/)) into voxels ugins [obj2voxel](https://github.com/antigol/obj2voxel)
 
+
+## Dependencies
+
+- [lie_learn](https://github.com/AMLab-Amsterdam/lie_learn)
+
 ## Usage
 
 Install with
