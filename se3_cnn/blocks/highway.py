@@ -5,12 +5,16 @@ from se3_cnn.non_linearities.scalar_activation import BiasRelu
 from se3_cnn import SO3
 
 class HighwayBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, non_linearities, stride):
+    def __init__(self, repr_in, repr_out, non_linearities, size, radial_amount, stride=1, padding=0, batch_norm_momentum=0.1):
         '''
         :param: repr_in: tuple with multiplicities of repr. (1, 3, 5)
         :param: repr_out: same but for the output
         :param: non_linearities: boolean, enable or not relu
-        :param: stride: stride of the convolution
+        :param: size: the filters are cubes of dimension = size x size x size
+        :param: radial_amount: number of radial discretization
+        :param: stride: stride of the convolution (for torch.nn.functional.conv3d)
+        :param: padding: padding of the convolution (for torch.nn.functional.conv3d)
+        :param: batch_norm_momentum: batch normalization momentum
         '''
         super().__init__()
         self.repr_out = repr_out
@@ -18,13 +22,13 @@ class HighwayBlock(torch.nn.Module):
         Rs_out = [(repr_out[1] + repr_out[2], SO3.repr1)] if non_linearities else []
 
         self.bn_conv = SE3BNConvolution(
-            size=7,
-            radial_amount=3,
+            size=size,
+            radial_amount=radial_amount,
             Rs_in=[(repr_in[0], SO3.repr1), (repr_in[1], SO3.repr3), (repr_in[2], SO3.repr5)],
             Rs_out=[(repr_out[0], SO3.repr1), (repr_out[1], SO3.repr3), (repr_out[2], SO3.repr5)] + Rs_out,
             stride=stride,
-            padding=3,
-            momentum=0.01,
+            padding=padding,
+            momentum=batch_norm_momentum,
             mode='maximum')
 
         if non_linearities:

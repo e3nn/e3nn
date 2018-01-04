@@ -31,14 +31,15 @@ class CNN(torch.nn.Module):
             (10, 10, 2),
             (2, 0, 0)
         ]
+        common_block_params = {'size': 3, 'radial_amount': 2, 'stride': 2, }
         block_params = [
-            {'stride': 2, 'non_linearities': True},
-            {'stride': 2, 'non_linearities': False},
+            {'non_linearities': True},
+            {'non_linearities': False},
         ]
 
         assert len(block_params) + 1 == len(features)
 
-        blocks = [HighwayBlock(features[i], features[i + 1], **block_params[i]) for i in range(len(block_params))]
+        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
         self.blocks = torch.nn.Sequential(*blocks)
 
     def forward(self, inp):  # pylint: disable=W
