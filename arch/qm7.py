@@ -10,12 +10,8 @@ from se3_cnn.batchnorm import SE3BatchNorm
 from se3_cnn.blocks.tensor_product import TensorProductBlock
 from util_cnn.model_backup import ModelBackup
 
-from util_cnn import time_logging
-import logging
 import numpy as np
 import pickle
-
-logger = logging.getLogger("trainer")
 
 
 
@@ -24,7 +20,7 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        self.features = [
+        features = [
             (5, 0, 0), # 64
             (10, 3, 0), # 32
             (10, 3, 1), # 32
@@ -33,7 +29,8 @@ class CNN(nn.Module):
             (16, 8, 1), # 32
             (1, 0, 0) # 32
         ]
-        self.block_params = [
+        common_block_params = {'size': 7, 'radial_amount': 3, 'padding': 3, 'batch_norm_momentum': 0.01}
+        block_params = [
             {'stride': 2, 'relu': True},
             {'stride': 1, 'relu': True},
             {'stride': 1, 'relu': True},
@@ -44,9 +41,8 @@ class CNN(nn.Module):
 
         assert len(self.block_params) + 1 == len(self.features)
 
-        for i in range(len(self.block_params)):
-            block = TensorProductBlock(self.features[i], self.features[i + 1], self.block_params[i]['relu'], self.block_params[i]['stride'])
-            setattr(self, 'block{}'.format(i), block)
+        blocks = [TensorProductBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
+        self.blocks = torch.nn.Sequential(*blocks)
 
         self.lin = torch.nn.Linear(5, 1)
         self.lin.weight.data[0, 0] = -69.14
@@ -61,13 +57,7 @@ class CNN(nn.Module):
         '''
         :param inp: [batch, features, x, y, z]
         '''
-        x = inp
-
-        t = time_logging.start()
-        for i in range(len(self.block_params)):
-            block = getattr(self, 'block{}'.format(i))
-            x = block(x)
-            t = time_logging.end("block {}".format(i), t)
+        x = self.blocks(inp)
 
         x = x.view(x.size(0), x.size(1), -1) # [batch, features, x*y*z]
         x = x.mean(-1) # [batch, features]
@@ -78,11 +68,10 @@ class CNN(nn.Module):
 
         y = self.lin(inp)
 
-        # print(repr(x.data.cpu().numpy()), repr(y.data.cpu().numpy()))
-
         return x + y
 
 
+#TODO replace this silly ModelBackup by Model with learning rate decay
 class MyModel(ModelBackup):
     def __init__(self):
         super().__init__(
@@ -103,6 +92,9 @@ class MyModel(ModelBackup):
 
     def get_criterion(self):
         return torch.nn.MSELoss()
+
+    def number_of_epochs(self):
+        return 100
 
     def get_learning_rate(self, epoch):
         for module in self.cnn.modules():

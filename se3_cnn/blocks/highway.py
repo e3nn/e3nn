@@ -14,7 +14,7 @@ class HighwayBlock(torch.nn.Module):
         :param: radial_amount: number of radial discretization
         :param: stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param: padding: padding of the convolution (for torch.nn.functional.conv3d)
-        :param: batch_norm_momentum: batch normalization momentum
+        :param: batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
         '''
         super().__init__()
         self.repr_out = repr_out
