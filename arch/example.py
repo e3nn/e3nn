@@ -27,12 +27,14 @@ class CNN(torch.nn.Module):
         # - The stride, same as 2D convolution
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
         features = [
-            (1, 0, 0),
-            (10, 10, 2),
-            (2, 0, 0)
+            (1, ),  # As input we have a scalar field
+            (2, 1, 0, 3, 3),  # Note that this particular choice of multiplicities it completely arbitrary
+            (0, 1, 0, 2),
+            (2, )  # Two scalar fields as output
         ]
         common_block_params = {'size': 3, 'radial_amount': 2, 'stride': 2, }
         block_params = [
+            {'non_linearities': True},
             {'non_linearities': True},
             {'non_linearities': False},
         ]
