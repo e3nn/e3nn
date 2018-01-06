@@ -1,5 +1,6 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 import torch
+
 
 class TensorProduct:
     def __init__(self, enabled):
@@ -23,15 +24,15 @@ class TensorProduct:
             if on:
                 for i in range(m):
                     s = slice(begin + i * dim, begin + (i + 1) * dim)
-                    field = x[:, s] # [batch, features, x, y, z]
-                    field = field.transpose(1, 4) # [batch, z, x, y, features]
+                    field = x[:, s]  # [batch, features, x, y, z]
+                    field = field.transpose(1, 4)  # [batch, z, x, y, features]
                     field = field.contiguous()
-                    a = field.view(-1, dim, 1) # [batch * z * x * y, features, 1]
-                    b = field.view(-1, 1, dim) # [batch * z * x * y, 1, features]
-                    field = a * b # [batch * z * x * y, features, features]
+                    a = field.view(-1, dim, 1)  # [batch * z * x * y, features, 1]
+                    b = field.view(-1, 1, dim)  # [batch * z * x * y, 1, features]
+                    field = a * b  # [batch * z * x * y, features, features]
                     field = field.contiguous()
-                    field = field.view(nbatch, nz, nx, ny, dim ** 2) # [batch, z, x, y, features]
-                    field = field.transpose(1, 4) # [batch, features, x, y, z]
+                    field = field.view(nbatch, nz, nx, ny, dim ** 2)  # [batch, z, x, y, features]
+                    field = field.transpose(1, 4)  # [batch, features, x, y, z]
 
                     ys.append(field)
 

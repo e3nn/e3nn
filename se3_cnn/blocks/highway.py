@@ -1,7 +1,7 @@
 # pylint: disable=C,R,E1101
 import torch
-from se3_cnn.bn_conv import SE3BNConvolution
-from se3_cnn.non_linearities.scalar_activation import BiasRelu
+from se3_cnn import SE3BNConvolution
+from se3_cnn.non_linearities import BiasRelu
 from se3_cnn import SO3
 
 

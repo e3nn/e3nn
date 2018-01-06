@@ -1,9 +1,9 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 import numpy as np
 import torch
-from torch.nn.parameter import Parameter
 from se3_cnn import basis_kernels
 from se3_cnn import SO3
+
 
 class SE3Convolution(torch.nn.Module):
     def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, **kwargs):
@@ -17,7 +17,7 @@ class SE3Convolution(torch.nn.Module):
         '''
         super().__init__()
         self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_in, Rs_out, central_base=central_base)
-        self.weight = Parameter(torch.randn(self.combination.nweights))
+        self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
 
     def __repr__(self):
@@ -26,7 +26,7 @@ class SE3Convolution(torch.nn.Module):
             self.combination.size,
             self.kwargs)
 
-    def forward(self, input): # pylint: disable=W
+    def forward(self, input):  # pylint: disable=W
         kernel = self.combination(self.weight)
 
         output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
@@ -48,14 +48,14 @@ class SE3KernelCombination(torch.autograd.Function):
         self.n_out = sum([self.multiplicites_out[i] * self.dims_out[i] for i in range(len(self.multiplicites_out))])
         self.n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
-        def generate_basis(R_out, R_in, m_out, m_in): # pylint: disable=W0613
+        def generate_basis(R_out, R_in, m_out, m_in):  # pylint: disable=W0613
             basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_in)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
                 center = np.zeros((len(Ks),) + basis.shape[1:])
                 for k, K in enumerate(Ks):
-                    center[k, :, :, size//2, size//2, size//2] = K
+                    center[k, :, :, size // 2, size // 2, size // 2] = K
                 basis = np.concatenate((center, basis))
 
             basis = basis_kernels.orthonormalize(basis)
@@ -71,8 +71,8 @@ class SE3KernelCombination(torch.autograd.Function):
             return basis
 
         self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in, m_out, m_in))
-            for m_in, R_in in Rs_in]
-            for m_out, R_out in Rs_out]
+                         for m_in, R_in in Rs_in]
+                        for m_out, R_out in Rs_out]
         # In : [(i,j) for i in range(2) for j in range(2)]
         # Out: [(0, 0), (0, 1), (1, 0), (1, 1)]
 
@@ -81,7 +81,7 @@ class SE3KernelCombination(torch.autograd.Function):
             for j in range(len(Rs_in)):
                 self.nweights += self.multiplicites_out[i] * self.multiplicites_in[j] * self.kernels[i][j].size(0)
 
-    def forward(self, weight): # pylint: disable=W
+    def forward(self, weight):  # pylint: disable=W
         """
         :return: [feature_out, feature_in, x, y, z]
         """
@@ -107,15 +107,15 @@ class SE3KernelCombination(torch.autograd.Function):
                 b_el = self.kernels[i][j].size(0)
                 b_size = self.kernels[i][j].size()[1:]
 
-                w = weight[weight_index : weight_index + mi * mj * b_el].view(mi * mj, b_el) # [I*J, beta]
+                w = weight[weight_index: weight_index + mi * mj * b_el].view(mi * mj, b_el)  # [I*J, beta]
                 weight_index += mi * mj * b_el
 
-                basis_kernels_ij = self.kernels[i][j].view(b_el, -1) # [beta, i*j*x*y*z]
+                basis_kernels_ij = self.kernels[i][j].view(b_el, -1)  # [beta, i*j*x*y*z]
 
-                ker = torch.mm(w, basis_kernels_ij) # [I*J, i*j*x*y*z]
-                ker = ker.view(mi, mj, *b_size) # [I, J, i, j, x, y, z]
-                ker = ker.transpose(1, 2).contiguous() # [I, i, J, j, x, y, z]
-                ker = ker.view(mi * self.dims_out[i], mj * self.dims_in[j], *b_size[2:]) # [I*i, J*j, x, y, z]
+                ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*x*y*z]
+                ker = ker.view(mi, mj, *b_size)  # [I, J, i, j, x, y, z]
+                ker = ker.transpose(1, 2).contiguous()  # [I, i, J, j, x, y, z]
+                ker = ker.view(mi * self.dims_out[i], mj * self.dims_in[j], *b_size[2:])  # [I*i, J*j, x, y, z]
                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
                 kernel[si, sj] = ker
@@ -125,7 +125,7 @@ class SE3KernelCombination(torch.autograd.Function):
 
         return kernel
 
-    def backward(self, grad_kernel): #pylint: disable=W
+    def backward(self, grad_kernel):  # pylint: disable=W
         if grad_kernel.is_cuda and not self.kernels[0][0].is_cuda:
             self.kernels = [[K.cuda() for K in row] for row in self.kernels]
         if not grad_kernel.is_cuda and self.kernels[0][0].is_cuda:
@@ -143,18 +143,18 @@ class SE3KernelCombination(torch.autograd.Function):
             begin_j = 0
             for j, mj in enumerate(self.multiplicites_in):
                 b_el = self.kernels[i][j].size(0)
-                basis_kernels_ij = self.kernels[i][j] # [beta, i, j, x, y, z]
-                basis_kernels_ij = basis_kernels_ij.view(b_el, -1) # [beta, i*j*x*y*z]
+                basis_kernels_ij = self.kernels[i][j]  # [beta, i, j, x, y, z]
+                basis_kernels_ij = basis_kernels_ij.view(b_el, -1)  # [beta, i*j*x*y*z]
 
                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
 
-                grad = grad_kernel[si, sj] # [I * i, J * j, x, y, z]
-                grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2) # [I, J, i, j, x*y*z]
-                grad = grad.contiguous().view(mi * mj, -1) # [I*J, i*j*x*y*z]
-                grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1)) # [I*J, beta]
+                grad = grad_kernel[si, sj]  # [I * i, J * j, x, y, z]
+                grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2)  # [I, J, i, j, x*y*z]
+                grad = grad.contiguous().view(mi * mj, -1)  # [I*J, i*j*x*y*z]
+                grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1))  # [I*J, beta]
 
-                grad_weight[weight_index : weight_index + mi * mj * b_el] = grad.view(-1) # [I * J * beta]
+                grad_weight[weight_index: weight_index + mi * mj * b_el] = grad.view(-1)  # [I * J * beta]
                 weight_index += mi * mj * b_el
 
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]

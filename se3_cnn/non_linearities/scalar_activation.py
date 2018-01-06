@@ -1,6 +1,6 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 import torch
-from torch.nn.parameter import Parameter
+
 
 class BiasRelu(torch.nn.Module):
     def __init__(self, enable, normalize=True):
@@ -23,14 +23,14 @@ class BiasRelu(torch.nn.Module):
 
         nbias = sum([d for d, on in self.enable if on])
         if nbias > 0:
-            self.bias = Parameter(torch.FloatTensor(nbias))
+            self.bias = torch.nn.Parameter(torch.FloatTensor(nbias))
             self.bias.data[:] = 0
         else:
             self.bias = None
 
         self.normalize = normalize
 
-    def forward(self, input): # pylint: disable=W
+    def forward(self, input):  # pylint: disable=W
         '''
         :param input: [batch, feature, x, y, z]
         '''

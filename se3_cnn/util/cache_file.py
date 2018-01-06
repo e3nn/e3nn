@@ -7,6 +7,7 @@ import gzip
 import os
 import sys
 
+
 def cached_dirpklgz(dirname):
     '''
     Cache a function with a directory

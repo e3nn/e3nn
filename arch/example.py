@@ -14,7 +14,7 @@ import numpy as np
 # The Highway Block is a way to introduce non linearity into the neural network
 # The class HighwayBlock inherit from the class torch.nn.Module.
 # It contains one convolution, some ReLU and multiplications
-from se3_cnn.blocks.highway import HighwayBlock
+from se3_cnn.blocks import HighwayBlock
 
 
 class CNN(torch.nn.Module):

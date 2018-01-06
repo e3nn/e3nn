@@ -1,6 +1,6 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 import torch
-from torch.nn.parameter import Parameter
+
 
 class NormRelu(torch.nn.Module):
     def __init__(self, enable):
@@ -13,14 +13,14 @@ class NormRelu(torch.nn.Module):
 
         self.enable = enable
         nbias = sum([1 for d, on in self.enable if on])
-        self.bias = Parameter(torch.FloatTensor(nbias)) if nbias > 0 else None
+        self.bias = torch.nn.Parameter(torch.FloatTensor(nbias)) if nbias > 0 else None
         self.reset_parameters()
 
     def reset_parameters(self):
         if self.bias is not None:
             self.bias.data[:] = 0.1
 
-    def forward(self, input): # pylint: disable=W
+    def forward(self, input):  # pylint: disable=W
         '''
         :param input: [batch, feature, x, y, z]
         '''
@@ -35,7 +35,7 @@ class NormRelu(torch.nn.Module):
             x = input[:, begin1:begin1 + d]
 
             if on:
-                x = NormReluFunction()(x, self.bias[begin2:begin2+1])
+                x = NormReluFunction()(x, self.bias[begin2:begin2 + 1])
 
                 begin2 += 1
 
@@ -50,9 +50,9 @@ class NormRelu(torch.nn.Module):
 
 
 class NormReluFunction(torch.autograd.Function):
-    def forward(self, x, b): # pylint: disable=W
-        norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8 # [batch, x, y, z]
-        newnorm = norm - b.expand_as(norm) # [batch, x, y, z]
+    def forward(self, x, b):  # pylint: disable=W
+        norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8  # [batch, x, y, z]
+        newnorm = norm - b.expand_as(norm)  # [batch, x, y, z]
         newnorm[newnorm < 0] = 0
         ratio = newnorm / norm
         ratio = ratio.view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x)
@@ -61,21 +61,22 @@ class NormReluFunction(torch.autograd.Function):
         r = x * ratio
         return r
 
-    def backward(self, grad_out): # pylint: disable=W
+    def backward(self, grad_out):  # pylint: disable=W
         x, b = self.saved_tensors
 
-        norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8 # [batch, x, y, z]
+        norm = torch.sqrt(torch.sum(x * x, dim=1)) + 1e-8  # [batch, x, y, z]
 
         grad_x = grad_b = None
 
         if self.needs_input_grad[0]:
-            newnorm = norm - b.expand_as(norm) # [batch, x, y, z]
+            newnorm = norm - b.expand_as(norm)  # [batch, x, y, z]
             newnorm[newnorm < 0] = 0
             ratio = newnorm / norm
             ratio = ratio.view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x)
 
             grad_x = grad_out * ratio
-            grad_x += torch.sum(grad_out * x, dim=1, keepdim=True).expand_as(x) * x / (norm ** 2).view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x) * (1 - ratio)
+            grad_x += torch.sum(grad_out * x, dim=1, keepdim=True).expand_as(x) * x / \
+                (norm ** 2).view(x.size(0), 1, x.size(2), x.size(3), x.size(4)).expand_as(x) * (1 - ratio)
             grad_x[ratio <= 0] = 0
 
         if self.needs_input_grad[1]:

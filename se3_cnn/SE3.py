@@ -8,6 +8,7 @@ def rotate_scalar(x, rot):
     center = (np.array(x.shape) - 1) / 2
     return affine_transform(x, matrix=invrot, offset=center - np.dot(invrot, center))
 
+
 def rotate_field(x, rot, R):
     invrot = np.linalg.inv(rot)
     y = np.empty_like(x)

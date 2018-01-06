@@ -1,4 +1,4 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 '''
 Given two representation of SO(3), computes the basis elements of
 the vector space of kernels K such that
@@ -20,6 +20,8 @@ from se3_cnn.SO3 import dim
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
 ################################################################################
+
+
 def get_matrix_kernel(A, eps=1e-10):
     '''
     Compute an orthonormal basis of the kernel (x_1, x_2, ...)
@@ -34,7 +36,7 @@ def get_matrix_kernel(A, eps=1e-10):
     >>> np.linalg.norm(ks[0] - np.array([1, 1]) / np.sqrt(2)) < 1e-10
     True
     '''
-    u, s, v = np.linalg.svd(A, full_matrices=False) #pylint: disable=W0612
+    u, s, v = np.linalg.svd(A, full_matrices=False)  # pylint: disable=W0612
     # A = u @ np.diag(s) @ v
     kernel = v[s < eps]
     return kernel
@@ -126,6 +128,8 @@ def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
 ################################################################################
 # Constructing kernel basis elements
 ################################################################################
+
+
 def transport_kernel(x, base0e, R_out, R_in):
     '''
     "Transport" the kernel K(0, ez) to K(0, x)
@@ -166,6 +170,8 @@ def cube_basis_kernels(size, R_out, R_in):
 ################################################################################
 # Subsampling function
 ################################################################################
+
+
 def gaussian_subsampling(im, M):
     '''
     :param im: array of dimentions (d0, d1, d2, ...)
@@ -181,7 +187,6 @@ def gaussian_subsampling(im, M):
 
     s = [slice(m // 2, None, m) for m in M]
     return im[s]
-
 
 
 ################################################################################
@@ -201,6 +206,8 @@ def orthonormalize(basis):
 ################################################################################
 # Full generation
 ################################################################################
+
+
 @cached_dirpklgz("kernels_cache_hat")
 def cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_in):
     basis = cube_basis_kernels(size * upsampling, R_out, R_in)

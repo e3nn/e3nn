@@ -1,8 +1,8 @@
 # pylint: disable=C,R,E1101
 import torch
-from se3_cnn.bn_conv import SE3BNConvolution
-from se3_cnn.non_linearities.scalar_activation import BiasRelu
-from se3_cnn.non_linearities.tensor_product import TensorProduct
+from se3_cnn import SE3BNConvolution
+from se3_cnn.non_linearities import BiasRelu
+from se3_cnn.non_linearities import TensorProduct
 from se3_cnn import SO3
 
 
@@ -25,7 +25,7 @@ class TensorProductBlock(torch.nn.Module):
         else:
             self.relu = None
 
-    def forward(self, sv5): # pylint: disable=W
+    def forward(self, sv5):  # pylint: disable=W
         if self.tensor is not None:
             t = self.tensor(sv5)
             sv5t = torch.cat([sv5, t], dim=1)

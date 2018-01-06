@@ -1,5 +1,6 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 import torch
+
 
 class SE3Dropout(torch.nn.Module):
     def __init__(self, Rs, p=0.5):
@@ -7,8 +8,9 @@ class SE3Dropout(torch.nn.Module):
         self.Rs = Rs
         self.p = p
 
-    def forward(self, x): # pylint: disable=W
+    def forward(self, x):  # pylint: disable=W
         return SE3DropoutF(self.Rs, self.p if self.training else 0)(x)
+
 
 class SE3DropoutF(torch.autograd.Function):
     def __init__(self, Rs, p=0.5):
@@ -25,25 +27,27 @@ class SE3DropoutF(torch.autograd.Function):
         for mul, dim in self.Rs:
             noise = torch.FloatTensor(size[0], mul, *size[2:])
 
-            if self.p == 1: noise.fill_(0)
-            elif self.p == 0: noise.fill_(1)
-            else: noise.bernoulli_(1 - self.p).div_(1 - self.p)
+            if self.p == 1:
+                noise.fill_(0)
+            elif self.p == 0:
+                noise.fill_(1)
+            else:
+                noise.bernoulli_(1 - self.p).div_(1 - self.p)
 
             noises.append(noise.repeat(1, dim, *(1,) * (len(size) - 2)))
         self.noise = torch.cat(noises, dim=1)
 
-    def forward(self, x): # pylint: disable=W
+    def forward(self, x):  # pylint: disable=W
         if self.noise is None:
             self.compute_noise(x.size())
         if x.is_cuda and not self.noise.is_cuda:
             self.noise = self.noise.cuda()
         return x * self.noise
 
-    def backward(self, grad_y): #pylint: disable=W
+    def backward(self, grad_y):  # pylint: disable=W
         if grad_y.is_cuda and not self.noise.is_cuda:
             self.noise = self.noise.cuda()
         return grad_y * self.noise
-
 
 
 def test_dropout_gradient():

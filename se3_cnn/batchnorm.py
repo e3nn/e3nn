@@ -1,5 +1,6 @@
-#pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101
 import torch
+
 
 class SE3BatchNorm(torch.nn.Module):
     def __init__(self, Rs, eps=1e-5, momentum=0.1, mode='normal'):
@@ -37,28 +38,28 @@ class SE3BatchNorm(torch.nn.Module):
             begin1 = 0
             begin2 = 0
             for m, d in self.Rs:
-                y = x[:, begin1: begin1 + m * d] # [batch, feature * repr, x, y, z]
+                y = x[:, begin1: begin1 + m * d]  # [batch, feature * repr, x, y, z]
                 begin1 += m * d
-                y = y.contiguous().view(x.size(0), m, d, -1) # [batch, feature, repr, x * y * z]
+                y = y.contiguous().view(x.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
 
-                y = torch.sum(y ** 2, dim=2) # [batch, feature, x * y * z]
+                y = torch.sum(y ** 2, dim=2)  # [batch, feature, x * y * z]
 
                 if self.mode == 'normal':
-                    y = y.mean(-1).mean(0) # [feature]
+                    y = y.mean(-1).mean(0)  # [feature]
                 if self.mode == 'ignore_zeros':
-                    mask = torch.abs(y) > self.eps # [batch, feature, x * y * z]
-                    number = mask.sum(-1).sum(0) # [feature]
-                    y = y.sum(-1).sum(0) # [feature]
+                    mask = torch.abs(y) > self.eps  # [batch, feature, x * y * z]
+                    number = mask.sum(-1).sum(0)  # [feature]
+                    y = y.sum(-1).sum(0)  # [feature]
                     y = y / (number.float() + self.eps)
                 if self.mode == 'maximum':
-                    y = y.max(-1)[0].mean(0) # [feature]
+                    y = y.max(-1)[0].mean(0)  # [feature]
                 else:
                     raise ValueError("no mode named \"{}\"".format(self.mode))
 
                 self.running_var[begin2: begin2 + m] = (1 - self.momentum) * self.running_var[begin2: begin2 + m] + self.momentum * y
                 begin2 += m
 
-    def forward(self, x): # pylint: disable=W
+    def forward(self, x):  # pylint: disable=W
         '''
         :param x: [batch, feature, x, y, z]
         '''
@@ -70,7 +71,7 @@ class SE3BatchNorm(torch.nn.Module):
         for m, d in self.Rs:
             y = x[:, begin1: begin1 + m * d]
             begin1 += m * d
-            y = y.contiguous().view(x.size(0), m, d, *x.size()[2:]) # [batch, feature, repr, x, y, z]
+            y = y.contiguous().view(x.size(0), m, d, *x.size()[2:])  # [batch, feature, repr, x, y, z]
 
             factor = 1 / (self.running_var[begin2: begin2 + m] + self.eps) ** 0.5
             begin2 += m
@@ -85,7 +86,7 @@ class SE3BatchNorm(torch.nn.Module):
 def test_batchnorm():
     bn = SE3BatchNorm([(3, 1), (4, 3), (1, 5)])
 
-    x = torch.autograd.Variable(torch.randn(16, 3+12+5, 10, 10, 10))
+    x = torch.autograd.Variable(torch.randn(16, 3 + 12 + 5, 10, 10, 10))
 
     y = bn(x)
     return y
