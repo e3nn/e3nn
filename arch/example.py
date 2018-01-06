@@ -86,7 +86,7 @@ def main():
 
             if label == 0:
                 # ball
-                mask = mx ** 2 + my ** 2 + mz ** 2 < radius ** 2
+                mask = mx ** 2 + my ** 2 + mz ** 2 < radius ** 2 / np.pi ** (2 / 3)
             if label == 1:
                 # octahedron
                 mask = abs(mx) + abs(my) + abs(mz) < radius
