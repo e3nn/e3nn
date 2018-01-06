@@ -213,9 +213,10 @@ def cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_
     step = 1 / radial_amount
     w = 0.5 / radial_amount
     for i in range(0, radial_amount):
-        mask = w - np.abs(r - step * i)
-        mask[r > step * i + w] = 0
-        mask[r < step * i - w] = 0
+        c = step * i + w
+        mask = w - np.abs(r - c)
+        mask[r > c + w] = 0
+        mask[r < c - w] = 0
 
         kernels.append(basis * mask)
     basis = np.concatenate(kernels)
