@@ -2,12 +2,14 @@
 import torch
 
 
-class BiasRelu(torch.nn.Module):
-    def __init__(self, enable, normalize=True):
+class ScalarActivation(torch.nn.Module):
+    def __init__(self, enable, activation, bias=True):
         '''
-        :param enable: list of tuple (dimension, boolean)
+        Can be used only with scalar fields
 
-        If boolean is True a bias and relu will be applied
+        :param enable: list of tuple (dimension, boolean on/off)
+        :param activation: function that takes in input a torch.autograd.Variable
+        :param bool bias: add a bias before the applying the activation
         '''
         super().__init__()
 
@@ -22,21 +24,18 @@ class BiasRelu(torch.nn.Module):
                 self.enable.append((d, on))
 
         nbias = sum([d for d, on in self.enable if on])
-        if nbias > 0:
+        if bias and nbias > 0:
             self.bias = torch.nn.Parameter(torch.FloatTensor(nbias))
             self.bias.data[:] = 0
         else:
             self.bias = None
 
-        self.normalize = normalize
+        self.activation = activation
 
     def forward(self, input):  # pylint: disable=W
         '''
         :param input: [batch, feature, x, y, z]
         '''
-        if self.bias is None:
-            return input
-
         xs = []
         begin1 = 0
         begin2 = 0
@@ -45,18 +44,17 @@ class BiasRelu(torch.nn.Module):
             x = input[:, begin1:begin1 + d]
 
             if on:
-                x = x + self.bias[begin2:begin2 + d].view(1, -1, 1, 1, 1).expand_as(x)
-                x = torch.nn.functional.relu(x)
-                if self.normalize:
-                    x.sub_(0.3989422804014327)
-                    x.mul_(1.712858550449663)
-                begin2 += d
+                if self.bias is not None:
+                    x = x + self.bias[begin2:begin2 + d].view(1, -1, 1, 1, 1)
+                    begin2 += d
+
+                x = self.activation(x)
 
             xs.append(x)
 
             begin1 += d
 
         assert begin1 == input.size(1)
-        assert begin2 == self.bias.size(0)
+        assert self.bias is None or begin2 == self.bias.size(0)
 
         return torch.cat(xs, dim=1)

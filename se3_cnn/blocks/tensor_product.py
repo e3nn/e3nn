@@ -1,7 +1,7 @@
 # pylint: disable=C,R,E1101
 import torch
 from se3_cnn import SE3BNConvolution
-from se3_cnn.non_linearities import BiasRelu
+from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn.non_linearities import TensorProduct
 from se3_cnn import SO3
 
@@ -21,7 +21,7 @@ class TensorProductBlock(torch.nn.Module):
             mode='maximum')
 
         if relu:
-            self.relu = BiasRelu([(repr_out[0], True), (repr_out[1] * 3, False), (repr_out[2] * 5, False)], normalize=False)
+            self.relu = ScalarActivation([(repr_out[0], True), (repr_out[1] * 3, False), (repr_out[2] * 5, False)], torch.nn.functional.relu)
         else:
             self.relu = None
 

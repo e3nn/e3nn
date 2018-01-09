@@ -1,7 +1,7 @@
 # pylint: disable=C,R,E1101
 import torch
 from se3_cnn import SE3BNConvolution
-from se3_cnn.non_linearities import BiasRelu
+from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 
 
@@ -38,8 +38,8 @@ class HighwayBlock(torch.nn.Module):
             mode='maximum')
 
         if non_linearities:
-            self.relu = BiasRelu(
-                [(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)] + [(sum(repr_out[1:]), True)], normalize=False)
+            self.relu = ScalarActivation(
+                [(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)] + [(sum(repr_out[1:]), True)], torch.nn.functional.relu)
         else:
             self.relu = None
 
