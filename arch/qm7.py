@@ -29,7 +29,7 @@ class CNN(nn.Module):
             (16, 8, 1), # 32
             (1, 0, 0) # 32
         ]
-        common_block_params = {'size': 7, 'radial_amount': 3, 'padding': 3, 'batch_norm_momentum': 0.01}
+        common_block_params = {'size': 7, 'n_radial': 3, 'padding': 3, 'batch_norm_momentum': 0.01}
         block_params = [
             {'stride': 2, 'relu': True},
             {'stride': 1, 'relu': True},

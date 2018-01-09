@@ -209,7 +209,7 @@ def orthonormalize(basis):
 
 
 @cached_dirpklgz("kernels_cache_hat")
-def cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_in):
+def cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in):
     basis = cube_basis_kernels(size * upsampling, R_out, R_in)
     rng = np.linspace(start=-1, stop=1, num=size * upsampling, endpoint=True)
     z, y, x = np.meshgrid(rng, rng, rng)
@@ -217,9 +217,9 @@ def cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_
 
     kernels = []
 
-    step = 1 / radial_amount
-    w = 0.5 / radial_amount
-    for i in range(0, radial_amount):
+    step = 1 / n_radial
+    w = 0.5 / n_radial
+    for i in range(0, n_radial):
         c = step * i + w
         mask = w - np.abs(r - c)
         mask[r > c + w] = 0

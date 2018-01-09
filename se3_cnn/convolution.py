@@ -6,7 +6,7 @@ from se3_cnn import SO3
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, verbose=True, **kwargs):
+    def __init__(self, size, n_radial, Rs_in, Rs_out, upsampling=15, central_base=True, verbose=True, **kwargs):
         '''
         :param Rs_in: list of couple (multiplicity, representation)
         :param Rs_out: list of couple (multiplicity, representation)
@@ -16,7 +16,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super().__init__()
-        self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_in, Rs_out, central_base, verbose)
+        self.combination = SE3KernelCombination(size, n_radial, upsampling, Rs_in, Rs_out, central_base, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
 
@@ -35,7 +35,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, radial_amount, upsampling, Rs_in, Rs_out, central_base, verbose):
+    def __init__(self, size, n_radial, upsampling, Rs_in, Rs_out, central_base, verbose):
         super().__init__()
 
         self.size = size
@@ -49,7 +49,7 @@ class SE3KernelCombination(torch.autograd.Function):
         self.n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
         def generate_basis(R_out, R_in, m_out, m_in):  # pylint: disable=W0613
-            basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_in)
+            basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in)
 
             if central_base and size % 2 == 1:
                 Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)

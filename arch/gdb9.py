@@ -26,7 +26,7 @@ class Block(nn.Module):
     def __init__(self, repr_in, repr_out, relu, stride):
         super().__init__()
         self.tensor = TensorProduct([(repr_in[0], 1, False), (repr_in[1], 3, True), (repr_in[2], 5, False)]) if repr_in[1] > 0 else None
-        self.conv = SE3Convolution(size=7, radial_amount=3,
+        self.conv = SE3Convolution(size=7, n_radial=3,
             Rs_out=[(repr_out[0], SO3.repr1), (repr_out[1], SO3.repr3), (repr_out[2], SO3.repr5)],
             Rs_in=[(repr_in[0], SO3.repr1), (repr_in[1], SO3.repr3), (repr_in[2], SO3.repr5), (repr_in[1], SO3.repr3x3)],
             stride=stride,

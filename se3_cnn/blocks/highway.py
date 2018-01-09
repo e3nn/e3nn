@@ -6,13 +6,13 @@ from se3_cnn import SO3
 
 
 class HighwayBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, non_linearities, size, radial_amount, stride=1, padding=0, batch_norm_momentum=0.1):
+    def __init__(self, repr_in, repr_out, non_linearities, size, n_radial, stride=1, padding=0, batch_norm_momentum=0.1):
         '''
         :param: repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 11)
         :param: repr_out: same but for the output
         :param: non_linearities: boolean, enable or not relu
         :param: size: the filters are cubes of dimension = size x size x size
-        :param: radial_amount: number of radial discretization
+        :param: n_radial: number of radial discretization
         :param: stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param: padding: padding of the convolution (for torch.nn.functional.conv3d)
         :param: batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
@@ -29,7 +29,7 @@ class HighwayBlock(torch.nn.Module):
 
         self.bn_conv = SE3BNConvolution(
             size=size,
-            radial_amount=radial_amount,
+            n_radial=n_radial,
             Rs_in=Rs_in,
             Rs_out=Rs_out,
             stride=stride,

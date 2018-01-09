@@ -32,7 +32,7 @@ class CNN(torch.nn.Module):
             (0, 1, 0, 2),
             (2, )  # Two scalar fields as output
         ]
-        common_block_params = {'size': 3, 'radial_amount': 2, 'stride': 2, }
+        common_block_params = {'size': 3, 'n_radial': 2, 'stride': 2, }
         block_params = [
             {'non_linearities': True},
             {'non_linearities': True},
