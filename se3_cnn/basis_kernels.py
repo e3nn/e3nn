@@ -234,6 +234,38 @@ def cube_basis_kernels_subsampled_hat(size, radial_amount, upsampling, R_out, R_
 
 
 ################################################################################
+# Full generation
+################################################################################
+
+def check_basis_equivariance(basis, R_out, R_in, alpha, beta, gamma):
+    from se3_cnn import SO3
+    from scipy.ndimage import affine_transform
+
+    n = basis.shape[0]
+    dim_in = SO3.dim(R_in)
+    dim_out = SO3.dim(R_out)
+    size = basis.shape[-1]
+    assert basis.shape == (n, dim_out, dim_in, size, size, size)
+
+    basis = basis / np.linalg.norm(basis.reshape((n, -1)), axis=1).reshape((-1, 1, 1, 1, 1, 1))
+
+    x = basis.reshape((-1, size, size, size))
+    y = np.empty_like(x)
+
+    invrot = SO3.rot(-gamma, -beta, -alpha)
+    center = (np.array(x.shape[1:]) - 1) / 2
+
+    for k in range(y.shape[0]):
+        y[k] = affine_transform(x[k], matrix=invrot, offset=center - np.dot(invrot, center))
+
+    y = y.reshape(basis.shape)
+
+    y = np.einsum("ij,bjk...,kl->bil...", R_out(alpha, beta, gamma), y, R_in(-gamma, -beta, -alpha))
+
+    return [np.sum(basis[i] * y[i]) for i in range(n)]
+
+
+################################################################################
 # Testing
 ################################################################################
 if __name__ == '__main__':

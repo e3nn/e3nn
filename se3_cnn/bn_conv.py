@@ -12,10 +12,10 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
+    def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, verbose=True, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
         super().__init__()
         self.bn = SE3BatchNorm([(m, SO3.dim(R)) for m, R in Rs_in], eps=eps, momentum=momentum, mode=mode)
-        self.conv = SE3Convolution(size, radial_amount, Rs_in=Rs_in, Rs_out=Rs_out, upsampling=upsampling, central_base=central_base, **kwargs)
+        self.conv = SE3Convolution(size, radial_amount, Rs_in=Rs_in, Rs_out=Rs_out, upsampling=upsampling, central_base=central_base, verbose=verbose, **kwargs)
 
     def forward(self, input):  # pylint: disable=W
         self.bn.update_statistics(input.data)

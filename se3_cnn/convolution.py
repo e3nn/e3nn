@@ -6,7 +6,7 @@ from se3_cnn import SO3
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, **kwargs):
+    def __init__(self, size, radial_amount, Rs_in, Rs_out, upsampling=15, central_base=True, verbose=True, **kwargs):
         '''
         :param Rs_in: list of couple (multiplicity, representation)
         :param Rs_out: list of couple (multiplicity, representation)
@@ -16,7 +16,7 @@ class SE3Convolution(torch.nn.Module):
         :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
         '''
         super().__init__()
-        self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_in, Rs_out, central_base=central_base)
+        self.combination = SE3KernelCombination(size, radial_amount, upsampling, Rs_in, Rs_out, central_base, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
 
@@ -35,7 +35,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, radial_amount, upsampling, Rs_in, Rs_out, central_base):
+    def __init__(self, size, radial_amount, upsampling, Rs_in, Rs_out, central_base, verbose):
         super().__init__()
 
         self.size = size
@@ -68,13 +68,17 @@ class SE3KernelCombination(torch.autograd.Function):
                 # such that the weight can be initialized with Normal(0,1)
 
             assert basis.shape[0] > 0
+
+            if verbose:
+                overlaps = basis_kernels.check_basis_equivariance(basis, R_out, R_in, np.pi / 4, 0, 0)
+                overlaps = ", ".join(str(round(100 * x)) + "%" for x in overlaps)
+                print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
+
             return basis
 
         self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in, m_out, m_in))
                          for m_in, R_in in Rs_in]
                         for m_out, R_out in Rs_out]
-        # In : [(i,j) for i in range(2) for j in range(2)]
-        # Out: [(0, 0), (0, 1), (1, 0), (1, 1)]
 
         self.nweights = 0
         for i in range(len(Rs_out)):
@@ -190,7 +194,7 @@ def test_combination_gradient(Rs_out=None, Rs_in=None):
     if Rs_out is None:
         Rs_out = [(1, SO3.repr3), (1, SO3.repr1)]
 
-    combination = SE3KernelCombination(4, 2, 15, Rs_out, Rs_in, central_base=True)
+    combination = SE3KernelCombination(4, 2, 15, Rs_out, Rs_in, central_base=True, verbose=True)
 
     w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
 
