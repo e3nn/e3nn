@@ -6,16 +6,18 @@ from se3_cnn import SO3
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, n_radial, Rs_in, Rs_out, upsampling=15, central_base=True, verbose=True, **kwargs):
+    def __init__(self, size, n_radial, Rs_in, Rs_out, upsampling=None, central_base=True, verbose=True, **kwargs):
         '''
         :param Rs_in: list of couple (multiplicity, representation)
         :param Rs_out: list of couple (multiplicity, representation)
         multiplicity is a positive integer
         representation is a function of SO(3) in Euler ZYZ parametrisation alpha, beta, gamma
 
-        :param M: the sampling of the kernel is made on a grid M time bigger and then subsampled with a gaussian
+        :param upsampling: the sampling of the kernel is made on a grid `upsampling` time bigger and then subsampled with a gaussian
         '''
         super().__init__()
+        if upsampling is None:
+            upsampling = min(70 // size, 15)
         self.combination = SE3KernelCombination(size, n_radial, upsampling, Rs_in, Rs_out, central_base, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
