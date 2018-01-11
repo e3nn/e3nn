@@ -35,8 +35,7 @@ class HighwayBlock(torch.nn.Module):
             Rs_out=Rs_out,
             stride=stride,
             padding=padding,
-            momentum=batch_norm_momentum,
-            mode='maximum')
+            momentum=batch_norm_momentum)
 
         if non_linearities:
             self.relu = ScalarActivation(

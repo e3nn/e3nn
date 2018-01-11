@@ -46,12 +46,12 @@ class SE3BatchNorm(torch.nn.Module):
 
                 if self.mode == 'normal':
                     y = y.mean(-1).mean(0)  # [feature]
-                if self.mode == 'ignore_zeros':
+                elif self.mode == 'ignore_zeros':
                     mask = torch.abs(y) > self.eps  # [batch, feature, x * y * z]
                     number = mask.sum(-1).sum(0)  # [feature]
                     y = y.sum(-1).sum(0)  # [feature]
                     y = y / (number.float() + self.eps)
-                if self.mode == 'maximum':
+                elif self.mode == 'maximum':
                     y = y.max(-1)[0].mean(0)  # [feature]
                 else:
                     raise ValueError("no mode named \"{}\"".format(self.mode))
