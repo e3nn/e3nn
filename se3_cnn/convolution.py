@@ -17,7 +17,7 @@ class SE3Convolution(torch.nn.Module):
         '''
         super().__init__()
         if upsampling is None:
-            upsampling = min(70 // size, 15)
+            upsampling = min(48 // size, 15)
             upsampling = (upsampling // 2) * 2 + 1  # must be odd
 
         self.combination = SE3KernelCombination(size, n_radial, upsampling, Rs_in, Rs_out, central_base, verbose)

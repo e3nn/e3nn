@@ -28,11 +28,11 @@ class CNN(torch.nn.Module):
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
         features = [
             (1, ),  # As input we have a scalar field
-            (2, 1, 0, 3, 3),  # Note that this particular choice of multiplicities it completely arbitrary
-            (0, 1, 0, 2),
+            (10, 5, 5, 5),  # Note that this particular choice of multiplicities it completely arbitrary
+            (10, 5, 5, 5),
             (2, )  # Two scalar fields as output
         ]
-        common_block_params = {'size': 3, 'n_radial': 2, 'stride': 2, }
+        common_block_params = {'size': 4, 'n_radial': 1, 'stride': 2, 'batch_norm_before_conv': False }
         block_params = [
             {'non_linearities': True},
             {'non_linearities': True},
@@ -61,6 +61,7 @@ class CNN(torch.nn.Module):
 
 def main():
     cnn = CNN()
+    print("The model contains {} parameters".format(sum(p.numel() for p in cnn.parameters() if p.requires_grad)))
 
     if torch.cuda.is_available():
         cnn.cuda()

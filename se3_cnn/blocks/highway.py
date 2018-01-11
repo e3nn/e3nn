@@ -1,21 +1,22 @@
 # pylint: disable=C,R,E1101
 import torch
-from se3_cnn import SE3BNConvolution
+from se3_cnn import SE3BNConvolution, SE3ConvolutionBN
 from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 
 
 class HighwayBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, non_linearities, size, n_radial, stride=1, padding=0, batch_norm_momentum=0.1):
+    def __init__(self, repr_in, repr_out, non_linearities, size, n_radial, stride=1, padding=0, batch_norm_momentum=0.1, batch_norm_before_conv=True):
         '''
-        :param: repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 11)
-        :param: repr_out: same but for the output
-        :param: non_linearities: boolean, enable or not relu
-        :param: size: the filters are cubes of dimension = size x size x size
-        :param: n_radial: number of radial discretization
-        :param: stride: stride of the convolution (for torch.nn.functional.conv3d)
-        :param: padding: padding of the convolution (for torch.nn.functional.conv3d)
-        :param: batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
+        :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 11)
+        :param repr_out: same but for the output
+        :param bool non_linearities: boolean, enable or not relu
+        :param int size: the filters are cubes of dimension = size x size x size
+        :param int n_radial: number of radial discretization
+        :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
+        :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
+        :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
+        :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
         '''
         super().__init__()
         self.repr_out = repr_out
@@ -27,7 +28,7 @@ class HighwayBlock(torch.nn.Module):
         if non_linearities:
             Rs_out += [(sum(repr_out[1:]), SO3.repr1)]
 
-        self.bn_conv = SE3BNConvolution(
+        self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
             size=size,
             n_radial=n_radial,
             Rs_in=Rs_in,

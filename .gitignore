@@ -11,3 +11,4 @@ dist
 *.zip
 *.7z
 tmp.*
+.*
