@@ -32,7 +32,7 @@ class CNN(torch.nn.Module):
             (10, 5, 5, 5),
             (2, )  # Two scalar fields as output
         ]
-        common_block_params = {'size': 4, 'n_radial': 1, 'stride': 2, 'batch_norm_before_conv': False }
+        common_block_params = {'size': 4, 'n_radial': 1, 'stride': 2, 'batch_norm_before_conv': False}
         block_params = [
             {'non_linearities': True},
             {'non_linearities': True},
@@ -122,6 +122,8 @@ def main():
         acc = np.sum(out.argmax(-1) == y) / batch_size
 
         print("{}: acc={}% loss={}".format(i, 100 * acc, float(loss)))
+
+    torch.backends.cudnn.benchmark = True
 
     for i in range(1000):
         step(i)
