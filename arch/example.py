@@ -17,6 +17,12 @@ import numpy as np
 from se3_cnn.blocks import HighwayBlock
 
 
+class AvgSpacial(torch.nn.Module):
+    def forward(self, inp):  # pylint: disable=W
+        # inp [batch, features, x, y, z]
+        return inp.view(inp.size(0), inp.size(1), -1).mean(-1)  # [batch, features]
+
+
 class CNN(torch.nn.Module):
 
     def __init__(self):
@@ -28,45 +34,48 @@ class CNN(torch.nn.Module):
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
         features = [
             (1, ),  # As input we have a scalar field
-            (10, 5, 5, 5),  # Note that this particular choice of multiplicities it completely arbitrary
-            (10, 5, 5, 5),
-            (2, )  # Two scalar fields as output
+            (5, 1, 1, 1),  # Note that this particular choice of multiplicities it completely arbitrary
+            (5, 1, 1, 1),
+            (20, )  # Two scalar fields as output
         ]
-        common_block_params = {'size': 4, 'n_radial': 1, 'stride': 2, 'batch_norm_before_conv': False}
+        common_block_params = {'size': 5, 'n_radial': 1, 'stride': 2, 'padding': 3, 'batch_norm_before_conv': False}
         block_params = [
-            {'non_linearities': True},
-            {'non_linearities': True},
-            {'non_linearities': False},
+            {'activation': torch.nn.functional.relu},
+            {'activation': torch.nn.functional.relu},
+            {'activation': None},
         ]
 
         assert len(block_params) + 1 == len(features)
 
         blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
-        self.blocks = torch.nn.Sequential(*blocks)
+
+        self.sequence = torch.nn.Sequential(
+            *blocks,
+            AvgSpacial(),
+            torch.nn.Linear(20, 50),
+            torch.nn.ReLU(),
+            torch.nn.Linear(50, 2),
+        )
 
     def forward(self, inp):  # pylint: disable=W
         '''
         :param inp: [batch, features, x, y, z]
         '''
 
-        # Perform the Highway blocks
-        x = self.blocks(inp)  # [batch, features, x, y, z]
-
-        # Take the average over the spacial indicies
-        x = x.view(x.size(0), x.size(1), -1)  # [batch, features, x*y*z]
-        x = x.mean(-1)  # [batch, features]
+        x = self.sequence(inp)  # [batch, features]
 
         return x
 
 
 def main():
+    torch.backends.cudnn.benchmark = True
+
     cnn = CNN()
     print("The model contains {} parameters".format(sum(p.numel() for p in cnn.parameters() if p.requires_grad)))
 
     if torch.cuda.is_available():
         cnn.cuda()
 
-    criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(cnn.parameters(), lr=1e-2)
 
     batch_size = 64
@@ -109,7 +118,7 @@ def main():
         # forward and backward propagation
         optimizer.zero_grad()
         out = cnn(x)
-        loss = criterion(out, y)
+        loss = torch.nn.functional.cross_entropy(out, y)
         loss.backward()
         optimizer.step()
 
@@ -122,8 +131,6 @@ def main():
         acc = np.sum(out.argmax(-1) == y) / batch_size
 
         print("{}: acc={}% loss={}".format(i, 100 * acc, float(loss)))
-
-    torch.backends.cudnn.benchmark = True
 
     for i in range(1000):
         step(i)
