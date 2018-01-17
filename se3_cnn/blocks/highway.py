@@ -6,16 +6,17 @@ from se3_cnn import SO3
 
 
 class HighwayBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, non_linearities, size, n_radial, stride=1, padding=0, batch_norm_momentum=0.1, batch_norm_before_conv=True):
+    def __init__(self, repr_in, repr_out, size, n_radial, activation=None, stride=1, padding=0, batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 11)
         :param repr_out: same but for the output
-        :param bool non_linearities: boolean, enable or not relu
+        :param activation: function like for instance torch.nn.functional.relu
         :param int size: the filters are cubes of dimension = size x size x size
         :param int n_radial: number of radial discretization
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
         :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
+        :param batch_norm_mode: the mode of the batch normalization
         :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
         '''
         super().__init__()
@@ -25,7 +26,7 @@ class HighwayBlock(torch.nn.Module):
 
         Rs_in = list(zip(repr_in, irreducible_repr))
         Rs_out = list(zip(repr_out, irreducible_repr))
-        if non_linearities:
+        if activation is not None:
             Rs_out += [(sum(repr_out[1:]), SO3.repr1)]
 
         self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
@@ -35,21 +36,22 @@ class HighwayBlock(torch.nn.Module):
             Rs_out=Rs_out,
             stride=stride,
             padding=padding,
-            momentum=batch_norm_momentum)
+            momentum=batch_norm_momentum,
+            mode=batch_norm_mode)
 
-        if non_linearities:
-            self.relu = ScalarActivation(
-                [(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)] + [(sum(repr_out[1:]), True)], torch.nn.functional.relu)
+        if activation is not None:
+            self.act = ScalarActivation(
+                [(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)] + [(sum(repr_out[1:]), True)], activation)
         else:
-            self.relu = None
+            self.act = None
 
     def forward(self, x):  # pylint: disable=W
         y = self.bn_conv(x)
 
-        if self.relu is None:
+        if self.act is None:
             return y
 
-        y = self.relu(y)
+        y = self.act(y)
 
         if sum(self.repr_out[1:]) == 0:
             return y
