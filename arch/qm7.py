@@ -5,41 +5,119 @@ Architecture to predict molecule energy on database qm7
 RMSE test = 5.7
 '''
 import torch
-import torch.nn as nn
-from se3_cnn.batchnorm import SE3BatchNorm
+import torch.utils.data
 from se3_cnn.blocks.tensor_product import TensorProductBlock
-from util_cnn.model_backup import ModelBackup
 
 import numpy as np
-import pickle
+import scipy.io
+import os
+import time
 
 
+class QM7(torch.utils.data.Dataset):
+    url = 'http://quantum-machine.org/data/qm7.mat'
+    mat_file = 'qm7.mat'
 
-class CNN(nn.Module):
+    def __init__(self, root, split, download=False):
+        self.root = os.path.expanduser(root)
+
+        if download:
+            self.download()
+
+        if not self._check_exists():
+            raise RuntimeError('Dataset not found.' +
+                               ' You can use download=True to download it')
+
+        data = scipy.io.loadmat(os.path.join(self.root, self.mat_file))
+        indices = data['P'][split]  # shape = (5, 1433)
+        self.positions = data['R'][indices]  # positions, shape = (7165, 23, 3)
+        self.charges = data['Z'][indices].astype(np.int32)  # charge: 5 atom types: 1, 6, 7, 8, 16, shape = (7165, 23)
+        self.energies = data['T'].flatten()[indices]  # labels: atomization energies in kcal/mol, shape = (7165, )
+
+    def __getitem__(self, index):
+        positions, charges, energy = self.positions[index], self.charges[index], self.energies[index]
+
+        p = 0.3
+        n = 64
+
+        number_of_atoms_types = 5
+        fields = np.zeros((number_of_atoms_types, n, n, n), dtype=np.float32)
+
+        a = np.linspace(start=-n / 2 * p + p / 2, stop=n / 2 * p - p / 2, num=n, endpoint=True)
+        xx, yy, zz = np.meshgrid(a, a, a, indexing="ij")
+
+        for ch, pos in zip(charges, positions):
+            if ch == 0:
+                break
+
+            ato = {1: 0, 6: 1, 7: 2, 8: 3, 16: 4}[ch]
+
+            x = pos[0]
+            y = pos[1]
+            z = pos[2]
+
+            density = np.exp(-((xx - x)**2 + (yy - y)**2 + (zz - z)**2) / (2 * p**2))
+            density /= np.sum(density)
+
+            fields[ato] += density
+
+        return torch.FloatTensor(fields), energy
+
+    def __len__(self):
+        return len(self.energies)
+
+    def _check_exists(self):
+        return os.path.exists(os.path.join(self.root, self.mat_file))
+
+    def download(self):
+        from six.moves import urllib
+
+        if self._check_exists():
+            return
+
+        # download files
+        try:
+            os.makedirs(self.root)
+        except OSError as e:
+            if e.errno == os.errno.EEXIST:
+                pass
+            else:
+                raise
+
+        print('Downloading ' + self.url)
+        data = urllib.request.urlopen(self.url)
+        file_path = os.path.join(self.root, self.mat_file)
+        with open(file_path, 'wb') as f:
+            f.write(data.read())
+
+        print('Done!')
+
+
+class CNN(torch.nn.Module):
 
     def __init__(self):
-        super(CNN, self).__init__()
+        super().__init__()
 
         features = [
-            (5, 0, 0), # 64
-            (10, 3, 0), # 32
-            (10, 3, 1), # 32
-            (16, 8, 1), # 32
-            (16, 8, 1), # 32
-            (16, 8, 1), # 32
-            (1, 0, 0) # 32
+            (5, 0, 0),  # 64
+            (10, 3, 0),  # 32
+            (10, 3, 1),  # 32
+            (16, 8, 1),  # 32
+            (16, 8, 1),  # 32
+            (16, 8, 1),  # 32
+            (1, 0, 0)  # 32
         ]
-        common_block_params = {'size': 7, 'n_radial': 3, 'padding': 3, 'batch_norm_momentum': 0.01}
+        common_block_params = {'size': 7, 'n_radial': 3, 'padding': 3, 'batch_norm_momentum': 0.01, 'batch_norm_mode': 'maximum'}
         block_params = [
-            {'stride': 2, 'relu': True},
-            {'stride': 1, 'relu': True},
-            {'stride': 1, 'relu': True},
-            {'stride': 1, 'relu': True},
-            {'stride': 1, 'relu': True},
-            {'stride': 1, 'relu': False},
+            {'stride': 2, 'activation': torch.nn.functional.relu},
+            {'stride': 1, 'activation': torch.nn.functional.relu},
+            {'stride': 1, 'activation': torch.nn.functional.relu},
+            {'stride': 1, 'activation': torch.nn.functional.relu},
+            {'stride': 1, 'activation': torch.nn.functional.relu},
+            {'stride': 1, 'activation': None},
         ]
 
-        assert len(self.block_params) + 1 == len(self.features)
+        assert len(block_params) + 1 == len(features)
 
         blocks = [TensorProductBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
         self.blocks = torch.nn.Sequential(*blocks)
@@ -53,14 +131,14 @@ class CNN(nn.Module):
 
         self.alpha = torch.nn.Parameter(torch.ones(1))
 
-    def forward(self, inp): # pylint: disable=W
+    def forward(self, inp):  # pylint: disable=W
         '''
         :param inp: [batch, features, x, y, z]
         '''
         x = self.blocks(inp)
 
-        x = x.view(x.size(0), x.size(1), -1) # [batch, features, x*y*z]
-        x = x.mean(-1) # [batch, features]
+        x = x.view(x.size(0), x.size(1), -1)  # [batch, features, x*y*z]
+        x = x.mean(-1)  # [batch, features]
 
         x = x * self.alpha * 5
 
@@ -71,60 +149,61 @@ class CNN(nn.Module):
         return x + y
 
 
-#TODO replace this silly ModelBackup by Model with learning rate decay
-class MyModel(ModelBackup):
-    def __init__(self):
-        super().__init__(
-            success_factor=1,
-            decay_factor=2 ** (-1/4 * 1/6),
-            reject_factor=2 ** (-1),
-            reject_ratio=2,
-            min_learning_rate=1e-4,
-            max_learning_rate=0.2,
-            initial_learning_rate=2e-3)
+def main():
+    torch.backends.cudnn.benchmark = True
 
-    def initialize(self, **kargs):
-        self.cnn = CNN()
-        self.optimizer = torch.optim.Adam(self.cnn.parameters())
+    train_set = torch.utils.data.ConcatDataset([QM7('qm7', split=i, download=True) for i in range(4)])
+    test_set = QM7('qm7', split=4)
 
-    def get_batch_size(self, epoch=None):
-        return 16
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=32, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=32, shuffle=False, num_workers=4, pin_memory=True, drop_last=False)
 
-    def get_criterion(self):
-        return torch.nn.MSELoss()
+    model = CNN()
+    if torch.cuda.is_available():
+        model.cuda()
+    print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-    def number_of_epochs(self):
-        return 100
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
-    def get_learning_rate(self, epoch):
-        for module in self.cnn.modules():
-            if isinstance(module, SE3BatchNorm):
-                module.momentum = 0.01 * (0.1 ** epoch)
+    def train_step(epoch, batch_idx, data, target):
+        time_start = time.perf_counter()
 
-        return super().get_learning_rate(epoch)
+        model.train()
+        if torch.cuda.is_available():
+            data, target = data.cuda(), target.cuda()
+        data, target = torch.autograd.Variable(data), torch.autograd.Variable(target)
+        optimizer.zero_grad()
 
-    def load_files(self, files):
-        p = 0.3
-        n = 64
+        prediction = model(data)
+        loss = torch.nn.functional.mse_loss(prediction, target)
 
-        number_of_atoms_types = 5
-        inputs = np.zeros((len(files), number_of_atoms_types, n, n, n), dtype=np.float32)
+        loss.backward()
+        optimizer.step()
 
-        a = np.linspace(start=-n/2*p + p/2, stop=n/2*p - p/2, num=n, endpoint=True)
-        xx, yy, zz = np.meshgrid(a, a, a, indexing="ij")
+        print("[{}:{}/{}] RMSE={:.2} time={:.2}".format(
+            epoch, batch_idx, len(train_loader), loss.data[0] ** 0.5, time.perf_counter() - time_start))
 
-        for i, f in enumerate(files):
-            with open(f, 'rb') as f:
-                content = pickle.load(f)
+    for epoch in range(7):
+        for batch_idx, (data, target) in enumerate(train_loader):
+            train_step(epoch, batch_idx, data, target)
 
-            for ato, pos in zip(content[0], content[1]):
-                x = pos[0]
-                y = pos[1]
-                z = pos[2]
 
-                density = np.exp(-((xx-x)**2 + (yy-y)**2 + (zz-z)**2) / (2 * p**2))
-                density /= np.sum(density)
 
-                inputs[i, ato] += density
+    model.eval()
+    se = 0
+    for batch_idx, (data, target) in enumerate(test_loader):
+        if torch.cuda.is_available():
+            data, target = data.cuda(), target.cuda()
+        data, target = torch.autograd.Variable(data, volatile=True), torch.autograd.Variable(target)
+        output = model(data)
+        se += torch.nn.functional.mse_loss(output, target, size_average=False).data[0] # sum up batch loss
+        print("{}/{}".format(batch_idx, len(test_loader)))
 
-        return inputs
+    mse = se / len(test_loader.dataset)
+    rmse = mse ** 0.5
+
+    print('TEST RMSE={}'.format(rmse))
+
+
+if __name__ == '__main__':
+    main()
