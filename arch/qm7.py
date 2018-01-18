@@ -119,9 +119,13 @@ class CNN(torch.nn.Module):
 
         assert len(block_params) + 1 == len(features)
 
+        # I used TensorProductBlock because I did it before Taco proposed the HighwayBlock
         blocks = [TensorProductBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
         self.blocks = torch.nn.Sequential(*blocks)
 
+        # This is a pretrained Perceptron that takes as input only the number of each atom types
+        # I itself makes a RMSE of 20
+        # The idea is that SE3Net will add a correction depending on the geometry of the molecule
         self.lin = torch.nn.Linear(5, 1)
         self.lin.weight.data[0, 0] = -69.14
         self.lin.weight.data[0, 1] = -153.3
@@ -146,6 +150,7 @@ class CNN(torch.nn.Module):
 
         y = self.lin(inp)
 
+        # output the sum of the Perceptron and the SE3Net
         return x + y
 
 
@@ -155,19 +160,17 @@ def main():
     train_set = torch.utils.data.ConcatDataset([QM7('qm7', split=i, download=True) for i in range(4)])
     test_set = QM7('qm7', split=4)
 
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=32, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=32, shuffle=False, num_workers=4, pin_memory=True, drop_last=False)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=16, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=16, shuffle=False, num_workers=4, pin_memory=True, drop_last=False)
 
     model = CNN()
     if torch.cuda.is_available():
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
 
-    def train_step(epoch, batch_idx, data, target):
-        time_start = time.perf_counter()
-
+    def train_step(data, target):
         model.train()
         if torch.cuda.is_available():
             data, target = data.cuda(), target.cuda()
@@ -180,14 +183,18 @@ def main():
         loss.backward()
         optimizer.step()
 
-        print("[{}:{}/{}] RMSE={:.2} time={:.2}".format(
-            epoch, batch_idx, len(train_loader), loss.data[0] ** 0.5, time.perf_counter() - time_start))
+        return loss.data[0]
 
     for epoch in range(7):
+        total_mse = 0
         for batch_idx, (data, target) in enumerate(train_loader):
-            train_step(epoch, batch_idx, data, target)
+            time_start = time.perf_counter()
+            mse = train_step(data, target)
 
+            total_mse += mse
 
+            print("[{}:{}/{}] RMSE={:.2} <RMSE>={:.2} time={:.2}".format(
+                epoch, batch_idx, len(train_loader), mse ** 0.5, (total_mse / (batch_idx + 1)) ** 0.5, time.perf_counter() - time_start))
 
     model.eval()
     se = 0
@@ -196,7 +203,7 @@ def main():
             data, target = data.cuda(), target.cuda()
         data, target = torch.autograd.Variable(data, volatile=True), torch.autograd.Variable(target)
         output = model(data)
-        se += torch.nn.functional.mse_loss(output, target, size_average=False).data[0] # sum up batch loss
+        se += torch.nn.functional.mse_loss(output, target, size_average=False).data[0]  # sum up batch loss
         print("{}/{}".format(batch_idx, len(test_loader)))
 
     mse = se / len(test_loader.dataset)
