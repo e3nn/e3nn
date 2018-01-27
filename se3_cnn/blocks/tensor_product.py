@@ -7,7 +7,7 @@ from se3_cnn import SO3
 
 
 class TensorProductBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, size, n_radial, activation=None, stride=1, padding=0, batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):
+    def __init__(self, repr_in, repr_out, size, n_radial, activation=None, stride=1, padding=0, central_base=True, overlap_threshold=-1, batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):
         super().__init__()
         self.tensor = TensorProduct([(repr_in[0], 1, False), (repr_in[1], 3, True), (repr_in[2], 5, False)]) if repr_in[1] > 0 else None
         self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
@@ -17,6 +17,8 @@ class TensorProductBlock(torch.nn.Module):
             Rs_out=[(repr_out[0], SO3.repr1), (repr_out[1], SO3.repr3), (repr_out[2], SO3.repr5)],
             stride=stride,
             padding=padding,
+            central_base=central_base,
+            overlap_threshold=overlap_threshold,
             momentum=batch_norm_momentum,
             mode=batch_norm_mode)
 

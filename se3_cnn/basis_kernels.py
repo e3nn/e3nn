@@ -234,7 +234,7 @@ def cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in):
 
 
 ################################################################################
-# Full generation
+# Measure equivariance
 ################################################################################
 
 def check_basis_equivariance(basis, R_out, R_in, alpha, beta, gamma):
@@ -245,7 +245,7 @@ def check_basis_equivariance(basis, R_out, R_in, alpha, beta, gamma):
     dim_in = SO3.dim(R_in)
     dim_out = SO3.dim(R_out)
     size = basis.shape[-1]
-    assert basis.shape == (n, dim_out, dim_in, size, size, size)
+    assert basis.shape == (n, dim_out, dim_in, size, size, size), basis.shape
 
     basis = basis / np.linalg.norm(basis.reshape((n, -1)), axis=1).reshape((-1, 1, 1, 1, 1, 1))
 
@@ -262,7 +262,7 @@ def check_basis_equivariance(basis, R_out, R_in, alpha, beta, gamma):
 
     y = np.einsum("ij,bjk...,kl->bil...", R_out(alpha, beta, gamma), y, R_in(-gamma, -beta, -alpha))
 
-    return [np.sum(basis[i] * y[i]) for i in range(n)]
+    return np.array([np.sum(basis[i] * y[i]) for i in range(n)])
 
 
 ################################################################################

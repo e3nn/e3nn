@@ -6,7 +6,7 @@ from se3_cnn import SO3
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, size, n_radial, Rs_in, Rs_out, upsampling=None, central_base=True, verbose=True, **kwargs):
+    def __init__(self, size, n_radial, Rs_in, Rs_out, upsampling=None, central_base=True, overlap_threshold=-1, verbose=True, **kwargs):
         '''
         :param Rs_in: list of couple (multiplicity, representation)
         :param Rs_out: list of couple (multiplicity, representation)
@@ -20,7 +20,7 @@ class SE3Convolution(torch.nn.Module):
             upsampling = min(48 // size, 15)
             upsampling = (upsampling // 2) * 2 + 1  # must be odd
 
-        self.combination = SE3KernelCombination(size, n_radial, upsampling, Rs_in, Rs_out, central_base, verbose)
+        self.combination = SE3KernelCombination(size, n_radial, upsampling, Rs_in, Rs_out, central_base, overlap_threshold, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
 
@@ -39,7 +39,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, size, n_radial, upsampling, Rs_in, Rs_out, central_base, verbose):
+    def __init__(self, size, n_radial, upsampling, Rs_in, Rs_out, central_base, overlap_threshold, verbose):
         super().__init__()
 
         self.size = size
@@ -52,42 +52,61 @@ class SE3KernelCombination(torch.autograd.Function):
         self.n_out = sum([self.multiplicites_out[i] * self.dims_out[i] for i in range(len(self.multiplicites_out))])
         self.n_in = sum([self.multiplicites_in[j] * self.dims_in[j] for j in range(len(self.multiplicites_in))])
 
-        def generate_basis(R_out, R_in, m_out, m_in):  # pylint: disable=W0613
-            basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in)
-
-            if central_base and size % 2 == 1:
-                Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
-                center = np.zeros((len(Ks),) + basis.shape[1:])
-                for k, K in enumerate(Ks):
-                    center[k, :, :, size // 2, size // 2, size // 2] = K
-                basis = np.concatenate((center, basis))
-
-            basis = basis_kernels.orthonormalize(basis)
-
-            # normalize each basis element
-            for k in range(len(basis)):
-                basis[k] /= np.linalg.norm(basis[k])
-                basis[k] *= np.sqrt(SO3.dim(R_out) / len(basis))
-                basis[k] /= np.sqrt(m_in)
-                # such that the weight can be initialized with Normal(0,1)
-
-            assert basis.shape[0] > 0
-
-            if verbose:
-                overlaps = basis_kernels.check_basis_equivariance(basis, R_out, R_in, np.pi / 4, 0, 0)
-                overlaps = ", ".join(str(round(100 * x)) + "%" for x in overlaps)
-                print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
-
-            return basis
-
-        self.kernels = [[torch.FloatTensor(generate_basis(R_out, R_in, m_out, m_in))
-                         for m_in, R_in in Rs_in]
-                        for m_out, R_out in Rs_out]
-
+        self.kernels = []
         self.nweights = 0
-        for i in range(len(Rs_out)):
-            for j in range(len(Rs_in)):
-                self.nweights += self.multiplicites_out[i] * self.multiplicites_in[j] * self.kernels[i][j].size(0)
+
+        for m_out, R_out in Rs_out:
+            self.kernels.append([])
+            for m_in, R_in in Rs_in:
+                basis = self._generate_basis(R_out, R_in, m_out, m_in, size, n_radial, upsampling, central_base, overlap_threshold, verbose)
+                if basis is not None:
+                    self.kernels[-1].append(torch.FloatTensor(basis))
+                    self.nweights += m_out * m_in * basis.shape[0]
+                else:
+                    self.kernels[-1].append(None)
+
+    def _generate_basis(self, R_out, R_in, m_out, m_in, size, n_radial, upsampling, central_base, overlap_threshold, verbose):  # pylint: disable=W0613
+        basis = basis_kernels.cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in)
+        assert basis.shape[1:] == (SO3.dim(R_out), SO3.dim(R_in), size, size, size), "Your cache files may probably be corrupted"
+
+        if central_base and size % 2 == 1:
+            Ks = basis_kernels.basis_kernels_satisfying_SO3_constraint(R_out, R_in)
+            center = np.zeros((len(Ks),) + basis.shape[1:])
+            for k, K in enumerate(Ks):
+                center[k, :, :, size // 2, size // 2, size // 2] = K
+            basis = np.concatenate((center, basis))
+
+        basis = basis_kernels.orthonormalize(basis)
+
+        # measure the degree of equivariance of the basis elements
+        overlaps = basis_kernels.check_basis_equivariance(basis, R_out, R_in, np.pi / 4, 0, 0)
+        basis = basis[overlaps > overlap_threshold]
+
+        # normalize each basis element
+        for k in range(len(basis)):
+            basis[k] /= np.linalg.norm(basis[k])
+            basis[k] *= np.sqrt(SO3.dim(R_out) / len(basis))
+            basis[k] /= np.sqrt(m_in)
+            # such that the weight can be initialized with Normal(0,1)
+
+        if verbose:
+            overlaps = ", ".join(("(" if x < overlap_threshold else "") + str(round(100 * x)) + "%" + (")" if x < overlap_threshold else "") for x in overlaps)
+            print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
+
+        return basis if basis.shape[0] > 0 else None
+
+    def _cuda_kernels(self, cuda):
+        for row in self.kernels:
+            for i in range(len(row)):
+                ker = row[i]
+                if ker is None:
+                    pass
+                elif ker.is_cuda and not cuda:
+                    ker = ker.cpu()
+                elif not ker.is_cuda and cuda:
+                    ker = ker.cuda()
+
+                row[i] = ker
 
     def forward(self, weight):  # pylint: disable=W
         """
@@ -96,10 +115,7 @@ class SE3KernelCombination(torch.autograd.Function):
         assert weight.dim() == 1, "size = {}".format(weight.size())
         assert weight.size(0) == self.nweights
 
-        if weight.is_cuda and not self.kernels[0][0].is_cuda:
-            self.kernels = [[K.cuda() for K in row] for row in self.kernels]
-        if not weight.is_cuda and self.kernels[0][0].is_cuda:
-            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
+        self._cuda_kernels(weight.is_cuda)
 
         if weight.is_cuda:
             kernel = torch.cuda.FloatTensor(self.n_out, self.n_in, self.size, self.size, self.size)
@@ -112,21 +128,25 @@ class SE3KernelCombination(torch.autograd.Function):
         for i, mi in enumerate(self.multiplicites_out):
             begin_j = 0
             for j, mj in enumerate(self.multiplicites_in):
-                b_el = self.kernels[i][j].size(0)
-                b_size = self.kernels[i][j].size()[1:]
-
-                w = weight[weight_index: weight_index + mi * mj * b_el].view(mi * mj, b_el)  # [I*J, beta]
-                weight_index += mi * mj * b_el
-
-                basis_kernels_ij = self.kernels[i][j].view(b_el, -1)  # [beta, i*j*x*y*z]
-
-                ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*x*y*z]
-                ker = ker.view(mi, mj, *b_size)  # [I, J, i, j, x, y, z]
-                ker = ker.transpose(1, 2).contiguous()  # [I, i, J, j, x, y, z]
-                ker = ker.view(mi * self.dims_out[i], mj * self.dims_in[j], *b_size[2:])  # [I*i, J*j, x, y, z]
                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
-                kernel[si, sj] = ker
+
+                if self.kernels[i][j] is not None:
+                    b_el = self.kernels[i][j].size(0)
+                    b_size = self.kernels[i][j].size()[1:]
+
+                    w = weight[weight_index: weight_index + mi * mj * b_el].view(mi * mj, b_el)  # [I*J, beta]
+                    weight_index += mi * mj * b_el
+
+                    basis_kernels_ij = self.kernels[i][j].view(b_el, -1)  # [beta, i*j*x*y*z]
+
+                    ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*x*y*z]
+                    ker = ker.view(mi, mj, *b_size)  # [I, J, i, j, x, y, z]
+                    ker = ker.transpose(1, 2).contiguous()  # [I, i, J, j, x, y, z]
+                    ker = ker.view(mi * self.dims_out[i], mj * self.dims_in[j], *b_size[2:])  # [I*i, J*j, x, y, z]
+                    kernel[si, sj] = ker
+                else:
+                    kernel[si, sj] = 0
 
                 begin_j += mj * self.dims_in[j]
             begin_i += mi * self.dims_out[i]
@@ -134,10 +154,7 @@ class SE3KernelCombination(torch.autograd.Function):
         return kernel
 
     def backward(self, grad_kernel):  # pylint: disable=W
-        if grad_kernel.is_cuda and not self.kernels[0][0].is_cuda:
-            self.kernels = [[K.cuda() for K in row] for row in self.kernels]
-        if not grad_kernel.is_cuda and self.kernels[0][0].is_cuda:
-            self.kernels = [[K.cpu() for K in row] for row in self.kernels]
+        self._cuda_kernels(grad_kernel.is_cuda)
 
         if grad_kernel.is_cuda:
             grad_weight = torch.cuda.FloatTensor(self.nweights)
@@ -150,20 +167,21 @@ class SE3KernelCombination(torch.autograd.Function):
         for i, mi in enumerate(self.multiplicites_out):
             begin_j = 0
             for j, mj in enumerate(self.multiplicites_in):
-                b_el = self.kernels[i][j].size(0)
-                basis_kernels_ij = self.kernels[i][j]  # [beta, i, j, x, y, z]
-                basis_kernels_ij = basis_kernels_ij.view(b_el, -1)  # [beta, i*j*x*y*z]
+                if self.kernels[i][j] is not None:
+                    b_el = self.kernels[i][j].size(0)
+                    basis_kernels_ij = self.kernels[i][j]  # [beta, i, j, x, y, z]
+                    basis_kernels_ij = basis_kernels_ij.view(b_el, -1)  # [beta, i*j*x*y*z]
 
-                si = slice(begin_i, begin_i + mi * self.dims_out[i])
-                sj = slice(begin_j, begin_j + mj * self.dims_in[j])
+                    si = slice(begin_i, begin_i + mi * self.dims_out[i])
+                    sj = slice(begin_j, begin_j + mj * self.dims_in[j])
 
-                grad = grad_kernel[si, sj]  # [I * i, J * j, x, y, z]
-                grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2)  # [I, J, i, j, x*y*z]
-                grad = grad.contiguous().view(mi * mj, -1)  # [I*J, i*j*x*y*z]
-                grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1))  # [I*J, beta]
+                    grad = grad_kernel[si, sj]  # [I * i, J * j, x, y, z]
+                    grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2)  # [I, J, i, j, x*y*z]
+                    grad = grad.contiguous().view(mi * mj, -1)  # [I*J, i*j*x*y*z]
+                    grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1))  # [I*J, beta]
 
-                grad_weight[weight_index: weight_index + mi * mj * b_el] = grad.view(-1)  # [I * J * beta]
-                weight_index += mi * mj * b_el
+                    grad_weight[weight_index: weight_index + mi * mj * b_el] = grad.view(-1)  # [I * J * beta]
+                    weight_index += mi * mj * b_el
 
                 begin_j += self.multiplicites_in[j] * self.dims_in[j]
             begin_i += self.multiplicites_out[i] * self.dims_out[i]
@@ -192,13 +210,13 @@ def test_normalization(batch, size, Rs_out=None, Rs_in=None):
     return y.data
 
 
-def test_combination_gradient(Rs_out=None, Rs_in=None):
+def test_combination_gradient(size, n_radial, upsamplig, Rs_out=None, Rs_in=None, **kargs):
     if Rs_in is None:
         Rs_in = [(2, SO3.repr1), (1, SO3.repr3), (1, SO3.repr5)]
     if Rs_out is None:
         Rs_out = [(1, SO3.repr3), (1, SO3.repr1)]
 
-    combination = SE3KernelCombination(4, 2, 15, Rs_out, Rs_in, central_base=True, verbose=True)
+    combination = SE3KernelCombination(size, n_radial, upsamplig, Rs_out, Rs_in, **kargs)
 
     w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
 

@@ -28,16 +28,17 @@ class SE3BNConvolution(torch.nn.Module):
         for i, mi in enumerate(self.conv.combination.multiplicites_out):
             var_index = 0
             for j, mj in enumerate(self.conv.combination.multiplicites_in):
-                b_el = self.conv.combination.kernels[i][j].size(0)
+                if self.conv.combination.kernels[i][j] is not None:
+                    b_el = self.conv.combination.kernels[i][j].size(0)
 
-                factor = 1 / (self.bn.running_var[var_index: var_index + mj] + self.bn.eps) ** 0.5
-                var_index += mj
+                    factor = 1 / (self.bn.running_var[var_index: var_index + mj] + self.bn.eps) ** 0.5
+                    var_index += mj
 
-                w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
-                weight_index += mi * mj * b_el
+                    w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
+                    weight_index += mi * mj * b_el
 
-                w = w.view(mi, mj, b_el) * torch.autograd.Variable(factor).view(1, -1, 1)
-                ws.append(w.view(-1))
+                    w = w.view(mi, mj, b_el) * torch.autograd.Variable(factor).view(1, -1, 1)
+                    ws.append(w.view(-1))
 
         kernel = self.conv.combination(torch.cat(ws))
         return torch.nn.functional.conv3d(input, kernel, **self.conv.kwargs)
@@ -67,13 +68,14 @@ class SE3ConvolutionBN(torch.nn.Module):
             var_index += mi
 
             for j, mj in enumerate(self.conv.combination.multiplicites_in):
-                b_el = self.conv.combination.kernels[i][j].size(0)
+                if self.conv.combination.kernels[i][j] is not None:
+                    b_el = self.conv.combination.kernels[i][j].size(0)
 
-                w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
-                weight_index += mi * mj * b_el
+                    w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
+                    weight_index += mi * mj * b_el
 
-                w = w.view(mi, mj, b_el) * torch.autograd.Variable(factor).view(-1, 1, 1)
-                ws.append(w.view(-1))
+                    w = w.view(mi, mj, b_el) * torch.autograd.Variable(factor).view(-1, 1, 1)
+                    ws.append(w.view(-1))
 
         kernel = self.conv.combination(torch.cat(ws))
         output = torch.nn.functional.conv3d(input, kernel, **self.conv.kwargs)

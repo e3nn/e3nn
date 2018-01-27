@@ -6,15 +6,17 @@ from se3_cnn import SO3
 
 
 class HighwayBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, size, n_radial, activation=None, stride=1, padding=0, batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):
+    def __init__(self, repr_in, repr_out, size, n_radial, activation=None, stride=1, padding=0, central_base=True, overlap_threshold=-1, batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 11)
         :param repr_out: same but for the output
-        :param activation: function like for instance torch.nn.functional.relu
         :param int size: the filters are cubes of dimension = size x size x size
         :param int n_radial: number of radial discretization
+        :param activation: function like for instance torch.nn.functional.relu
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
+        :param bool central_base: Adds a kernel basis element in the central pixel, works only if size is odd
+        :param float overlap_threshold: Allow to filter the basis element according to their equivariance, takes a value between -1 (no filtering) and 1
         :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
         :param batch_norm_mode: the mode of the batch normalization
         :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
@@ -36,6 +38,8 @@ class HighwayBlock(torch.nn.Module):
             Rs_out=Rs_out,
             stride=stride,
             padding=padding,
+            central_base=central_base,
+            overlap_threshold=overlap_threshold,
             momentum=batch_norm_momentum,
             mode=batch_norm_mode)
 
