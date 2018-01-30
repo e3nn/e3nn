@@ -197,7 +197,22 @@ class AvgSpacial(torch.nn.Module):
         # inp [batch, features, x, y, z]
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)  # [batch, features]
 
-class CNN(torch.nn.Module):
+
+class BaseCNN(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, inp):  # pylint: disable=W
+        '''
+        :param inp: [batch, features, x, y, z]
+        '''
+        x = self.sequence(inp)  # [batch, features]
+
+        return x
+
+
+class CNN(BaseCNN):
 
     def __init__(self, n_output):
         super().__init__()
@@ -239,16 +254,100 @@ class CNN(torch.nn.Module):
         )
 
 
-    def forward(self, inp):  # pylint: disable=W
-        '''
-        :param inp: [batch, features, x, y, z]
-        '''
-        x = self.sequence(inp)  # [batch, features]
+class DeeperDense(BaseCNN):
 
-        return x
+    def __init__(self, n_output):
+        super().__init__()
+
+        # The parameters of a HighwayBlock are:
+        # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
+        # - The stride, same as 2D convolution
+        # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
+        features = [
+            (1,),  # As input we have a scalar field
+            (4, 4, 4),
+            (4, 4, 4),
+            (8, 8, 8),
+            (8, 8, 8),
+            (8, 8, 8),
+            (256,)
+        ]
+        common_block_params = {'n_radial': 1, 'batch_norm_before_conv': False}
+        block_params = [
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 2, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 3, 'stride': 1, 'padding': 0},
+            {'activation': None, 'size': 3},
+        ]
+
+        assert len(block_params) + 1 == len(features)
+
+        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in
+                  range(len(block_params))]
+
+        self.sequence = torch.nn.Sequential(
+            *blocks,
+            AvgSpacial(),
+            torch.nn.Linear(256, 128),
+            torch.nn.BatchNorm1d(128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, n_output),
+            torch.nn.BatchNorm1d(n_output)
+        )
 
 
-def main(data_filename):
+class DeeperConv(BaseCNN):
+
+    def __init__(self, n_output):
+        super().__init__()
+
+        # The parameters of a HighwayBlock are:
+        # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
+        # - The stride, same as 2D convolution
+        # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
+        features = [
+            (1,),  # As input we have a scalar field
+            (4, 4, 4),
+            (4, 4, 4),
+            (4, 4, 4),
+            (4, 4, 4),
+            (8, 8, 8),
+            (8, 8, 8),
+            (8, 8, 8),
+            (128,)
+        ]
+        common_block_params = {'n_radial': 1, 'batch_norm_before_conv': False}
+        block_params = [
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
+            {'activation': torch.nn.functional.relu, 'size': 3, 'stride': 1, 'padding': 0},
+            {'activation': None, 'size': 3},
+        ]
+
+        assert len(block_params) + 1 == len(features)
+
+        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in
+                  range(len(block_params))]
+
+        self.sequence = torch.nn.Sequential(
+            *blocks,
+            AvgSpacial(),
+            torch.nn.Linear(128, n_output),
+            torch.nn.BatchNorm1d(n_output),
+        )
+
+
+model_classes = {"CNN": CNN,
+                 "DeeperDense": DeeperDense,
+                 "DeeperConv": DeeperConv}
+
+def main(data_filename, model_class):
 
     # torch.backends.cudnn.benchmark = True
 
@@ -262,7 +361,7 @@ def main(data_filename):
 
     n_output = len(validation_set.label_set)
     
-    model = CNN(n_output = n_output)
+    model = model_class(n_output = n_output)
     if torch.cuda.is_available():
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
@@ -325,8 +424,18 @@ def main(data_filename):
 
 if __name__ == '__main__':
 
-    import sys
+    import argparse
 
-    data_filename = sys.argv[1]
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("data_filename",
+                        help="The name of the data file (will automatically downloaded)")
+    parser.add_argument("--model", choices=model_classes.keys(), default='CNN',
+                        help="Which model definition to use (default: %(default)s)")
+    args = parser.parse_args()
+
+    print("# Options")
+    for key, value in sorted(vars(args).items()):
+        print(key, "=", value)
     
-    main(data_filename)
+    main(data_filename=args.data_filename, model_class=model_classes[args.model])
