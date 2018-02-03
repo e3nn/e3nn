@@ -20,9 +20,9 @@ def rot_y(beta):
     '''
     Rotation around Y axis
     '''
-    return np.array([[np.cos(beta), 0, np.sin(beta)],
+    return np.array([[np.cos(beta), 0, -np.sin(beta)],
                      [0, 1, 0],
-                     [-np.sin(beta), 0, np.cos(beta)]])
+                     [np.sin(beta), 0, np.cos(beta)]])
 
 
 def rot(alpha, beta, gamma):
