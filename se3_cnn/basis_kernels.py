@@ -347,7 +347,7 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
                             z = idx_z - size/2 + 0.5
                             if x==y==z==0: # angles at origin are nan, special treatment
                                 if J==0: # Y^0 is angularly independent, choose any angle
-                                    Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, 123, 321)
+                                    Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
                                 else: # insert zeros for Y^J with J!=0
                                     Y_J[idx_m, idx_x, idx_y, idx_z] = 0
                             else: # not at the origin, sample spherical harmonic
@@ -363,25 +363,30 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
             K_J = np.einsum('mn,n...->m...', Q_J, Y_J)
 
             # ROW MAJOR VS COLUMN MAJOR (same as in unvec for Q above)
-            # gives better results but corresponds to column major
+            # corresponds to column major
             K_J = K_J.reshape(2*order_out+1, 2*order_in+1, size, size, size)
-            # row major, should be correct but is not
+            # row major
             # K_J = K_J.reshape(2*order_in+1, 2*order_out+1, size, size, size)
             # K_J = np.transpose(K_J, axes=(1,0,2,3,4))
 
             sh_cubes.append(K_J)
 
-        # # WINDOW FUNCTIONS
-        # # spherical shells with Gaussian radial part
-        # def _window(r_field, r0, sigma=.6):
-        #     gauss = lambda x, mu, sig: np.exp(-.5 * ((x - mu) / sig) ** 2) / (np.sqrt(2 * np.pi) * sig)
-        #     window = gauss(r_field, r0, sigma)
+        # WINDOW FUNCTIONS
+        # spherical shells with Gaussian radial part
+        def _window(r_field, r0, sigma=.8):
+            gauss = lambda x, mu, sig: np.exp(-.5 * ((x - mu) / sig) ** 2) / (np.sqrt(2 * np.pi) * sig)
+            window = gauss(r_field, r0, sigma)
+            return window
+
+        # # solid ball of radius size//2 (independent of r0)
+        # def _window(r_field, r0):
+        #     window = (r_field<=(size//2)).astype(int)
         #     return window
 
-        # solid ball of radius size//2 (independent of r0)
-        def _window(r_field, r0):
-            window = (r_field<=(size//2)).astype(int)
-            return window
+        # # linearly decreasing ball of radius size//2 (independent of r0)
+        # def _window(r_field, r0):
+        #     window = (r_field<=(size//2)).astype(int) * (size//2 - r_field)
+        #     return window
 
         # run over radial parts and window out non-aliased basis functions
         basis = []
@@ -406,6 +411,7 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
     assert upsampling == 1  # not implemented
     radii = np.arange(n_radial)
     J_max_list = 2 * (radii + 1)
+    # J_max_list = 2*radii + 1
     J_max_list[0] = 0
     # hack to get the orders of the in/out reps
     order_in = (int(R_in.__name__[4:]) - 1) // 2 # aka j
@@ -419,17 +425,17 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
     #######################################################################################################
     # DEBUG PRINT
     #######################################################################################################
-    print('\nkernel size: {}'.format(size))
-    print('shell radii: {}'.format(radii))
-    print('shell bandlimit: {}'.format(J_max_list))
+    # print('\nkernel size: {}'.format(size))
+    # print('shell radii: {}'.format(radii))
+    # print('shell bandlimit: {}'.format(J_max_list))
 
-    print('\ncheck_basis_equivariance for R_in={} -> R_out={}:'.format(R_in.__name__, R_out.__name__))
-    accum = np.zeros(len(basis))
-    N = 100
-    for a,b,c in 2*np.pi*np.random.rand(N,3):
-        equiv_vals = check_basis_equivariance(basis, R_out, R_in, a,b,c)
-        accum += equiv_vals
-    print(accum/N)
+    # print('\ncheck_basis_equivariance for R_in={} -> R_out={}:'.format(R_in.__name__, R_out.__name__))
+    # accum = np.zeros(len(basis))
+    # N = 100
+    # for a,b,c in 2*np.pi*np.random.rand(N,3):
+    #     equiv_vals = check_basis_equivariance(basis, R_out, R_in, a,b,c)
+    #     accum += equiv_vals
+    # print(accum/N)
 
     # import se3_cnn.SO3 as SO3
     # reps = [SO3.repr1, SO3.repr3, SO3.repr5]#, SO3.repr7, SO3.repr9, SO3.repr11]
@@ -461,13 +467,6 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
     # plt.title('Overlaps between basis elements.')
     # plt.show()
     #######################################################################################################
-
-
-
-    # from IPython.core.debugger import Tracer
-    # Tracer()() #this one triggers the debugger
-
-
 
     return basis
 
