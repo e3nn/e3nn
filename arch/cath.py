@@ -14,6 +14,19 @@ import os
 import time
 from timeit import default_timer as timer
 
+
+def get_output_shape(input_size, func):
+    f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
+    return f.size()[1:]
+
+
+def print_layer(layers, input_shape):
+    """"Method for print architecture during model construction"""
+
+    shape = get_output_shape(input_shape, layers)
+    print("layer %2d - %20s: %s [output size %s]" % (len(layers), list(layers.named_modules())[-1][0], tuple(shape), "{:,}".format(np.prod(shape))))
+
+
 class Cath(torch.utils.data.Dataset):
     url = 'https://github.com/deepfold/cath_datasets/blob/master/{}?raw=true'
 
@@ -198,6 +211,14 @@ class AvgSpacial(torch.nn.Module):
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)  # [batch, features]
 
 
+class Flatten(torch.nn.Module):
+    def __init__(self):
+        super(Flatten, self).__init__()
+
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
 class BaseCNN(torch.nn.Module):
 
     def __init__(self):
@@ -343,9 +364,75 @@ class DeeperConv(BaseCNN):
         )
 
 
+class CNN3Dflat(BaseCNN):
+
+    def __init__(self, n_output):
+        super().__init__()
+
+        self.sequence = torch.nn.Sequential()
+
+        channels = [1, 24, 48, 48, 48, 48, 128]
+        params = [{'kernel_size': 5, 'stride': 2},
+                  {'kernel_size': 5, 'stride': 1},
+                  {'kernel_size': 5, 'stride': 1},
+                  {'kernel_size': 5, 'stride': 1},
+                  {'kernel_size': 3, 'stride': 1},
+                  {'kernel_size': 3, 'stride': 1}]
+
+        assert(len(channels)==len(params)+1)
+
+        for i in range(len(params)):
+            self.sequence.add_module('conv%d'%i, torch.nn.Conv3d(channels[i], channels[i+1], **params[i]))
+            torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
+            print_layer(self.sequence, (1, 50, 50, 50))
+            self.sequence.add_module('bn%d'%i, torch.nn.BatchNorm2d(channels[i+1]))
+            self.sequence.add_module('relu%d'%i, torch.nn.ReLU())
+
+        self.sequence.add_module("flatten", Flatten())
+        print_layer(self.sequence, (1, 50, 50, 50))
+        self.sequence.add_module("lin7", torch.nn.Linear(128*7*7*7, n_output))
+        torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
+        print_layer(self.sequence, (1, 50, 50, 50))
+        torch.nn.BatchNorm1d(n_output)
+
+
+class CNN3Davg(BaseCNN):
+
+    def __init__(self, n_output):
+        super().__init__()
+
+        self.sequence = torch.nn.Sequential()
+
+        channels = [1, 24, 48, 48, 48, 48, 128]
+        params = [{'kernel_size': 5, 'stride': 2},
+                  {'kernel_size': 5, 'stride': 1},
+                  {'kernel_size': 5, 'stride': 1},
+                  {'kernel_size': 5, 'stride': 1},
+                  {'kernel_size': 3, 'stride': 1},
+                  {'kernel_size': 3, 'stride': 1}]
+
+        assert(len(channels)==len(params)+1)
+
+        for i in range(len(params)):
+            self.sequence.add_module('conv%d'%i, torch.nn.Conv3d(channels[i], channels[i+1], **params[i]))
+            torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
+            print_layer(self.sequence, (1, 50, 50, 50))
+            self.sequence.add_module('bn%d'%i, torch.nn.BatchNorm2d(channels[i+1]))
+            self.sequence.add_module('relu%d'%i, torch.nn.ReLU())
+
+        self.sequence.add_module("flatten", AvgSpacial())
+        print_layer(self.sequence, (1, 50, 50, 50))
+        self.sequence.add_module("lin7", torch.nn.Linear(128, n_output))
+        torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
+        print_layer(self.sequence, (1, 50, 50, 50))
+        torch.nn.BatchNorm1d(n_output)
+
+
 model_classes = {"CNN": CNN,
                  "DeeperDense": DeeperDense,
-                 "DeeperConv": DeeperConv}
+                 "DeeperConv": DeeperConv,
+                 "CNN3Dflat": CNN3Dflat,
+                 "CNN3Davg": CNN3Davg}
 
 def main(data_filename, model_class):
 
