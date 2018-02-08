@@ -90,6 +90,11 @@ def repr9(alpha, beta, gamma):
 def repr11(alpha, beta, gamma):
     return wigner_D_matrix(5, alpha, beta, gamma)
 
+def repr13(alpha, beta, gamma):
+    return wigner_D_matrix(6, alpha, beta, gamma)
+
+def repr15(alpha, beta, gamma):
+    return wigner_D_matrix(7, alpha, beta, gamma)
 
 def repr3x3(alpha, beta, gamma):
     r = repr3(alpha, beta, gamma)
