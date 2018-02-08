@@ -233,39 +233,28 @@ def cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in):
     return gaussian_subsampling(basis, (1, 1, 1, upsampling, upsampling, upsampling))
 
 
-
-
-
-
-
-
 ################################################################################
 # Analytically derived basis
 ################################################################################
 
-
-
-
-
-
-
-
-
+# SHOULD MAYBE NOT BE CACHED BUT ONLY THE EXPENSIVE PART INSIDE (_compute_basistrafo)
 # @cached_dirpklgz("kernels_cache_analytical")
-def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
+
+def cube_basis_kernels_analytical(size, R_out, R_in, radial_window_fct, **radial_window_fct_kwargs):
     '''
     Generate equivariant kernel basis mapping between capsules transforming under R_in and R_out
     :param size: side length of the filter kernel (CURRENTLY ONLY ODD SIZES SUPPORTED)
-    :param n_radial: number of sampled spherical shells at different radii (CURRENTLY FIXED TO size//2+1)
-    :param upsampling: upsampling factor during kernel sampling (NOT IMPLEMENTED YET)
     :param R_out: output representation
     :param R_in: input representation
+    :param radial_window_fct: callable for windowing out radial parts, taking mandatory parameters 'sh_cubes',
+                              'r_field' and 'order_irreps' as well as optional kwargs via 'radial_window_fct_kwargs'
+    :param radial_window_fct_kwargs: keyword arguments for the radial window function
     :return: basis of equivariant kernels of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
     '''
-    # TODO: solve Q_J in subspaces rather than full Q basis
     # TODO: add support for even sidelength kernels
     # TODO: add upsampling (?)
 
+    # @cached_dirpklgz("basis_trafo_generation_cache")
     def _compute_basistrafo(R_in, R_out, order_in, order_out, order_irreps):
         '''
         Given the input and output representations compute the J-subspace change of basis matrices Q_J, each associated with one kernel basis element Y_J
@@ -287,42 +276,37 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
             # inverted wrt notes ( R_tensor = Q R_irrep Q^-1 and K = Q K_tilde )
             return np.kron(np.eye(*R_irrep_J.shape), R_tensor) - np.kron(R_irrep_J.T, np.eye(*R_tensor.shape))
         def _nullspace(A, eps=1e-13):
-            u, s, v = np.linalg.svd(A, full_matrices=False)
+            # sometimes the svd with gesdd does not converge, fall back to gesvd in this case
+            try:
+                u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesdd')
+            except:
+                u, s, v = np.linalg.svd(A, full_matrices=False, lapack_driver='gesvd')
             null_space = v[s<eps]
             assert null_space.shape[0] == 1 # unique subspace solution
             return null_space[0]
-        N_sample = 5 # number of sampled angles for which the linear system is solved simultaneously
-        Q_list = []
-        for J in order_irreps:
+        @cached_dirpklgz("Q_J_cache")
+        def _solve_Q_J(J, order_in, order_out, N_sample):
+            ''' wrapper to cache expensive solution for J which appears for several j,l combinations
+                order_in and order_out are not actually used but the Q_J are of shape ((2*j+1)*(2*l+1), 2*J+1), which means
+                that the caching needs to differentiate different input / output orders
+             '''
             A_sylvester = np.vstack([_sylvester_submatrix(J,a,b,c) for a,b,c in 2*np.pi*np.random.rand(N_sample,3)])
             Q_J = _nullspace(A_sylvester)
             # transposition necessary since 'vec' is defined column major while python is row major
             Q_J = Q_J.reshape(2*J+1, (2*order_in+1)*(2*order_out+1)).T
             assert np.allclose(np.dot(_R_tensor(321,111,123), Q_J), np.dot(Q_J, _R_irrep_J(J,321,111,123)))
+            return Q_J
+        N_sample = 5 # number of sampled angles for which the linear system is solved simultaneously
+        Q_list = []
+        for J in order_irreps:
+            Q_J = _solve_Q_J(J, order_in, order_out, N_sample)
             Q_list.append(Q_J)
-
-        ########################################################################################################################
-        # sanity check, full Q is never actually used. can be commented out in final version
-        Q = np.hstack(Q_list)
-        def _R_irrep_directsum(a,b,c):
-            ''' direct sum of irreps representation of R_out and R_in '''
-            dim_tensorrep = (2*order_in+1)*(2*order_out+1)
-            R_irrep = np.zeros((dim_tensorrep, dim_tensorrep))
-            idxs_start = np.cumsum(np.insert(2*order_irreps+1, 0, 0))
-            for i in range(len(order_irreps)):
-                R_irrep[idxs_start[i]:idxs_start[i+1], idxs_start[i]:idxs_start[i+1]] = wigner_D_matrix(order_irreps[i], a,b,c)
-            return R_irrep
-        Rt = _R_tensor(321,111,123)
-        Ri = _R_irrep_directsum(321,111,123)
-        assert np.allclose(Rt, np.dot(np.dot(Q, Ri), np.linalg.inv(Q)))
-        ########################################################################################################################
-
         return Q_list
 
-
-    def _sample_basis(size, Q_list, order_irreps, order_in, order_out):
+    def _sample_sh_cubes(size, Q_list, order_irreps, order_in, order_out):
         '''
-        Sample kernels in a cube. Generates radial parts via a fixed heuristic for now.
+        Sample spherical harmonics in a cube.
+        No bandlimiting considered, aliased regions need to be cut by windowing!
         :param size: side length of the kernel
         :param Q: change of basis matrix between tensor representation and irrep representation
         :param order_irreps: orders of the irreps in the multiplet
@@ -361,123 +345,92 @@ def cube_basis_kernels_analytical(size, n_radial, upsampling, R_out, R_in):
         for J,Q_J in zip(order_irreps,Q_list):
             Y_J = _sample_Y_J(J, r_field)
             K_J = np.einsum('mn,n...->m...', Q_J, Y_J)
-
-            # ROW MAJOR VS COLUMN MAJOR (same as in unvec for Q above)
-            # corresponds to column major
             K_J = K_J.reshape(2*order_out+1, 2*order_in+1, size, size, size)
-            # row major
-            # K_J = K_J.reshape(2*order_in+1, 2*order_out+1, size, size, size)
-            # K_J = np.transpose(K_J, axes=(1,0,2,3,4))
-
             sh_cubes.append(K_J)
+        return sh_cubes, r_field
 
-        # WINDOW FUNCTIONS
-        # spherical shells with Gaussian radial part
-        def _window(r_field, r0, sigma=.8):
-            gauss = lambda x, mu, sig: np.exp(-.5 * ((x - mu) / sig) ** 2) / (np.sqrt(2 * np.pi) * sig)
-            window = gauss(r_field, r0, sigma)
-            return window
-
-        # # solid ball of radius size//2 (independent of r0)
-        # def _window(r_field, r0):
-        #     window = (r_field<=(size//2)).astype(int)
-        #     return window
-
-        # # linearly decreasing ball of radius size//2 (independent of r0)
-        # def _window(r_field, r0):
-        #     window = (r_field<=(size//2)).astype(int) * (size//2 - r_field)
-        #     return window
-
-        # run over radial parts and window out non-aliased basis functions
-        basis = []
-        for r,J_max in zip(radii, J_max_list):
-            window = _window(r_field, r0=r)
-            window = window[np.newaxis,np.newaxis,:]
-            # for each spherical shell at radius r window sh_cube if J does not exceed the bandlimit J_max
-            for idx_J,J in enumerate(order_irreps):
-                if J>J_max:
-                    break
-                else:
-                    basis.append(sh_cubes[idx_J] * window)
-        basis = np.stack(basis, axis=0)
-        # normalize filter energy
-        basis = basis / np.sqrt(np.sum(basis**2, axis=(1,2,3,4,5), keepdims=True))
-        return basis
-
-
-    # feel free to adapt handling of radial part
+    # only odd sidelength filters supported for now
     assert size % 2 == 1
-    assert n_radial == size // 2 + 1  # hardcoded for now
-    assert upsampling == 1  # not implemented
-    radii = np.arange(n_radial)
-    J_max_list = 2 * (radii + 1)
-    # J_max_list = 2*radii + 1
-    J_max_list[0] = 0
     # hack to get the orders of the in/out reps
     order_in = (int(R_in.__name__[4:]) - 1) // 2 # aka j
     order_out = (int(R_out.__name__[4:]) - 1) // 2 # aka l
     order_irreps = np.arange(abs(order_in-order_out), order_in+order_out+1) # J with |j-l|<=J<=j+l
-    # idxs_start = np.cumsum(np.insert(2*order_irreps+1, 0, 0))
-    # compute basis
+
+    # compute basis transformation matrices Q_J
     Q_list = _compute_basistrafo(R_in, R_out, order_in, order_out, order_irreps)
-    basis = _sample_basis(size, Q_list, order_irreps, order_in, order_out)
-
-    #######################################################################################################
-    # DEBUG PRINT
-    #######################################################################################################
-    # print('\nkernel size: {}'.format(size))
-    # print('shell radii: {}'.format(radii))
-    # print('shell bandlimit: {}'.format(J_max_list))
-
-    # print('\ncheck_basis_equivariance for R_in={} -> R_out={}:'.format(R_in.__name__, R_out.__name__))
-    # accum = np.zeros(len(basis))
-    # N = 100
-    # for a,b,c in 2*np.pi*np.random.rand(N,3):
-    #     equiv_vals = check_basis_equivariance(basis, R_out, R_in, a,b,c)
-    #     accum += equiv_vals
-    # print(accum/N)
-
-    # import se3_cnn.SO3 as SO3
-    # reps = [SO3.repr1, SO3.repr3, SO3.repr5]#, SO3.repr7, SO3.repr9, SO3.repr11]
-    # for rin in reps:
-    #     for rout in reps:
-    #         order_in = (int(rin.__name__[4:]) - 1) // 2
-    #         order_out = (int(rout.__name__[4:]) - 1) // 2
-    #         print('\nBasis for R_in={} -> R_out={}'.format(rin.__name__, rout.__name__))
-    #         Q, order_irreps, idxs_start = _compute_reps_and_basistrafo(rin, rout, order_in, order_out)
-    #         basis = _sample_basis(size, Q, order_irreps, idxs_start, order_in, order_out)
-    #         accum = np.zeros(len(basis))
-    #         N = 25
-    #         for a, b, c in 2*np.pi*np.random.rand(N, 3):
-    #             equiv_vals = check_basis_equivariance(basis, rout, rin, a, b, c)
-    #             accum += equiv_vals
-    #         accum /= N
-    #         print(accum)
-
-    # print('\nCheck basis scalar products for order_in={} -> order_out={}'.format(order_in, order_out))
-    # import matplotlib.pyplot as plt
-    # overlaps = np.zeros((len(basis), len(basis)))
-    # for i,b1 in enumerate(basis):
-    #     print('\n')
-    #     for j,b2 in enumerate(basis):
-    #         overlap = np.sum(b1*b2)
-    #         print(i,j, np.round(overlap, decimals=4))
-    #         overlaps[i,j] = overlap
-    # plt.matshow(overlaps)
-    # plt.title('Overlaps between basis elements.')
-    # plt.show()
-    #######################################################################################################
-
+    # sample (basis transformed) spherical harmonics on cube, ignore aliasing
+    sh_cubes, r_field = _sample_sh_cubes(size, Q_list, order_irreps, order_in, order_out)
+    # window out radial parts
+    # make sure to remove aliased regions!
+    basis = radial_window_fct(sh_cubes, r_field, order_irreps, **radial_window_fct_kwargs)
+    # normalize filter energy
+    basis = basis / np.sqrt(np.sum(basis**2, axis=(1,2,3,4,5), keepdims=True))
     return basis
 
 
+def gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma=.6):
+    '''
+    gaussian windowing function with manual handling of shell radii, shell bandlimits and shell width
+    :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
+    :param r_field: np.ndarray containing radial coordinates in the cube, shape (size,size,size)
+    :param order_irreps: np.ndarray with the order J of the irreps in sh_cubes with |j-l|<=J<=j+l
+    :param radii: np.ndarray with radii of the shells, sets mean of the radial gaussians
+    :param J_max_list: np.ndarray with bandlimits of the shells, same length as radii
+    :param sigma: width of the shells, corresponds to standard deviation of radial gaussians
+    '''
+    # spherical shells with Gaussian radial part
+    def _gauss_window(r_field, r0, sigma):
+        return np.exp(-.5*((r_field-r0)/sigma)**2) / (np.sqrt(2*np.pi)*sigma)
+    # run over radial parts and window out non-aliased basis functions
+    assert len(radii) == len(J_max_list)
+    basis = []
+    for r,J_max in zip(radii, J_max_list):
+
+        print('radius={}, with bandlimit={}'.format(r,J_max))
+
+        window = _gauss_window(r_field, r0=r, sigma=sigma)
+        window = window[np.newaxis,np.newaxis,:]
+        # for each spherical shell at radius r window sh_cube if J does not exceed the bandlimit J_max
+        for idx_J,J in enumerate(order_irreps):
+            if J>J_max:
+                break
+            else:
+                basis.append(sh_cubes[idx_J] * window)
+    basis = np.stack(basis, axis=0)
+    return basis
 
 
-
-
-
-
-
+def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mode, border_dist=0., sigma=.6):
+    '''
+    convenience wrapper for windowing function with three different predefined modes for radii and bandlimits
+    :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
+    :param r_field: np.ndarray containing radial coordinates in the cube, shape (size,size,size)
+    :param order_irreps: np.ndarray with the order J of the irreps in sh_cubes with |j-l|<=J<=j+l
+    :param mode: string in ['sfcnn', 'conservative', '']
+                 'conservative': radial bandlimits such that equivariance value stays over 90% (for border_dist=0 and except for outer shell)
+                          [0,2,4,6,8,10,...]
+                 'compromise' something inbetween
+                          [0,3,5,7,9,11,...]
+                 'sfcnn': same radial bandlimits as used in https://arxiv.org/abs/1711.07289
+                          [0,4,6,8,10,12,...]
+    :param border_dist: distance of mean of outermost shell from outermost pixel center
+    :param sigma: width of the shell
+    '''
+    assert mode in ['conservative', 'compromise', 'sfcnn']
+    size = r_field.shape[0]
+    # radii = np.arange(size//2 + 1)
+    n_radial = size//2+1
+    radii = np.linspace(start=0, stop=size//2-border_dist, num=n_radial)
+    if mode == 'conservative':
+        J_max_list = np.array([0,2,4,6,8,10,12,14])[:n_radial]
+    if mode == 'compromise':
+        J_max_list = np.array([0,3,5,7,9,11,13,15])[:n_radial]
+    if mode == 'sfcnn':
+        # J_max_list = np.floor(2*(radii + 1))
+        # J_max_list[0] = 0
+        J_max_list = np.array([0,4,6,8,10,12,14,16])[:n_radial]
+    basis = gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma)
+    return basis
 
 
 
