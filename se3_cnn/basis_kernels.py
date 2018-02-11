@@ -14,6 +14,7 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import numpy as np
+import scipy.linalg
 from se3_cnn.util.cache_file import cached_dirpklgz
 from se3_cnn.SO3 import dim
 
@@ -240,15 +241,16 @@ def cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in):
 # SHOULD MAYBE NOT BE CACHED BUT ONLY THE EXPENSIVE PART INSIDE (_compute_basistrafo)
 # @cached_dirpklgz("kernels_cache_analytical")
 
-def cube_basis_kernels_analytical(size, R_out, R_in, radial_window_fct, **radial_window_fct_kwargs):
+def cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict):
     '''
     Generate equivariant kernel basis mapping between capsules transforming under R_in and R_out
     :param size: side length of the filter kernel (CURRENTLY ONLY ODD SIZES SUPPORTED)
     :param R_out: output representation
     :param R_in: input representation
-    :param radial_window_fct: callable for windowing out radial parts, taking mandatory parameters 'sh_cubes',
-                              'r_field' and 'order_irreps' as well as optional kwargs via 'radial_window_fct_kwargs'
-    :param radial_window_fct_kwargs: keyword arguments for the radial window function
+    :param radial_window_dict: dictionary containing radial_window_fct and its keyword arguments with
+                                - radial_window_fct: callable for windowing out radial parts, taking mandatory parameters 'sh_cubes',
+                                                     'r_field' and 'order_irreps' as well as optional kwargs via 'radial_window_fct_kwargs'
+                                - radial_window_fct_kwargs: keyword arguments for the radial window function
     :return: basis of equivariant kernels of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
     '''
     # TODO: add support for even sidelength kernels
@@ -280,7 +282,7 @@ def cube_basis_kernels_analytical(size, R_out, R_in, radial_window_fct, **radial
             try:
                 u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesdd')
             except:
-                u, s, v = np.linalg.svd(A, full_matrices=False, lapack_driver='gesvd')
+                u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesvd')
             null_space = v[s<eps]
             assert null_space.shape[0] == 1 # unique subspace solution
             return null_space[0]
@@ -362,6 +364,8 @@ def cube_basis_kernels_analytical(size, R_out, R_in, radial_window_fct, **radial
     sh_cubes, r_field = _sample_sh_cubes(size, Q_list, order_irreps, order_in, order_out)
     # window out radial parts
     # make sure to remove aliased regions!
+    radial_window_fct = radial_window_dict.get('radial_window_fct')
+    radial_window_fct_kwargs = radial_window_dict.get('radial_window_fct_kwargs')
     basis = radial_window_fct(sh_cubes, r_field, order_irreps, **radial_window_fct_kwargs)
     # normalize filter energy
     basis = basis / np.sqrt(np.sum(basis**2, axis=(1,2,3,4,5), keepdims=True))

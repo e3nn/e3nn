@@ -12,10 +12,10 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, size, n_radial, Rs_in, Rs_out, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
         super().__init__()
         self.bn = SE3BatchNorm([(m, SO3.dim(R)) for m, R in Rs_in], eps=eps, momentum=momentum, mode=mode)
-        self.conv = SE3Convolution(size, n_radial, Rs_in=Rs_in, Rs_out=Rs_out, **kwargs)
+        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
 
     def forward(self, input):  # pylint: disable=W
         self.bn.update_statistics(input.data)
@@ -25,9 +25,9 @@ class SE3BNConvolution(torch.nn.Module):
 
         ws = []
         weight_index = 0
-        for i, mi in enumerate(self.conv.combination.multiplicites_out):
+        for i, mi in enumerate(self.conv.combination.multiplicities_out):
             var_index = 0
-            for j, mj in enumerate(self.conv.combination.multiplicites_in):
+            for j, mj in enumerate(self.conv.combination.multiplicities_in):
                 if self.conv.combination.kernels[i][j] is not None:
                     b_el = self.conv.combination.kernels[i][j].size(0)
 
@@ -51,9 +51,9 @@ class SE3ConvolutionBN(torch.nn.Module):
     SE3Convolution followed by SE3BatchNorm
     '''
 
-    def __init__(self, size, n_radial, Rs_in, Rs_out, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
         super().__init__()
-        self.conv = SE3Convolution(size, n_radial, Rs_in=Rs_in, Rs_out=Rs_out, **kwargs)
+        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
         self.bn = SE3BatchNorm([(m, SO3.dim(R)) for m, R in Rs_out], eps=eps, momentum=momentum, mode=mode)
 
     def forward(self, input):  # pylint: disable=W
@@ -63,11 +63,11 @@ class SE3ConvolutionBN(torch.nn.Module):
         ws = []
         weight_index = 0
         var_index = 0
-        for i, mi in enumerate(self.conv.combination.multiplicites_out):
+        for i, mi in enumerate(self.conv.combination.multiplicities_out):
             factor = 1 / (self.bn.running_var[var_index: var_index + mi] + self.bn.eps) ** 0.5
             var_index += mi
 
-            for j, mj in enumerate(self.conv.combination.multiplicites_in):
+            for j, mj in enumerate(self.conv.combination.multiplicities_in):
                 if self.conv.combination.kernels[i][j] is not None:
                     b_el = self.conv.combination.kernels[i][j].size(0)
 
