@@ -353,9 +353,13 @@ def cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict):
 
     # only odd sidelength filters supported for now
     assert size % 2 == 1
+    # only irrep representations allowed so far, no tensor representations
+    import se3_cnn.SO3 as SO3
+    admissible_reps = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
+    assert R_in in admissible_reps and R_out in admissible_reps, 'only irreducible representations allowed with analytical solution, no tensor representations!'
     # hack to get the orders of the in/out reps
-    order_in = (int(R_in.__name__[4:]) - 1) // 2 # aka j
-    order_out = (int(R_out.__name__[4:]) - 1) // 2 # aka l
+    order_in  = (dim(R_in)  - 1) // 2 # aka j
+    order_out = (dim(R_out) - 1) // 2 # aka l
     order_irreps = np.arange(abs(order_in-order_out), order_in+order_out+1) # J with |j-l|<=J<=j+l
 
     # compute basis transformation matrices Q_J

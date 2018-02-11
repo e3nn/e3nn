@@ -107,7 +107,15 @@ class CNN(torch.nn.Module):
             (16, 8, 1),  # 32
             (1, 0, 0)  # 32
         ]
-        common_block_params = {'size': 7, 'n_radial': 3, 'padding': 3, 'batch_norm_momentum': 0.01, 'batch_norm_mode': 'maximum'}
+
+
+        from se3_cnn import basis_kernels
+        radial_window_dict = {'radial_window_fct':basis_kernels.gaussian_window_fct_convenience_wrapper,
+                              'radial_window_fct_kwargs':{'mode':'sfcnn', 'border_dist':0., 'sigma':.6}}
+        common_block_params = {'size': 7, 'padding': 3, 'batch_norm_momentum': 0.01, 'batch_norm_mode': 'maximum', 'radial_window_dict':radial_window_dict}
+
+
+
         block_params = [
             {'stride': 2, 'activation': torch.nn.functional.relu},
             {'stride': 1, 'activation': torch.nn.functional.relu},
