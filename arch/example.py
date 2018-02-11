@@ -38,7 +38,21 @@ class CNN(torch.nn.Module):
             (5, 1, 1, 1),
             (20, )  # Two scalar fields as output
         ]
-        common_block_params = {'size': 5, 'n_radial': 1, 'stride': 2, 'padding': 3, 'batch_norm_before_conv': False}
+
+
+
+
+
+        from se3_cnn import basis_kernels
+        radial_window_dict = {'radial_window_fct':basis_kernels.gaussian_window_fct_convenience_wrapper,
+                              'radial_window_fct_kwargs':{'mode':'sfcnn', 'border_dist':0., 'sigma':.6}}
+        common_block_params = {'size': 5, 'stride': 2, 'padding': 3, 'batch_norm_before_conv': False, 'radial_window_dict':radial_window_dict}
+
+
+
+
+
+
         block_params = [
             {'activation': torch.nn.functional.relu},
             {'activation': torch.nn.functional.relu},
@@ -134,7 +148,6 @@ def main():
 
     for i in range(1000):
         step(i)
-
 
 if __name__ == '__main__':
     main()
