@@ -5,7 +5,7 @@ from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 
 
-class HighwayBlock(torch.nn.Module):
+class GatedBlock(torch.nn.Module):
     def __init__(self, repr_in, repr_out, size, n_radial, activation=None, stride=1, padding=0, central_base=True, overlap_threshold=-1, batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 11)
