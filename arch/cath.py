@@ -1,19 +1,22 @@
 # pylint: disable=C,R,E1101
 '''
 Architecture to predict the structural categories of proteins according to the CATH 
-classification (www.cathdb.info) - at the Architecture level.
+classification (www.cathdb.info).
 
 '''
 import torch
+import torch.nn as nn
 import torch.utils.data
-from se3_cnn.blocks import HighwayBlock
 
 import numpy as np
+import math
 import scipy.io
 import os
 import time
 from timeit import default_timer as timer
+from scipy.stats import special_ortho_group
 
+from se3_cnn.blocks import GatedBlock
 
 def get_output_shape(input_size, func):
     f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
@@ -30,13 +33,14 @@ def print_layer(layers, input_shape):
 class Cath(torch.utils.data.Dataset):
     url = 'https://github.com/deepfold/cath_datasets/blob/master/{}?raw=true'
 
-    def __init__(self, dataset, split, download=False, use_density=True):
+    def __init__(self, dataset, split, download=False, use_density=True, randomize_orientation=False):
         self.root = os.path.expanduser("cath")
 
         if download:
             self.download(dataset)
 
         self.use_density = use_density
+        self.randomize_orientation = randomize_orientation
         
         if not self._check_exists(dataset):
             raise RuntimeError('Dataset not found.' +
@@ -73,7 +77,11 @@ class Cath(torch.utils.data.Dataset):
             fields = torch.cuda.FloatTensor(*(self.n_atom_types,)+(n,n,n)).fill_(0)
         else:
             fields = torch.zeros(*(self.n_atom_types,)+(n,n,n))
-        
+
+        if self.randomize_orientation:
+            random_rotation = special_ortho_group.rvs(3)
+            positions = np.dot(random_rotation,positions.T).T
+
         if self.use_density:
         
             ## Numpy version ##
@@ -205,40 +213,17 @@ class Cath(torch.utils.data.Dataset):
 
         print('Done!')
 
-class AvgSpacial(torch.nn.Module):
-    def forward(self, inp):  # pylint: disable=W
-        # inp [batch, features, x, y, z]
-        return inp.view(inp.size(0), inp.size(1), -1).mean(-1)  # [batch, features]
 
+class AvgSpacial(nn.Module):
+    def forward(self, inp):
+        return inp.view(inp.size(0), inp.size(1), -1).mean(-1)
 
-class Flatten(torch.nn.Module):
-    def __init__(self):
-        super(Flatten, self).__init__()
-
-    def forward(self, x):
-        return x.view(x.size(0), -1)
-
-
-class BaseCNN(torch.nn.Module):
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, inp):  # pylint: disable=W
-        '''
-        :param inp: [batch, features, x, y, z]
-        '''
-        x = self.sequence(inp)  # [batch, features]
-
-        return x
-
-
-class CNN(BaseCNN):
+class SE3Net(nn.Module):
 
     def __init__(self, n_output):
         super().__init__()
 
-        # The parameters of a HighwayBlock are:
+        # The parameters of a GatedBlock are:
         # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
         # - The stride, same as 2D convolution
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
@@ -263,188 +248,140 @@ class CNN(BaseCNN):
         
         assert len(block_params) + 1 == len(features)
 
-        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
+        blocks = [GatedBlock(features[i], features[i + 1],
+                             **common_block_params, **block_params[i])
+                  for i in range(len(block_params))]
 
         self.sequence = torch.nn.Sequential(
             *blocks,
             AvgSpacial(),
             torch.nn.Linear(128, n_output),
-            torch.nn.BatchNorm1d(n_output),
             # torch.nn.ReLU(),
             # torch.nn.Linear(50, 10),
         )
 
+    def forward(self, x):
+        return self.sequence(x)
 
-class DeeperDense(BaseCNN):
 
-    def __init__(self, n_output):
+class ResBlock(nn.Module):
+    def __init__(self, channels_in, channels_out, kernel_size=3, stride=1):
         super().__init__()
 
-        # The parameters of a HighwayBlock are:
-        # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
-        # - The stride, same as 2D convolution
-        # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
-        features = [
-            (1,),  # As input we have a scalar field
-            (4, 4, 4),
-            (4, 4, 4),
-            (8, 8, 8),
-            (8, 8, 8),
-            (8, 8, 8),
-            (256,)
-        ]
-        common_block_params = {'n_radial': 1, 'batch_norm_before_conv': False}
-        block_params = [
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 2, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 3, 'stride': 1, 'padding': 0},
-            {'activation': None, 'size': 3},
-        ]
+        channels = [channels_in] + channels_out
 
-        assert len(block_params) + 1 == len(features)
+        self.layers = []
+        for i in range(len(channels) - 1):
+            self.layers += [
+                nn.Conv3d(channels[i], channels[i+1],
+                          kernel_size=kernel_size,
+                          padding=kernel_size//2,
+                          stride=stride if i==0 else 1,
+                          bias=False),
+                nn.BatchNorm3d(channels[i+1])]
+        self.layers = nn.Sequential(*self.layers)
 
-        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in
-                  range(len(block_params))]
+        self.shortcut = nn.Sequential(*[
+            nn.Conv3d(channels[0], channels[-1],
+                      kernel_size=1,
+                      padding=0,
+                      stride=stride,
+                      bias=False),
+            nn.BatchNorm3d(channels[-1])])
 
-        self.sequence = torch.nn.Sequential(
-            *blocks,
+        # initialize
+        for module in self.modules():
+            if isinstance(module, nn.Conv3d):
+                torch.nn.init.xavier_normal(module.weight.data)
+            elif isinstance(module, nn.BatchNorm2d):
+                module.weight.data.fill_(1)
+                module.bias.data.zero_()
+
+    def forward(self, x):
+        return self.layers(x) + self.shortcut(x)
+
+
+class SE3ResBlock(nn.Module):
+    def __init__(self, in_repr, out_reprs, kernel_size=3, n_radial=1, stride=1):
+        super().__init__()
+
+        reprs = [in_repr] + out_reprs
+
+        self.layers = []
+        for i in range(len(reprs) - 1):
+            self.layers.append(
+                GatedBlock(reprs[i], reprs[i + 1],
+                           size=kernel_size,
+                           padding=kernel_size//2,
+                           stride=stride if i == 0 else 1,
+                           n_radial=n_radial,
+                           activation=torch.nn.functional.relu))
+        self.layers = nn.Sequential(*self.layers)
+
+        self.shortcut = GatedBlock(reprs[0], reprs[-1],
+                                   size=1,
+                                   padding=0,
+                                   stride=stride,
+                                   n_radial=1,
+                                   activation=None)
+
+    def forward(self, x):
+        return self.layers(x) + self.shortcut(x)
+
+class ResNet(nn.Module):
+    def __init__(self, *blocks):
+        super().__init__()
+        self.blocks = nn.Sequential(*blocks)
+
+    def forward(self, x):
+        return self.blocks(x)
+
+
+class ResNet34(ResNet):
+    def __init__(self, n_output):
+        features = [ [16] * 3,
+                     [32] * 4,
+                     [64] * 6,
+                    [128] * 3]
+        super().__init__(
+            ResBlock(1,              features[0], kernel_size=3),
+            ResBlock(features[0][0], features[1], kernel_size=3, stride=2),
+            ResBlock(features[1][0], features[2], kernel_size=3, stride=2),
+            ResBlock(features[2][0], features[3], kernel_size=3, stride=2),
             AvgSpacial(),
-            torch.nn.Linear(256, 128),
-            torch.nn.BatchNorm1d(128),
-            torch.nn.ReLU(),
-            torch.nn.Linear(128, n_output),
-            torch.nn.BatchNorm1d(n_output)
-        )
+            nn.Linear(features[3][-1], n_output))
 
 
-class DeeperConv(BaseCNN):
-
+class SE3ResNet34(ResNet):
     def __init__(self, n_output):
-        super().__init__()
-
-        # The parameters of a HighwayBlock are:
-        # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
-        # - The stride, same as 2D convolution
-        # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
-        features = [
-            (1,),  # As input we have a scalar field
-            (4, 4, 4),
-            (4, 4, 4),
-            (4, 4, 4),
-            (4, 4, 4),
-            (8, 8, 8),
-            (8, 8, 8),
-            (8, 8, 8),
-            (128,)
-        ]
-        common_block_params = {'n_radial': 1, 'batch_norm_before_conv': False}
-        block_params = [
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 3, 'stride': 1, 'padding': 0},
-            {'activation': None, 'size': 3},
-        ]
-
-        assert len(block_params) + 1 == len(features)
-
-        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in
-                  range(len(block_params))]
-
-        self.sequence = torch.nn.Sequential(
-            *blocks,
+        features = [[(2,  6, 10)] * 3,
+                    [(2,  6, 10)] * 4,
+                    [(4, 12, 20)] * 6,
+                    [(8, 24, 40)] * 2 + [(8*1 + 24*3 + 40*5, 0, 0)]]
+        super().__init__(
+            SE3ResBlock((1,),           features[0], kernel_size=5),
+            SE3ResBlock(features[0][0], features[1], kernel_size=5, stride=2),
+            SE3ResBlock(features[1][0], features[2], kernel_size=5, stride=2),
+            SE3ResBlock(features[2][0], features[3], kernel_size=5, stride=2),
             AvgSpacial(),
-            torch.nn.Linear(128, n_output),
-            torch.nn.BatchNorm1d(n_output),
-        )
+            nn.Linear(features[3][-1][0], n_output))
 
 
-class CNN3Dflat(BaseCNN):
+model_classes = {"se3net": SE3Net,
+                 "resnet34": ResNet34,
+                 "se3resnet34": SE3ResNet34}
 
-    def __init__(self, n_output):
-        super().__init__()
+def main(data_filename, model_class, batch_size=30, randomize_orientation=False):
 
-        self.sequence = torch.nn.Sequential()
+    torch.backends.cudnn.benchmark = True
 
-        channels = [1, 24, 48, 48, 48, 48, 128]
-        params = [{'kernel_size': 5, 'stride': 2},
-                  {'kernel_size': 5, 'stride': 1},
-                  {'kernel_size': 5, 'stride': 1},
-                  {'kernel_size': 5, 'stride': 1},
-                  {'kernel_size': 3, 'stride': 1},
-                  {'kernel_size': 3, 'stride': 1}]
-
-        assert(len(channels)==len(params)+1)
-
-        for i in range(len(params)):
-            self.sequence.add_module('conv%d'%i, torch.nn.Conv3d(channels[i], channels[i+1], **params[i]))
-            torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
-            print_layer(self.sequence, (1, 50, 50, 50))
-            self.sequence.add_module('bn%d'%i, torch.nn.BatchNorm2d(channels[i+1]))
-            self.sequence.add_module('relu%d'%i, torch.nn.ReLU())
-
-        self.sequence.add_module("flatten", Flatten())
-        print_layer(self.sequence, (1, 50, 50, 50))
-        self.sequence.add_module("lin7", torch.nn.Linear(128*7*7*7, n_output))
-        torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
-        print_layer(self.sequence, (1, 50, 50, 50))
-        torch.nn.BatchNorm1d(n_output)
-
-
-class CNN3Davg(BaseCNN):
-
-    def __init__(self, n_output):
-        super().__init__()
-
-        self.sequence = torch.nn.Sequential()
-
-        channels = [1, 24, 48, 48, 48, 48, 128]
-        params = [{'kernel_size': 5, 'stride': 2},
-                  {'kernel_size': 5, 'stride': 1},
-                  {'kernel_size': 5, 'stride': 1},
-                  {'kernel_size': 5, 'stride': 1},
-                  {'kernel_size': 3, 'stride': 1},
-                  {'kernel_size': 3, 'stride': 1}]
-
-        assert(len(channels)==len(params)+1)
-
-        for i in range(len(params)):
-            self.sequence.add_module('conv%d'%i, torch.nn.Conv3d(channels[i], channels[i+1], **params[i]))
-            torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
-            print_layer(self.sequence, (1, 50, 50, 50))
-            self.sequence.add_module('bn%d'%i, torch.nn.BatchNorm2d(channels[i+1]))
-            self.sequence.add_module('relu%d'%i, torch.nn.ReLU())
-
-        self.sequence.add_module("flatten", AvgSpacial())
-        print_layer(self.sequence, (1, 50, 50, 50))
-        self.sequence.add_module("lin7", torch.nn.Linear(128, n_output))
-        torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
-        print_layer(self.sequence, (1, 50, 50, 50))
-        torch.nn.BatchNorm1d(n_output)
-
-
-model_classes = {"CNN": CNN,
-                 "DeeperDense": DeeperDense,
-                 "DeeperConv": DeeperConv,
-                 "CNN3Dflat": CNN3Dflat,
-                 "CNN3Davg": CNN3Davg}
-
-def main(data_filename, model_class):
-
-    # torch.backends.cudnn.benchmark = True
-
-    train_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i, download=True) for i in range(7)])
+    train_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i, download=True, randomize_orientation=randomize_orientation) for i in range(7)])
     validation_set = Cath(data_filename, split=7)
     test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8,10)])
 
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=30, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
-    validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=30, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=30, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+    validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
 
     n_output = len(validation_set.label_set)
     
@@ -453,7 +390,8 @@ def main(data_filename, model_class):
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=0.001)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     for epoch in range(100):
         for batch_idx, (data, target) in enumerate(train_loader):
@@ -515,14 +453,21 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("data_filename",
+    parser.add_argument("--data-filename",
                         help="The name of the data file (will automatically downloaded)")
     parser.add_argument("--model", choices=model_classes.keys(), default='CNN',
                         help="Which model definition to use (default: %(default)s)")
+    parser.add_argument("--randomize-orientation", action="store_true", default=False,
+                        help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
+    parser.add_argument("--batch-size", default=30, type=int,
+                        help="Size of mini batches to use (default: %(default)s)")
     args = parser.parse_args()
 
     print("# Options")
     for key, value in sorted(vars(args).items()):
         print(key, "=", value)
     
-    main(data_filename=args.data_filename, model_class=model_classes[args.model])
+    main(data_filename=args.data_filename,
+         model_class=model_classes[args.model],
+         batch_size=args.batch_size,
+         randomize_orientation=args.randomize_orientation)
