@@ -278,7 +278,8 @@ class ResBlock(nn.Module):
                           padding=kernel_size//2,
                           stride=stride if i==0 else 1,
                           bias=False),
-                nn.BatchNorm3d(channels[i+1])]
+                nn.BatchNorm3d(channels[i+1]),
+                nn.ReLU(inplace=True)]
         self.layers = nn.Sequential(*self.layers)
 
         self.shortcut = nn.Sequential(*[
