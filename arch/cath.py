@@ -293,7 +293,7 @@ class ResBlock(nn.Module):
         for module in self.modules():
             if isinstance(module, nn.Conv3d):
                 torch.nn.init.xavier_normal(module.weight.data)
-            elif isinstance(module, nn.BatchNorm2d):
+            elif isinstance(module, nn.BatchNorm3d):
                 module.weight.data.fill_(1)
                 module.bias.data.zero_()
 
