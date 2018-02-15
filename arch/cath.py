@@ -229,17 +229,18 @@ class SE3Net(nn.Module):
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
         features = [
             (1, ),  # As input we have a scalar field
-            (1,  3,  5),  # 35 channels
-            (1,  3,  5),  # 35 channels
-            (2,  6, 10),  # 70 channels
-            (4, 12, 20),  # 140 channels
+            (1,  3,  5, 5),  # 70 channels
+            (1,  3,  5, 5),  # 70 channels
+            (2,  6, 10, 10),  # 140 channels
+            (4, 12, 20, 20),  # 280 channels
             (140, )
         ]
 
         from se3_cnn import basis_kernels
         radial_window_dict = {
             'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-            'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
+            # 'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
+            'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0.,
                                          'sigma': .6}}
         common_block_params = {'size': 7, 'padding': 3,
                                'batch_norm_momentum': 0.01,
