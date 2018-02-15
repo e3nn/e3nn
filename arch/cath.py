@@ -229,21 +229,30 @@ class SE3Net(nn.Module):
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
         features = [
             (1, ),  # As input we have a scalar field
-            (4, 4, 4),  
-            (4, 4, 4),
-            (8, 8, 8),
-            (8, 8, 8),
-            (8, 8, 8),
-            (128, )  
+            (1,  3,  5),  # 35 channels
+            (1,  3,  5),  # 35 channels
+            (2,  6, 10),  # 70 channels
+            (4, 12, 20),  # 140 channels
+            (140, )
         ]
-        common_block_params = {'n_radial': 1, 'batch_norm_before_conv': False}
+
+        from se3_cnn import basis_kernels
+        radial_window_dict = {
+            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+            'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
+                                         'sigma': .6}}
+        common_block_params = {'size': 7, 'padding': 3,
+                               'batch_norm_momentum': 0.01,
+                               'batch_norm_mode': 'maximum',
+                               'radial_window_dict': radial_window_dict,
+                               'batch_norm_before_conv': False}
+
         block_params = [
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 2, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 5, 'stride': 1, 'padding': 0},
-            {'activation': torch.nn.functional.relu, 'size': 3, 'stride': 1, 'padding': 0},
-            {'activation': None, 'size':3},
+            {'activation': torch.nn.functional.relu, 'stride': 1},
+            {'activation': torch.nn.functional.relu, 'stride': 2},
+            {'activation': torch.nn.functional.relu, 'stride': 2},
+            {'activation': torch.nn.functional.relu, 'stride': 2},
+            {'activation': None},
         ]
         
         assert len(block_params) + 1 == len(features)
@@ -255,7 +264,7 @@ class SE3Net(nn.Module):
         self.sequence = torch.nn.Sequential(
             *blocks,
             AvgSpacial(),
-            torch.nn.Linear(128, n_output),
+            torch.nn.Linear(140, n_output),
             # torch.nn.ReLU(),
             # torch.nn.Linear(50, 10),
         )
