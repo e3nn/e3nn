@@ -1,2 +1,2 @@
-from .highway import HighwayBlock
+from .gated_block import GatedBlock
 from .tensor_product import TensorProductBlock

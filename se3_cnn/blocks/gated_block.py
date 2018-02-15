@@ -5,7 +5,7 @@ from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 
 
-class HighwayBlock(torch.nn.Module):
+class GatedBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window_dict, # kernel params
                  activation=None, stride=1, padding=0, # conv/nonlinearity params
