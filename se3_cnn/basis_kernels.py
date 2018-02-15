@@ -393,9 +393,6 @@ def gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigm
     assert len(radii) == len(J_max_list)
     basis = []
     for r,J_max in zip(radii, J_max_list):
-
-        print('radius={}, with bandlimit={}'.format(r,J_max))
-
         window = _gauss_window(r_field, r0=r, sigma=sigma)
         window = window[np.newaxis,np.newaxis,:]
         # for each spherical shell at radius r window sh_cube if J does not exceed the bandlimit J_max
