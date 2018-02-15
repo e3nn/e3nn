@@ -18,6 +18,9 @@ from scipy.stats import special_ortho_group
 
 from se3_cnn.blocks import GatedBlock
 
+from se3_cnn.util.optimizers_L1L2 import Adam
+from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
+
 def get_output_shape(input_size, func):
     f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
     return f.size()[1:]
@@ -382,7 +385,7 @@ model_classes = {"se3net": SE3Net,
                  "resnet34": ResNet34,
                  "se3resnet34": SE3ResNet34}
 
-def main(data_filename, model_class, batch_size=30, randomize_orientation=False):
+def main(data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, lambda_L1, lambda_L2, batch_size=32, randomize_orientation=False):
 
     torch.backends.cudnn.benchmark = True
 
@@ -401,10 +404,16 @@ def main(data_filename, model_class, batch_size=30, randomize_orientation=False)
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0.001)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)] # You can set different regularization for different parameter groups by splitting them up
+    optimizer = Adam(param_groups, lr=initial_lr)
 
     for epoch in range(100):
+
+        # decay learning rate
+        optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)
+
         for batch_idx, (data, target) in enumerate(train_loader):
             time_start = time.perf_counter()
 
@@ -470,15 +479,32 @@ if __name__ == '__main__':
                         help="Which model definition to use (default: %(default)s)")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
-    parser.add_argument("--batch-size", default=30, type=int,
+    parser.add_argument("--batch-size", default=32, type=int,
                         help="Size of mini batches to use (default: %(default)s)")
+    parser.add_argument("--initial_lr", default=1e-3, type=float,
+                        help="Initial learning rate (without decay)")
+    parser.add_argument("--lr_decay_start", type=int,
+                        help="epoch after which the exponential learning rate decay starts")
+    parser.add_argument("--lr_decay_base", type=float,
+                        help="exponential decay factor per epoch")
+    parser.add_argument("--lambda_L1", default=0, type=float,
+                        help="L1 regularization factor")
+    parser.add_argument("--lambda_L2", default=0, type=float,
+                        help="L2 regularization factor")
     args = parser.parse_args()
 
     print("# Options")
     for key, value in sorted(vars(args).items()):
         print(key, "=", value)
     
+    # import ipdb; ipdb.set_trace()
+
     main(data_filename=args.data_filename,
          model_class=model_classes[args.model],
+         initial_lr=args.initial_lr,
+         lr_decay_start=args.lr_decay_start,
+         lr_decay_base=args.lr_decay_base,
+         lambda_L1=args.lambda_L1,
+         lambda_L2=args.lambda_L2,
          batch_size=args.batch_size,
          randomize_orientation=args.randomize_orientation)
