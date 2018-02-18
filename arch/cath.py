@@ -322,17 +322,20 @@ class ResBlock(nn.Module):
 
 
 class SE3ResBlock(nn.Module):
-    def __init__(self, in_repr, out_reprs, kernel_size=3, n_radial=1, stride=1):
+    def __init__(self, in_repr, out_reprs, kernel_size=3,
+                 radial_window_dict=None,
+                 stride=1):
         super().__init__()
 
         reprs = [in_repr] + out_reprs
 
         from se3_cnn import basis_kernels
-        radial_window_dict = {
-            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-            # 'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
-            'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0.,
-                                         'sigma': .6}}
+        if radial_window_dict is None:
+            radial_window_dict = {
+                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+                # 'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
+                'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0.,
+                                             'sigma': .6}}
 
         self.layers = []
         for i in range(len(reprs) - 1):
@@ -355,7 +358,10 @@ class SE3ResBlock(nn.Module):
                                        size=1,
                                        padding=0,
                                        stride=stride,
-                                       n_radial=1,
+                                       radial_window_dict=radial_window_dict,
+                                       batch_norm_momentum=0.01,
+                                       batch_norm_mode='maximum',
+                                       batch_norm_before_conv=False,
                                        activation=None)
 
     def forward(self, x):
