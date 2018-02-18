@@ -282,13 +282,16 @@ class ResBlock(nn.Module):
                 nn.ReLU(inplace=True)]
         self.layers = nn.Sequential(*self.layers)
 
-        self.shortcut = nn.Sequential(*[
-            nn.Conv3d(channels[0], channels[-1],
-                      kernel_size=1,
-                      padding=0,
-                      stride=stride,
-                      bias=False),
-            nn.BatchNorm3d(channels[-1])])
+        self.shortcut = None
+        # Add shortcut if number of layers is larger than 1
+        if len(channels_out) > 1:
+            self.shortcut = nn.Sequential(*[
+                nn.Conv3d(channels[0], channels[-1],
+                          kernel_size=1,
+                          padding=0,
+                          stride=stride,
+                          bias=False),
+                nn.BatchNorm3d(channels[-1])])
 
         # initialize
         for module in self.modules():
@@ -299,7 +302,10 @@ class ResBlock(nn.Module):
                 module.bias.data.zero_()
 
     def forward(self, x):
-        return self.layers(x) + self.shortcut(x)
+        out = self.layers(x)
+        if self.shortcut is not None:
+            out += self.shortcut(x)
+        return out
 
 
 class SE3ResBlock(nn.Module):
@@ -316,18 +322,26 @@ class SE3ResBlock(nn.Module):
                            padding=kernel_size//2,
                            stride=stride if i == 0 else 1,
                            n_radial=n_radial,
+                           batch_norm_before_conv=False,
                            activation=torch.nn.functional.relu))
         self.layers = nn.Sequential(*self.layers)
 
-        self.shortcut = GatedBlock(reprs[0], reprs[-1],
-                                   size=1,
-                                   padding=0,
-                                   stride=stride,
-                                   n_radial=1,
-                                   activation=None)
+        self.shortcut = None
+        # Add shortcut if number of layers is larger than 1
+        if len(out_reprs) > 1:
+            self.shortcut = GatedBlock(reprs[0], reprs[-1],
+                                       size=1,
+                                       padding=0,
+                                       stride=stride,
+                                       n_radial=1,
+                                       batch_norm_before_conv=False,
+                                       activation=None)
 
     def forward(self, x):
-        return self.layers(x) + self.shortcut(x)
+        out = self.layers(x)
+        if self.shortcut is not None:
+            out += self.shortcut(x)
+        return out
 
 class ResNet(nn.Module):
     def __init__(self, *blocks):
@@ -353,6 +367,40 @@ class ResNet34(ResNet):
             nn.Linear(features[3][-1], n_output))
 
 
+class SE3Net_k5(ResNet):
+    def __init__(self, n_output):
+        features = [[(4, 4, 4)] * 1,
+                    [(4, 4, 4)] * 1,
+                    [(8, 8, 8)] * 1,
+                    [(8, 8, 8)] * 1,
+                    [(128,)]]
+        super().__init__(
+            SE3ResBlock((1,),           features[0], kernel_size=5),
+            SE3ResBlock(features[0][0], features[1], kernel_size=5, stride=2),
+            SE3ResBlock(features[1][0], features[2], kernel_size=5, stride=2),
+            SE3ResBlock(features[2][0], features[3], kernel_size=5, stride=2),
+            SE3ResBlock(features[3][0], features[4], kernel_size=3, stride=1),
+            AvgSpacial(),
+            nn.Linear(features[4][-1][0], n_output))
+
+
+class SE3Net_k7(ResNet):
+    def __init__(self, n_output):
+        features = [[(4, 4, 4)] * 1,
+                    [(4, 4, 4)] * 1,
+                    [(8, 8, 8)] * 1,
+                    [(8, 8, 8)] * 1,
+                    [(128,)]]
+        super().__init__(
+            SE3ResBlock((1,),           features[0], kernel_size=7),
+            SE3ResBlock(features[0][0], features[1], kernel_size=7, stride=2),
+            SE3ResBlock(features[1][0], features[2], kernel_size=7, stride=2),
+            SE3ResBlock(features[2][0], features[3], kernel_size=7, stride=2),
+            SE3ResBlock(features[3][0], features[4], kernel_size=3, stride=1),
+            AvgSpacial(),
+            nn.Linear(features[4][-1][0], n_output))
+
+
 class SE3ResNet34(ResNet):
     def __init__(self, n_output):
         features = [[(2,  6, 10)] * 3,
@@ -370,7 +418,9 @@ class SE3ResNet34(ResNet):
 
 model_classes = {"se3net": SE3Net,
                  "resnet34": ResNet34,
-                 "se3resnet34": SE3ResNet34}
+                 "se3resnet34": SE3ResNet34,
+                 "se3net_k5": SE3Net_k5,
+                 "se3net_k7": SE3Net_k7}
 
 def main(data_filename, model_class, batch_size=30, randomize_orientation=False):
 
@@ -391,8 +441,8 @@ def main(data_filename, model_class, batch_size=30, randomize_orientation=False)
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     for epoch in range(100):
         for batch_idx, (data, target) in enumerate(train_loader):
