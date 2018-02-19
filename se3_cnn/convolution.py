@@ -73,7 +73,7 @@ class SE3KernelCombination(torch.autograd.Function):
 
                 # EQUAL CONTRIB OF ALL CAPSULES
                 # more sensible?
-                basis *= np.sqrt(SO3.dim(R_out)) / (len(basis)*sum(self.multiplicities_in))
+                basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*sum(self.multiplicities_in)))
 
 
 
