@@ -416,13 +416,52 @@ class SE3ResNet34(ResNet):
             nn.Linear(features[3][-1][0], n_output))
 
 
+class tiny3dcnn(torch.nn.Module):
+
+    def __init__(self, n_output):
+        super().__init__()
+
+        self.sequence = torch.nn.Sequential()
+
+        channels = [1, 4, 8, 16, 32]
+        params = [{'kernel_size': 5, 'stride': 2},
+                  {'kernel_size': 3, 'stride': 1},
+                  {'kernel_size': 3, 'stride': 1},
+                  {'kernel_size': 3, 'stride': 1}]
+
+        assert(len(channels)==len(params)+1)
+
+        for i in range(len(params)):
+            self.sequence.add_module('conv%d'%i, torch.nn.Conv3d(channels[i], channels[i+1], **params[i]))
+            torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
+            print_layer(self.sequence, (1, 50, 50, 50))
+            self.sequence.add_module('bn%d'%i, torch.nn.BatchNorm2d(channels[i+1]))
+            self.sequence.add_module('relu%d'%i, torch.nn.ReLU())
+
+        self.sequence.add_module("flatten", AvgSpacial())
+        print_layer(self.sequence, (1, 50, 50, 50))
+        self.sequence.add_module("lin7", torch.nn.Linear(32, n_output))
+        torch.nn.init.xavier_normal(self.sequence[-1].weight.data)
+        print_layer(self.sequence, (1, 50, 50, 50))
+        torch.nn.BatchNorm1d(n_output)
+
+    def forward(self, inp):  # pylint: disable=W
+        '''
+        :param inp: [batch, features, x, y, z]
+        '''
+        x = self.sequence(inp)  # [batch, features]
+
+        return x
+
+
 model_classes = {"se3net": SE3Net,
                  "resnet34": ResNet34,
                  "se3resnet34": SE3ResNet34,
                  "se3net_k5": SE3Net_k5,
-                 "se3net_k7": SE3Net_k7}
+                 "se3net_k7": SE3Net_k7,
+                 "tiny3dcnn": tiny3dcnn}
 
-def main(data_filename, model_class, batch_size=30, randomize_orientation=False):
+def main(data_filename, model_class, batch_size, randomize_orientation, lr, weight_decay, epochs):
 
     torch.backends.cudnn.benchmark = True
 
@@ -441,10 +480,9 @@ def main(data_filename, model_class, batch_size=30, randomize_orientation=False)
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    for epoch in range(100):
+    for epoch in range(epochs):
         for batch_idx, (data, target) in enumerate(train_loader):
             time_start = time.perf_counter()
 
@@ -512,6 +550,13 @@ if __name__ == '__main__':
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=30, type=int,
                         help="Size of mini batches to use (default: %(default)s)")
+    parser.add_argument("--weight-decay", default=1e-3, type=float,
+                        help="Weight decay (default: %(default)s)")
+    parser.add_argument("--epochs", default=100, type=int,
+                        help="Number of epochs (default: %(default)s)")
+    parser.add_argument("--lr", default=1e-4, type=float,
+                        help="Learning rate (default: %(default)s)")
+        
     args = parser.parse_args()
 
     print("# Options")
@@ -521,4 +566,7 @@ if __name__ == '__main__':
     main(data_filename=args.data_filename,
          model_class=model_classes[args.model],
          batch_size=args.batch_size,
-         randomize_orientation=args.randomize_orientation)
+         randomize_orientation=args.randomize_orientation,
+         lr=args.lr,
+         weight_decay=args.weight_decay,
+         epochs=args.epochs)
