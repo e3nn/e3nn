@@ -371,7 +371,7 @@ def cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict):
     radial_window_fct = radial_window_dict.get('radial_window_fct')
     radial_window_fct_kwargs = radial_window_dict.get('radial_window_fct_kwargs')
     basis = radial_window_fct(sh_cubes, r_field, order_irreps, **radial_window_fct_kwargs)
-    # normalize filter energy
+    # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
     basis = basis / np.sqrt(np.sum(basis**2, axis=(1,2,3,4,5), keepdims=True))
     return basis
 
