@@ -56,42 +56,11 @@ class SE3KernelCombination(torch.autograd.Function):
             self.kernels.append([])
             for m_in, R_in in Rs_in:
                 basis = self._generate_basis(R_in, R_out, m_in, m_out, size, radial_window_dict, verbose)
-
-
-
-
-
-
-
-
-                # ORIGINAL
-                # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in))
-
-                # EQUAL CONTRIB OF ALL SUPERBLOCKS
-                # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
-                # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in*len(Rs_in)))
-
-                # EQUAL CONTRIB OF ALL CAPSULES
-                # more sensible?
-                basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*sum(self.multiplicities_in)))
-
-
-
-
-
-
-
                 if basis is not None:
                     self.kernels[-1].append(torch.FloatTensor(basis))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
                     self.kernels[-1].append(None)
-
-
-
-
-
-
 
     def _generate_basis(self, R_in, R_out, m_in, m_out, size, radial_window_dict, verbose):  # pylint: disable=W0613
         basis = basis_kernels.cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict)
@@ -99,17 +68,19 @@ class SE3KernelCombination(torch.autograd.Function):
 
 
 
-
-
-
-
         # rescale each basis element such that the weight can be initialized with Normal(0,1)
         # orthonormalization already done in cube_basis_kernels_analytical!
-        for k in range(len(basis)):
-            basis[k] *= np.sqrt(SO3.dim(R_out) / len(basis))
-            basis[k] /= np.sqrt(m_in)
 
+        # ORIGINAL
+        # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in))
 
+        # EQUAL CONTRIB OF ALL SUPERBLOCKS
+        # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
+        # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in*len(Rs_in)))
+
+        # EQUAL CONTRIB OF ALL CAPSULES
+        # more sensible?
+        basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*sum(self.multiplicities_in)))
 
 
 
