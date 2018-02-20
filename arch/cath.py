@@ -21,6 +21,55 @@ from se3_cnn.blocks import GatedBlock
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
 
+tensorflow_available = True
+try:
+    import tensorflow as tf
+except:
+    tensorflow_available = True
+
+if tensorflow_available:
+
+    class Logger(object):
+        '''From https://github.com/yunjey/pytorch-tutorial/tree/master/tutorials/04-utils/tensorboard'''
+
+        def __init__(self, log_dir):
+            """Create a summary writer logging to log_dir."""
+            self.writer = tf.summary.FileWriter(log_dir)
+
+        def scalar_summary(self, tag, value, step):
+            """Log a scalar variable."""
+            summary = tf.Summary(
+                value=[tf.Summary.Value(tag=tag, simple_value=value)])
+            self.writer.add_summary(summary, step)
+
+        def histo_summary(self, tag, values, step, bins=1000):
+            """Log a histogram of the tensor of values."""
+
+            # Create a histogram using numpy
+            counts, bin_edges = np.histogram(values, bins=bins)
+
+            # Fill the fields of the histogram proto
+            hist = tf.HistogramProto()
+            hist.min = float(np.min(values))
+            hist.max = float(np.max(values))
+            hist.num = int(np.prod(values.shape))
+            hist.sum = float(np.sum(values))
+            hist.sum_squares = float(np.sum(values ** 2))
+
+            # Drop the start of the first bin
+            bin_edges = bin_edges[1:]
+
+            # Add bin edges and counts
+            for edge in bin_edges:
+                hist.bucket_limit.append(edge)
+            for c in counts:
+                hist.bucket.append(c)
+
+            # Create and write Summary
+            summary = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
+            self.writer.add_summary(summary, step)
+            self.writer.flush()
+
 def get_output_shape(input_size, func):
     f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
     return f.size()[1:]
@@ -472,6 +521,10 @@ def main(data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, 
     param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)] # You can set different regularization for different parameter groups by splitting them up
     optimizer = Adam(param_groups, lr=initial_lr)
 
+    # Set the logger
+    if tensorflow_available:
+        logger = Logger('./logs')
+
     for epoch in range(100):
 
         # decay learning rate
@@ -494,16 +547,32 @@ def main(data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, 
             loss.backward()
             optimizer.step()
 
-            # download results on the CPU
-            loss = loss.data.cpu().numpy()
-            out = out.data.cpu().numpy()
-            y = y.data.cpu().numpy()
-
-            # compute the accuracy
-            acc = np.sum(out.argmax(-1) == y) / len(y)
+            _, argmax = torch.max(out, 1)
+            acc = (argmax.squeeze() == y).float().mean()
 
             print("[{}:{}/{}] loss={:.4} acc={:.2} time={:.2}".format(
-                epoch, batch_idx, len(train_loader), float(loss), acc, time.perf_counter() - time_start))
+                epoch, batch_idx, len(train_loader),
+                float(loss.data[0]), float(acc.data[0]),
+                time.perf_counter() - time_start))
+
+            if tensorflow_available:
+                #============ TensorBoard logging ============#
+                # (1) Log the scalar values
+                info = {
+                    'loss': loss.data[0],
+                    'accuracy': acc.data[0]
+                }
+
+                step = epoch*len(train_loader)+batch_idx
+                for tag, value in info.items():
+                    logger.scalar_summary(tag, value, step+1)
+
+                # (2) Log values and gradients of the parameters (histogram)
+                for tag, value in model.named_parameters():
+                    tag = tag.replace('.', '/')
+                    logger.histo_summary(tag, value.data.cpu().numpy(), step+1)
+                    logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), step+1)
+
 
         model.eval()
         loss_sum = 0
