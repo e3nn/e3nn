@@ -12,9 +12,9 @@ import torch
 import numpy as np
 
 # The Highway Block is a way to introduce non linearity into the neural network
-# The class HighwayBlock inherit from the class torch.nn.Module.
+# The class GatedBlock inherit from the class torch.nn.Module.
 # It contains one convolution, some ReLU and multiplications
-from se3_cnn.blocks import HighwayBlock
+from se3_cnn.blocks import GatedBlock
 
 
 class AvgSpacial(torch.nn.Module):
@@ -28,7 +28,7 @@ class CNN(torch.nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        # The parameters of a HighwayBlock are:
+        # The parameters of a GatedBlock are:
         # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
         # - The stride, same as 2D convolution
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
@@ -47,7 +47,7 @@ class CNN(torch.nn.Module):
 
         assert len(block_params) + 1 == len(features)
 
-        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
+        blocks = [GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
 
         self.sequence = torch.nn.Sequential(
             *blocks,
