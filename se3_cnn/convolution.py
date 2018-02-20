@@ -134,7 +134,7 @@ class SE3KernelCombination(torch.autograd.Function):
                     w = weight[weight_index: weight_index + mi * mj * b_el].view(mi * mj, b_el)  # [I*J, beta]
                     weight_index += mi * mj * b_el
 
-                    basis_kernels_ij = self.kernels[i][j].view(b_el, -1)  # [beta, i*j*x*y*z]
+                    basis_kernels_ij = self.kernels[i][j].contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
 
                     ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*x*y*z]
                     ker = ker.view(mi, mj, *b_size)  # [I, J, i, j, x, y, z]
@@ -166,7 +166,7 @@ class SE3KernelCombination(torch.autograd.Function):
                 if self.kernels[i][j] is not None:
                     b_el = self.kernels[i][j].size(0)
                     basis_kernels_ij = self.kernels[i][j]  # [beta, i, j, x, y, z]
-                    basis_kernels_ij = basis_kernels_ij.view(b_el, -1)  # [beta, i*j*x*y*z]
+                    basis_kernels_ij = basis_kernels_ij.contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
 
                     si = slice(begin_i, begin_i + mi * self.dims_out[i])
                     sj = slice(begin_j, begin_j + mj * self.dims_in[j])
