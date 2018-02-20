@@ -185,24 +185,31 @@ class SE3KernelCombination(torch.autograd.Function):
         return grad_weight
 
 
-def test_normalization(batch, size, Rs_out=None, Rs_in=None):
-    if Rs_out is None:
-        Rs_out = [(1, SO3.repr1), (1, SO3.repr3)]
-    if Rs_in is None:
-        Rs_in = [(1, SO3.repr1), (1, SO3.repr3)]
-    conv = SE3Convolution(4, 2, Rs_in, Rs_out)
-    print("Weights Amount = {} Mean = {} Std = {}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
+def test_normalization(batch, input_size, Rs_in, Rs_out, kernel_size):
+    from se3_cnn import basis_kernels
+    radial_window_dict = {
+        'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+        'radial_window_fct_kwargs': {
+            'mode': 'sfcnn',
+            'border_dist': 0.,
+            'sigma': .6
+        }
+    } 
+
+    conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window_dict)
+
+    print("Weights Number = {} Mean = {:.3f} Std = {:.3f}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
 
     n_out = sum([m * SO3.dim(r) for m, r in Rs_out])
     n_in = sum([m * SO3.dim(r) for m, r in Rs_in])
 
-    x = torch.autograd.Variable(torch.randn(batch, n_in, size, size, size))
-    print("x Amount = {} Mean = {} Std = {}".format(x.numel(), x.data.mean(), x.data.std()))
+    x = torch.autograd.Variable(torch.randn(batch, n_in, input_size, input_size, input_size))
+    print("x Number = {} Mean = {:.3f} Std = {:.3f}".format(x.numel(), x.data.mean(), x.data.std()))
     y = conv(x)
 
     assert y.size(1) == n_out
 
-    print("y Amount = {} Mean = {} Std = {}".format(y.numel(), y.data.mean(), y.data.std()))
+    print("y Number = {} Mean = {:.3f} Std = {:.3f}".format(y.numel(), y.data.mean(), y.data.std()))
     return y.data
 
 
