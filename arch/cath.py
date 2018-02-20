@@ -27,10 +27,6 @@ from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
 tensorflow_available = True
 try:
     import tensorflow as tf
-except:
-    tensorflow_available = True
-
-if tensorflow_available:
 
     class Logger(object):
         '''From https://github.com/yunjey/pytorch-tutorial/tree/master/tutorials/04-utils/tensorboard'''
@@ -72,6 +68,10 @@ if tensorflow_available:
             summary = tf.Summary(value=[tf.Summary.Value(tag=tag, histo=hist)])
             self.writer.add_summary(summary, step)
             self.writer.flush()
+
+except:
+    tensorflow_available = False
+
 
 def get_output_shape(input_size, func):
     f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
