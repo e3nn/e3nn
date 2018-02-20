@@ -17,6 +17,9 @@ from timeit import default_timer as timer
 from scipy.stats import special_ortho_group
 
 from se3_cnn.blocks import GatedBlock
+from se3_cnn.batchnorm import SE3BatchNorm
+from se3_cnn.convolution import SE3Convolution
+
 
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
@@ -292,8 +295,7 @@ class SE3Net(nn.Module):
         radial_window_dict = {
             'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
             # 'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
-            'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0.,
-                                         'sigma': .6}}
+            'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0., 'sigma': .6}}
         common_block_params = {'size': 7, 'padding': 3,
                                'batch_norm_momentum': 0.01,
                                'batch_norm_mode': 'maximum',
@@ -497,7 +499,7 @@ model_classes = {"se3net": SE3Net,
                  "se3net_k5": SE3Net_k5,
                  "se3net_k7": SE3Net_k7}
 
-def main(data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, lambda_L1, lambda_L2, batch_size=32, randomize_orientation=False):
+def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, batch_size=32, randomize_orientation=False):
 
     torch.backends.cudnn.benchmark = True
 
@@ -516,9 +518,36 @@ def main(data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, 
         model.cuda()
     print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
+
+    # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
+    # each group gets its own regularization gain
+    convLayers      = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
+    batchnormLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
+    linearLayers    = [m for m in model.modules() if isinstance(m, nn.Linear)]
+    weights_conv  = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('weight')]
+    weights_bn    = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('weight')]
+    weights_fully = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('weight')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    weights_fully, weights_softmax = weights_fully[:-1], [weights_fully[-1]]
+    biases_conv   = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('bias')]
+    biases_bn     = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('bias')]
+    biases_fully  = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('bias')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    biases_fully, biases_softmax = biases_fully[:-1], [biases_fully[-1]]
+    for np_tuple in model.named_parameters():
+        if not np_tuple[0].endswith(('weight', 'weights_re', 'weights_im', 'bias')):
+            raise Exception('named parameter encountered which is neither a weight nor a bias but `{:s}`'.format(np_tuple[0]))
+    param_groups = [dict(params=weights_conv,    lamb_L1=args.lamb_conv_weight_L1,    lamb_L2=args.lamb_conv_weight_L2),
+                    dict(params=weights_bn,      lamb_L1=args.lamb_bn_weight_L1,      lamb_L2=args.lamb_bn_weight_L2),
+                    dict(params=weights_fully,   lamb_L1=args.lamb_linear_weight_L1,  lamb_L2=args.lamb_linear_weight_L2),
+                    dict(params=weights_softmax, lamb_L1=args.lamb_softmax_weight_L1, lamb_L2=args.lamb_softmax_weight_L2),
+                    dict(params=biases_conv,     lamb_L1=args.lamb_conv_bias_L1,      lamb_L2=args.lamb_conv_bias_L2),
+                    dict(params=biases_bn,       lamb_L1=args.lamb_bn_bias_L1,        lamb_L2=args.lamb_bn_bias_L2),
+                    dict(params=biases_fully,    lamb_L1=args.lamb_linear_bias_L1,    lamb_L2=args.lamb_linear_bias_L2),
+                    dict(params=biases_softmax,  lamb_L1=args.lamb_softmax_bias_L2,   lamb_L2=args.lamb_softmax_bias_L2)]
+    # old version, does not differentiate between parameter groups
+    # param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)] # You can set different regularization for different parameter groups by splitting them up
+
     # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)] # You can set different regularization for different parameter groups by splitting them up
     optimizer = Adam(param_groups, lr=initial_lr)
 
     # Set the logger
@@ -619,24 +648,58 @@ if __name__ == '__main__':
                         help="epoch after which the exponential learning rate decay starts")
     parser.add_argument("--lr_decay_base", type=float,
                         help="exponential decay factor per epoch")
-    parser.add_argument("--lambda_L1", default=0, type=float,
-                        help="L1 regularization factor")
-    parser.add_argument("--lambda_L2", default=0, type=float,
-                        help="L2 regularization factor")
+    # parser.add_argument("--lambda_L1", default=0, type=float,
+    #                     help="L1 regularization factor")
+    # parser.add_argument("--lambda_L2", default=0, type=float,
+    #                     help="L2 regularization factor")
+
+    # WEIGHTS
+    parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
+                        help="L1 regularization factor for convolution weights")
+    parser.add_argument("--lamb_conv_weight_L2", default=0, type=float,
+                        help="L2 regularization factor for convolution weights")
+    parser.add_argument("--lamb_bn_weight_L1", default=0, type=float,
+                        help="L1 regularization factor for batchnorm weights")
+    parser.add_argument("--lamb_bn_weight_L2", default=0, type=float,
+                        help="L2 regularization factor for batchnorm weights")
+    parser.add_argument("--lamb_linear_weight_L1", default=0, type=float,
+                        help="L1 regularization factor for fully connected layer weights (except last / classification layer)")
+    parser.add_argument("--lamb_linear_weight_L2", default=0, type=float,
+                        help="L2 regularization factor for fully connected layer weights (except last / classification layer)")
+    parser.add_argument("--lamb_softmax_weight_L1", default=0, type=float,
+                        help="L1 regularization factor for classification layer weights")
+    parser.add_argument("--lamb_softmax_weight_L2", default=0, type=float,
+                        help="L2 regularization factor for classification layer weights")
+    # BIASES
+    parser.add_argument("--lamb_conv_bias_L1", default=0, type=float,
+                        help="L1 regularization factor for convolution biases")
+    parser.add_argument("--lamb_conv_bias_L2", default=0, type=float,
+                        help="L2 regularization factor for convolution biases")
+    parser.add_argument("--lamb_bn_bias_L1", default=0, type=float,
+                        help="L1 regularization factor for batchnorm biases")
+    parser.add_argument("--lamb_bn_bias_L2", default=0, type=float,
+                        help="L2 regularization factor for batchnorm biases")
+    parser.add_argument("--lamb_linear_bias_L1", default=0, type=float,
+                        help="L1 regularization factor for fully connected layer biases (except last / classification layer)")
+    parser.add_argument("--lamb_linear_bias_L2", default=0, type=float,
+                        help="L2 regularization factor for fully connected layer biases (except last / classification layer)")
+    parser.add_argument("--lamb_softmax_bias_L1", default=0, type=float,
+                        help="L1 regularization factor for classification layer biases")
+    parser.add_argument("--lamb_softmax_bias_L2", default=0, type=float,
+                        help="L2 regularization factor for classification layer biases")
+
     args = parser.parse_args()
 
     print("# Options")
     for key, value in sorted(vars(args).items()):
         print(key, "=", value)
-    
-    # import ipdb; ipdb.set_trace()
 
-    main(data_filename=args.data_filename,
+    main(args=args,
+         data_filename=args.data_filename,
          model_class=model_classes[args.model],
          initial_lr=args.initial_lr,
          lr_decay_start=args.lr_decay_start,
          lr_decay_base=args.lr_decay_base,
-         lambda_L1=args.lambda_L1,
-         lambda_L2=args.lambda_L2,
          batch_size=args.batch_size,
-         randomize_orientation=args.randomize_orientation)
+         randomize_orientation=args.randomize_orientation,
+         )

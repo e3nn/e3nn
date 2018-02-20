@@ -42,8 +42,8 @@ class CNN(torch.nn.Module):
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
         features = [
             (1, ),  # As input we have a scalar field
-            (5, 1, 1, 1),  # Note that this particular choice of multiplicities it completely arbitrary
-            (5, 1, 1, 1),
+            (2, 2, 2, 2),  # Note that this particular choice of multiplicities it completely arbitrary
+            (4, 4, 3, 3),
             (20, )  # Two scalar fields as output
         ]
 
