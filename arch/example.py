@@ -11,10 +11,18 @@ The input data is generated on the fly, the radius is random and noise is added
 import torch
 import numpy as np
 
+import torch.nn as nn
+
 # The Highway Block is a way to introduce non linearity into the neural network
-# The class HighwayBlock inherit from the class torch.nn.Module.
+# The class GatedBlock inherit from the class torch.nn.Module.
 # It contains one convolution, some ReLU and multiplications
-from se3_cnn.blocks import HighwayBlock
+from se3_cnn.blocks import GatedBlock
+
+from se3_cnn.batchnorm import SE3BatchNorm
+from se3_cnn.convolution import SE3Convolution
+
+from se3_cnn.util.optimizers_L1L2 import Adam
+from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
 
 
 class AvgSpacial(torch.nn.Module):
@@ -28,7 +36,7 @@ class CNN(torch.nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
 
-        # The parameters of a HighwayBlock are:
+        # The parameters of a GatedBlock are:
         # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
         # - The stride, same as 2D convolution
         # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
@@ -45,7 +53,7 @@ class CNN(torch.nn.Module):
 
         from se3_cnn import basis_kernels
         radial_window_dict = {'radial_window_fct':basis_kernels.gaussian_window_fct_convenience_wrapper,
-                              'radial_window_fct_kwargs':{'mode':'sfcnn', 'border_dist':0., 'sigma':.6}}
+                              'radial_window_fct_kwargs':{'mode':'compromise', 'border_dist':0., 'sigma':.6}}
         common_block_params = {'size': 5, 'stride': 2, 'padding': 3, 'batch_norm_before_conv': False, 'radial_window_dict':radial_window_dict}
 
 
@@ -61,7 +69,7 @@ class CNN(torch.nn.Module):
 
         assert len(block_params) + 1 == len(features)
 
-        blocks = [HighwayBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
+        blocks = [GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
 
         self.sequence = torch.nn.Sequential(
             *blocks,
@@ -84,13 +92,41 @@ class CNN(torch.nn.Module):
 def main():
     torch.backends.cudnn.benchmark = True
 
-    cnn = CNN()
-    print("The model contains {} parameters".format(sum(p.numel() for p in cnn.parameters() if p.requires_grad)))
+    model = CNN()
+    print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
     if torch.cuda.is_available():
-        cnn.cuda()
+        model.cuda()
 
-    optimizer = torch.optim.Adam(cnn.parameters(), lr=1e-2)
+
+    # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
+    # each group gets its own regularization gain
+    convLayers      = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
+    batchnormLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
+    linearLayers    = [m for m in model.modules() if isinstance(m, nn.Linear)]
+    weights_conv  = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('weight')]
+    weights_bn    = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('weight')]
+    weights_fully = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('weight')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    weights_fully, weights_softmax = weights_fully[:-1], [weights_fully[-1]]
+    biases_conv   = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('bias')]
+    biases_bn     = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('bias')]
+    biases_fully  = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('bias')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    biases_fully, biases_softmax = biases_fully[:-1], [biases_fully[-1]]
+    for np_tuple in model.named_parameters():
+        if not np_tuple[0].endswith(('weight', 'weights_re', 'weights_im', 'bias')):
+            raise Exception('named parameter encountered which is neither a weight nor a bias but `{:s}`'.format(np_tuple[0]))
+    param_groups = [dict(params=weights_conv,    lamb_L1=0, lamb_L2=0),
+                    dict(params=weights_bn,      lamb_L1=0, lamb_L2=0),
+                    dict(params=weights_fully,   lamb_L1=0, lamb_L2=0),
+                    dict(params=weights_softmax, lamb_L1=0, lamb_L2=0),
+                    dict(params=biases_conv,     lamb_L1=0, lamb_L2=0),
+                    dict(params=biases_bn,       lamb_L1=0, lamb_L2=0),
+                    dict(params=biases_fully,    lamb_L1=0, lamb_L2=0),
+                    dict(params=biases_softmax,  lamb_L1=0, lamb_L2=0)]
+    optimizer = Adam(param_groups, lr=1e-2)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    # optimizer = Adam(model.parameters(), lr=1e-2)
+
 
     batch_size = 64
     sample_size = 24  # Size of the input cube
@@ -131,7 +167,7 @@ def main():
 
         # forward and backward propagation
         optimizer.zero_grad()
-        out = cnn(x)
+        out = model(x)
         loss = torch.nn.functional.cross_entropy(out, y)
         loss.backward()
         optimizer.step()
