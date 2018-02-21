@@ -55,41 +55,31 @@ class SE3KernelCombination(torch.autograd.Function):
         for m_out, R_out in Rs_out:
             self.kernels.append([])
             for m_in, R_in in Rs_in:
-                basis = self._generate_basis(R_in, R_out, m_in, m_out, size, radial_window_dict, verbose)
+                basis = self._generate_basis(R_in, R_out, size, radial_window_dict, verbose)
                 if basis is not None:
                     self.kernels[-1].append(torch.FloatTensor(basis))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
                     self.kernels[-1].append(None)
 
-    def _generate_basis(self, R_in, R_out, m_in, m_out, size, radial_window_dict, verbose):  # pylint: disable=W0613
+    def _generate_basis(self, R_in, R_out, size, radial_window_dict, verbose):  # pylint: disable=W0613
         basis = basis_kernels.cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict)
-        assert basis.shape[1:] == (SO3.dim(R_out), SO3.dim(R_in), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
-
-
-
-        # rescale each basis element such that the weight can be initialized with Normal(0,1)
-        # orthonormalization already done in cube_basis_kernels_analytical!
-
-        # ORIGINAL
-        # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in))
-
-        # EQUAL CONTRIB OF ALL SUPERBLOCKS
-        # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
-        # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in*len(Rs_in)))
-
-        # EQUAL CONTRIB OF ALL CAPSULES
-        # more sensible?
-        basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*sum(self.multiplicities_in)))
-
-
-
-        if verbose:
-            N_sample = 5
-            overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, R_out, R_in, a,b,c) for a,b,c in 2*np.pi*np.random.rand(N_sample,3)], axis=0)
-            print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
-
-        return basis if basis.shape[0] > 0 else None
+        if basis is not None:
+            assert basis.shape[1:] == (SO3.dim(R_out), SO3.dim(R_in), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
+            # rescale each basis element such that the weight can be initialized with Normal(0,1)
+            # orthonormalization already done in cube_basis_kernels_analytical!
+            # ORIGINAL
+            # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in))
+            # EQUAL CONTRIB OF ALL SUPERBLOCKS
+            # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
+            # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in*len(Rs_in)))
+            # EQUAL CONTRIB OF ALL CAPSULES
+            basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*sum(self.multiplicities_in)))
+            if verbose:
+                N_sample = 5
+                overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, R_out, R_in, a,b,c) for a,b,c in 2*np.pi*np.random.rand(N_sample,3)], axis=0)
+                print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
+        return basis
 
     def _cuda_kernels(self, cuda):
         for row in self.kernels:
