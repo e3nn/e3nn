@@ -598,6 +598,16 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                     dict(params=biases_bn,       lamb_L1=args.lamb_bn_bias_L1,         lamb_L2=args.lamb_bn_bias_L2),
                     dict(params=biases_fully,    lamb_L1=args.lamb_linear_bias_L1,     lamb_L2=args.lamb_linear_bias_L2),
                     dict(params=biases_softmax,  lamb_L1=args.lamb_softmax_bias_L1,    lamb_L2=args.lamb_softmax_bias_L2)]
+
+    # Check whether all parameters are in groups
+    params_in_groups = [id(param) for group in param_groups for param in group['params']]
+    if len(list(params_in_groups)) != len(list(model.parameters())):
+        import sys
+        print("WARNING: the following parameters will not be optimized:", file=sys.stderr)
+        for name, param in model.named_parameters():
+            if id(param) not in params_in_groups:
+                print(name)
+
     # old version, does not differentiate between parameter groups
     # param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)] # You can set different regularization for different parameter groups by splitting them up
 
