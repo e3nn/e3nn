@@ -106,6 +106,7 @@ def main():
     # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
     # each group gets its own regularization gain
     convLayers      = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
+    normActivs      = [m for m in model.modules() if isinstance(m, (NormSoftplus, NormRelu))]
     batchnormLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
     linearLayers    = [m for m in model.modules() if isinstance(m, nn.Linear)]
     weights_conv  = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('weight')]
@@ -113,6 +114,7 @@ def main():
     weights_fully = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('weight')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
     weights_fully, weights_softmax = weights_fully[:-1], [weights_fully[-1]]
     biases_conv   = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('bias')]
+    biases_activs = [p for m in normActivs      for n,p in m.named_parameters() if n.endswith('bias')]
     biases_bn     = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('bias')]
     biases_fully  = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('bias')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
     biases_fully, biases_softmax = biases_fully[:-1], [biases_fully[-1]]
@@ -124,13 +126,13 @@ def main():
                     dict(params=weights_fully,   lamb_L1=0, lamb_L2=0),
                     dict(params=weights_softmax, lamb_L1=0, lamb_L2=0),
                     dict(params=biases_conv,     lamb_L1=0, lamb_L2=0),
+                    dict(params=biases_activs,   lamb_L1=0, lamb_L2=0),
                     dict(params=biases_bn,       lamb_L1=0, lamb_L2=0),
                     dict(params=biases_fully,    lamb_L1=0, lamb_L2=0),
                     dict(params=biases_softmax,  lamb_L1=0, lamb_L2=0)]
     optimizer = Adam(param_groups, lr=1e-2)
     # optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     # optimizer = Adam(model.parameters(), lr=1e-2)
-
 
     batch_size = 64
     sample_size = 24  # Size of the input cube
@@ -184,7 +186,9 @@ def main():
         # compute the accuracy
         acc = np.sum(out.argmax(-1) == y) / batch_size
 
-        print("{}: acc={}% loss={}".format(i, 100 * acc, float(loss)))
+        # print("{}: acc={}% loss={}".format(i, 100 * acc, float(loss)))
+        biases_means = [np.mean(b.data.cpu().numpy()) for b in biases_activs]
+        print("{}: {:4} {:4} acc={}% loss={:4}".format(i, *biases_means, 100 * acc, float(loss)))
 
     for i in range(1000):
         step(i)
