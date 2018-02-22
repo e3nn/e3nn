@@ -22,6 +22,8 @@ from se3_cnn.batchnorm import SE3BatchNorm
 from se3_cnn.convolution import SE3Convolution
 from se3_cnn import SE3BNConvolution, SE3ConvolutionBN
 
+from se3_cnn.blocks import NormBlock
+
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
 
@@ -30,48 +32,6 @@ class AvgSpacial(torch.nn.Module):
     def forward(self, inp):  # pylint: disable=W
         # inp [batch, features, x, y, z]
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)  # [batch, features]
-
-
-class Block(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, size, radial_window_dict, # kernel params
-                 activation=None, stride=1, padding=0, # conv/nonlinearity params
-                 batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True): # batch norm params
-        '''
-        :param repr_in: tuple with multiplicities of irreps
-        '''
-        super().__init__()
-
-        irreducible_repr = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
-
-        Rs_in = list(zip(repr_in, irreducible_repr))
-        Rs_out = list(zip(repr_out, irreducible_repr))
-
-        self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
-            Rs_in=Rs_in,
-            Rs_out=Rs_out,
-            size=size,
-            radial_window_dict=radial_window_dict,
-            stride=stride,
-            padding=padding,
-            momentum=batch_norm_momentum,
-            mode=batch_norm_mode)
-
-        # self.norm_relu = NormRelu([(2 * n + 1, n > 0) for n, mul in enumerate(repr_out) for i in range(mul)])
-        # if activation is not None:
-        #     self.act = ScalarActivation([(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)], activation)
-        # else:
-        #     self.act = None
-
-        capsule_dims = [2*n+1 for n,mul in enumerate(repr_out) for i in range(mul)] # list of capsule dimensionalities
-        self.norm_relu = NormSoftplus(capsule_dims, scalar_act=activation) 
-
-
-    def forward(self, x):  # pylint: disable=W
-        x = self.bn_conv(x)
-        x = self.norm_relu(x)
-        # if self.act is not None:
-        #     x = self.act(x)
-        return x
 
 
 class CNN(torch.nn.Module):
@@ -113,7 +73,7 @@ class CNN(torch.nn.Module):
         assert len(block_params) + 1 == len(features)
 
 
-        blocks = [Block(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
+        blocks = [NormBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
 
         self.sequence = torch.nn.Sequential(
             *blocks,

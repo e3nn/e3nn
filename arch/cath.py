@@ -17,9 +17,10 @@ from timeit import default_timer as timer
 from scipy.stats import special_ortho_group
 
 from se3_cnn.blocks import GatedBlock
+from se3_cnn.blocks import NormBlock
 from se3_cnn.batchnorm import SE3BatchNorm
 from se3_cnn.convolution import SE3Convolution
-
+from se3_cnn import basis_kernels
 
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
@@ -329,7 +330,7 @@ class SE3Net(nn.Module):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, channels_in, channels_out, kernel_size=3, stride=1):
+    def __init__(self, channels_in, channels_out, size=3, stride=1):
         super().__init__()
 
         channels = [channels_in] + channels_out
@@ -338,8 +339,8 @@ class ResBlock(nn.Module):
         for i in range(len(channels) - 1):
             self.layers += [
                 nn.Conv3d(channels[i], channels[i+1],
-                          kernel_size=kernel_size,
-                          padding=kernel_size//2,
+                          kernel_size=size,
+                          padding=size//2,
                           stride=stride if i==0 else 1,
                           bias=False),
                 nn.BatchNorm3d(channels[i+1]),
@@ -372,48 +373,54 @@ class ResBlock(nn.Module):
         return out
 
 
+
 class SE3ResBlock(nn.Module):
-    def __init__(self, in_repr, out_reprs, kernel_size=3,
+    def __init__(self, in_repr, out_reprs,
+                 size=3,
+                 stride=1,
+                 norm_activation=True,
                  radial_window_dict=None,
-                 stride=1):
+                 batch_norm_momentum=0.01,
+                 batch_norm_mode='maximum',
+                 batch_norm_before_conv=False,
+                 activation=torch.nn.functional.relu,
+                 **kwargs):
         super().__init__()
 
         reprs = [in_repr] + out_reprs
 
-        from se3_cnn import basis_kernels
         if radial_window_dict is None:
             radial_window_dict = {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-                # 'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
-                'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0.,
+                'radial_window_fct_kwargs': {'mode': 'compromise',
+                                             'border_dist': 0.,
                                              'sigma': .6}}
 
         self.layers = []
         for i in range(len(reprs) - 1):
             self.layers.append(
-                GatedBlock(reprs[i], reprs[i + 1],
-                           size=kernel_size,
-                           padding=kernel_size//2,
-                           stride=stride if i == 0 else 1,
-                           radial_window_dict=radial_window_dict,
-                           batch_norm_momentum=0.01,
-                           batch_norm_mode='maximum',
-                           batch_norm_before_conv=False,
-                           activation=torch.nn.functional.relu))
+                (GatedBlock if not norm_activation else NormBlock)(
+                    reprs[i], reprs[i + 1], size=size, padding=size//2,
+                    stride=stride if i == 0 else 1,
+                    radial_window_dict=radial_window_dict,
+                    batch_norm_momentum=batch_norm_momentum,
+                    batch_norm_mode=batch_norm_mode,
+                    batch_norm_before_conv=batch_norm_before_conv,
+                    activation=activation,
+                    **kwargs))
         self.layers = nn.Sequential(*self.layers)
 
         self.shortcut = None
         # Add shortcut if number of layers is larger than 1
         if len(out_reprs) > 1:
-            self.shortcut = GatedBlock(reprs[0], reprs[-1],
-                                       size=1,
-                                       padding=0,
-                                       stride=stride,
-                                       radial_window_dict=radial_window_dict,
-                                       batch_norm_momentum=0.01,
-                                       batch_norm_mode='maximum',
-                                       batch_norm_before_conv=False,
-                                       activation=None)
+            self.shortcut = (GatedBlock if not norm_activation else NormBlock)(
+                reprs[0], reprs[-1], size=1, padding=0, stride=stride,
+                radial_window_dict=radial_window_dict,
+                batch_norm_momentum=batch_norm_momentum,
+                batch_norm_mode=batch_norm_mode,
+                batch_norm_before_conv=batch_norm_before_conv,
+                activation=None,
+                **kwargs)
 
     def forward(self, x):
         out = self.layers(x)
@@ -437,10 +444,10 @@ class ResNet34(ResNet):
                      [64] * 6,
                     [128] * 3]
         super().__init__(
-            ResBlock(1,              features[0], kernel_size=3),
-            ResBlock(features[0][0], features[1], kernel_size=3, stride=2),
-            ResBlock(features[1][0], features[2], kernel_size=3, stride=2),
-            ResBlock(features[2][0], features[3], kernel_size=3, stride=2),
+            ResBlock(1,              features[0], size=3),
+            ResBlock(features[0][0], features[1], size=3, stride=2),
+            ResBlock(features[1][0], features[2], size=3, stride=2),
+            ResBlock(features[2][0], features[3], size=3, stride=2),
             AvgSpacial(),
             nn.Linear(features[3][-1], n_output))
 
@@ -452,12 +459,26 @@ class SE3Net_k5(ResNet):
                     [(8, 8, 8)] * 1,
                     [(8, 8, 8)] * 1,
                     [(128,)]]
+        params = {
+            'radial_window_dict': {
+                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+                'radial_window_fct_kwargs': {'mode': 'compromise',
+                                             'border_dist': 0.,
+                                             'sigma': .6}},
+            'batch_norm_momentum': 0.01,
+            'batch_norm_mode': 'maximum',
+            'batch_norm_before_conv': False,
+            'activation': torch.nn.functional.relu,
+            'norm_activation': True,
+            'activation_bias_min': 0.5,
+            'activation_bias_max': 2.0,
+        }
         super().__init__(
-            SE3ResBlock((1,),           features[0], kernel_size=5),
-            SE3ResBlock(features[0][0], features[1], kernel_size=5, stride=2),
-            SE3ResBlock(features[1][0], features[2], kernel_size=5, stride=2),
-            SE3ResBlock(features[2][0], features[3], kernel_size=5, stride=2),
-            SE3ResBlock(features[3][0], features[4], kernel_size=3, stride=1),
+            SE3ResBlock((1,),           features[0], size=5, **params),
+            SE3ResBlock(features[0][0], features[1], size=5, stride=2, **params),
+            SE3ResBlock(features[1][0], features[2], size=5, stride=2, **params),
+            SE3ResBlock(features[2][0], features[3], size=5, stride=2, **params),
+            SE3ResBlock(features[3][0], features[4], size=3, stride=1, **params),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
@@ -469,12 +490,26 @@ class SE3Net_k7(ResNet):
                     [(8, 8, 8)] * 1,
                     [(8, 8, 8)] * 1,
                     [(128,)]]
+        params = {
+            'radial_window_dict': {
+                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+                'radial_window_fct_kwargs': {'mode': 'compromise',
+                                             'border_dist': 0.,
+                                             'sigma': .6}},
+            'batch_norm_momentum': 0.01,
+            'batch_norm_mode': 'maximum',
+            'batch_norm_before_conv': False,
+            'activation': torch.nn.functional.relu,
+            'norm_activation': True,
+            'activation_bias_min': 0.5,
+            'activation_bias_max': 2.0,
+        }
         super().__init__(
-            SE3ResBlock((1,),           features[0], kernel_size=7),
-            SE3ResBlock(features[0][0], features[1], kernel_size=7, stride=2),
-            SE3ResBlock(features[1][0], features[2], kernel_size=7, stride=2),
-            SE3ResBlock(features[2][0], features[3], kernel_size=7, stride=2),
-            SE3ResBlock(features[3][0], features[4], kernel_size=3, stride=1),
+            SE3ResBlock((1,),           features[0], size=7, **params),
+            SE3ResBlock(features[0][0], features[1], size=7, stride=2, **params),
+            SE3ResBlock(features[1][0], features[2], size=7, stride=2, **params),
+            SE3ResBlock(features[2][0], features[3], size=7, stride=2, **params),
+            SE3ResBlock(features[3][0], features[4], size=3, stride=1, **params),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
@@ -484,11 +519,25 @@ class SE3ResNet34(ResNet):
                     [(2,  6, 10)] * 4,
                     [(4, 12, 20)] * 6,
                     [(8, 24, 40)] * 2 + [(8*1 + 24*3 + 40*5, 0, 0)]]
+        params = {
+            'radial_window_dict': {
+                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+                'radial_window_fct_kwargs': {'mode': 'compromise',
+                                             'border_dist': 0.,
+                                             'sigma': .6}},
+            'batch_norm_momentum': 0.01,
+            'batch_norm_mode': 'maximum',
+            'batch_norm_before_conv': False,
+            'activation': torch.nn.functional.relu,
+            'norm_activation': True,
+            'activation_bias_min': 0.5,
+            'activation_bias_max': 2.0,
+        }
         super().__init__(
-            SE3ResBlock((1,),           features[0], kernel_size=5),
-            SE3ResBlock(features[0][0], features[1], kernel_size=5, stride=2),
-            SE3ResBlock(features[1][0], features[2], kernel_size=5, stride=2),
-            SE3ResBlock(features[2][0], features[3], kernel_size=5, stride=2),
+            SE3ResBlock((1,),           features[0], size=5, **params),
+            SE3ResBlock(features[0][0], features[1], size=5, stride=2, **params),
+            SE3ResBlock(features[1][0], features[2], size=5, stride=2, **params),
+            SE3ResBlock(features[2][0], features[3], size=5, stride=2, **params),
             AvgSpacial(),
             nn.Linear(features[3][-1][0], n_output))
 
