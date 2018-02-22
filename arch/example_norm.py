@@ -14,6 +14,7 @@ import numpy as np
 import torch.nn as nn
 
 from se3_cnn.non_linearities import NormRelu
+from se3_cnn.non_linearities import NormSoftplus
 from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 
@@ -35,6 +36,9 @@ class Block(torch.nn.Module):
     def __init__(self, repr_in, repr_out, size, radial_window_dict, # kernel params
                  activation=None, stride=1, padding=0, # conv/nonlinearity params
                  batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True): # batch norm params
+        '''
+        :param repr_in: tuple with multiplicities of irreps
+        '''
         super().__init__()
 
         irreducible_repr = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
@@ -52,17 +56,21 @@ class Block(torch.nn.Module):
             momentum=batch_norm_momentum,
             mode=batch_norm_mode)
 
-        self.norm_relu = NormRelu([(2 * n + 1, n > 0) for n, mul in enumerate(repr_out) for i in range(mul)])
-        if activation is not None:
-            self.act = ScalarActivation([(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)], activation)
-        else:
-            self.act = None
+        # self.norm_relu = NormRelu([(2 * n + 1, n > 0) for n, mul in enumerate(repr_out) for i in range(mul)])
+        # if activation is not None:
+        #     self.act = ScalarActivation([(mul * (2 * n + 1), n == 0) for n, mul in enumerate(repr_out)], activation)
+        # else:
+        #     self.act = None
+
+        capsule_dims = [2*n+1 for n,mul in enumerate(repr_out) for i in range(mul)] # list of capsule dimensionalities
+        self.norm_relu = NormSoftplus(capsule_dims, scalar_act=activation) 
+
 
     def forward(self, x):  # pylint: disable=W
         x = self.bn_conv(x)
         x = self.norm_relu(x)
-        if self.act is not None:
-            x = self.act(x)
+        # if self.act is not None:
+        #     x = self.act(x)
         return x
 
 
