@@ -3,34 +3,31 @@ import torch
 
 
 class ScalarActivation(torch.nn.Module):
-    def __init__(self, enable, activation, bias=True):
+    def __init__(self, enable, bias=True):
         '''
         Can be used only with scalar fields
 
-        :param enable: list of tuple (dimension, boolean on/off)
-        :param activation: function that takes in input a torch.autograd.Variable
+        :param enable: list of tuple (dimension, activation function or None)
         :param bool bias: add a bias before the applying the activation
         '''
         super().__init__()
 
         self.enable = []
-        for d, on in enable:
+        for d, act in enable:
             if d == 0:
                 continue
 
-            if len(self.enable) > 0 and self.enable[-1][1] == on:
-                self.enable[-1] = (self.enable[-1][0] + d, on)
+            if self.enable and self.enable[-1][1] is act:
+                self.enable[-1] = (self.enable[-1][0] + d, act)
             else:
-                self.enable.append((d, on))
+                self.enable.append((d, act))
 
-        nbias = sum([d for d, on in self.enable if on])
+        nbias = sum([d for d, act in self.enable if act is not None])
         if bias and nbias > 0:
             self.bias = torch.nn.Parameter(torch.FloatTensor(nbias))
             self.bias.data[:] = 0
         else:
             self.bias = None
-
-        self.activation = activation
 
     def forward(self, input):  # pylint: disable=W
         '''
@@ -40,15 +37,15 @@ class ScalarActivation(torch.nn.Module):
         begin1 = 0
         begin2 = 0
 
-        for d, on in self.enable:
+        for d, act in self.enable:
             x = input[:, begin1:begin1 + d]
 
-            if on:
+            if act is not None:
                 if self.bias is not None:
                     x = x + self.bias[begin2:begin2 + d].view(1, -1, 1, 1, 1)
                     begin2 += d
 
-                x = self.activation(x)
+                x = act(x)
 
             xs.append(x)
 
