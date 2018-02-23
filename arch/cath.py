@@ -277,60 +277,6 @@ class AvgSpacial(nn.Module):
     def forward(self, inp):
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)
 
-class SE3Net(nn.Module):
-
-    def __init__(self, n_output):
-        super().__init__()
-
-        # The parameters of a GatedBlock are:
-        # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
-        # - The stride, same as 2D convolution
-        # - A parameter to tell if the non linearity is enabled or not (ReLU or nothing)
-        features = [
-            (1, ),  # As input we have a scalar field
-            (1,  3,  5, 5),  # 70 channels
-            (1,  3,  5, 5),  # 70 channels
-            (2,  6, 10, 10),  # 140 channels
-            (4, 12, 20, 20),  # 280 channels
-            (140, )
-        ]
-
-        from se3_cnn import basis_kernels
-        radial_window_dict = {
-            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-            # 'radial_window_fct_kwargs': {'mode': 'sfcnn', 'border_dist': 0.,
-            'radial_window_fct_kwargs': {'mode': 'compromise', 'border_dist': 0., 'sigma': .6}}
-        common_block_params = {'size': 7, 'padding': 3,
-                               'batch_norm_momentum': 0.01,
-                               'batch_norm_mode': 'maximum',
-                               'radial_window_dict': radial_window_dict,
-                               'batch_norm_before_conv': False}
-
-        block_params = [
-            {'activation': torch.nn.functional.softplus, 'stride': 1},
-            {'activation': torch.nn.functional.softplus, 'stride': 2},
-            {'activation': torch.nn.functional.softplus, 'stride': 2},
-            {'activation': torch.nn.functional.softplus, 'stride': 2},
-            {'activation': None},
-        ]
-
-        assert len(block_params) + 1 == len(features)
-
-        blocks = [GatedBlock(features[i], features[i + 1],
-                             **common_block_params, **block_params[i])
-                  for i in range(len(block_params))]
-
-        self.sequence = torch.nn.Sequential(
-            *blocks,
-            AvgSpacial(),
-            torch.nn.Linear(140, n_output),
-            # torch.nn.ReLU(),
-            # torch.nn.Linear(50, 10),
-        )
-
-    def forward(self, x):
-        return self.sequence(x)
-
 
 class ResBlock(nn.Module):
     def __init__(self, channels_in, channels_out, size=3, stride=1):
@@ -374,7 +320,6 @@ class ResBlock(nn.Module):
         if self.shortcut is not None:
             out += self.shortcut(x)
         return out
-
 
 
 class SE3ResBlock(nn.Module):
@@ -431,6 +376,7 @@ class SE3ResBlock(nn.Module):
             out += self.shortcut(x)
         return out
 
+
 class ResNet(nn.Module):
     def __init__(self, *blocks):
         super().__init__()
@@ -457,11 +403,11 @@ class ResNet34(ResNet):
 
 class SE3Net_k5(ResNet):
     def __init__(self, n_output):
-        features = [[(1,  3,  5,  7)] * 1,  #  84 channels
-                    [(1,  3,  5,  7)] * 1,  #  84 channels
-                    [(2,  6, 10, 14)] * 1,  # 168 channels
-                    [(4, 12, 20, 28)] * 1,  # 336 channels
-                    [(336,)]]
+        features = [[( 4,  4,  4,  4)] * 1,  # 64 channels
+                    [( 4,  4,  4,  4)] * 1,  # 64 channels
+                    [( 8,  8,  8,  8)] * 1,  # 128 channels
+                    [(16, 16, 16, 16)] * 1,  # 256 channels
+                    [(256,)]]
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
@@ -488,11 +434,11 @@ class SE3Net_k5(ResNet):
 
 class SE3Net_k7(ResNet):
     def __init__(self, n_output):
-        features = [[(1,  3,  5,  7)] * 1,  #  84 channels
-                    [(1,  3,  5,  7)] * 1,  #  84 channels
-                    [(2,  6, 10, 14)] * 1,  # 168 channels
-                    [(4, 12, 20, 28)] * 1,  # 336 channels
-                    [(336,)]]
+        features = [[( 4,  4,  4,  4)] * 1,  # 64 channels
+                    [( 4,  4,  4,  4)] * 1,  # 64 channels
+                    [( 8,  8,  8,  8)] * 1,  # 128 channels
+                    [(16, 16, 16, 16)] * 1,  # 256 channels
+                    [(256,)]]
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
@@ -516,12 +462,13 @@ class SE3Net_k7(ResNet):
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
+
 class SE3ResNet34(ResNet):
     def __init__(self, n_output):
-        features = [[(2,  6, 10)] * 3,
-                    [(2,  6, 10)] * 4,
-                    [(4, 12, 20)] * 6,
-                    [(8, 24, 40)] * 2 + [(8*1 + 24*3 + 40*5, 0, 0)]]
+        features = [[( 4,  4,  4,  4)] * 3,  # 64 channels
+                    [( 4,  4,  4,  4)] * 4,  # 64 channels
+                    [( 8,  8,  8,  8)] * 6,  # 128 channels
+                    [(16, 16, 16, 16)] * 2 + [256, 0, 0, 0]]  # 256 channels
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
@@ -545,8 +492,7 @@ class SE3ResNet34(ResNet):
             nn.Linear(features[3][-1][0], n_output))
 
 
-model_classes = {"se3net": SE3Net,
-                 "resnet34": ResNet34,
+model_classes = {"resnet34": ResNet34,
                  "se3resnet34": SE3ResNet34,
                  "se3net_k5": SE3Net_k5,
                  "se3net_k7": SE3Net_k7}
