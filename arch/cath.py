@@ -649,23 +649,6 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 float(loss.data[0]), float(acc.data[0]),
                 time.perf_counter() - time_start))
 
-            if tensorflow_available:
-                #============ TensorBoard logging ============#
-                # (1) Log the scalar values
-                info = {
-                    'loss': loss.data[0],
-                    'accuracy': acc.data[0]
-                }
-
-                step = epoch*len(train_loader)+batch_idx
-                for tag, value in info.items():
-                    logger.scalar_summary(tag, value, step+1)
-
-                # (2) Log values and gradients of the parameters (histogram)
-                for tag, value in model.named_parameters():
-                    tag = tag.replace('.', '/')
-                    logger.histo_summary(tag, value.data.cpu().numpy(), step+1)
-                    logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), step+1)
 
 
         model.eval()
@@ -693,6 +676,26 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         print('VALIDATION [{}:{}/{}] loss={:.4} acc={:.2}'.format(epoch, len(train_loader)-1, len(train_loader), avg_loss, acc))
 
 
+    if tensorflow_available:
+        # ============ TensorBoard logging ============#
+        # (1) Log the scalar values
+        info = {
+            'loss': loss.data[0],
+            'accuracy': acc.data[0]
+        }
+
+        step = epoch * len(train_loader) + batch_idx
+        for tag, value in info.items():
+            logger.scalar_summary(tag, value, step + 1)
+
+        # (2) Log values and gradients of the parameters (histogram)
+        for tag, value in model.named_parameters():
+            tag = tag.replace('.', '/')
+            logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
+            logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
+                                 step + 1)
+
+
 if __name__ == '__main__':
 
     import argparse
@@ -707,6 +710,8 @@ if __name__ == '__main__':
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=32, type=int,
                         help="Size of mini batches to use (default: %(default)s)")
+    parser.add_argument("--log-to-tensorboard", action="store_true", default=False,
+                        help="Whether to output log information in tensorboard format (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-3, type=float,
                         help="Initial learning rate (without decay)")
     parser.add_argument("--lr_decay_start", type=int,
