@@ -457,11 +457,11 @@ class ResNet34(ResNet):
 
 class SE3Net_k5(ResNet):
     def __init__(self, n_output):
-        features = [[(4, 4, 4)] * 1,
-                    [(4, 4, 4)] * 1,
-                    [(8, 8, 8)] * 1,
-                    [(8, 8, 8)] * 1,
-                    [(128,)]]
+        features = [[(1,  3,  5,  7)] * 1,  #  84 channels
+                    [(1,  3,  5,  7)] * 1,  #  84 channels
+                    [(2,  6, 10, 14)] * 1,  # 168 channels
+                    [(4, 12, 20, 28)] * 1,  # 336 channels
+                    [(336,)]]
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
@@ -488,11 +488,11 @@ class SE3Net_k5(ResNet):
 
 class SE3Net_k7(ResNet):
     def __init__(self, n_output):
-        features = [[(4, 4, 4)] * 1,
-                    [(4, 4, 4)] * 1,
-                    [(8, 8, 8)] * 1,
-                    [(8, 8, 8)] * 1,
-                    [(128,)]]
+        features = [[(1,  3,  5,  7)] * 1,  #  84 channels
+                    [(1,  3,  5,  7)] * 1,  #  84 channels
+                    [(2,  6, 10, 14)] * 1,  # 168 channels
+                    [(4, 12, 20, 28)] * 1,  # 336 channels
+                    [(336,)]]
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
