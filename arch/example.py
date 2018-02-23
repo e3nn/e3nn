@@ -44,26 +44,37 @@ class CNN(torch.nn.Module):
             (1, ),  # As input we have a scalar field
             (2, 2, 2, 2),  # Note that this particular choice of multiplicities it completely arbitrary
             (4, 4, 3, 3),
+            (4, 4, 3, 3),
+            (4, 4, 3, 3),
+            (4, 4, 3, 3),
+            (4, 4, 3, 3),
             (20, )  # Two scalar fields as output
         ]
 
-
-
-
-
         from se3_cnn import basis_kernels
-        radial_window_dict = {'radial_window_fct':basis_kernels.gaussian_window_fct_convenience_wrapper,
-                              'radial_window_fct_kwargs':{'mode':'compromise', 'border_dist':0., 'sigma':.6}}
-        common_block_params = {'size': 5, 'stride': 2, 'padding': 3, 'batch_norm_before_conv': False, 'radial_window_dict':radial_window_dict}
-
-
-
-
-
+        radial_window_dict = {
+            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+            'radial_window_fct_kwargs': {
+                'mode': 'compromise',
+                'border_dist': 0.,
+                'sigma': .6
+            }
+        }
+        common_block_params = {
+            'size': 5,
+            'stride': 2,
+            'padding': 3,
+            'batch_norm_before_conv': False,
+            'radial_window_dict': radial_window_dict
+        }
 
         block_params = [
-            {'activation': torch.nn.functional.relu},
-            {'activation': torch.nn.functional.relu},
+            {'activation': (None, torch.nn.functional.sigmoid)},
+            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
+            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
+            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
+            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
+            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
             {'activation': None},
         ]
 
@@ -98,19 +109,18 @@ def main():
     if torch.cuda.is_available():
         model.cuda()
 
-
     # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
     # each group gets its own regularization gain
-    convLayers      = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
+    convLayers = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
     batchnormLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
-    linearLayers    = [m for m in model.modules() if isinstance(m, nn.Linear)]
-    weights_conv  = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('weight')]
-    weights_bn    = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('weight')]
-    weights_fully = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('weight')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    linearLayers = [m for m in model.modules() if isinstance(m, nn.Linear)]
+    weights_conv = [p for m in convLayers for n, p in m.named_parameters() if n.endswith('weight')]
+    weights_bn = [p for m in batchnormLayers for n, p in m.named_parameters() if n.endswith('weight')]
+    weights_fully = [p for m in linearLayers for n, p in m.named_parameters() if n.endswith('weight')]  # CROP OFF LAST WEIGHT !!!!! (classification layer)
     weights_fully, weights_softmax = weights_fully[:-1], [weights_fully[-1]]
-    biases_conv   = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('bias')]
-    biases_bn     = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('bias')]
-    biases_fully  = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('bias')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    biases_conv = [p for m in convLayers for n, p in m.named_parameters() if n.endswith('bias')]
+    biases_bn = [p for m in batchnormLayers for n, p in m.named_parameters() if n.endswith('bias')]
+    biases_fully = [p for m in linearLayers for n, p in m.named_parameters() if n.endswith('bias')]  # CROP OFF LAST WEIGHT !!!!! (classification layer)
     biases_fully, biases_softmax = biases_fully[:-1], [biases_fully[-1]]
     for np_tuple in model.named_parameters():
         if not np_tuple[0].endswith(('weight', 'weights_re', 'weights_im', 'bias')):
@@ -126,7 +136,6 @@ def main():
     optimizer = Adam(param_groups, lr=1e-2)
     # optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     # optimizer = Adam(model.parameters(), lr=1e-2)
-
 
     batch_size = 64
     sample_size = 24  # Size of the input cube
@@ -184,6 +193,7 @@ def main():
 
     for i in range(1000):
         step(i)
+
 
 if __name__ == '__main__':
     main()
