@@ -435,7 +435,7 @@ class SE3Net(ResNet):
 
 
 class SE3ResNet34(ResNet):
-    def __init__(self, n_output):
+    def __init__(self, n_output, size):
         features = [[( 4,  4,  4,  4)] * 3,  # 64 channels
                     [( 4,  4,  4,  4)] * 4,  # 64 channels
                     [( 8,  8,  8,  8)] * 6,  # 128 channels
@@ -449,20 +449,20 @@ class SE3ResNet34(ResNet):
             'batch_norm_momentum': 0.01,
             'batch_norm_mode': 'maximum',
             'batch_norm_before_conv': False,
-            'activation': torch.nn.functional.relu,
-            'block': block
+            'block': partial(GatedBlock,
+                             activation=(F.relu, F.sigmoid))
         }
         super().__init__(
-            SE3ResBlock((1,),           features[0], size=5, **params),
-            SE3ResBlock(features[0][0], features[1], size=5, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=5, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=5, stride=2, **params),
+            SE3ResBlock((1,),           features[0], size=size, **params),
+            SE3ResBlock(features[0][0], features[1], size=size, stride=2, **params),
+            SE3ResBlock(features[1][0], features[2], size=size, stride=2, **params),
+            SE3ResBlock(features[2][0], features[3], size=size, stride=2, **params),
             AvgSpacial(),
             nn.Linear(features[3][-1][0], n_output))
 
 
 model_classes = {"resnet34": ResNet34,
-                 "se3resnet34": SE3ResNet34,
+                 "se3resnet34_k5": partial(SE3ResNet34, size=5),
                  "se3net_k5_gated": partial(SE3Net, size=5,
                                             block=partial(GatedBlock,
                                                           activation=(F.relu, F.sigmoid))),
