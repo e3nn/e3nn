@@ -126,7 +126,7 @@ class Cath(torch.utils.data.Dataset):
         
     def __getitem__(self, index):
 
-        time_stamp = timer()
+        # time_stamp = timer()
         
         n_atoms    = self.n_atoms[index]
         positions  = self.positions[index][:n_atoms]
@@ -242,7 +242,7 @@ class Cath(torch.utils.data.Dataset):
         # plt.show()
         # plt.savefig("grid.png")
 
-        time_elapsed = timer() - time_stamp
+        # time_elapsed = timer() - time_stamp
         # print("Time spent on __getitem__: %.4f sec" % time_elapsed)
         
         return fields, label
@@ -425,10 +425,10 @@ class SE3Net(ResNet):
         }
         super().__init__(
             SE3ResBlock((1,),           features[0], size=size, **params),
-            SE3ResBlock(features[0][0], features[1], size=size, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=size, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=size, stride=2, **params),
-            SE3ResBlock(features[3][0], features[4], size=3,    stride=1, **params),
+            SE3ResBlock(features[0][-1], features[1], size=size, stride=2, **params),
+            SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
+            SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
+            SE3ResBlock(features[3][-1], features[4], size=3,    stride=1, **params),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
@@ -439,7 +439,7 @@ class SE3ResNet34(ResNet):
         features = [[( 4,  4,  4,  4)] * 3,  # 64 channels
                     [( 4,  4,  4,  4)] * 4,  # 64 channels
                     [( 8,  8,  8,  8)] * 6,  # 128 channels
-                    [(16, 16, 16, 16)] * 2 + [256, 0, 0, 0]]  # 256 channels
+                    [(16, 16, 16, 16)] * 2 + [(256, 0, 0, 0)]]  # 256 channels
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
@@ -454,9 +454,9 @@ class SE3ResNet34(ResNet):
         }
         super().__init__(
             SE3ResBlock((1,),           features[0], size=size, **params),
-            SE3ResBlock(features[0][0], features[1], size=size, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=size, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=size, stride=2, **params),
+            SE3ResBlock(features[0][-1], features[1], size=size, stride=2, **params),
+            SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
+            SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
             AvgSpacial(),
             nn.Linear(features[3][-1][0], n_output))
 
@@ -488,11 +488,11 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
 
     train_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i, download=True, randomize_orientation=randomize_orientation) for i in range(7)])
     validation_set = Cath(data_filename, split=7)
-    test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8,10)])
+    # test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8,10)])
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
     validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
+    # test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
 
     n_output = len(validation_set.label_set)
     
@@ -631,10 +631,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data-filename",
+    parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz"}, required=True,
                         help="The name of the data file (will automatically downloaded)")
-    parser.add_argument("--model", choices=model_classes.keys(), default='CNN',
-                        help="Which model definition to use (default: %(default)s)")
+    parser.add_argument("--model", choices=model_classes.keys(), required=True,
+                        help="Which model definition to use")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=32, type=int,
@@ -643,9 +643,9 @@ if __name__ == '__main__':
                         help="Whether to output log information in tensorboard format (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-3, type=float,
                         help="Initial learning rate (without decay)")
-    parser.add_argument("--lr_decay_start", type=int,
+    parser.add_argument("--lr_decay_start", type=int, default=1,
                         help="epoch after which the exponential learning rate decay starts")
-    parser.add_argument("--lr_decay_base", type=float,
+    parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
     # parser.add_argument("--lambda_L1", default=0, type=float,
     #                     help="L1 regularization factor")
