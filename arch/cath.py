@@ -7,12 +7,14 @@ classification (www.cathdb.info).
 import torch
 import torch.nn as nn
 import torch.utils.data
+import torch.nn.functional as F
 
 import numpy as np
 import math
 import scipy.io
 import os
 import time
+from functools import partial
 from timeit import default_timer as timer
 from scipy.stats import special_ortho_group
 
@@ -24,9 +26,11 @@ from se3_cnn import basis_kernels
 
 from se3_cnn.non_linearities import NormRelu
 from se3_cnn.non_linearities import NormSoftplus
+from se3_cnn.non_linearities import ScalarActivation
 
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
+
 
 tensorflow_available = True
 try:
@@ -326,7 +330,7 @@ class SE3ResBlock(nn.Module):
     def __init__(self, in_repr, out_reprs,
                  size=3,
                  stride=1,
-                 norm_activation=True,
+                 block=GatedBlock,
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
                  batch_norm_mode='maximum',
@@ -347,7 +351,7 @@ class SE3ResBlock(nn.Module):
         self.layers = []
         for i in range(len(reprs) - 1):
             self.layers.append(
-                (GatedBlock if not norm_activation else NormBlock)(
+                block(
                     reprs[i], reprs[i + 1], size=size, padding=size//2,
                     stride=stride if i == 0 else 1,
                     radial_window_dict=radial_window_dict,
@@ -361,7 +365,7 @@ class SE3ResBlock(nn.Module):
         self.shortcut = None
         # Add shortcut if number of layers is larger than 1
         if len(out_reprs) > 1:
-            self.shortcut = (GatedBlock if not norm_activation else NormBlock)(
+            self.shortcut = block(
                 reprs[0], reprs[-1], size=1, padding=0, stride=stride,
                 radial_window_dict=radial_window_dict,
                 batch_norm_momentum=batch_norm_momentum,
@@ -401,8 +405,8 @@ class ResNet34(ResNet):
             nn.Linear(features[3][-1], n_output))
 
 
-class SE3Net_k5(ResNet):
-    def __init__(self, n_output):
+class SE3Net(ResNet):
+    def __init__(self, n_output, size, block):
         features = [[( 4,  4,  4,  4)] * 1,  # 64 channels
                     [( 4,  4,  4,  4)] * 1,  # 64 channels
                     [( 8,  8,  8,  8)] * 1,  # 128 channels
@@ -417,50 +421,17 @@ class SE3Net_k5(ResNet):
             'batch_norm_momentum': 0.01,
             'batch_norm_mode': 'maximum',
             'batch_norm_before_conv': False,
-            'activation': torch.nn.functional.relu,
-            'norm_activation': True,
-            'activation_bias_min': 0.5,
-            'activation_bias_max': 2.0,
+            'block': block
         }
         super().__init__(
-            SE3ResBlock((1,),           features[0], size=5, **params),
-            SE3ResBlock(features[0][0], features[1], size=5, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=5, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=5, stride=2, **params),
-            SE3ResBlock(features[3][0], features[4], size=3, stride=1, **params),
+            SE3ResBlock((1,),           features[0], size=size, **params),
+            SE3ResBlock(features[0][0], features[1], size=size, stride=2, **params),
+            SE3ResBlock(features[1][0], features[2], size=size, stride=2, **params),
+            SE3ResBlock(features[2][0], features[3], size=size, stride=2, **params),
+            SE3ResBlock(features[3][0], features[4], size=3,    stride=1, **params),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
-
-class SE3Net_k7(ResNet):
-    def __init__(self, n_output):
-        features = [[( 4,  4,  4,  4)] * 1,  # 64 channels
-                    [( 4,  4,  4,  4)] * 1,  # 64 channels
-                    [( 8,  8,  8,  8)] * 1,  # 128 channels
-                    [(16, 16, 16, 16)] * 1,  # 256 channels
-                    [(256,)]]
-        params = {
-            'radial_window_dict': {
-                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-                'radial_window_fct_kwargs': {'mode': 'compromise',
-                                             'border_dist': 0.,
-                                             'sigma': .6}},
-            'batch_norm_momentum': 0.01,
-            'batch_norm_mode': 'maximum',
-            'batch_norm_before_conv': False,
-            'activation': torch.nn.functional.relu,
-            'norm_activation': True,
-            'activation_bias_min': 0.5,
-            'activation_bias_max': 2.0,
-        }
-        super().__init__(
-            SE3ResBlock((1,),           features[0], size=7, **params),
-            SE3ResBlock(features[0][0], features[1], size=7, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=7, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=7, stride=2, **params),
-            SE3ResBlock(features[3][0], features[4], size=3, stride=1, **params),
-            AvgSpacial(),
-            nn.Linear(features[4][-1][0], n_output))
 
 
 class SE3ResNet34(ResNet):
@@ -479,9 +450,7 @@ class SE3ResNet34(ResNet):
             'batch_norm_mode': 'maximum',
             'batch_norm_before_conv': False,
             'activation': torch.nn.functional.relu,
-            'norm_activation': True,
-            'activation_bias_min': 0.5,
-            'activation_bias_max': 2.0,
+            'block': block
         }
         super().__init__(
             SE3ResBlock((1,),           features[0], size=5, **params),
@@ -494,8 +463,24 @@ class SE3ResNet34(ResNet):
 
 model_classes = {"resnet34": ResNet34,
                  "se3resnet34": SE3ResNet34,
-                 "se3net_k5": SE3Net_k5,
-                 "se3net_k7": SE3Net_k7}
+                 "se3net_k5_gated": partial(SE3Net, size=5,
+                                            block=partial(GatedBlock,
+                                                          activation=(F.relu, F.sigmoid))),
+                 "se3net_k7_gated": partial(SE3Net, size=7,
+                                            block=partial(GatedBlock,
+                                                          activation=(F.relu, F.sigmoid))),
+                 "se3net_k5_norm":  partial(SE3Net, size=5,
+                                            block=partial(NormBlock,
+                                                          activation=F.relu,
+                                                          activation_bias_min=0.5,
+                                                          activation_bias_max=2.0)),
+                 "se3net_k7_norm":  partial(SE3Net, size=7,
+                                            block=partial(NormBlock,
+                                                          activation=F.relu,
+                                                          activation_bias_min=0.5,
+                                                          activation_bias_max=2.0))
+                                            }
+
 
 def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, batch_size=32, randomize_orientation=False):
 
@@ -520,7 +505,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
     # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
     # each group gets its own regularization gain
     convLayers      = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
-    normActivs      = [m for m in model.modules() if isinstance(m, (NormSoftplus, NormRelu))]
+    normActivs      = [m for m in model.modules() if isinstance(m, (NormSoftplus, NormRelu, ScalarActivation))]
     batchnormLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
     linearLayers    = [m for m in model.modules() if isinstance(m, nn.Linear)]
     weights_conv  = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('weight')]
@@ -621,25 +606,24 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
 
         print('VALIDATION [{}:{}/{}] loss={:.4} acc={:.2}'.format(epoch, len(train_loader)-1, len(train_loader), avg_loss, acc))
 
+        if tensorflow_available:
+            # ============ TensorBoard logging ============#
+            # (1) Log the scalar values
+            info = {
+                'loss': loss.data[0],
+                'accuracy': acc.data[0]
+            }
 
-    if tensorflow_available:
-        # ============ TensorBoard logging ============#
-        # (1) Log the scalar values
-        info = {
-            'loss': loss.data[0],
-            'accuracy': acc.data[0]
-        }
+            step = epoch * len(train_loader) + batch_idx
+            for tag, value in info.items():
+                logger.scalar_summary(tag, value, step + 1)
 
-        step = epoch * len(train_loader) + batch_idx
-        for tag, value in info.items():
-            logger.scalar_summary(tag, value, step + 1)
-
-        # (2) Log values and gradients of the parameters (histogram)
-        for tag, value in model.named_parameters():
-            tag = tag.replace('.', '/')
-            logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
-            logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
-                                 step + 1)
+            # (2) Log values and gradients of the parameters (histogram)
+            for tag, value in model.named_parameters():
+                tag = tag.replace('.', '/')
+                logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
+                logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
+                                     step + 1)
 
 
 if __name__ == '__main__':
