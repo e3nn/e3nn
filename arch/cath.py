@@ -425,10 +425,10 @@ class SE3Net(ResNet):
         }
         super().__init__(
             SE3ResBlock((1,),           features[0], size=size, **params),
-            SE3ResBlock(features[0][0], features[1], size=size, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=size, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=size, stride=2, **params),
-            SE3ResBlock(features[3][0], features[4], size=3,    stride=1, **params),
+            SE3ResBlock(features[0][-1], features[1], size=size, stride=2, **params),
+            SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
+            SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
+            SE3ResBlock(features[3][-1], features[4], size=3,    stride=1, **params),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
@@ -454,9 +454,9 @@ class SE3ResNet34(ResNet):
         }
         super().__init__(
             SE3ResBlock((1,),           features[0], size=size, **params),
-            SE3ResBlock(features[0][0], features[1], size=size, stride=2, **params),
-            SE3ResBlock(features[1][0], features[2], size=size, stride=2, **params),
-            SE3ResBlock(features[2][0], features[3], size=size, stride=2, **params),
+            SE3ResBlock(features[0][-1], features[1], size=size, stride=2, **params),
+            SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
+            SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
             AvgSpacial(),
             nn.Linear(features[3][-1][0], n_output))
 
