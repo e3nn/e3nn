@@ -335,7 +335,6 @@ class SE3ResBlock(nn.Module):
                  batch_norm_momentum=0.01,
                  batch_norm_mode='maximum',
                  batch_norm_before_conv=False,
-                 activation=torch.nn.functional.relu,
                  **kwargs):
         super().__init__()
 
@@ -358,7 +357,6 @@ class SE3ResBlock(nn.Module):
                     batch_norm_momentum=batch_norm_momentum,
                     batch_norm_mode=batch_norm_mode,
                     batch_norm_before_conv=batch_norm_before_conv,
-                    activation=activation,
                     **kwargs))
         self.layers = nn.Sequential(*self.layers)
 
