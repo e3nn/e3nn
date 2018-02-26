@@ -334,7 +334,7 @@ class SE3ResBlock(nn.Module):
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
                  batch_norm_mode='maximum',
-                 batch_norm_before_conv=False,
+                 batch_norm_before_conv=True,
                  **kwargs):
         super().__init__()
 
@@ -418,7 +418,7 @@ class SE3Net(ResNet):
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
             'batch_norm_mode': 'maximum',
-            'batch_norm_before_conv': False,
+            'batch_norm_before_conv': True,
             'block': block
         }
         super().__init__(
@@ -446,7 +446,7 @@ class SE3ResNet34(ResNet):
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
             'batch_norm_mode': 'maximum',
-            'batch_norm_before_conv': False,
+            'batch_norm_before_conv': True,
             'block': partial(GatedBlock,
                              activation=(F.relu, F.sigmoid))
         }
