@@ -460,7 +460,11 @@ class SE3ResNet34(ResNet):
 
 
 model_classes = {"resnet34": ResNet34,
+                 "se3resnet34_k3": partial(SE3ResNet34, size=3),
                  "se3resnet34_k5": partial(SE3ResNet34, size=5),
+                 "se3net_k3_gated": partial(SE3Net, size=3,
+                                            block=partial(GatedBlock,
+                                                          activation=(F.relu, F.sigmoid))),
                  "se3net_k5_gated": partial(SE3Net, size=5,
                                             block=partial(GatedBlock,
                                                           activation=(F.relu, F.sigmoid))),
@@ -553,6 +557,8 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         # decay learning rate
         optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)
 
+        loss_sum = 0
+        acc_sum = 0
         for batch_idx, (data, target) in enumerate(train_loader):
             time_start = time.perf_counter()
 
@@ -573,17 +579,54 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
             _, argmax = torch.max(out, 1)
             acc = (argmax.squeeze() == y).float().mean()
 
+            loss_sum += loss.data[0]
+            acc_sum += acc.data[0]
+
             print("[{}:{}/{}] loss={:.4} acc={:.2} time={:.2}".format(
                 epoch, batch_idx, len(train_loader),
                 float(loss.data[0]), float(acc.data[0]),
                 time.perf_counter() - time_start))
+        loss_avg = loss_sum / len(train_loader)
+        acc_avg = acc_sum / len(train_loader)
+
+        model.eval()
+        validation_loss_sum = 0
+        outs = []
+        ys = []
+        for batch_idx, (data, target) in enumerate(validation_loader):
+            if torch.cuda.is_available():
+                data, target = data.cuda(), target.cuda()
+            x, y = torch.autograd.Variable(data, volatile=True), torch.autograd.Variable(target)
+            out = model(x)
+            outs.append(out.data.cpu().numpy())
+            ys.append(y.data.cpu().numpy())
+            validation_loss_sum += torch.nn.functional.cross_entropy(out, y, size_average=False).data[0]  # sum up batch loss
+            # print("{}/{}".format(batch_idx, len(validation_loader)))
+
+        out = np.concatenate(outs)
+        y = np.concatenate(ys)
+
+        # compute the accuracy
+        validation_acc = np.sum(out.argmax(-1) == y) / len(y)
+
+        validation_loss_avg = validation_loss_sum / len(validation_loader.dataset)
+
+        print('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+            epoch, len(train_loader)-1, len(train_loader),
+            loss_avg, acc_avg))
+        print('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+            epoch, len(train_loader)-1, len(train_loader),
+            validation_loss_avg, validation_acc))
+
 
         if tensorflow_available:
             # ============ TensorBoard logging ============#
             # (1) Log the scalar values
             info = {
-                'loss': loss.data[0],
-                'accuracy': acc.data[0]
+                'training set avg loss': loss_avg,
+                'training set accuracy': acc_avg,
+                'validation set avg loss': validation_loss_avg,
+                'validation set accuracy': validation_acc,
             }
 
             step = epoch
@@ -596,30 +639,6 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
                 logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
                                      step + 1)
-
-        model.eval()
-        loss_sum = 0
-        outs = []
-        ys = []
-        for batch_idx, (data, target) in enumerate(validation_loader):
-            if torch.cuda.is_available():
-                data, target = data.cuda(), target.cuda()
-            x, y = torch.autograd.Variable(data, volatile=True), torch.autograd.Variable(target)
-            out = model(x)
-            outs.append(out.data.cpu().numpy())
-            ys.append(y.data.cpu().numpy())
-            loss_sum += torch.nn.functional.cross_entropy(out, y, size_average=False).data[0]  # sum up batch loss
-            # print("{}/{}".format(batch_idx, len(validation_loader)))
-
-        out = np.concatenate(outs)
-        y = np.concatenate(ys)
-
-        # compute the accuracy
-        acc = np.sum(out.argmax(-1) == y) / len(y)
-
-        avg_loss = loss_sum / len(validation_loader.dataset)
-
-        print('VALIDATION [{}:{}/{}] loss={:.4} acc={:.2}'.format(epoch, len(train_loader)-1, len(train_loader), avg_loss, acc))
 
 
 
