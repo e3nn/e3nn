@@ -434,10 +434,10 @@ class SE3Net(ResNet):
 
 class SE3ResNet34(ResNet):
     def __init__(self, n_output, size):
-        features = [[( 4,  4,  4,  4)] * 3,  # 64 channels
-                    [( 4,  4,  4,  4)] * 4,  # 64 channels
-                    [( 8,  8,  8,  8)] * 6,  # 128 channels
-                    [(16, 16, 16, 16)] * 2 + [(256, 0, 0, 0)]]  # 256 channels
+        features = [[( 4,  4,  4,  4)] * 2 + [(6, 6, 6, 6)],  # 64 channels
+                    [( 8,  8,  8,  8)] * 4,  # 64 channels
+                    [(16, 16, 16, 16)] * 4,  # 128 channels
+                    [(32, 32, 32, 32)] * 3 + [(256, 0, 0, 0)]]  # 256 channels
         params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
@@ -456,6 +456,7 @@ class SE3ResNet34(ResNet):
             SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
             SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
             AvgSpacial(),
+            nn.Dropout(p=0.3, inplace=True),
             nn.Linear(features[3][-1][0], n_output))
 
 
