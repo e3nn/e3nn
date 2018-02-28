@@ -25,7 +25,8 @@ class SE3DropoutF(torch.autograd.Function):
     def compute_noise(self, size):
         noises = []
         for mul, dim in self.Rs:
-            noise = torch.FloatTensor(size[0], mul, *size[2:])
+            noise = torch.FloatTensor(size[0], mul)
+            #noise = torch.FloatTensor(size[0], mul, *size[2:])
 
             if self.p == 1:
                 noise.fill_(0)
