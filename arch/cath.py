@@ -486,7 +486,7 @@ model_classes = {"resnet34": ResNet34,
 
 def infer(model, loader):
     model.eval()
-    loss_sum = 0
+    losses = []
     outs = []
     ys = []
     for batch_idx, (data, target) in enumerate(loader):
@@ -497,11 +497,10 @@ def infer(model, loader):
         out = model(x)
         outs.append(out.data.cpu().numpy())
         ys.append(y.data.cpu().numpy())
-        loss_sum += \
-        torch.nn.functional.cross_entropy(out, y, size_average=False).data[0]
-    out = np.concatenate(outs)
-    y = np.concatenate(ys)
-    return out, y, loss_sum
+        losses.append(torch.nn.functional.cross_entropy(out, y, reduce=False).data.cpu().numpy())
+    outs = np.concatenate(outs)
+    ys = np.concatenate(ys)
+    return outs, ys, np.concatenate(losses)
 
 def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, batch_size=32, randomize_orientation=False):
 
@@ -602,8 +601,9 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
             # decay learning rate
             optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)
 
-            loss_sum = 0
-            acc_sum = 0
+            training_losses = []
+            training_outs = []
+            training_accs = []
             for batch_idx, (data, target) in enumerate(train_loader):
                 time_start = time.perf_counter()
 
@@ -617,45 +617,33 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 # forward and backward propagation
                 optimizer.zero_grad()
                 out = model(x)
-                loss = torch.nn.functional.cross_entropy(out, y)
+                losses = torch.nn.functional.cross_entropy(out, y, reduce=False)
+                loss = losses.mean()
                 loss.backward()
                 optimizer.step()
 
                 _, argmax = torch.max(out, 1)
                 acc = (argmax.squeeze() == y).float().mean()
 
-                loss_sum += loss.data[0]
-                acc_sum += acc.data[0]
+                training_losses.append(losses.data.cpu().numpy())
+                training_outs.append(out.data.cpu().numpy())
+                training_accs.append(acc.data[0])
 
                 print("[{}:{}/{}] loss={:.4} acc={:.2} time={:.2}".format(
                     epoch, batch_idx, len(train_loader),
                     float(loss.data[0]), float(acc.data[0]),
                     time.perf_counter() - time_start))
-            loss_avg = loss_sum / len(train_loader)
-            acc_avg = acc_sum / len(train_loader)
+            loss_avg = np.mean(training_losses)
+            acc_avg = np.mean(training_accs)
+            training_outs = np.concatenate(training_outs)
+            training_losses = np.concatenate(training_losses)
 
-            # model.eval()
-            # validation_loss_sum = 0
-            # outs = []
-            # ys = []
-            # for batch_idx, (data, target) in enumerate(validation_loader):
-            #     if torch.cuda.is_available():
-            #         data, target = data.cuda(), target.cuda()
-            #     x, y = torch.autograd.Variable(data, volatile=True), torch.autograd.Variable(target)
-            #     out = model(x)
-            #     outs.append(out.data.cpu().numpy())
-            #     ys.append(y.data.cpu().numpy())
-            #     validation_loss_sum += torch.nn.functional.cross_entropy(out, y, size_average=False).data[0]  # sum up batch loss
-            #     # print("{}/{}".format(batch_idx, len(validation_loader)))
-            #
-            # out = np.concatenate(outs)
-            # y = np.concatenate(ys)
-            out, y, validation_loss_sum = infer(model, validation_loader)
+            validation_outs, ys, validation_losses = infer(model, validation_loader)
 
             # compute the accuracy
-            validation_acc = np.sum(out.argmax(-1) == y) / len(y)
+            validation_acc = np.sum(validation_outs.argmax(-1) == ys) / len(ys)
 
-            validation_loss_avg = validation_loss_sum / len(validation_loader.dataset)
+            validation_loss_avg = np.mean(validation_losses)
 
             print('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
                 epoch, len(train_loader)-1, len(train_loader),
@@ -685,6 +673,16 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                     logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
                     logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
                                          step + 1)
+
+                # (3) Log losses for all datapoints in validation and training set
+                logger.histo_summary("losses/validation/", validation_losses, step+1)
+                logger.histo_summary("losses/training", training_losses, step+1)
+
+                # (4) Log losses for all datapoints in validation and training set
+                for i in range(n_output):
+                    logger.histo_summary("logits/%d/validation" % i, validation_outs[:,i], step+1)
+                    logger.histo_summary("logits/%d/training" % i, training_outs[:,i], step+1)
+
 
             if args.save_checkpoints:
                 checkpoint_filename = os.path.join(
