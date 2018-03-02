@@ -591,8 +591,10 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         epoch_start_index = checkpoint_index+1
 
     # Set the logger
-    if tensorflow_available:
-        logger = Logger('./logs')
+    if args.log_to_tensorboard:
+        from datetime import datetime
+        now = datetime.now()
+        logger = Logger('./logs/%s/' % now.strftime("%Y%m%d_%H%M%S"))
 
     if args.mode == 'train':
 
@@ -653,7 +655,8 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 validation_loss_avg, validation_acc))
 
 
-            if tensorflow_available:
+            if args.log_to_tensorboard:
+
                 # ============ TensorBoard logging ============#
                 # (1) Log the scalar values
                 info = {
