@@ -484,21 +484,43 @@ model_classes = {"resnet34": ResNet34,
                                                           activation_bias_max=2.0))
                                             }
 
+def infer(model, loader):
+    model.eval()
+    losses = []
+    outs = []
+    ys = []
+    for batch_idx, (data, target) in enumerate(loader):
+        if torch.cuda.is_available():
+            data, target = data.cuda(), target.cuda()
+        x = torch.autograd.Variable(data, volatile=True)
+        y = torch.autograd.Variable(target)
+        out = model(x)
+        outs.append(out.data.cpu().numpy())
+        ys.append(y.data.cpu().numpy())
+        losses.append(torch.nn.functional.cross_entropy(out, y, reduce=False).data.cpu().numpy())
+    outs = np.concatenate(outs)
+    ys = np.concatenate(ys)
+    return outs, ys, np.concatenate(losses)
 
 def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, batch_size=32, randomize_orientation=False):
 
     torch.backends.cudnn.benchmark = True
 
-    train_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i, download=True, randomize_orientation=randomize_orientation) for i in range(7)])
-    validation_set = Cath(data_filename, split=7)
-    # test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8,10)])
+    if args.mode == 'train':
+        train_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i, download=True, randomize_orientation=randomize_orientation) for i in range(7)])
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+        n_output = len(train_set.datasets[0].label_set)
 
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
-    validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
-    # test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
+    if args.mode in ['train', 'validate']:
+        validation_set = Cath(data_filename, split=7)
+        validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+        n_output = len(validation_set.label_set)
 
-    n_output = len(validation_set.label_set)
-    
+    if args.mode == 'test':
+        test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8,10)])
+        test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
+        n_output = len(test_set.datasets[0].label_set)
+
     model = model_class(n_output = n_output)
     if torch.cuda.is_available():
         model.cuda()
@@ -549,99 +571,150 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     optimizer = Adam(param_groups, lr=initial_lr)
 
+    # Set up model dumping
+    epoch_start_index = 0
+    if args.read_from_checkpoint is not None:
+        checkpoint_index = args.read_from_checkpoint
+        checkpoint_basename = os.path.join(args.model_checkpoint_path,
+                                           'model_%s' % (model.__class__.__name__))
+        if checkpoint_index == -1:
+            import glob
+            checkpoint_filename = glob.glob(checkpoint_basename + '_*.ckpt')[-1]
+            checkpoint_index = int(checkpoint_filename.split('.')[-2].split('_')[-1])
+        else:
+            checkpoint_filename = checkpoint_basename+'_%d.ckpt'%checkpoint_index
+        print("Restoring model from:", checkpoint_filename)
+        checkpoint = torch.load(checkpoint_filename)
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
+        epoch_start_index = checkpoint_index+1
+
     # Set the logger
-    if tensorflow_available:
-        logger = Logger('./logs')
+    if args.log_to_tensorboard:
+        from datetime import datetime
+        now = datetime.now()
+        logger = Logger('./logs/%s/' % now.strftime("%Y%m%d_%H%M%S"))
 
-    for epoch in range(100):
+    if args.mode == 'train':
 
-        # decay learning rate
-        optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)
+        for epoch in range(epoch_start_index, 100):
 
-        loss_sum = 0
-        acc_sum = 0
-        for batch_idx, (data, target) in enumerate(train_loader):
-            time_start = time.perf_counter()
+            # decay learning rate
+            optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)
 
-            target = torch.LongTensor(target)
-            
-            model.train()
-            if torch.cuda.is_available():
-                data, target = data.cuda(), target.cuda()
-            x, y = torch.autograd.Variable(data), torch.autograd.Variable(target)
+            training_losses = []
+            training_outs = []
+            training_accs = []
+            for batch_idx, (data, target) in enumerate(train_loader):
+                time_start = time.perf_counter()
 
-            # forward and backward propagation
-            optimizer.zero_grad()
-            out = model(x)
-            loss = torch.nn.functional.cross_entropy(out, y)
-            loss.backward()
-            optimizer.step()
+                target = torch.LongTensor(target)
 
-            _, argmax = torch.max(out, 1)
-            acc = (argmax.squeeze() == y).float().mean()
+                model.train()
+                if torch.cuda.is_available():
+                    data, target = data.cuda(), target.cuda()
+                x, y = torch.autograd.Variable(data), torch.autograd.Variable(target)
 
-            loss_sum += loss.data[0]
-            acc_sum += acc.data[0]
+                # forward and backward propagation
+                optimizer.zero_grad()
+                out = model(x)
+                losses = torch.nn.functional.cross_entropy(out, y, reduce=False)
+                loss = losses.mean()
+                loss.backward()
+                optimizer.step()
 
-            print("[{}:{}/{}] loss={:.4} acc={:.2} time={:.2}".format(
-                epoch, batch_idx, len(train_loader),
-                float(loss.data[0]), float(acc.data[0]),
-                time.perf_counter() - time_start))
-        loss_avg = loss_sum / len(train_loader)
-        acc_avg = acc_sum / len(train_loader)
+                _, argmax = torch.max(out, 1)
+                acc = (argmax.squeeze() == y).float().mean()
 
-        model.eval()
-        validation_loss_sum = 0
-        outs = []
-        ys = []
-        for batch_idx, (data, target) in enumerate(validation_loader):
-            if torch.cuda.is_available():
-                data, target = data.cuda(), target.cuda()
-            x, y = torch.autograd.Variable(data, volatile=True), torch.autograd.Variable(target)
-            out = model(x)
-            outs.append(out.data.cpu().numpy())
-            ys.append(y.data.cpu().numpy())
-            validation_loss_sum += torch.nn.functional.cross_entropy(out, y, size_average=False).data[0]  # sum up batch loss
-            # print("{}/{}".format(batch_idx, len(validation_loader)))
+                training_losses.append(losses.data.cpu().numpy())
+                training_outs.append(out.data.cpu().numpy())
+                training_accs.append(acc.data[0])
 
-        out = np.concatenate(outs)
-        y = np.concatenate(ys)
+                print("[{}:{}/{}] loss={:.4} acc={:.2} time={:.2}".format(
+                    epoch, batch_idx, len(train_loader),
+                    float(loss.data[0]), float(acc.data[0]),
+                    time.perf_counter() - time_start))
+            loss_avg = np.mean(training_losses)
+            acc_avg = np.mean(training_accs)
+            training_outs = np.concatenate(training_outs)
+            training_losses = np.concatenate(training_losses)
+
+            validation_outs, ys, validation_losses = infer(model, validation_loader)
+
+            # compute the accuracy
+            validation_acc = np.sum(validation_outs.argmax(-1) == ys) / len(ys)
+
+            validation_loss_avg = np.mean(validation_losses)
+
+            print('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+                epoch, len(train_loader)-1, len(train_loader),
+                loss_avg, acc_avg))
+            print('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+                epoch, len(train_loader)-1, len(train_loader),
+                validation_loss_avg, validation_acc))
+
+
+            if args.log_to_tensorboard:
+
+                # ============ TensorBoard logging ============#
+                # (1) Log the scalar values
+                info = {
+                    'training set avg loss': loss_avg,
+                    'training set accuracy': acc_avg,
+                    'validation set avg loss': validation_loss_avg,
+                    'validation set accuracy': validation_acc,
+                }
+
+                step = epoch
+                for tag, value in info.items():
+                    logger.scalar_summary(tag, value, step + 1)
+
+                # (2) Log values and gradients of the parameters (histogram)
+                for tag, value in model.named_parameters():
+                    tag = tag.replace('.', '/')
+                    logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
+                    logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
+                                         step + 1)
+
+                # (3) Log losses for all datapoints in validation and training set
+                logger.histo_summary("losses/validation/", validation_losses, step+1)
+                logger.histo_summary("losses/training", training_losses, step+1)
+
+                # (4) Log losses for all datapoints in validation and training set
+                for i in range(n_output):
+                    logger.histo_summary("logits/%d/validation" % i, validation_outs[:,i], step+1)
+                    logger.histo_summary("logits/%d/training" % i, training_outs[:,i], step+1)
+
+
+            if args.save_checkpoints:
+                checkpoint_filename = os.path.join(
+                    args.model_checkpoint_path,
+                    'model_%s_%d.ckpt' % (model.__class__.__name__, epoch))
+                torch.save({'state_dict': model.state_dict(),
+                            'optimizer': optimizer.state_dict()},
+                           checkpoint_filename)
+                print("Model saved to %s" % checkpoint_filename)
+
+    elif args.mode == 'validate':
+        out, y, validation_loss_sum = infer(model, validation_loader)
 
         # compute the accuracy
         validation_acc = np.sum(out.argmax(-1) == y) / len(y)
-
         validation_loss_avg = validation_loss_sum / len(validation_loader.dataset)
 
-        print('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
-            epoch, len(train_loader)-1, len(train_loader),
-            loss_avg, acc_avg))
-        print('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
-            epoch, len(train_loader)-1, len(train_loader),
+        print('VALIDATION SET: loss={:.4} acc={:.2}'.format(
             validation_loss_avg, validation_acc))
 
+    elif args.mode == 'test':
+        out, y, test_loss_sum = infer(model, test_loader)
 
-        if tensorflow_available:
-            # ============ TensorBoard logging ============#
-            # (1) Log the scalar values
-            info = {
-                'training set avg loss': loss_avg,
-                'training set accuracy': acc_avg,
-                'validation set avg loss': validation_loss_avg,
-                'validation set accuracy': validation_acc,
-            }
+        # compute the accuracy
+        test_acc = np.sum(out.argmax(-1) == y) / len(y)
+        test_loss_avg = test_loss_sum / len(test_loader.dataset)
 
-            step = epoch
-            for tag, value in info.items():
-                logger.scalar_summary(tag, value, step + 1)
-
-            # (2) Log values and gradients of the parameters (histogram)
-            for tag, value in model.named_parameters():
-                tag = tag.replace('.', '/')
-                logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
-                logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
-                                     step + 1)
-
-
+        print('VALIDATION SET: loss={:.4} acc={:.2}'.format(
+            test_loss_avg, test_acc))
 
 if __name__ == '__main__':
 
@@ -653,12 +726,22 @@ if __name__ == '__main__':
                         help="The name of the data file (will automatically downloaded)")
     parser.add_argument("--model", choices=model_classes.keys(), required=True,
                         help="Which model definition to use")
+    parser.add_argument("--training-epochs", default=100, type=int,
+                        help="Which model definition to use")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=32, type=int,
                         help="Size of mini batches to use (default: %(default)s)")
     parser.add_argument("--log-to-tensorboard", action="store_true", default=False,
                         help="Whether to output log information in tensorboard format (default: %(default)s)")
+    parser.add_argument("--model-checkpoint-path", type=str, default="models",
+                        help="Where to dump/read model checkpoints (default: %(default)s)")
+    parser.add_argument("--save-checkpoints", action="store_true", default=False,
+                        help="Save model checkpoints at each epoch")
+    parser.add_argument("--read-from-checkpoint", type=int, default=None,
+                        help="Read model from checkpoint given by index")
+    parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
+                        help="Mode of operation (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-3, type=float,
                         help="Initial learning rate (without decay)")
     parser.add_argument("--lr_decay_start", type=int, default=1,
@@ -714,6 +797,9 @@ if __name__ == '__main__':
     print("# Options")
     for key, value in sorted(vars(args).items()):
         print(key, "=", value)
+
+    if not os.path.exists(args.model_checkpoint_path):
+        os.mkdir(args.model_checkpoint_path)
 
     main(args=args,
          data_filename=args.data_filename,
