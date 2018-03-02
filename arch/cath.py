@@ -445,8 +445,25 @@ class SE3ResNet34(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
+
+
+            # STILL OPEN TO TEST
             'batch_norm_mode': 'maximum',
+
+
+
             'batch_norm_before_conv': True,
+
+
+
+            # needs to be added to other network types
+            # needs to be settable as command line parameter
+            # probability needs to be adapted to capsule order
+            # needs to be implemented for NormActivation blocks
+            'p_drop': .1, # drop probability of whole capsules
+
+
+
             'block': partial(GatedBlock,
                              activation=(F.relu, F.sigmoid))
         }
@@ -456,7 +473,7 @@ class SE3ResNet34(ResNet):
             SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
             SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
             AvgSpacial(),
-            nn.Dropout(p=0.3, inplace=True),
+            nn.Dropout(p=0.5, inplace=True),
             nn.Linear(features[3][-1][0], n_output))
 
 
