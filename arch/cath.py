@@ -619,6 +619,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
 
             # decay learning rate
             optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)
+            optimizer.zero_grad()
 
             training_losses = []
             training_outs = []
@@ -634,12 +635,13 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 x, y = torch.autograd.Variable(data), torch.autograd.Variable(target)
 
                 # forward and backward propagation
-                optimizer.zero_grad()
                 out = model(x)
                 losses = torch.nn.functional.cross_entropy(out, y, reduce=False)
                 loss = losses.mean()
                 loss.backward()
-                optimizer.step()
+                if batch_idx%args.batchsize_multiplyer == args.batchsize_multiplyer-1:
+                    optimizer.step()
+                    optimizer.zero_grad()
 
                 _, argmax = torch.max(out, 1)
                 acc = (argmax.squeeze() == y).float().mean()
@@ -748,7 +750,9 @@ if __name__ == '__main__':
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=32, type=int,
-                        help="Size of mini batches to use (default: %(default)s)")
+                        help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplyer(default: %(default)s)")
+    parser.add_argument("--batchsize_multiplyer", default=1, type=int,
+                        help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
     parser.add_argument("--log-to-tensorboard", action="store_true", default=False,
                         help="Whether to output log information in tensorboard format (default: %(default)s)")
     parser.add_argument("--model-checkpoint-path", type=str, default="models",
