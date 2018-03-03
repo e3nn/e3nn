@@ -16,6 +16,7 @@ class SE3BatchNorm(torch.nn.Module):
         self.momentum = momentum
         self.mode = mode
         self.register_buffer('running_var', torch.ones(self.num_features))
+        self.weight = torch.nn.Parameter(torch.ones(self.num_features))
         self.reset_parameters()
 
     def __repr__(self):
@@ -28,11 +29,14 @@ class SE3BatchNorm(torch.nn.Module):
     def reset_parameters(self):
         self.running_var.fill_(1)
 
-    def update_statistics(self, x):
+    def update_statistics(self, x, divisor=None):
         '''
         update self.running_var using x
 
         :param x: Tensor [batch, feature, x, y, z]
+        :param divisor: Tensor same size as self.running_var
+
+        divisor is needed by SE3ConvolutionBN
         '''
         if self.training and self.momentum > 0:
             begin1 = 0
@@ -43,6 +47,9 @@ class SE3BatchNorm(torch.nn.Module):
                 y = y.contiguous().view(x.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
 
                 y = torch.sum(y ** 2, dim=2)  # [batch, feature, x * y * z]
+
+                if divisor is not None:
+                    y = y / (divisor[begin2: begin2 + m] ** 2 + self.eps).view(1, -1, 1)  # [batch, feature, x * y * z]
 
                 if self.mode == 'normal':
                     y = y.mean(-1).mean(0)  # [feature]
@@ -74,9 +81,11 @@ class SE3BatchNorm(torch.nn.Module):
             y = y.contiguous().view(x.size(0), m, d, *x.size()[2:])  # [batch, feature, repr, x, y, z]
 
             factor = 1 / (self.running_var[begin2: begin2 + m] + self.eps) ** 0.5
+            weight = self.weight[begin2: begin2 + m]
+
             begin2 += m
 
-            y = y * torch.autograd.Variable(factor).view(1, -1, 1, 1, 1, 1)
+            y = y * (torch.autograd.Variable(factor) * weight).view(1, -1, 1, 1, 1, 1)
             ys.append(y.view(x.size(0), m * d, *x.size()[2:]))
 
         y = torch.cat(ys, dim=1)

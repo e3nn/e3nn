@@ -20,8 +20,8 @@ from scipy.stats import special_ortho_group
 
 from se3_cnn.blocks import GatedBlock
 from se3_cnn.blocks import NormBlock
-from se3_cnn.batchnorm import SE3BatchNorm
-from se3_cnn.convolution import SE3Convolution
+from se3_cnn import SE3BatchNorm
+from se3_cnn import SE3Convolution
 from se3_cnn import basis_kernels
 
 from se3_cnn.non_linearities import NormRelu
@@ -506,7 +506,7 @@ def infer(model, loader):
     losses = []
     outs = []
     ys = []
-    for batch_idx, (data, target) in enumerate(loader):
+    for _, (data, target) in enumerate(loader):
         if torch.cuda.is_available():
             data, target = data.cuda(), target.cuda()
         x = torch.autograd.Variable(data, volatile=True)
