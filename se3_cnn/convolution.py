@@ -74,10 +74,10 @@ class SE3KernelCombination(torch.autograd.Function):
             # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
             # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in*len(Rs_in)))
             # EQUAL CONTRIB OF ALL CAPSULES
-            basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*sum(self.multiplicities_in)))
+            basis *= np.sqrt(SO3.dim(R_out) / (len(basis) * sum(self.multiplicities_in)))
             if verbose:
                 N_sample = 5
-                overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, R_out, R_in, a,b,c) for a,b,c in 2*np.pi*np.random.rand(N_sample,3)], axis=0)
+                overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, R_out, R_in, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
                 print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
         return basis
 
@@ -184,7 +184,7 @@ def test_normalization(batch, input_size, Rs_in, Rs_out, kernel_size):
             'border_dist': 0.,
             'sigma': .6
         }
-    } 
+    }
 
     conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window_dict)
 

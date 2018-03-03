@@ -106,7 +106,6 @@ class SGD(Optimizer):
         return loss
 
 
-
 class Adam(Optimizer):
     """Implements Adam algorithm.
 
@@ -165,7 +164,7 @@ class Adam(Optimizer):
                     grad.add_(group['lamb_L1'], p.sign().data)
                 if group['lamb_L2'] != 0:
                     grad.add_(group['lamb_L2'], p.data)
-                
+
                 # Decay the first and second moment running average coefficient
                 exp_avg.mul_(beta1).add_(1 - beta1, grad)
                 exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
