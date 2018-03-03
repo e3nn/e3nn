@@ -60,11 +60,16 @@ class SE3ConvolutionBN(torch.nn.Module):
         # Instead of rescale the output with the running_var
         # We rescale the weights that are much smaller (memory)
 
+        # Computes self.bn(self.conv(input)) * self.weight
+        # In a memory efficient way
+
         ws = []
         weight_index = 0
         var_index = 0
         for i, mi in enumerate(self.conv.combination.multiplicities_out):
             factor = 1 / (self.bn.running_var[var_index: var_index + mi] + self.bn.eps) ** 0.5
+            weight = self.bn.weight[var_index: var_index + mi]
+            factor = (torch.autograd.Variable(factor) * weight).view(-1, 1, 1)
             var_index += mi
 
             for j, mj in enumerate(self.conv.combination.multiplicities_in):
@@ -74,12 +79,12 @@ class SE3ConvolutionBN(torch.nn.Module):
                     w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
                     weight_index += mi * mj * b_el
 
-                    w = w.view(mi, mj, b_el) * torch.autograd.Variable(factor).view(-1, 1, 1)
+                    w = w.view(mi, mj, b_el) * factor
                     ws.append(w.view(-1))
 
         kernel = self.conv.combination(torch.cat(ws))
         output = torch.nn.functional.conv3d(input, kernel, **self.conv.kwargs)
 
-        self.bn.update_statistics(output.data)
+        self.bn.update_statistics(output.data, divisor=self.bn.weight.data)
 
         return output
