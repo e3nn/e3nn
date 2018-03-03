@@ -15,6 +15,7 @@ class SE3BNConvolution(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, momentum=0.1, mode='normal', **kwargs):
         super().__init__()
         self.bn = SE3BatchNorm([(m, SO3.dim(R)) for m, R in Rs_in], eps=eps, momentum=momentum, mode=mode)
+        self.bn.weight = None  # Not used because the convolution comes after
         self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
 
     def forward(self, input):  # pylint: disable=W
