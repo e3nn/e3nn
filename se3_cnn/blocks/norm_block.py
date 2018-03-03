@@ -7,10 +7,10 @@ from se3_cnn import SO3
 
 class NormBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window_dict, # kernel params
+                 repr_in, repr_out, size, radial_window_dict,  # kernel params
                  activation=None, activation_bias_min=0.5, activation_bias_max=2,
-                 stride=1, padding=0, # conv/nonlinearity params
-                 batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True): # batch norm params
+                 stride=1, padding=0,  # conv/nonlinearity params
+                 batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -44,7 +44,7 @@ class NormBlock(torch.nn.Module):
             mode=batch_norm_mode)
 
         capsule_dims = [2 * n + 1 for n, mul in enumerate(repr_out) for i in
-                            range(mul)]  # list of capsule dimensionalities
+                        range(mul)]  # list of capsule dimensionalities
         self.act = NormSoftplus(capsule_dims,
                                 scalar_act=activation,
                                 bias_min=activation_bias_min,
