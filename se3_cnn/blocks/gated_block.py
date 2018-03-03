@@ -39,7 +39,7 @@ class GatedBlock(torch.nn.Module):
 
         n_non_scalar = sum(repr_out[1:])
         if gate_activation is not None and n_non_scalar > 0:
-            Rs_out_with_gate.append((n_non_scalar, SO3.repr1)) # concatenate scalar gate capsules after normal capsules
+            Rs_out_with_gate.append((n_non_scalar, SO3.repr1))  # concatenate scalar gate capsules after normal capsules
             self.has_gates = True
         else:
             self.has_gates = False
@@ -56,24 +56,23 @@ class GatedBlock(torch.nn.Module):
 
         if (scalar_activation is not None and repr_out[0] > 0) or self.has_gates:
             # only non-None for scalar capsules
-            settings = [(mul * (2*n + 1), scalar_activation if n==0 else None) for n, mul in enumerate(repr_out)]
+            settings = [(mul * (2 * n + 1), scalar_activation if n == 0 else None) for n, mul in enumerate(repr_out)]
             if self.has_gates:
                 settings.append((n_non_scalar, gate_activation))
             self.act = ScalarActivation(settings)
         else:
             self.act = None
 
-        self.p_drop = p_drop
         if p_drop != 0:
-            Rs_out_without_gate = list(zip(repr_out, irreducible_repr)) # only dimension as second elem of tuple assumed by SE3Dropout, not callable
-            Rs_out_without_gate = [(mul, SO3.dim(rep_fct)) for mul,rep_fct in Rs_out_without_gate]
-            self.drop_layer = SE3Dropout(Rs_out_without_gate, p_drop) # Rs_out without gates
+            Rs_out_without_gate = [(mul, 2 * n + 1) for n, mul in enumerate(repr_out)]  # Rs_out without gates
+            self.drop_layer = SE3Dropout(Rs_out_without_gate, p_drop)
+        else:
+            self.drop_layer = None
 
     def forward(self, x):  # pylint: disable=W
 
         # convolution
         y = self.bn_conv(x)
-
 
         # nonlinear activation
         if self.act is None:
@@ -90,8 +89,8 @@ class GatedBlock(torch.nn.Module):
                 ny = y.size(3)
                 nz = y.size(4)
 
-                begin_y = self.repr_out[0] # index of first non-scalar capsule
-                begin_u = sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out)) # index of first scalar gate capsule
+                begin_y = self.repr_out[0]  # index of first non-scalar capsule
+                begin_u = sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out))  # index of first scalar gate capsule
 
                 zs = []
 
@@ -127,11 +126,10 @@ class GatedBlock(torch.nn.Module):
                     begin_y += mul * dim
                     begin_u += mul
 
-                z = torch.cat(zs, dim=1) # does not contain gates
-
+                z = torch.cat(zs, dim=1)  # does not contain gates
 
         # dropout
-        if self.p_drop != 0:
+        if self.drop_layer is not None:
             z = self.drop_layer(z)
 
         return z
