@@ -37,12 +37,17 @@ class GatedBlock(torch.nn.Module):
         Rs_in = list(zip(repr_in, irreducible_repr))
         Rs_out_with_gate = list(zip(repr_out, irreducible_repr))
 
+        if (scalar_activation is not None and repr_out[0] > 0):
+            self.scalar_act = ScalarActivation([(repr_out[0], scalar_activation)])
+        else:
+            self.scalar_act = None
+
         n_non_scalar = sum(repr_out[1:])
         if gate_activation is not None and n_non_scalar > 0:
             Rs_out_with_gate.append((n_non_scalar, SO3.repr1))  # concatenate scalar gate capsules after normal capsules
-            self.has_gates = True
+            self.gate_act = ScalarActivation([(n_non_scalar, gate_activation)])
         else:
-            self.has_gates = False
+            self.gate_act = None
 
         self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
             Rs_in=Rs_in,
@@ -53,15 +58,6 @@ class GatedBlock(torch.nn.Module):
             padding=padding,
             momentum=batch_norm_momentum,
             mode=batch_norm_mode)
-
-        if (scalar_activation is not None and repr_out[0] > 0) or self.has_gates:
-            # only non-None for scalar capsules
-            settings = [(mul * (2 * n + 1), scalar_activation if n == 0 else None) for n, mul in enumerate(repr_out)]
-            if self.has_gates:
-                settings.append((n_non_scalar, gate_activation))
-            self.act = ScalarActivation(settings)
-        else:
-            self.act = None
 
         if p_drop != 0:
             Rs_out_without_gate = [(mul, 2 * n + 1) for n, mul in enumerate(repr_out)]  # Rs_out without gates
@@ -74,59 +70,57 @@ class GatedBlock(torch.nn.Module):
         # convolution
         y = self.bn_conv(x)
 
-        # nonlinear activation
-        if self.act is None:
-            z = y
-        else:
-            # apply nonlinearity to scalar capsules
-            y = self.act(y)
-            # if there are gates multiply non-scalar capsules by gate activations
-            if not self.has_gates:
-                z = y
+        nbatch = y.size(0)
+        nx = y.size(2)
+        ny = y.size(3)
+        nz = y.size(4)
+
+        begin_y = 0  # index of first non-scalar capsule
+
+        if self.gate_act is not None:
+            g = y[:, sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out)):]
+            g = self.gate_act(g)
+            begin_g = 0  # index of first scalar gate capsule
+
+        zs = []
+
+        for n, mul in enumerate(self.repr_out):
+            if mul == 0:
+                continue
+            dim = 2 * n + 1
+
+            # crop out capsules of order n
+            field_y = y[:, begin_y: begin_y + mul * dim]  # [batch, feature * repr, x, y, z]
+            begin_y += mul * dim
+
+            if n == 0:
+                # Scalar activation
+                if self.scalar_act is not None:
+                    field = self.scalar_act(field_y)
+                else:
+                    field = field_y
             else:
-                nbatch = y.size(0)
-                nx = y.size(2)
-                ny = y.size(3)
-                nz = y.size(4)
-
-                begin_y = self.repr_out[0]  # index of first non-scalar capsule
-                begin_u = sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out))  # index of first scalar gate capsule
-
-                zs = []
-
-                if self.repr_out[0] != 0:
-                    # add scalar capsules to output
-                    zs.append(y[:, :self.repr_out[0]])
-
-                for n, mul in enumerate(self.repr_out):
-                    if n == 0:
-                        continue
-                    if mul == 0:
-                        continue
-                    dim = 2 * n + 1
-
-                    # crop out capsules of order n
-                    field_y = y[:, begin_y: begin_y + mul * dim]  # [batch, feature * repr, x, y, z]
-                    field_y = field_y.contiguous()
+                if self.gate_act is not None:
                     # reshape channels in capsules and capsule entries
+                    field_y = field_y.contiguous()
                     field_y = field_y.view(nbatch, mul, dim, nx, ny, nz)  # [batch, feature, repr, x, y, z]
 
                     # crop out corresponding scalar gates
-                    field_u = y[:, begin_u: begin_u + mul]  # [batch, feature, x, y, z]
-                    field_u = field_u.contiguous()
+                    field_g = g[:, begin_g: begin_g + mul]  # [batch, feature, x, y, z]
+                    begin_g += mul
                     # reshape channels for broadcasting
-                    field_u = field_u.view(nbatch, mul, 1, nx, ny, nz)  # [batch, feature, repr, x, y, z]
+                    field_g = field_g.contiguous()
+                    field_g = field_g.view(nbatch, mul, 1, nx, ny, nz)  # [batch, feature, repr, x, y, z]
 
                     # scale non-scalar capsules by gate values
-                    field = field_y * field_u  # [batch, feature, repr, x, y, z]
+                    field = field_y * field_g  # [batch, feature, repr, x, y, z]
                     field = field.view(nbatch, mul * dim, nx, ny, nz)  # [batch, feature * repr, x, y, z]
+                else:
+                    field = field_y
 
-                    zs.append(field)
+            zs.append(field)
 
-                    begin_y += mul * dim
-                    begin_u += mul
-
-                z = torch.cat(zs, dim=1)  # does not contain gates
+        z = torch.cat(zs, dim=1)
 
         # dropout
         if self.drop_layer is not None:
