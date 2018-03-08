@@ -22,14 +22,19 @@ class GatedActivation(torch.nn.Module):
         super().__init__()
 
         if type(activation) is tuple:
-            self.scalar_activation, gate_activation = activation
+            scalar_activation, gate_activation = activation
         else:
-            self.scalar_activation, gate_activation = activation, activation
+            scalar_activation, gate_activation = activation, activation
 
         irreducible_repr = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
 
         self.repr_in = repr_in
         n_non_scalar = sum(repr_in[1:])
+
+        if scalar_activation is not None and repr_in[0] > 0:
+            self.scalar_act = ScalarActivation([(repr_in[0], scalar_activation)])
+        else:
+            self.scalar_act = None
 
         if gate_activation is not None and n_non_scalar > 0:
             assert size % 2 == 1, "This size needs to be odd such that the gates matches well with the non-scalar fields"
@@ -48,18 +53,17 @@ class GatedActivation(torch.nn.Module):
             self.gates = None
 
     def forward(self, x):  # pylint: disable=W
-
-        # gates
-        if self.gates is not None:
-            g = self.gates(x)
-
         nbatch = x.size(0)
         nx = x.size(2)
         ny = x.size(3)
         nz = x.size(4)
 
         begin_x = 0  # index of first non-scalar capsule
-        begin_g = 0  # index of first scalar gate capsule
+
+        # gates
+        if self.gates is not None:
+            g = self.gates(x)
+            begin_g = 0  # index of first scalar gate capsule
 
         zs = []
 
@@ -73,8 +77,8 @@ class GatedActivation(torch.nn.Module):
             begin_x += mul * dim
 
             if n == 0:
-                if self.scalar_activation is not None:
-                    field = self.scalar_activation(field_x)
+                if self.scalar_act is not None:
+                    field = self.scalar_act(field_x)
                 else:
                     field = field_x
             else:
