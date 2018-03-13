@@ -351,7 +351,7 @@ class ResNet34(ResNet):
                              res_block=ResBlock)
         super().__init__(
             OuterBlock(1,                   features[0], size=7),
-            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
             OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
@@ -374,7 +374,7 @@ class ResNet34Large(ResNet):
                              res_block=ResBlock)
         super().__init__(
             OuterBlock(1,                   features[0], size=7),
-            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
             OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
@@ -412,11 +412,11 @@ class SE3Net(ResNet):
                              res_block=partial(res_block, **common_params))
 
         super().__init__(
-            OuterBlock((1,),            features[0], size=size),
-            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock((1,),                features[0], size=size),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
-            OuterBlock(features[3][-1][-1], features[4], size=3,    stride=1),
+            OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
             AvgSpacial(),
             nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
             nn.Linear(features[4][-1][-1][0], n_output))
@@ -448,7 +448,7 @@ class SE3ResNet34(ResNet):
                              res_block=partial(res_block, **common_params))
         super().__init__(
             OuterBlock((1,),                features[0], size=7),
-            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
             OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
@@ -484,7 +484,7 @@ class SE3ResNet34Large(ResNet):
                              res_block=partial(res_block, **common_params))
         super().__init__(
             OuterBlock((1,),                features[0], size=7),
-            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
             OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
@@ -493,8 +493,12 @@ class SE3ResNet34Large(ResNet):
             nn.Linear(features[4][-1][-1][0], n_output))
 
 
-model_classes = {"resnet34_k3": partial(ResNet34, size=3),
-                 "resnet34_large_k3": partial(ResNet34Large, size=3),
+model_classes = {"resnet34_k3":
+                     partial(ResNet34, size=3,
+                             dense_dropout_p=0.5),
+                 "resnet34_large_k3":
+                     partial(ResNet34Large, size=3,
+                             dense_dropout_p=0.5),
                  "se3net_k3_gated":
                      partial(SE3Net, size=3,
                              dense_dropout_p=None,
@@ -797,7 +801,7 @@ if __name__ == '__main__':
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=32, type=int,
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
-    parser.add_argument("--batchsize_multiplier", default=1, type=int,
+    parser.add_argument("--batchsize-multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
     parser.add_argument("--log-to-tensorboard", action="store_true", default=False,
                         help="Whether to output log information in tensorboard format (default: %(default)s)")
