@@ -20,11 +20,12 @@ class SE3BatchNorm(torch.nn.Module):
         self.reset_parameters()
 
     def __repr__(self):
-        return "{} (Rs={}, eps={} momentum={})".format(
+        return "{} (Rs={}, eps={}, momentum={}, mode={})".format(
             self.__class__.__name__,
             self.Rs,
             self.eps,
-            self.momentum)
+            self.momentum,
+            self.mode)
 
     def reset_parameters(self):
         self.running_var.fill_(1)

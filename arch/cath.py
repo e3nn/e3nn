@@ -27,6 +27,7 @@ from se3_cnn import basis_kernels
 from se3_cnn.non_linearities import NormRelu
 from se3_cnn.non_linearities import NormSoftplus
 from se3_cnn.non_linearities import ScalarActivation
+from se3_cnn.non_linearities import GatedActivation
 
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
@@ -291,25 +292,29 @@ class ResBlock(nn.Module):
         self.layers = []
         for i in range(len(channels) - 1):
             self.layers += [
-                nn.Conv3d(channels[i], channels[i+1],
+                nn.Conv3d(channels[i], channels[i + 1],
                           kernel_size=size,
-                          padding=size//2,
-                          stride=stride if i==0 else 1,
+                          padding=size // 2,
+                          stride=stride if i == 0 else 1,
                           bias=False),
-                nn.BatchNorm3d(channels[i+1]),
-                nn.ReLU(inplace=True)]
+                nn.BatchNorm3d(channels[i + 1])]
+            if (i + 1) < len(channels) - 1:
+                self.layers += [nn.ReLU(inplace=True)]
         self.layers = nn.Sequential(*self.layers)
 
         self.shortcut = None
-        # Add shortcut if number of layers is larger than 1
         if len(channels_out) > 1:
-            self.shortcut = nn.Sequential(*[
-                nn.Conv3d(channels[0], channels[-1],
-                          kernel_size=1,
-                          padding=0,
-                          stride=stride,
-                          bias=False),
-                nn.BatchNorm3d(channels[-1])])
+            if channels_in == channels_out[-1] and stride == 1:
+                self.shortcut = lambda x: x
+            else:
+                self.shortcut = nn.Sequential(*[
+                    nn.Conv3d(channels[0], channels[-1],
+                              kernel_size=1,
+                              padding=0,
+                              stride=stride,
+                              bias=False),
+                    nn.BatchNorm3d(channels[-1])])
+        self.activation = nn.ReLU(inplace=True)
 
         # initialize
         for module in self.modules():
@@ -319,187 +324,412 @@ class ResBlock(nn.Module):
                 module.weight.data.fill_(1)
                 module.bias.data.zero_()
 
+
     def forward(self, x):
         out = self.layers(x)
         if self.shortcut is not None:
             out += self.shortcut(x)
+        out = self.activation(out)
         return out
 
 
-class SE3ResBlock(nn.Module):
+class SE3GatedResBlock(nn.Module):
     def __init__(self, in_repr, out_reprs,
                  size=3,
                  stride=1,
-                 block=GatedBlock,
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
                  batch_norm_mode='maximum',
                  batch_norm_before_conv=True,
-                 **kwargs):
+                 capsule_dropout_p=0.1,
+                 scalar_gate_activation=(F.relu, F.sigmoid),
+                 downsample_by_pooling=False):
         super().__init__()
 
         reprs = [in_repr] + out_reprs
 
-        if radial_window_dict is None:
-            radial_window_dict = {
-                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-                'radial_window_fct_kwargs': {'mode': 'compromise',
-                                             'border_dist': 0.,
-                                             'sigma': .6}}
-
         self.layers = []
+        single_layer = len(out_reprs) == 1
+        conv_stride = 1 if downsample_by_pooling else stride
         for i in range(len(reprs) - 1):
+            # No activation in last block
+            activation = scalar_gate_activation
+            if i == (len(reprs) - 2) and not single_layer:
+                activation = None
             self.layers.append(
-                block(
-                    reprs[i], reprs[i + 1], size=size, padding=size//2,
-                    stride=stride if i == 0 else 1,
-                    radial_window_dict=radial_window_dict,
-                    batch_norm_momentum=batch_norm_momentum,
-                    batch_norm_mode=batch_norm_mode,
-                    batch_norm_before_conv=batch_norm_before_conv,
-                    **kwargs))
+                GatedBlock(reprs[i], reprs[i + 1],
+                           size=size, padding=size//2,
+                           stride=conv_stride if i == 0 else 1,
+                           activation=activation,
+                           radial_window_dict=radial_window_dict,
+                           batch_norm_momentum=batch_norm_momentum,
+                           batch_norm_mode=batch_norm_mode,
+                           batch_norm_before_conv=batch_norm_before_conv,
+                           capsule_dropout_p=capsule_dropout_p))
+            if downsample_by_pooling and i == 0 and stride > 1:
+                self.layers.append(nn.AvgPool3d(kernel_size=size,
+                                                padding=size//2,
+                                                stride=stride))
         self.layers = nn.Sequential(*self.layers)
 
         self.shortcut = None
+        self.activation = None
         # Add shortcut if number of layers is larger than 1
-        if len(out_reprs) > 1:
-            self.shortcut = block(
-                reprs[0], reprs[-1], size=1, padding=0, stride=stride,
+        if not single_layer:
+            # Use identity is input and output reprs are identical
+            if in_repr == out_reprs[-1] and stride == 1:
+                self.shortcut = lambda x: x
+            else:
+                self.shortcut = []
+                self.shortcut.append(
+                    GatedBlock(reprs[0], reprs[-1],
+                               size=1, padding=0,
+                               stride=conv_stride,
+                               activation=None,
+                               radial_window_dict=radial_window_dict,
+                               batch_norm_momentum=batch_norm_momentum,
+                               batch_norm_mode=batch_norm_mode,
+                               batch_norm_before_conv=batch_norm_before_conv,
+                               capsule_dropout_p=None))
+                if downsample_by_pooling and stride > 1:
+                    self.shortcut.append(nn.AvgPool3d(kernel_size=size,
+                                                      padding=size//2,
+                                                      stride=stride))
+                self.shortcut = nn.Sequential(*self.shortcut)
+
+            self.activation = GatedActivation(
+                repr_in=reprs[-1],
+                size=size,
                 radial_window_dict=radial_window_dict,
                 batch_norm_momentum=batch_norm_momentum,
                 batch_norm_mode=batch_norm_mode,
-                batch_norm_before_conv=batch_norm_before_conv,
-                activation=None,
-                **kwargs)
+                batch_norm_before_conv=batch_norm_before_conv)
 
     def forward(self, x):
         out = self.layers(x)
         if self.shortcut is not None:
             out += self.shortcut(x)
+            out = self.activation(out)
+        return out
+
+
+class SE3NormResBlock(nn.Module):
+    def __init__(self, in_repr, out_reprs,
+                 size=3,
+                 stride=1,
+                 radial_window_dict=None,
+                 batch_norm_momentum=0.01,
+                 batch_norm_mode='maximum',
+                 batch_norm_before_conv=True,
+                 capsule_dropout_p = 0.1,
+                 scalar_activation=F.relu,
+                 activation_bias_min=0.5,
+                 activation_bias_max=2,
+                 downsample_by_pooling=False):
+        super().__init__()
+
+        reprs = [in_repr] + out_reprs
+
+        self.layers = []
+        single_layer = len(out_reprs) == 1
+        conv_stride = 1 if downsample_by_pooling else stride
+        for i in range(len(reprs) - 1):
+            # No activation in last block
+            activation = scalar_activation
+            if i == (len(reprs) - 2) and not single_layer:
+                activation = None
+            self.layers.append(
+                NormBlock(reprs[i], reprs[i + 1],
+                          size=size, padding=size//2,
+                          stride=conv_stride if i == 0 else 1,
+                          activation=activation,
+                          radial_window_dict=radial_window_dict,
+                          batch_norm_momentum=batch_norm_momentum,
+                          batch_norm_mode=batch_norm_mode,
+                          batch_norm_before_conv=batch_norm_before_conv,
+                          capsule_dropout_p=capsule_dropout_p))
+            if downsample_by_pooling and i == 0 and stride > 1:
+                self.layers.append(nn.AvgPool3d(kernel_size=size,
+                                                padding=size//2,
+                                                stride=stride))
+        self.layers = nn.Sequential(*self.layers)
+
+        self.shortcut = None
+        self.activation = None
+        # Add shortcut if number of layers is larger than 1
+        if not single_layer:
+            # Use identity is input and output reprs are identical
+            if in_repr == out_reprs[-1] and stride == 1:
+                self.shortcut = lambda x: x
+            else:
+                self.shortcut = []
+                self.shortcut.append(
+                    NormBlock(reprs[0], reprs[-1],
+                              size=1, padding=0,
+                              stride=conv_stride,
+                              activation=None,
+                              radial_window_dict=radial_window_dict,
+                              batch_norm_momentum=batch_norm_momentum,
+                              batch_norm_mode=batch_norm_mode,
+                              batch_norm_before_conv=batch_norm_before_conv,
+                              capsule_dropout_p=None))
+                if downsample_by_pooling and stride > 1:
+                    self.shortcut.append(nn.AvgPool3d(kernel_size=size,
+                                                      padding=size//2,
+                                                      stride=stride))
+                self.shortcut = nn.Sequential(*self.shortcut)
+
+            capsule_dims = [2 * n + 1 for n, mul in enumerate(out_reprs[-1]) for i in
+                            range(mul)]  # list of capsule dimensionalities
+            self.activation = NormSoftplus(capsule_dims,
+                                           scalar_act=scalar_activation,
+                                           bias_min=activation_bias_min,
+                                           bias_max=activation_bias_max)
+
+    def forward(self, x):
+        out = self.layers(x)
+        if self.shortcut is not None:
+            out += self.shortcut(x)
+            out = self.activation(out)
+        return out
+
+
+class OuterBlock(nn.Module):
+    def __init__(self, in_repr, out_reprs, res_block, size=3, stride=1, **kwargs):
+        super().__init__()
+
+        reprs = [[in_repr]] + out_reprs
+
+        self.layers = []
+        for i in range(len(reprs) - 1):
+            self.layers.append(
+                res_block(reprs[i][-1], reprs[i+1],
+                          size=size,
+                          stride=stride if i == 0 else 1,
+                          **kwargs)
+            )
+        self.layers = nn.Sequential(*self.layers)
+
+    def forward(self, x):
+        out = self.layers(x)
         return out
 
 
 class ResNet(nn.Module):
     def __init__(self, *blocks):
         super().__init__()
-        self.blocks = nn.Sequential(*blocks)
+        self.blocks = nn.Sequential(*[block for block in blocks if block is not None])
 
     def forward(self, x):
         return self.blocks(x)
 
 
 class ResNet34(ResNet):
-    def __init__(self, n_output):
-        features = [ [16] * 3,
-                     [32] * 4,
-                     [64] * 6,
-                    [128] * 3]
+    def __init__(self, n_output, size, dense_dropout_p=0.5):
+
+        features = [[ [16]],
+                    [ [16] * 2] * 3,
+                    [[ 32] * 2] * 4,
+                    [[ 64] * 2] * 6,
+                    [[128] * 2] * 3]
+
+        global OuterBlock
+        OuterBlock = partial(OuterBlock,
+                             res_block=ResBlock)
         super().__init__(
-            ResBlock(1,              features[0], size=3),
-            ResBlock(features[0][0], features[1], size=3, stride=2),
-            ResBlock(features[1][0], features[2], size=3, stride=2),
-            ResBlock(features[2][0], features[3], size=3, stride=2),
+            OuterBlock(1,                   features[0], size=7),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
+            OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
+            OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
             AvgSpacial(),
-            nn.Linear(features[3][-1], n_output))
+            nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
+            nn.Linear(features[4][-1][-1], n_output))
+
+
+class ResNet34Large(ResNet):
+    def __init__(self, n_output, size, dense_dropout_p=0.5):
+
+        features = [[ [64]],
+                    [ [64] * 2] * 3,
+                    [[128] * 2] * 4,
+                    [[256] * 2] * 6,
+                    [[512] * 2] * 3]
+
+        global OuterBlock
+        OuterBlock = partial(OuterBlock,
+                             res_block=ResBlock)
+        super().__init__(
+            OuterBlock(1,                   features[0], size=7),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
+            OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
+            OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
+            AvgSpacial(),
+            nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
+            nn.Linear(features[4][-1][-1], n_output))
 
 
 class SE3Net(ResNet):
-    def __init__(self, n_output, size, block):
-        features = [[( 4,  4,  4,  4)] * 1,  # 64 channels
-                    [( 4,  4,  4,  4)] * 1,  # 64 channels
-                    [( 8,  8,  8,  8)] * 1,  # 128 channels
-                    [(16, 16, 16, 16)] * 1,  # 256 channels
-                    [(256,)]]
-        params = {
+    def __init__(self, res_block, n_output, size,
+                 capsule_dropout_p=0.1, dense_dropout_p=0.5,
+                 downsample_by_pooling=False):
+
+        features = [[[( 4,  4,  4,  4)] * 1],  # 64 channels
+                    [[( 4,  4,  4,  4)] * 1],  # 64 channels
+                    [[( 8,  8,  8,  8)] * 1],  # 128 channels
+                    [[(16, 16, 16, 16)] * 1],  # 256 channels
+                    [[(256,)]]]
+
+        common_params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
                 'radial_window_fct_kwargs': {'mode': 'compromise',
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_mode': 'maximum',
+            'batch_norm_mode': 'maximum',  # STILL OPEN TO TEST
             'batch_norm_before_conv': True,
-            'block': block
+            # TODO: probability needs to be adapted to capsule order
+            'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
+            'downsample_by_pooling': downsample_by_pooling,
         }
-        super().__init__(
-            SE3ResBlock((1,),           features[0], size=size, **params),
-            SE3ResBlock(features[0][-1], features[1], size=size, stride=2, **params),
-            SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
-            SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
-            SE3ResBlock(features[3][-1], features[4], size=3,    stride=1, **params),
-            AvgSpacial(),
-            nn.Linear(features[4][-1][0], n_output))
+        global OuterBlock
+        OuterBlock = partial(OuterBlock,
+                             res_block=partial(res_block, **common_params))
 
+        super().__init__(
+            OuterBlock((1,),            features[0], size=size),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
+            OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
+            OuterBlock(features[3][-1][-1], features[4], size=3,    stride=1),
+            AvgSpacial(),
+            nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
+            nn.Linear(features[4][-1][-1][0], n_output))
 
 
 class SE3ResNet34(ResNet):
-    def __init__(self, n_output, size):
-        features = [[( 4,  4,  4,  4)] * 2 + [(6, 6, 6, 6)],  # 64 channels
-                    [( 8,  8,  8,  8)] * 4,  # 64 channels
-                    [(16, 16, 16, 16)] * 4,  # 128 channels
-                    [(32, 32, 32, 32)] * 3 + [(256, 0, 0, 0)]]  # 256 channels
-        params = {
+    def __init__(self, res_block, n_output, size,
+                 capsule_dropout_p=0.1, dense_dropout_p=0.5,
+                 downsample_by_pooling=False):
+        features = [[[( 4,  4,  4,  4)]],          #  64 channels
+                    [[( 4,  4,  4,  4)] * 2] * 3,  #  64 channels
+                    [[( 8,  8,  8,  8)] * 2] * 4,  # 128 channels
+                    [[(16, 16, 16, 16)] * 2] * 6,  # 256 channels
+                    [[(32, 32, 32, 32)] * 2] * 2 + [[(32, 32, 32, 32), (512, 0, 0, 0)]]]  # 512 channels
+        common_params = {
             'radial_window_dict': {
                 'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
                 'radial_window_fct_kwargs': {'mode': 'compromise',
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-
-
-            # STILL OPEN TO TEST
-            'batch_norm_mode': 'maximum',
-
-
-
+            'batch_norm_mode': 'maximum',   # STILL OPEN TO TEST
             'batch_norm_before_conv': True,
-
-
-
-            # needs to be added to other network types
-            # needs to be settable as command line parameter
-            # probability needs to be adapted to capsule order
-            # needs to be implemented for NormActivation blocks
-            'p_drop': .1, # drop probability of whole capsules
-
-
-
-            'block': partial(GatedBlock,
-                             activation=(F.relu, F.sigmoid))
+            # TODO: probability needs to be adapted to capsule order
+            'capsule_dropout_p': capsule_dropout_p, # drop probability of whole capsules
+            'downsample_by_pooling': downsample_by_pooling,
         }
+        global OuterBlock
+        OuterBlock = partial(OuterBlock,
+                             res_block=partial(res_block, **common_params))
         super().__init__(
-            SE3ResBlock((1,),           features[0], size=size, **params),
-            SE3ResBlock(features[0][-1], features[1], size=size, stride=2, **params),
-            SE3ResBlock(features[1][-1], features[2], size=size, stride=2, **params),
-            SE3ResBlock(features[2][-1], features[3], size=size, stride=2, **params),
+            OuterBlock((1,),                features[0], size=7),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
+            OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
+            OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
             AvgSpacial(),
-            nn.Dropout(p=0.5, inplace=True),
-            nn.Linear(features[3][-1][0], n_output))
+            nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
+            nn.Linear(features[4][-1][-1][0], n_output))
 
 
-model_classes = {"resnet34": ResNet34,
-                 "se3resnet34_k3": partial(SE3ResNet34, size=3),
-                 "se3resnet34_k5": partial(SE3ResNet34, size=5),
-                 "se3net_k3_gated": partial(SE3Net, size=3,
-                                            block=partial(GatedBlock,
-                                                          activation=(F.relu, F.sigmoid))),
-                 "se3net_k5_gated": partial(SE3Net, size=5,
-                                            block=partial(GatedBlock,
-                                                          activation=(F.relu, F.sigmoid))),
-                 "se3net_k7_gated": partial(SE3Net, size=7,
-                                            block=partial(GatedBlock,
-                                                          activation=(F.relu, F.sigmoid))),
-                 "se3net_k5_norm":  partial(SE3Net, size=5,
-                                            block=partial(NormBlock,
-                                                          activation=F.relu,
-                                                          activation_bias_min=0.5,
-                                                          activation_bias_max=2.0)),
-                 "se3net_k7_norm":  partial(SE3Net, size=7,
-                                            block=partial(NormBlock,
-                                                          activation=F.relu,
-                                                          activation_bias_min=0.5,
-                                                          activation_bias_max=2.0))
-                                            }
+class SE3ResNet34Large(ResNet):
+    def __init__(self, res_block, n_output, size,
+                 capsule_dropout_p=0.1, dense_dropout_p=0.5,
+                 downsample_by_pooling=False):
+        features = [[[( 8,  8,  8,  8)]],          # 128 channels
+                    [[( 8,  8,  8,  8)] * 2] * 3,  # 128 channels
+                    [[(16, 16, 16, 16)] * 2] * 4,  # 256 channels
+                    [[(32, 32, 32, 32)] * 2] * 6,  # 512 channels
+                    [[(64, 64, 64, 64)] * 2] * 2 + [[(64, 64, 64, 64), (1024, 0, 0, 0)]]]  # 1024 channels
+        common_params = {
+            'radial_window_dict': {
+                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+                'radial_window_fct_kwargs': {'mode': 'compromise',
+                                             'border_dist': 0.,
+                                             'sigma': .6}},
+            'batch_norm_momentum': 0.01,
+            'batch_norm_mode': 'maximum',  # STILL OPEN TO TEST
+            'batch_norm_before_conv': True,
+            # TODO: probability needs to be adapted to capsule order
+            'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
+            'downsample_by_pooling': downsample_by_pooling,
+        }
+        global OuterBlock
+        OuterBlock = partial(OuterBlock,
+                             res_block=partial(res_block, **common_params))
+        super().__init__(
+            OuterBlock((1,),                features[0], size=7),
+            OuterBlock(features[0][-1][-1], features[1], size=size, stride=2),
+            OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
+            OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
+            OuterBlock(features[3][-1][-1], features[4], size=size, stride=2),
+            AvgSpacial(),
+            nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
+            nn.Linear(features[4][-1][-1][0], n_output))
+
+
+model_classes = {"resnet34_k3": partial(ResNet34, size=3),
+                 "resnet34_large_k3": partial(ResNet34Large, size=3),
+                 "se3net_k3_gated":
+                     partial(SE3Net, size=3,
+                             dense_dropout_p=None,
+                             capsule_dropout_p=None,
+                             res_block=SE3GatedResBlock),
+                 "se3net_k5_gated":
+                     partial(SE3Net, size=5,
+                             dense_dropout_p=None,
+                             capsule_dropout_p=None,
+                             res_block=SE3GatedResBlock),
+                 "se3net_k3_norm":
+                     partial(SE3Net, size=3,
+                             dense_dropout_p=None,
+                             capsule_dropout_p=None,
+                             res_block=SE3NormResBlock),
+                 "se3net_k5_norm":
+                     partial(SE3Net, size=5,
+                             dense_dropout_p=None,
+                             capsule_dropout_p=None,
+                             res_block=SE3NormResBlock),
+                 "se3resnet34_k3_gated":
+                     partial(SE3ResNet34, size=3,
+                             dense_dropout_p=0.5,
+                             capsule_dropout_p=0.1,
+                             res_block=SE3GatedResBlock),
+                 "se3resnet34_k5_gated":
+                     partial(SE3ResNet34, size=5,
+                             dense_dropout_p=0.5,
+                             capsule_dropout_p=0.1,
+                             res_block=SE3GatedResBlock),
+                 "se3resnet34_k3_norm":
+                     partial(SE3ResNet34, size=3,
+                             dense_dropout_p=0.5,
+                             capsule_dropout_p=0.1,
+                             res_block=SE3NormResBlock),
+                 "se3resnet34_k5_norm":
+                     partial(SE3ResNet34, size=5,
+                             dense_dropout_p=0.5,
+                             capsule_dropout_p=0.1,
+                             res_block=SE3NormResBlock),
+                 "se3resnet34_large_k3_gated":
+                     partial(SE3ResNet34Large, size=3,
+                             dense_dropout_p=0.5,
+                             capsule_dropout_p=0.1,
+                             res_block=SE3GatedResBlock)
+                 }
+
 
 def infer(model, loader):
     model.eval()
@@ -518,6 +748,7 @@ def infer(model, loader):
     outs = np.concatenate(outs)
     ys = np.concatenate(ys)
     return outs, ys, np.concatenate(losses)
+
 
 def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_base, batch_size=32, randomize_orientation=False):
 
@@ -541,8 +772,10 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
     model = model_class(n_output = n_output)
     if torch.cuda.is_available():
         model.cuda()
-    print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
+    print(model)
+
+    print("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
     # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
     # each group gets its own regularization gain
@@ -639,7 +872,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 losses = torch.nn.functional.cross_entropy(out, y, reduce=False)
                 loss = losses.mean()
                 loss.backward()
-                if batch_idx%args.batchsize_multiplyer == args.batchsize_multiplyer-1:
+                if batch_idx%args.batchsize_multiplier == args.batchsize_multiplier-1:
                     optimizer.step()
                     optimizer.zero_grad()
 
@@ -735,6 +968,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         print('VALIDATION SET: loss={:.4} acc={:.2}'.format(
             test_loss_avg, test_acc))
 
+
 if __name__ == '__main__':
 
     import argparse
@@ -750,8 +984,8 @@ if __name__ == '__main__':
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=32, type=int,
-                        help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplyer(default: %(default)s)")
-    parser.add_argument("--batchsize_multiplyer", default=1, type=int,
+                        help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
+    parser.add_argument("--batchsize_multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
     parser.add_argument("--log-to-tensorboard", action="store_true", default=False,
                         help="Whether to output log information in tensorboard format (default: %(default)s)")
