@@ -1,6 +1,6 @@
 # pylint: disable=C,R,E1101
 '''
-Architecture to predict the structural categories of proteins according to the CATH 
+Architecture to predict the structural categories of proteins according to the CATH
 classification (www.cathdb.info).
 
 '''
@@ -10,13 +10,9 @@ import torch.utils.data
 import torch.nn.functional as F
 
 import numpy as np
-import math
-import scipy.io
 import os
 import time
 from functools import partial
-from timeit import default_timer as timer
-from scipy.stats import special_ortho_group
 
 from se3_cnn.blocks import GatedBlock
 from se3_cnn.blocks import NormBlock
@@ -32,6 +28,7 @@ from se3_cnn.non_linearities import GatedActivation
 from se3_cnn.util.optimizers_L1L2 import Adam
 from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
 
+from se3_cnn.datasets import Cath
 
 tensorflow_available = True
 try:
@@ -92,190 +89,6 @@ def print_layer(layers, input_shape):
 
     shape = get_output_shape(input_shape, layers)
     print("layer %2d - %20s: %s [output size %s]" % (len(layers), list(layers.named_modules())[-1][0], tuple(shape), "{:,}".format(np.prod(shape))))
-
-
-class Cath(torch.utils.data.Dataset):
-    url = 'https://github.com/deepfold/cath_datasets/blob/master/{}?raw=true'
-
-    def __init__(self, dataset, split, download=False, use_density=True, randomize_orientation=False):
-        self.root = os.path.expanduser("cath")
-
-        if download:
-            self.download(dataset)
-
-        self.use_density = use_density
-        self.randomize_orientation = randomize_orientation
-        
-        if not self._check_exists(dataset):
-            raise RuntimeError('Dataset not found.' +
-                               ' You can use download=True to download it')
-
-        data = np.load(os.path.join(self.root, dataset))
-        split_start_indices = data['split_start_indices']
-        split_range = list(zip(split_start_indices[0:], list(split_start_indices[1:])+[None]))[split]
-        self.positions = data['positions'][split_range[0]:split_range[1]]
-        self.atom_types = data['atom_types'][split_range[0]:split_range[1]]
-        self.n_atoms = data['n_atoms'][split_range[0]:split_range[1]]
-        self.labels = [tuple(v) if len(v)>1 else v[0] for v in data['labels'][split_range[0]:split_range[1]]]
-
-        self.atom_type_set = np.unique(self.atom_types[0][:self.n_atoms[0]])
-        self.n_atom_types = len(self.atom_type_set)
-        self.atom_type_map = dict(zip(self.atom_type_set, range(len(self.atom_type_set))))
-
-        self.label_set = sorted(list(set(self.labels)))
-        self.label_map = dict(zip(self.label_set, range(len(self.label_set))))
-        
-    def __getitem__(self, index):
-
-        # time_stamp = timer()
-        
-        n_atoms    = self.n_atoms[index]
-        positions  = self.positions[index][:n_atoms]
-        atom_types = self.atom_types[index][:n_atoms]
-        label      = self.label_map[self.labels[index]]
-
-        p = 2.0
-        n = 50
-
-        if torch.cuda.is_available():
-            fields = torch.cuda.FloatTensor(*(self.n_atom_types,)+(n,n,n)).fill_(0)
-        else:
-            fields = torch.zeros(*(self.n_atom_types,)+(n,n,n))
-
-        if self.randomize_orientation:
-            random_rotation = special_ortho_group.rvs(3)
-            positions = np.dot(random_rotation,positions.T).T
-
-        if self.use_density:
-        
-            ## Numpy version ##
-            # a = np.linspace(start=-n / 2 * p + p / 2, stop=n / 2 * p - p / 2, num=n, endpoint=True)
-            # xx, yy, zz = np.meshgrid(a, a, a, indexing="ij")
-
-            # fields_np = np.zeros((self.n_atom_types, n, n, n), dtype=np.float32)
-            # for i, atom_type in enumerate(self.atom_type_set):
-
-            #     # Extract positions with current atom type
-            #     pos = positions[atom_types == atom_type]
-
-            #     # Create grid x atom_pos grid
-            #     posx_posx, xx_xx = np.meshgrid(pos[:,0], xx.reshape(-1))
-            #     posy_posy, yy_yy = np.meshgrid(pos[:,1], yy.reshape(-1))
-            #     posz_posz, zz_zz = np.meshgrid(pos[:,2], zz.reshape(-1))                            
-
-            #     # Calculate density
-            #     density = np.exp(-((xx_xx - posx_posx)**2 + (yy_yy - posy_posy)**2 + (zz_zz - posz_posz)**2) / (2 * (p)**2))
-
-            #     # Normalize so each atom density sums to one
-            #     density /= np.sum(density, axis=0)
-
-            #     # Sum densities and reshape to original shape
-            #     fields_np[i] = np.sum(density, axis=1).reshape(xx.shape)
-
-
-            ## Pytorch version ##        
-
-            # Create linearly spaced grid
-            a = torch.linspace(start=-n / 2 * p + p / 2, end=n / 2 * p - p / 2, steps=n)
-            if torch.cuda.is_available():
-                a = a.cuda()
-
-            # Pytorch does not suppoert meshgrid - do the repeats manually
-            xx = a.view(-1,1,1).repeat(1, len(a), len(a))
-            yy = a.view(1,-1,1).repeat(len(a), 1, len(a))
-            zz = a.view(1,1,-1).repeat(len(a), len(a), 1)
-
-            for i, atom_type in enumerate(self.atom_type_set):
-
-                # Extract positions with current atom type
-                pos = positions[atom_types == atom_type]
-
-                # Transfer position vector to gpu
-                pos = torch.FloatTensor(pos)
-                if torch.cuda.is_available():
-                    pos = pos.cuda()
-
-                # Pytorch does not suppoert meshgrid - do the repeats manually
-                # Numpy equivalent:
-                # posx_posx, xx_xx = np.meshgrid(pos[:,0], xx.reshape(-1))
-                # posy_posy, yy_yy = np.meshgrid(pos[:,1], yy.reshape(-1))
-                # posz_posz, zz_zz = np.meshgrid(pos[:,2], zz.reshape(-1))                            
-                xx_xx = xx.view(-1, 1).repeat(1, len(pos))
-                posx_posx = pos[:,0].contiguous().view(1, -1).repeat(len(xx.view(-1)), 1)
-                yy_yy = yy.view(-1, 1).repeat(1, len(pos))
-                posy_posy = pos[:,1].contiguous().view(1, -1).repeat(len(yy.view(-1)), 1)
-                zz_zz = zz.view(-1, 1).repeat(1, len(pos))
-                posz_posz = pos[:,2].contiguous().view(1, -1).repeat(len(zz.view(-1)), 1)
-
-                # Calculate density
-                sigma = 0.5*p
-                density = torch.exp(-((xx_xx - posx_posx)**2 + (yy_yy - posy_posy)**2 + (zz_zz - posz_posz)**2) / (2 * (sigma)**2))
-
-                # Normalize so each atom density sums to one
-                density /= torch.sum(density, dim=0)
-
-                # Sum densities and reshape to original shape
-                fields[i] = torch.sum(density, dim=1).view(xx.shape)
-        else:
-
-            for i, atom_type in enumerate(self.atom_type_set):
-            
-                # Extract positions with current atom type
-                pos = positions[atom_types == atom_type]
-
-                # Lookup indices and move to GPU
-                indices = torch.LongTensor(np.ravel_multi_index(np.digitize(pos, a+p/2).T, dims=(n,n,n)))
-                if torch.cuda.is_available():
-                    indices = indices.cuda()
-
-                # Set values
-                fields[i].view(-1)[indices] = 1
-
-            
-        # assert((np.abs(fields.numpy() - fields_np)<0.001).all())
-
-
-        # import matplotlib.pyplot as plt
-        # from mpl_toolkits.mplot3d import Axes3D
-        # fig = plt.figure()
-        # ax = fig.add_subplot(111, projection='3d')
-        # ax.scatter(xx.reshape(-1), yy.reshape(-1), zz.reshape(-1), s=10*fields.numpy().reshape(-1), c=fields.numpy().reshape(-1), cmap=plt.get_cmap("Blues"))
-        # plt.show()
-        # plt.savefig("grid.png")
-
-        # time_elapsed = timer() - time_stamp
-        # print("Time spent on __getitem__: %.4f sec" % time_elapsed)
-        
-        return fields, label
-
-    def __len__(self):
-        return len(self.labels)
-
-    def _check_exists(self, dataset):
-        return os.path.exists(os.path.join(self.root, dataset))
-
-    def download(self, dataset):
-        from six.moves import urllib
-
-        if self._check_exists(dataset):
-            return
-
-        # download files
-        try:
-            os.makedirs(self.root)
-        except OSError as e:
-            if e.errno == os.errno.EEXIST:
-                pass
-            else:
-                raise
-
-        print('Downloading ' + self.url.format(dataset))
-        data = urllib.request.urlopen(self.url.format(dataset))
-        file_path = os.path.join(self.root, dataset)
-        with open(file_path, 'wb') as f:
-            f.write(data.read())
-
-        print('Done!')
 
 
 class AvgSpacial(nn.Module):
@@ -608,7 +421,6 @@ class SE3Net(ResNet):
             nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
             nn.Linear(features[4][-1][-1][0], n_output))
 
-
 class SE3ResNet34(ResNet):
     def __init__(self, res_block, n_output, size,
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
@@ -765,11 +577,11 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         n_output = len(validation_set.label_set)
 
     if args.mode == 'test':
-        test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8,10)])
+        test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8, 10)])
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
         n_output = len(test_set.datasets[0].label_set)
 
-    model = model_class(n_output = n_output)
+    model = model_class(n_output=n_output)
     if torch.cuda.is_available():
         model.cuda()
 
@@ -779,18 +591,19 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
 
     # split up parameters into groups, named_parameters() returns tupels ('name', parameter)
     # each group gets its own regularization gain
-    convLayers      = [m for m in model.modules() if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
-    normActivs      = [m for m in model.modules() if isinstance(m, (NormSoftplus, NormRelu, ScalarActivation))]
+    convLayers = [m for m in model.modules()
+                  if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
+    normActivs = [m for m in model.modules() if isinstance(m, (NormSoftplus, NormRelu, ScalarActivation))]
     batchnormLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
-    linearLayers    = [m for m in model.modules() if isinstance(m, nn.Linear)]
-    weights_conv  = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('weight')]
-    weights_bn    = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('weight')]
-    weights_fully = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('weight')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    linearLayers = [m for m in model.modules() if isinstance(m, nn.Linear)]
+    weights_conv = [p for m in convLayers for n, p in m.named_parameters() if n.endswith('weight')]
+    weights_bn = [p for m in batchnormLayers for n, p in m.named_parameters() if n.endswith('weight')]
+    weights_fully = [p for m in linearLayers for n, p in m.named_parameters() if n.endswith('weight')]  # CROP OFF LAST WEIGHT !!!!! (classification layer)
     weights_fully, weights_softmax = weights_fully[:-1], [weights_fully[-1]]
-    biases_conv   = [p for m in convLayers      for n,p in m.named_parameters() if n.endswith('bias')]
-    biases_activs = [p for m in normActivs      for n,p in m.named_parameters() if n.endswith('bias')]
-    biases_bn     = [p for m in batchnormLayers for n,p in m.named_parameters() if n.endswith('bias')]
-    biases_fully  = [p for m in linearLayers    for n,p in m.named_parameters() if n.endswith('bias')] # CROP OFF LAST WEIGHT !!!!! (classification layer)
+    biases_conv = [p for m in convLayers for n, p in m.named_parameters() if n.endswith('bias')]
+    biases_activs = [p for m in normActivs for n, p in m.named_parameters() if n.endswith('bias')]
+    biases_bn = [p for m in batchnormLayers for n, p in m.named_parameters() if n.endswith('bias')]
+    biases_fully = [p for m in linearLayers for n, p in m.named_parameters() if n.endswith('bias')]  # CROP OFF LAST WEIGHT !!!!! (classification layer)
     biases_fully, biases_softmax = biases_fully[:-1], [biases_fully[-1]]
     for np_tuple in model.named_parameters():
         if not np_tuple[0].endswith(('weight', 'weights_re', 'weights_im', 'bias')):
@@ -815,7 +628,8 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         raise RuntimeError(error_msg)
 
     # old version, does not differentiate between parameter groups
-    # param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)] # You can set different regularization for different parameter groups by splitting them up
+    # param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)]
+    # You can set different regularization for different parameter groups by splitting them up
 
     # optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
     # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -832,7 +646,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
             checkpoint_filename = glob.glob(checkpoint_basename + '_*.ckpt')[-1]
             checkpoint_index = int(checkpoint_filename.split('.')[-2].split('_')[-1])
         else:
-            checkpoint_filename = checkpoint_basename+'_%d.ckpt'%checkpoint_index
+            checkpoint_filename = checkpoint_basename+'_%d.ckpt' % checkpoint_index
         print("Restoring model from:", checkpoint_filename)
         checkpoint = torch.load(checkpoint_filename)
         model.load_state_dict(checkpoint['state_dict'])
@@ -872,7 +686,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 losses = torch.nn.functional.cross_entropy(out, y, reduce=False)
                 loss = losses.mean()
                 loss.backward()
-                if batch_idx%args.batchsize_multiplier == args.batchsize_multiplier-1:
+                if batch_idx % args.batchsize_multiplier == args.batchsize_multiplier-1:
                     optimizer.step()
                     optimizer.zero_grad()
 
@@ -906,7 +720,6 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                 epoch, len(train_loader)-1, len(train_loader),
                 validation_loss_avg, validation_acc))
 
-
             if args.log_to_tensorboard:
 
                 # ============ TensorBoard logging ============#
@@ -935,9 +748,8 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
 
                 # (4) Log losses for all datapoints in validation and training set
                 for i in range(n_output):
-                    logger.histo_summary("logits/%d/validation" % i, validation_outs[:,i], step+1)
-                    logger.histo_summary("logits/%d/training" % i, training_outs[:,i], step+1)
-
+                    logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step+1)
+                    logger.histo_summary("logits/%d/training" % i, training_outs[:, i], step+1)
 
             if args.save_checkpoints:
                 checkpoint_filename = os.path.join(
@@ -1056,12 +868,13 @@ if __name__ == '__main__':
     if not os.path.exists(args.model_checkpoint_path):
         os.mkdir(args.model_checkpoint_path)
 
-    main(args=args,
-         data_filename=args.data_filename,
-         model_class=model_classes[args.model],
-         initial_lr=args.initial_lr,
-         lr_decay_start=args.lr_decay_start,
-         lr_decay_base=args.lr_decay_base,
-         batch_size=args.batch_size,
-         randomize_orientation=args.randomize_orientation,
-         )
+    main(
+        args=args,
+        data_filename=args.data_filename,
+        model_class=model_classes[args.model],
+        initial_lr=args.initial_lr,
+        lr_decay_start=args.lr_decay_start,
+        lr_decay_base=args.lr_decay_base,
+        batch_size=args.batch_size,
+        randomize_orientation=args.randomize_orientation,
+    )
