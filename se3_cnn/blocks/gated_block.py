@@ -9,7 +9,7 @@ from se3_cnn.dropout import SE3Dropout
 class GatedBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window_dict,  # kernel params
-                 activation=(None, None), stride=1, padding=0, p_drop=0,  # conv/nonlinearity/dropout params
+                 activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
@@ -19,6 +19,7 @@ class GatedBlock(torch.nn.Module):
         :param activation: (scalar activation, gate activation) which are functions like torch.nn.functional.relu or None
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
+        :param float conv_dropout_p: Convolution dropout probability
         :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
         :param batch_norm_mode: the mode of the batch normalization
         :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
@@ -59,11 +60,10 @@ class GatedBlock(torch.nn.Module):
             momentum=batch_norm_momentum,
             mode=batch_norm_mode)
 
-        if p_drop != 0:
+        self.dropout = None
+        if capsule_dropout_p is not None:
             Rs_out_without_gate = [(mul, 2 * n + 1) for n, mul in enumerate(repr_out)]  # Rs_out without gates
-            self.drop_layer = SE3Dropout(Rs_out_without_gate, p_drop)
-        else:
-            self.drop_layer = None
+            self.dropout = SE3Dropout(Rs_out_without_gate, capsule_dropout_p)
 
     def forward(self, x):  # pylint: disable=W
 
@@ -123,7 +123,7 @@ class GatedBlock(torch.nn.Module):
         z = torch.cat(zs, dim=1)
 
         # dropout
-        if self.drop_layer is not None:
-            z = self.drop_layer(z)
+        if self.dropout is not None:
+            z = self.dropout(z)
 
         return z

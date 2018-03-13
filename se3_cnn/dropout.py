@@ -8,6 +8,11 @@ class SE3Dropout(torch.nn.Module):
         self.Rs = Rs
         self.p = p
 
+    def __repr__(self):
+        return "{} (p={})".format(
+            self.__class__.__name__,
+            self.p)
+
     def forward(self, x):  # pylint: disable=W
         return SE3DropoutF(self.Rs, self.p if self.training else 0)(x)
 

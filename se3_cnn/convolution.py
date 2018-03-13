@@ -20,12 +20,15 @@ class SE3Convolution(torch.nn.Module):
         self.combination = SE3KernelCombination(Rs_in, Rs_out, size, radial_window_dict, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
+        self.radial_window_dict = radial_window_dict
 
     def __repr__(self):
-        return "{} (size={}, {})".format(
+        return "{} ({} -> {}, size={}, {})".format(
             self.__class__.__name__,
+            self.combination.multiplicities_in,
+            self.combination.multiplicities_out,
             self.combination.size,
-            self.kwargs)
+            {**self.kwargs, **self.radial_window_dict})  # TODO: radial_window_dict is perhaps not necessary to print in final version
 
     def forward(self, input):  # pylint: disable=W
         kernel = self.combination(self.weight)
