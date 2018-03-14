@@ -196,7 +196,7 @@ class SE3GatedResBlock(nn.Module):
                 self.shortcut = []
                 self.shortcut.append(
                     GatedBlock(reprs[0], reprs[-1],
-                               size=1, padding=0,
+                               size=size, padding=size//2,
                                stride=conv_stride,
                                activation=None,
                                radial_window_dict=radial_window_dict,
@@ -278,7 +278,7 @@ class SE3NormResBlock(nn.Module):
                 self.shortcut = []
                 self.shortcut.append(
                     NormBlock(reprs[0], reprs[-1],
-                              size=1, padding=0,
+                              size=size, padding=size//2,
                               stride=conv_stride,
                               activation=None,
                               radial_window_dict=radial_window_dict,
