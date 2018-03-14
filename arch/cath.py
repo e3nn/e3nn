@@ -281,6 +281,8 @@ class SE3NormResBlock(nn.Module):
                               size=size, padding=size//2,
                               stride=conv_stride,
                               activation=None,
+                              activation_bias_min=activation_bias_min,
+                              activation_bias_max=activation_bias_max,
                               radial_window_dict=radial_window_dict,
                               batch_norm_momentum=batch_norm_momentum,
                               batch_norm_mode=batch_norm_mode,
