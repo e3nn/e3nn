@@ -203,7 +203,7 @@ class SE3GatedResBlock(nn.Module):
                                batch_norm_momentum=batch_norm_momentum,
                                batch_norm_mode=batch_norm_mode,
                                batch_norm_before_conv=batch_norm_before_conv,
-                               capsule_dropout_p=None))
+                               capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,
                                                       padding=size//2,
@@ -285,7 +285,7 @@ class SE3NormResBlock(nn.Module):
                               batch_norm_momentum=batch_norm_momentum,
                               batch_norm_mode=batch_norm_mode,
                               batch_norm_before_conv=batch_norm_before_conv,
-                              capsule_dropout_p=None))
+                              capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,
                                                       padding=size//2,
