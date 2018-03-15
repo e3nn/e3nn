@@ -340,7 +340,7 @@ class ResNet(nn.Module):
 
 
 class ResNet34(ResNet):
-    def __init__(self, n_output, size, dense_dropout_p=0.5):
+    def __init__(self, n_input, n_output, size, dense_dropout_p=0.5):
 
         features = [[ [16]],
                     [ [16] * 2] * 3,
@@ -352,7 +352,7 @@ class ResNet34(ResNet):
         OuterBlock = partial(OuterBlock,
                              res_block=ResBlock)
         super().__init__(
-            OuterBlock(1,                   features[0], size=7),
+            OuterBlock(n_input,             features[0], size=7),
             OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
@@ -363,7 +363,7 @@ class ResNet34(ResNet):
 
 
 class ResNet34Large(ResNet):
-    def __init__(self, n_output, size, dense_dropout_p=0.5):
+    def __init__(self, n_input, n_output, size, dense_dropout_p=0.5):
 
         features = [[ [64]],
                     [ [64] * 2] * 3,
@@ -375,7 +375,7 @@ class ResNet34Large(ResNet):
         OuterBlock = partial(OuterBlock,
                              res_block=ResBlock)
         super().__init__(
-            OuterBlock(1,                   features[0], size=7),
+            OuterBlock(n_input,             features[0], size=7),
             OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
@@ -386,7 +386,7 @@ class ResNet34Large(ResNet):
 
 
 class SE3Net(ResNet):
-    def __init__(self, res_block, n_output, size,
+    def __init__(self, res_block, n_input, n_output, size,
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
                  downsample_by_pooling=False):
 
@@ -414,7 +414,7 @@ class SE3Net(ResNet):
                              res_block=partial(res_block, **common_params))
 
         super().__init__(
-            OuterBlock((1,),                features[0], size=size),
+            OuterBlock((n_input,),          features[0], size=size),
             OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
@@ -424,7 +424,7 @@ class SE3Net(ResNet):
             nn.Linear(features[4][-1][-1][0], n_output))
 
 class SE3ResNet34(ResNet):
-    def __init__(self, res_block, n_output, size,
+    def __init__(self, res_block, n_input, n_output, size,
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
                  downsample_by_pooling=False):
         features = [[[( 4,  4,  4,  4)]],          #  64 channels
@@ -449,7 +449,7 @@ class SE3ResNet34(ResNet):
         OuterBlock = partial(OuterBlock,
                              res_block=partial(res_block, **common_params))
         super().__init__(
-            OuterBlock((1,),                features[0], size=7),
+            OuterBlock((n_input,),          features[0], size=7),
             OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
@@ -460,7 +460,7 @@ class SE3ResNet34(ResNet):
 
 
 class SE3ResNet34Large(ResNet):
-    def __init__(self, res_block, n_output, size,
+    def __init__(self, res_block, n_input, n_output, size,
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
                  downsample_by_pooling=False):
         features = [[[( 8,  8,  8,  8)]],          # 128 channels
@@ -485,7 +485,7 @@ class SE3ResNet34Large(ResNet):
         OuterBlock = partial(OuterBlock,
                              res_block=partial(res_block, **common_params))
         super().__init__(
-            OuterBlock((1,),                features[0], size=7),
+            OuterBlock((n_input,),          features[0], size=7),
             OuterBlock(features[0][-1][-1], features[1], size=size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=size, stride=2),
@@ -579,6 +579,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
                  discretization_bins=args.data_discretization_bins,
                  discretization_bin_size=args.data_discretization_bin_size) for i in range(7)])
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+        n_input = train_set.datasets[0].n_atom_types
         n_output = len(train_set.datasets[0].label_set)
 
     if args.mode in ['train', 'validate']:
@@ -587,6 +588,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
             discretization_bins=args.data_discretization_bins,
             discretization_bin_size=args.data_discretization_bin_size)
         validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+        n_input = validation_set.n_atom_types
         n_output = len(validation_set.label_set)
 
     if args.mode == 'test':
@@ -595,9 +597,10 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
             discretization_bins=args.data_discretization_bins,
             discretization_bin_size=args.data_discretization_bin_size) for i in range(8, 10)])
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
+        n_input = test_set.datasets[0].n_atom_types
         n_output = len(test_set.datasets[0].label_set)
 
-    model = model_class(n_output=n_output)
+    model = model_class(n_input=n_input, n_output=n_output)
     if torch.cuda.is_available():
         model.cuda()
 
@@ -803,7 +806,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz"}, required=True,
+    parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz", "cath_3class_backbone.npz", }, required=True,
                         help="The name of the data file (will automatically downloaded)")
     parser.add_argument("--data-discretization-bins", type=int, default=50,
                         help="Number of bins used in each dimension for the discretization of the input data")
