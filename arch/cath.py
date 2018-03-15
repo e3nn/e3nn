@@ -571,17 +571,27 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
     torch.backends.cudnn.benchmark = True
 
     if args.mode == 'train':
-        train_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i, download=True, randomize_orientation=randomize_orientation) for i in range(7)])
+        train_set = torch.utils.data.ConcatDataset([
+            Cath(data_filename, split=i, download=True,
+                 randomize_orientation=randomize_orientation,
+                 discretization_bins=args.data_discretization_bins,
+                 discretization_bin_size=args.data_discretization_bin_size) for i in range(7)])
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
         n_output = len(train_set.datasets[0].label_set)
 
     if args.mode in ['train', 'validate']:
-        validation_set = Cath(data_filename, split=7)
+        validation_set = Cath(
+            data_filename, split=7,
+            discretization_bins=args.data_discretization_bins,
+            discretization_bin_size=args.data_discretization_bin_size)
         validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
         n_output = len(validation_set.label_set)
 
     if args.mode == 'test':
-        test_set = torch.utils.data.ConcatDataset([Cath(data_filename, split=i) for i in range(8, 10)])
+        test_set = torch.utils.data.ConcatDataset([Cath(
+            data_filename, split=i,
+            discretization_bins=args.data_discretization_bins,
+            discretization_bin_size=args.data_discretization_bin_size) for i in range(8, 10)])
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
         n_output = len(test_set.datasets[0].label_set)
 
@@ -793,6 +803,10 @@ if __name__ == '__main__':
 
     parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz"}, required=True,
                         help="The name of the data file (will automatically downloaded)")
+    parser.add_argument("--data-discretization-bins", type=int, default=50,
+                        help="Number of bins used in each dimension for the discretization of the input data")
+    parser.add_argument("--data-discretization-bin-size", type=float, default=2.0,
+                        help="Size of bins used in each dimension for the discretization of the input data")
     parser.add_argument("--model", choices=model_classes.keys(), required=True,
                         help="Which model definition to use")
     parser.add_argument("--training-epochs", default=100, type=int,
