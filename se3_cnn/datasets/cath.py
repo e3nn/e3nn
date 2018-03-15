@@ -8,12 +8,18 @@ from scipy.stats import special_ortho_group
 class Cath(torch.utils.data.Dataset):
     url = 'https://github.com/deepfold/cath_datasets/blob/master/{}?raw=true'
 
-    def __init__(self, dataset, split, download=False, use_density=True, randomize_orientation=False):
+    def __init__(self, dataset, split, download=False,
+                 discretization_bins=50,
+                 discretization_bin_size=2.0,
+                 use_density=True,
+                 randomize_orientation=False):
         self.root = os.path.expanduser("cath")
 
         if download:
             self.download(dataset)
 
+        self.discretization_bins = discretization_bins
+        self.discretization_bin_size = discretization_bin_size
         self.use_density = use_density
         self.randomize_orientation = randomize_orientation
 
@@ -45,8 +51,8 @@ class Cath(torch.utils.data.Dataset):
         atom_types = self.atom_types[index][:n_atoms]
         label = self.label_map[self.labels[index]]
 
-        p = 2.0
-        n = 50
+        p = self.discretization_bin_size
+        n = self.discretization_bins
 
         if torch.cuda.is_available():
             fields = torch.cuda.FloatTensor(*(self.n_atom_types,)+(n, n, n)).fill_(0)
