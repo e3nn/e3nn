@@ -581,15 +581,17 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
         n_input = train_set.datasets[0].n_atom_types
         n_output = len(train_set.datasets[0].label_set)
+        print("Training set: ", [len(dataset) for dataset in train_set.datasets])
 
     if args.mode in ['train', 'validate']:
         validation_set = Cath(
             data_filename, split=7,
             discretization_bins=args.data_discretization_bins,
             discretization_bin_size=args.data_discretization_bin_size)
-        validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
+        validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
         n_input = validation_set.n_atom_types
         n_output = len(validation_set.label_set)
+        print("Validation set: ", len(validation_set))
 
     if args.mode == 'test':
         test_set = torch.utils.data.ConcatDataset([Cath(
@@ -599,6 +601,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
         n_input = test_set.datasets[0].n_atom_types
         n_output = len(test_set.datasets[0].label_set)
+        print("Test set: ", [len(dataset) for dataset in test_set.datasets])
 
     model = model_class(n_input=n_input, n_output=n_output)
     if torch.cuda.is_available():
@@ -738,6 +741,8 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
             print('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
                 epoch, len(train_loader)-1, len(train_loader),
                 validation_loss_avg, validation_acc))
+
+            print('VALIDATION losses: ', validation_losses)
 
             if args.log_to_tensorboard:
 
