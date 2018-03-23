@@ -61,6 +61,10 @@ class SE3GroupNorm(nn.Module):
 
             fields.append(field.view(input.size(0), m * d, *input.size()[2:]))
 
+        assert ix == input.size(1)
+        if self.affine:
+            assert iw == self.weight.size(0)
+            assert ib == self.bias.size(0)
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
 
