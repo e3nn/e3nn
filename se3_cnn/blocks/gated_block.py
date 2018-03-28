@@ -10,7 +10,7 @@ class GatedBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window_dict,  # kernel params
                  activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
-                 batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):  # batch norm params
+                 batch_norm_momentum=0.1, batch_norm_before_conv=True):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -21,7 +21,6 @@ class GatedBlock(torch.nn.Module):
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
         :param float conv_dropout_p: Convolution dropout probability
         :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
-        :param batch_norm_mode: the mode of the batch normalization
         :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
         '''
         super().__init__()
@@ -57,8 +56,7 @@ class GatedBlock(torch.nn.Module):
             radial_window_dict=radial_window_dict,
             stride=stride,
             padding=padding,
-            momentum=batch_norm_momentum,
-            mode=batch_norm_mode)
+            momentum=batch_norm_momentum)
 
         self.dropout = None
         if capsule_dropout_p is not None:

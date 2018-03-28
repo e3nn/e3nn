@@ -152,7 +152,6 @@ class SE3GatedResBlock(nn.Module):
                  stride=1,
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
-                 batch_norm_mode='maximum',
                  batch_norm_before_conv=True,
                  capsule_dropout_p=0.1,
                  scalar_gate_activation=(F.relu, F.sigmoid),
@@ -176,7 +175,6 @@ class SE3GatedResBlock(nn.Module):
                            activation=activation,
                            radial_window_dict=radial_window_dict,
                            batch_norm_momentum=batch_norm_momentum,
-                           batch_norm_mode=batch_norm_mode,
                            batch_norm_before_conv=batch_norm_before_conv,
                            capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
@@ -201,7 +199,6 @@ class SE3GatedResBlock(nn.Module):
                                activation=None,
                                radial_window_dict=radial_window_dict,
                                batch_norm_momentum=batch_norm_momentum,
-                               batch_norm_mode=batch_norm_mode,
                                batch_norm_before_conv=batch_norm_before_conv,
                                capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
@@ -215,7 +212,6 @@ class SE3GatedResBlock(nn.Module):
                 size=size,
                 radial_window_dict=radial_window_dict,
                 batch_norm_momentum=batch_norm_momentum,
-                batch_norm_mode=batch_norm_mode,
                 batch_norm_before_conv=batch_norm_before_conv)
 
     def forward(self, x):
@@ -232,7 +228,6 @@ class SE3NormResBlock(nn.Module):
                  stride=1,
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
-                 batch_norm_mode='maximum',
                  batch_norm_before_conv=True,
                  capsule_dropout_p = 0.1,
                  scalar_activation=F.relu,
@@ -258,7 +253,6 @@ class SE3NormResBlock(nn.Module):
                           activation=activation,
                           radial_window_dict=radial_window_dict,
                           batch_norm_momentum=batch_norm_momentum,
-                          batch_norm_mode=batch_norm_mode,
                           batch_norm_before_conv=batch_norm_before_conv,
                           capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
@@ -285,7 +279,6 @@ class SE3NormResBlock(nn.Module):
                               activation_bias_max=activation_bias_max,
                               radial_window_dict=radial_window_dict,
                               batch_norm_momentum=batch_norm_momentum,
-                              batch_norm_mode=batch_norm_mode,
                               batch_norm_before_conv=batch_norm_before_conv,
                               capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
@@ -403,7 +396,6 @@ class SE3Net(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_mode': 'maximum',  # STILL OPEN TO TEST
             'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
@@ -439,7 +431,6 @@ class SE3ResNet34(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_mode': 'maximum',   # STILL OPEN TO TEST
             'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p, # drop probability of whole capsules
@@ -475,7 +466,6 @@ class SE3ResNet34Large(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_mode': 'maximum',  # STILL OPEN TO TEST
             'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
