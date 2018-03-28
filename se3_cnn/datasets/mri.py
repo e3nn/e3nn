@@ -7,10 +7,10 @@ import sys
 
 
 class MRISegmentation(torch.utils.data.Dataset):
-    '''Read 3D medical image files in .nii format, and provide it to the
+    """Read 3D medical image files in .nii format, and provide it to the
        user as 3D patches of the requested size. Setting
        randomize_patch_offsets=True will add random offsets to the
-       patches to reduce the affect of patch boundaries.'''
+       patches to reduce the affect of patch boundaries."""
 
     def __init__(self, h5_filename, filter, patch_shape,
                  randomize_patch_offsets=True,
@@ -82,7 +82,7 @@ class MRISegmentation(torch.utils.data.Dataset):
                 self.padding_boundary[i] = pad_width
 
     def __getitem__(self, index):
-        '''Retrieve a single patch'''
+        """Retrieve a single patch"""
 
         # Which image to retrieve patch from
         dataset_index = self.patch_indices[index][0]
@@ -118,78 +118,8 @@ class MRISegmentation(torch.utils.data.Dataset):
 
         return image_patch, labels_patch
 
-
-        # if (np.any(patch_index < 0) or np.any((patch_index + self.patch_shape) >
-        #                                       image_shape)):
-        #     print("Image\n", self.pad_patch(image_patch, self.patch_shape,
-        #                                     image_shape, patch_index,
-        #                                     pad_mode=self.pad_mode,
-        #                                     pad_constant=self.pad_constant))
-        #     # print("Label\n", self.pad_patch(labels_patch, self.patch_shape,
-        #     #                                 image_shape, patch_index,
-        #     #                                 pad_mode=self.pad_mode,
-        #     #                                 pad_constant=self.pad_constant))
-        #     image, patch_index_image = self.pad_image(
-        #         image, patch_index,
-        #         pad_mode=self.pad_mode,
-        #         pad_constant=self.pad_constant)
-        #     labels, patch_index_labels = self.pad_image(
-        #         labels, patch_index,
-        #         pad_mode=self.pad_mode,
-        #         pad_constant=self.pad_constant)
-        #     assert np.all(patch_index_image == patch_index_labels)
-        #     patch_index = patch_index_image
-        #
-        #     print("Image2\n", image[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
-        #                 patch_index[1]:(patch_index[1] + self.patch_shape[1]),
-        #                 patch_index[2]:(patch_index[2] + self.patch_shape[2])])
-        #     # print("Label2\n", labels[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
-        #     #                patch_index[1]:(patch_index[1] + self.patch_shape[1]),
-        #     #                patch_index[2]:(patch_index[2] + self.patch_shape[2])])
-        # return (image[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
-        #               patch_index[1]:(patch_index[1] + self.patch_shape[1]),
-        #               patch_index[2]:(patch_index[2] + self.patch_shape[2])],
-        #         labels[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
-        #                patch_index[1]:(patch_index[1] + self.patch_shape[1]),
-        #                patch_index[2]:(patch_index[2] + self.patch_shape[2])])
-
-
     def __len__(self):
         return len(self.patch_indices)
-
-    # @staticmethod
-    # def pad_patch(patch, full_patch_shape, image_shape, patch_index,
-    #               pad_mode, pad_constant=0):
-    #
-    #     n_pad_pre  = -((patch_index < 0) * patch_index)
-    #
-    #     patch_end_index = patch_index + full_patch_shape
-    #     voxels_beyond_end = patch_end_index - image_shape
-    #     n_pad_post = (voxels_beyond_end > 0) * voxels_beyond_end
-    #
-    #     pad_width = np.stack([n_pad_pre, n_pad_post], axis=1)
-    #
-    #     padded_patch = np.pad(patch, pad_width,
-    #                           mode=pad_mode, constant_values=pad_constant)
-    #
-    #     assert(np.all(padded_patch.shape == full_patch_shape))
-    #
-    #     return padded_patch
-    #
-    # def pad_image(self, image, patch_index, pad_mode, pad_constant=0):
-    #     image_shape = np.array(image.shape, dtype=np.int16)
-    #
-    #     n_pad_pre  = -((patch_index < 0) * patch_index)
-    #
-    #     patch_end_index = patch_index + self.patch_shape
-    #     voxels_beyond_end = patch_end_index - image_shape
-    #     n_pad_post = (voxels_beyond_end > 0) * voxels_beyond_end
-    #     pad_width = np.stack([n_pad_pre, n_pad_post], axis=1)
-    #     image = np.pad(image, pad_width,
-    #                    mode=pad_mode, constant_values=pad_constant)
-    #     patch_index += n_pad_pre
-    #     return image, patch_index
-
 
     @staticmethod
     def calc_patch_indices(image_shape, patch_shape,
