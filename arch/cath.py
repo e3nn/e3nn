@@ -360,9 +360,9 @@ class ResNet34(ResNet):
                     [128] * 3]
         super().__init__(
             ResBlock(1,              features[0], kernel_size=3),
-            ResBlock(features[0][0], features[1], kernel_size=3, stride=2),
-            ResBlock(features[1][0], features[2], kernel_size=3, stride=2),
-            ResBlock(features[2][0], features[3], kernel_size=3, stride=2),
+            ResBlock(features[0][-1], features[1], kernel_size=3, stride=2),
+            ResBlock(features[1][-1], features[2], kernel_size=3, stride=2),
+            ResBlock(features[2][-1], features[3], kernel_size=3, stride=2),
             AvgSpacial(),
             nn.Linear(features[3][-1], n_output))
 
@@ -376,10 +376,10 @@ class SE3Net_k5(ResNet):
                     [(128,)]]
         super().__init__(
             SE3ResBlock((1,),           features[0], kernel_size=5),
-            SE3ResBlock(features[0][0], features[1], kernel_size=5, stride=2),
-            SE3ResBlock(features[1][0], features[2], kernel_size=5, stride=2),
-            SE3ResBlock(features[2][0], features[3], kernel_size=5, stride=2),
-            SE3ResBlock(features[3][0], features[4], kernel_size=3, stride=1),
+            SE3ResBlock(features[0][-1], features[1], kernel_size=5, stride=2),
+            SE3ResBlock(features[1][-1], features[2], kernel_size=5, stride=2),
+            SE3ResBlock(features[2][-1], features[3], kernel_size=5, stride=2),
+            SE3ResBlock(features[3][-1], features[4], kernel_size=3, stride=1),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
@@ -393,10 +393,10 @@ class SE3Net_k7(ResNet):
                     [(128,)]]
         super().__init__(
             SE3ResBlock((1,),           features[0], kernel_size=7),
-            SE3ResBlock(features[0][0], features[1], kernel_size=7, stride=2),
-            SE3ResBlock(features[1][0], features[2], kernel_size=7, stride=2),
-            SE3ResBlock(features[2][0], features[3], kernel_size=7, stride=2),
-            SE3ResBlock(features[3][0], features[4], kernel_size=3, stride=1),
+            SE3ResBlock(features[0][-1], features[1], kernel_size=7, stride=2),
+            SE3ResBlock(features[1][-1], features[2], kernel_size=7, stride=2),
+            SE3ResBlock(features[2][-1], features[3], kernel_size=7, stride=2),
+            SE3ResBlock(features[3][-1], features[4], kernel_size=3, stride=1),
             AvgSpacial(),
             nn.Linear(features[4][-1][0], n_output))
 
@@ -409,9 +409,9 @@ class SE3ResNet34(ResNet):
                     [(8, 24, 40)] * 2 + [(8*1 + 24*3 + 40*5, 0, 0)]]
         super().__init__(
             SE3ResBlock((1,),           features[0], kernel_size=5),
-            SE3ResBlock(features[0][0], features[1], kernel_size=5, stride=2),
-            SE3ResBlock(features[1][0], features[2], kernel_size=5, stride=2),
-            SE3ResBlock(features[2][0], features[3], kernel_size=5, stride=2),
+            SE3ResBlock(features[0][-1], features[1], kernel_size=5, stride=2),
+            SE3ResBlock(features[1][-1], features[2], kernel_size=5, stride=2),
+            SE3ResBlock(features[2][-1], features[3], kernel_size=5, stride=2),
             AvgSpacial(),
             nn.Linear(features[3][-1][0], n_output))
 
