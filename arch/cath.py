@@ -674,7 +674,7 @@ def main(args, data_filename, model_class, initial_lr, lr_decay_start, lr_decay_
 
     if args.mode == 'train':
 
-        for epoch in range(epoch_start_index, 100):
+        for epoch in range(epoch_start_index, args.training_epochs):
 
             # decay learning rate
             optimizer, _ = lr_scheduler_exponential(optimizer, epoch, initial_lr, lr_decay_start, lr_decay_base, verbose=True)

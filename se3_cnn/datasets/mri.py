@@ -1,0 +1,265 @@
+# pylint: disable=C,R,E1101
+import torch
+import h5py
+import numpy as np
+import numbers
+import sys
+
+
+class MRISegmentation(torch.utils.data.Dataset):
+    '''Read 3D medical image files in .nii format, and provide it to the
+       user as 3D patches of the requested size. Setting
+       randomize_patch_offsets=True will add random offsets to the
+       patches to reduce the affect of patch boundaries.'''
+
+    def __init__(self, h5_filename, filter, patch_shape,
+                 randomize_patch_offsets=True,
+                 pad_mode='constant',
+                 pad_constant=0):
+
+        if isinstance(patch_shape, numbers.Integral):
+            patch_shape = np.repeat(patch_shape, 3)
+        self.patch_shape = patch_shape
+        self.randomize_patch_offsets = randomize_patch_offsets
+        self.pad_mode = pad_mode
+        self.pad_constant = pad_constant
+
+        self.data = []
+        self.labels = []
+        self.unpadded_data_shape = []
+        self.padding_boundary = []
+        self.patch_indices = []
+
+        # Read H5 file
+        print("Reading data...", end="")
+        sys.stdout.flush()
+        with h5py.File(h5_filename, 'r') as hf:
+            for name in filter:
+                data = hf[name][:]
+                # Assumption: voxel value and pixel are stored in last dim
+                self.data.append(data[:,:,:,0].squeeze())
+                self.labels.append(data[:,:,:,1].squeeze())
+                self.unpadded_data_shape.append(self.data[-1].shape)
+                self.padding_boundary.append(None)
+        print("done.")
+
+        # This first call to initialize_patch_indices will calculate the
+        # total padding around each image, and store it in self.padding_boundary
+        self.initialize_patch_indices()
+
+        # The total padding is fixed to a multiple of the patch size - we
+        # can therefore add the full padding in the setup fase
+        print("Applying padding...", end="")
+        sys.stdout.flush()
+        for i, image in enumerate(self.data):
+            pad_width = self.padding_boundary[i]
+            self.data[i] = np.pad(self.data[i], pad_width,
+                                  mode=self.pad_mode,
+                                  constant_values=self.pad_constant)
+            self.labels[i] = np.pad(self.labels[i], pad_width,
+                                    mode=self.pad_mode,
+                                    constant_values=self.pad_constant)
+        print("done.")
+
+    def initialize_patch_indices(self):
+        """For each image, calculate the indices for each patch, possibly
+           shifted by a random offset"""
+
+        self.patch_indices = []
+        for i, image in enumerate(self.data):
+            patch_indices, overflow = self.calc_patch_indices(
+                self.unpadded_data_shape[i],
+                self.patch_shape,
+                randomize_offset=self.randomize_patch_offsets)
+            patch_indices = np.append(np.full(shape=(patch_indices.shape[0],1),
+                                              fill_value=i),
+                                      patch_indices, axis=1)
+            self.patch_indices += patch_indices.tolist()
+
+            # Keep track of how much each image has been padded
+            if self.padding_boundary[i] is None:
+                pad_width = np.stack([overflow, overflow], axis=1)
+                self.padding_boundary[i] = pad_width
+
+    def __getitem__(self, index):
+        '''Retrieve a single patch'''
+
+        # Which image to retrieve patch from
+        dataset_index = self.patch_indices[index][0]
+
+        # Extract image and label
+        image = self.data[dataset_index]
+        labels = self.labels[dataset_index]
+
+        # Obtain patch indices into original image
+        patch_index_start = np.array(self.patch_indices[index][1:],
+                                     dtype=np.int16)
+        patch_index_end = patch_index_start + self.patch_shape
+
+        # Update patch indices to padded image
+        patch_index_start += self.padding_boundary[dataset_index][:,0]
+        patch_index_end += self.padding_boundary[dataset_index][:,0]
+
+        # Lookup image and add channel dimension
+        image_patch = np.expand_dims(
+            image[patch_index_start[0]:patch_index_end[0],
+                  patch_index_start[1]:patch_index_end[1],
+                  patch_index_start[2]:patch_index_end[2]],
+            axis=0).astype(np.float32)
+        labels_patch = np.expand_dims(
+            labels[patch_index_start[0]:patch_index_end[0],
+                   patch_index_start[1]:patch_index_end[1],
+                   patch_index_start[2]:patch_index_end[2]],
+            axis=0)
+
+        # Check that patch has the correct size
+        assert np.all(image_patch[0].shape == self.patch_shape)
+        assert np.all(labels_patch[0].shape == self.patch_shape)
+
+        return image_patch, labels_patch
+
+
+        # if (np.any(patch_index < 0) or np.any((patch_index + self.patch_shape) >
+        #                                       image_shape)):
+        #     print("Image\n", self.pad_patch(image_patch, self.patch_shape,
+        #                                     image_shape, patch_index,
+        #                                     pad_mode=self.pad_mode,
+        #                                     pad_constant=self.pad_constant))
+        #     # print("Label\n", self.pad_patch(labels_patch, self.patch_shape,
+        #     #                                 image_shape, patch_index,
+        #     #                                 pad_mode=self.pad_mode,
+        #     #                                 pad_constant=self.pad_constant))
+        #     image, patch_index_image = self.pad_image(
+        #         image, patch_index,
+        #         pad_mode=self.pad_mode,
+        #         pad_constant=self.pad_constant)
+        #     labels, patch_index_labels = self.pad_image(
+        #         labels, patch_index,
+        #         pad_mode=self.pad_mode,
+        #         pad_constant=self.pad_constant)
+        #     assert np.all(patch_index_image == patch_index_labels)
+        #     patch_index = patch_index_image
+        #
+        #     print("Image2\n", image[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
+        #                 patch_index[1]:(patch_index[1] + self.patch_shape[1]),
+        #                 patch_index[2]:(patch_index[2] + self.patch_shape[2])])
+        #     # print("Label2\n", labels[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
+        #     #                patch_index[1]:(patch_index[1] + self.patch_shape[1]),
+        #     #                patch_index[2]:(patch_index[2] + self.patch_shape[2])])
+        # return (image[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
+        #               patch_index[1]:(patch_index[1] + self.patch_shape[1]),
+        #               patch_index[2]:(patch_index[2] + self.patch_shape[2])],
+        #         labels[patch_index[0]:(patch_index[0] + self.patch_shape[0]),
+        #                patch_index[1]:(patch_index[1] + self.patch_shape[1]),
+        #                patch_index[2]:(patch_index[2] + self.patch_shape[2])])
+
+
+    def __len__(self):
+        return len(self.patch_indices)
+
+    # @staticmethod
+    # def pad_patch(patch, full_patch_shape, image_shape, patch_index,
+    #               pad_mode, pad_constant=0):
+    #
+    #     n_pad_pre  = -((patch_index < 0) * patch_index)
+    #
+    #     patch_end_index = patch_index + full_patch_shape
+    #     voxels_beyond_end = patch_end_index - image_shape
+    #     n_pad_post = (voxels_beyond_end > 0) * voxels_beyond_end
+    #
+    #     pad_width = np.stack([n_pad_pre, n_pad_post], axis=1)
+    #
+    #     padded_patch = np.pad(patch, pad_width,
+    #                           mode=pad_mode, constant_values=pad_constant)
+    #
+    #     assert(np.all(padded_patch.shape == full_patch_shape))
+    #
+    #     return padded_patch
+    #
+    # def pad_image(self, image, patch_index, pad_mode, pad_constant=0):
+    #     image_shape = np.array(image.shape, dtype=np.int16)
+    #
+    #     n_pad_pre  = -((patch_index < 0) * patch_index)
+    #
+    #     patch_end_index = patch_index + self.patch_shape
+    #     voxels_beyond_end = patch_end_index - image_shape
+    #     n_pad_post = (voxels_beyond_end > 0) * voxels_beyond_end
+    #     pad_width = np.stack([n_pad_pre, n_pad_post], axis=1)
+    #     image = np.pad(image, pad_width,
+    #                    mode=pad_mode, constant_values=pad_constant)
+    #     patch_index += n_pad_pre
+    #     return image, patch_index
+
+
+    @staticmethod
+    def calc_patch_indices(image_shape, patch_shape,
+                           overlap=0,
+                           randomize_offset=True,
+                           minimum_overflow_fraction=0.25):
+        """
+        Given the image shape and the patch shape, calculate the placement
+        of patches. If randomize_offset is on, it will randomize the placement,
+        so that the patch boundaries affect different regions in each epoch.
+        There is natural room for this randomization whenever the image size
+        if not divisible by the patch size, in the sense that the overflow
+        can be placed arbitrarily in the beginning on the end. If you want
+        to ensure that some randomization will always occur, you can set
+        minimum_overflow_fraction, which will ensure that an extra patch will
+        be added to provide extra overflow if necessary.
+
+        :param image_shape: Shape if input image
+        :param patch_shape: Shape of patch
+        :param overlap: Allow patches to overlap with this number of voxels
+        :param randomize_offset: Whether patch placement should be normalized
+        :param minimum_overflow_fraction: Specify to force overflow beyond image
+               to be at least this fraction of the patch size
+        :return:
+        """
+        if isinstance(overlap, numbers.Integral):
+            overlap = np.repeat(overlap, len(image_shape))
+
+        # Effective patch shape
+        eff_patch_shape = (patch_shape - overlap)
+
+        # Number of patches (rounding up)
+        n_patches = np.ceil(image_shape / eff_patch_shape).astype(int)
+
+        # Overflow of voxels beyond image
+        overflow = eff_patch_shape * n_patches - image_shape + overlap
+
+        if randomize_offset:
+
+            # Add extra patch for dimensions where minimum is below fraction
+            extra_patch = (overflow/patch_shape) < minimum_overflow_fraction
+            overflow += extra_patch*eff_patch_shape
+            n_patches += 1
+
+            # Select random start index so that overlap is spread randomly
+            # on both sides. If overflow is larger than patch_shape
+            max_start_offset = overflow
+            start_index = -np.array([np.random.choice(offset + 1)
+                                     for offset in max_start_offset])
+            # max_start_offset = np.minimum(overflow, patch_shape-1)
+            # min_start_offset = np.maximum(0, overflow-max_start_offset)
+            # minmax_start_offset = list(zip(min_start_offset, max_start_offset))
+            # start_index = -np.array([np.random.choice(np.arange(offset[0],
+            #                                                     offset[1]+1))
+            #                          for offset in minmax_start_offset])
+        else:
+
+            # Set start index to overflow is spread evenly on both sides
+            start_index = -np.ceil(overflow/2).astype(int)
+
+        stop_index = image_shape + start_index + overflow
+        step_size = eff_patch_shape
+
+        return (np.mgrid[start_index[0]:stop_index[0]:step_size[0],
+                         start_index[1]:stop_index[1]:step_size[1],
+                         start_index[2]:stop_index[2]:step_size[2]].reshape(3, -1).T,
+                overflow)
+
+
+
+
+
+
