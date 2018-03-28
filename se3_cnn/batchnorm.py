@@ -1,23 +1,32 @@
 # pylint: disable=C,R,E1101
 import torch
+import torch.nn as nn
 
 
-class SE3BatchNorm(torch.nn.Module):
-    def __init__(self, Rs, eps=1e-5, momentum=0.1, mode='normal'):
+class SE3BatchNorm(nn.Module):
+    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True):
         '''
         :param Rs: list of tuple (multiplicity, dimension)
         '''
         super().__init__()
 
         self.Rs = [(m, d) for m, d in Rs if m * d > 0]
-        self.num_features = sum([m for m, d in Rs])
-
         self.eps = eps
         self.momentum = momentum
-        self.mode = mode
-        self.register_buffer('running_var', torch.ones(self.num_features))
-        self.weight = torch.nn.Parameter(torch.ones(self.num_features))
-        self.reset_parameters()
+        self.affine = affine
+
+        num_scalar = sum(m for m, d in Rs if d == 1)
+        num_features = sum(m for m, d in Rs)
+
+        self.register_buffer('running_mean', torch.zeros(num_scalar))
+        self.register_buffer('running_var', torch.ones(num_features))
+
+        if affine:
+            self.weight = nn.Parameter(torch.ones(num_features))
+            self.bias = nn.Parameter(torch.zeros(num_scalar))
+        else:
+            self.register_parameter('weight', None)
+            self.register_parameter('bias', None)
 
     def __repr__(self):
         return "{} (Rs={}, eps={}, momentum={}, mode={})".format(
@@ -27,76 +36,72 @@ class SE3BatchNorm(torch.nn.Module):
             self.momentum,
             self.mode)
 
-    def reset_parameters(self):
-        self.running_var.fill_(1)
-
-    def update_statistics(self, x, divisor=None):
+    def forward(self, input):  # pylint: disable=W
         '''
-        update self.running_var using x
-
-        :param x: Tensor [batch, feature, x, y, z]
-        :param divisor: Tensor same size as self.running_var
-
-        divisor is needed by SE3ConvolutionBN
+        :param input: [batch, stacked feature, x, y, z]
         '''
-        if self.training and self.momentum > 0:
-            begin1 = 0
-            begin2 = 0
-            for m, d in self.Rs:
-                y = x[:, begin1: begin1 + m * d]  # [batch, feature * repr, x, y, z]
-                begin1 += m * d
-                y = y.contiguous().view(x.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
 
-                y = torch.sum(y ** 2, dim=2)  # [batch, feature, x * y * z]
-
-                if divisor is not None:
-                    y = y / (divisor[begin2: begin2 + m] ** 2 + self.eps).view(1, -1, 1)  # [batch, feature, x * y * z]
-
-                if self.mode == 'normal':
-                    y = y.mean(-1).mean(0)  # [feature]
-                elif self.mode == 'ignore_zeros':
-                    mask = torch.abs(y) > self.eps  # [batch, feature, x * y * z]
-                    number = mask.sum(-1).sum(0)  # [feature]
-                    y = y.sum(-1).sum(0)  # [feature]
-                    y = y / (number.float() + self.eps)
-                elif self.mode == 'maximum':
-                    y = y.max(-1)[0].mean(0)  # [feature]
-                else:
-                    raise ValueError("no mode named \"{}\"".format(self.mode))
-
-                self.running_var[begin2: begin2 + m] = (1 - self.momentum) * self.running_var[begin2: begin2 + m] + self.momentum * y
-                begin2 += m
-
-    def forward(self, x):  # pylint: disable=W
-        '''
-        :param x: [batch, feature, x, y, z]
-        '''
-        self.update_statistics(x.data)
-
-        ys = []
-        begin1 = 0
-        begin2 = 0
+        fields = []
+        ix = 0
+        irm = 0
+        irv = 0
+        iw = 0
+        ib = 0
         for m, d in self.Rs:
-            y = x[:, begin1: begin1 + m * d]
-            begin1 += m * d
-            y = y.contiguous().view(x.size(0), m, d, *x.size()[2:])  # [batch, feature, repr, x, y, z]
+            field = input[:, ix: ix + m * d]  # [batch, feature * repr, x, y, z]
+            ix += m * d
+            field = field.contiguous().view(input.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
 
-            factor = 1 / (self.running_var[begin2: begin2 + m] + self.eps) ** 0.5
-            weight = self.weight[begin2: begin2 + m]
+            if d == 1:  # scalars
+                if self.training:
+                    field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
+                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.data
+                    irm += m
+                else:
+                    field_mean = torch.autograd.Variable(self.running_mean)
+                field = field - field_mean.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
 
-            begin2 += m
+            if self.training:
+                field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
+                field_norm = field_norm.mean(0).mean(-1)  # [feature]
+                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.data
+                irv += m
+            else:
+                field_norm = torch.autograd.Variable(self.running_var)
 
-            y = y * (torch.autograd.Variable(factor) * weight).view(1, -1, 1, 1, 1, 1)
-            ys.append(y.view(x.size(0), m * d, *x.size()[2:]))
+            field_norm = (field_norm + self.eps).pow(-0.5).view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
 
-        y = torch.cat(ys, dim=1)
-        return y
+            if self.affine:
+                weight = self.weight[iw: iw + m]  # [feature]
+                iw += m
+                field_norm = field_norm * weight.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+
+            field = field * field_norm  # [batch, feature, repr, x * y * z]
+
+            if self.affine and d == 1:  # scalars
+                bias = self.bias[ib: ib + m]  # [feature]
+                ib += m
+                field = field + bias.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+
+            fields.append(field.view(input.size(0), m * d, *input.size()[2:]))
+
+        assert ix == input.size(1)
+        if self.training:
+            assert irm == self.running_mean.size(0)
+            assert irv == self.running_var.size(0)
+        if self.affine:
+            assert iw == self.weight.size(0)
+            assert ib == self.bias.size(0)
+
+        return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
 
 def test_batchnorm():
     bn = SE3BatchNorm([(3, 1), (4, 3), (1, 5)])
+    bn.bias.data[0] = 42
+    bn.weight.data[1] = 32
 
-    x = torch.autograd.Variable(torch.randn(16, 3 + 12 + 5, 10, 10, 10))
+    x = torch.autograd.Variable(torch.randn(16, 3 + 12 + 5, 10, 10, 10) * 3 + 12)
 
     y = bn(x)
     return y
