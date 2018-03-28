@@ -29,12 +29,11 @@ class SE3BatchNorm(nn.Module):
             self.register_parameter('bias', None)
 
     def __repr__(self):
-        return "{} (Rs={}, eps={}, momentum={}, mode={})".format(
+        return "{} (Rs={}, eps={}, momentum={})".format(
             self.__class__.__name__,
             self.Rs,
             self.eps,
-            self.momentum,
-            self.mode)
+            self.momentum)
 
     def forward(self, input):  # pylint: disable=W
         '''
