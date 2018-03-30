@@ -55,18 +55,18 @@ class SE3BatchNorm(nn.Module):
                 if self.training:
                     field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
                     self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.data
-                    irm += m
                 else:
-                    field_mean = torch.autograd.Variable(self.running_mean)
+                    field_mean = torch.autograd.Variable(self.running_mean[irm: irm + m])
+                irm += m
                 field = field - field_mean.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
 
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
                 field_norm = field_norm.mean(0).mean(-1)  # [feature]
                 self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.data
-                irv += m
             else:
-                field_norm = torch.autograd.Variable(self.running_var)
+                field_norm = torch.autograd.Variable(self.running_var[irv: irv + m])
+            irv += m
 
             field_norm = (field_norm + self.eps).pow(-0.5).view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
 
@@ -102,5 +102,10 @@ def test_batchnorm():
 
     x = torch.autograd.Variable(torch.randn(16, 3 + 12 + 5, 10, 10, 10) * 3 + 12)
 
+    bn.train()
     y = bn(x)
-    return y
+
+    bn.eval()
+    z = bn(x)
+
+    return y, z
