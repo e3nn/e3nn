@@ -232,7 +232,8 @@ def main(args):
     if args.mode == 'train':
         train_set = MRISegmentation(args.data_filename,
                                     patch_shape=args.patch_size,
-                                    filter=train_filter)
+                                    filter=train_filter,
+                                    log10_signal=args.log10_signal)
         train_loader = torch.utils.data.DataLoader(train_set,
                                                    batch_size=args.batch_size,
                                                    shuffle=True,
@@ -245,7 +246,8 @@ def main(args):
     if args.mode in ['train', 'validate']:
         validation_set = MRISegmentation(args.data_filename,
                                          patch_shape=args.patch_size,
-                                         filter=validation_filter)
+                                         filter=validation_filter,
+                                         log10_signal=args.log10_signal)
         validation_loader = torch.utils.data.DataLoader(validation_set,
                                                         batch_size=args.batch_size,
                                                         shuffle=False,
@@ -256,7 +258,8 @@ def main(args):
     if args.mode == 'test':
         test_set = MRISegmentation(args.data_filename,
                                    patch_shape=args.patch_size,
-                                   filter=test_filter)
+                                   filter=test_filter,
+                                   log10_signal=args.log10_signal)
         test_loader = torch.utils.data.DataLoader(test_set,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
@@ -371,6 +374,8 @@ if __name__ == '__main__':
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=2, type=int,
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
+    parser.add_argument("--log10_signal", action="store_true", default=False,
+                        help="Whether to logarithmize the MIR scan signal (default: %(default)s)")
 
     args = parser.parse_args()
 
