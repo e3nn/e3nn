@@ -38,14 +38,12 @@ class MRISegmentation(torch.utils.data.Dataset):
         with h5py.File(h5_filename, 'r') as hf:
             for name in filter:
                 data = hf[name][:]
-
-
-                # import ipdb; ipdb.set_trace()
-
-
                 # Assumption: voxel value and pixel are stored in last dim
-                self.data.append(data[:,:,:,0].squeeze())
-                self.labels.append(data[:,:,:,1].squeeze())
+                signal_volume = data[:,:,:,0].squeeze()
+                label_volume  = data[:,:,:,1].squeeze()
+                signal_volume, label_volume = self._crop_background(signal_volume, label_volume)
+                self.data.append(signal_volume)
+                self.labels.append(label_volume)
                 self.unpadded_data_shape.append(self.data[-1].shape)
                 self.padding_boundary.append(None)
         print("done.")
@@ -72,6 +70,33 @@ class MRISegmentation(torch.utils.data.Dataset):
             signal_min = min([np.min(data_i for data_i in self.data)])
             for i in range(len(self.data)):
                 self.data[i] = np.log10(self.data[i] + signal_min + 1) # add 1 to prevent -inf from the log
+
+
+    def _crop_background(self, signal_volume, label_volume, signal_bg=0, verbose=True):
+        """Crop out the cube in the signal and label volume in which the signal is non-zero"""
+        bg_mask = signal_volume == signal_bg
+        # the following DOES NOT work since there is skull/skin signal labeled as background
+        # bg_mask = label_volume == bg_label
+        # generate 1d arrays over axes which are false iff only bg is found in the corresponding slice
+        only_bg_x = 1-np.all(bg_mask, axis=(1,2))
+        only_bg_y = 1-np.all(bg_mask, axis=(0,2))
+        only_bg_z = 1-np.all(bg_mask, axis=(0,1))
+        # get start and stop index of non bg mri volume
+        x_start = np.argmax(only_bg_x)
+        x_stop  = np.argmax(1 - only_bg_x[x_start:]) + x_start
+        y_start = np.argmax(only_bg_y)
+        y_stop  = np.argmax(1 - only_bg_y[y_start:]) + y_start
+        z_start = np.argmax(only_bg_z)
+        z_stop  = np.argmax(1 - only_bg_z[z_start:]) + z_start
+        if verbose:
+            print('cropped x ({} - {}), of len {} ({}%)'.format(x_start, x_stop, len(only_bg_x), 100*(x_stop-x_start)/len(only_bg_x)))
+            print('cropped y ({} - {}), of len {} ({}%)'.format(y_start, y_stop, len(only_bg_y), 100*(y_stop-y_start)/len(only_bg_y)))
+            print('cropped z ({} - {}), of len {} ({}%)'.format(z_start, z_stop, len(only_bg_z), 100*(z_stop-z_start)/len(only_bg_z)))
+            print('volume fraction left = {}%'.format(100*(x_stop-x_start)*(y_stop-y_start)*(z_stop-z_start)/np.prod(signal_volume.shape)))
+        # crop out non bg signal
+        signal_volume = signal_volume[x_start:x_stop, y_start:y_stop, z_start:z_stop]
+        label_volume  = label_volume[ x_start:x_stop, y_start:y_stop, z_start:z_stop]
+        return signal_volume, label_volume
 
 
     def initialize_patch_indices(self):
