@@ -74,18 +74,33 @@ class Model(nn.Module):
         return out
 
 
-def dice_coefficient_orig_binary(y_pred, y_true, epsilon=1e-5):
+def dice_coefficient_orig_binary(y_pred, y_true, y_pred_is_dist=False,
+                                 classes=None, epsilon=1e-5, reduce=True):
     """As originally specified: using binary vectors and an explicit average
-       over classes """
+       over classes. If y_pred_is_dist is false, the classes variable must specify the
+       number of classes"""
 
-    y_pred = nn.Softmax(dim=1)(y_pred)
+    if y_pred_is_dist:
+        y_pred = torch.max(nn.Softmax(dim=1)(y_pred), dim=1)[1]
+
+    if classes is None:
+        classes = y_pred.size(1)
 
     dice_coeff = 0
-    for i in range(y_pred.size(1)):
+    if torch.cuda.is_available():
+        intersection = torch.cuda.FloatTensor(y_pred.size(0), classes).fill_(0)
+        union = torch.cuda.FloatTensor(y_pred.size(0), classes).fill_(0)
+    else:
+        intersection = torch.zeros(y_pred.size(0), classes)
+        union = torch.zeros(y_pred.size(0), classes)
+    if isinstance(y_pred, torch.autograd.Variable):
+        intersection = torch.autograd.Variable(intersection)
+        union = torch.autograd.Variable(union)
+    for i in range(classes):
 
         # Convert to binary values
-        y_pred_b = torch.max(y_pred, dim=1)[1] == i
-        y_true_b = y_true == i
+        y_pred_b = (y_pred == i)
+        y_true_b = (y_true == i)
 
         y_pred_f = y_pred_b.contiguous().view(y_pred.size(0), -1).float()
         y_true_f = y_true_b.contiguous().view(y_true.size(0), -1).float()
@@ -94,93 +109,206 @@ def dice_coefficient_orig_binary(y_pred, y_true, epsilon=1e-5):
         s2 = y_pred_f
 
         # Calculate dice score
+        intersection[:,i] = 2. * torch.sum(s1 * s2, dim=1)
+        union[:,i] = torch.sum(s1, dim=1) + torch.sum(s2, dim=1)
         dice_coeff += (2. * torch.sum(s1 * s2, dim=1)) / \
                       (epsilon + torch.sum(s1, dim=1) + torch.sum(s2, dim=1))
 
-    dice_coeff /= float(y_pred.size(1))
-
-    return dice_coeff.mean()
-
-
-def dice_coefficient_orig(y_pred, y_true, epsilon=1e-5):
-    """Original version but multiplying probs instead of 0-1 variables"""
-
-    y_pred = nn.Softmax(dim=1)(y_pred)
-
-    dice_coeff = 0
-    for i in range(y_pred.size(1)):
-
-        y_pred_b = y_pred[:,i,:,:,:]
-        y_true_b = y_true == i
-
-        y_pred_f = y_pred_b.contiguous().view(y_pred.size(0), -1)
-        y_true_f = y_true_b.contiguous().view(y_true.size(0), -1).float()
-
-        s1 = y_true_f
-        s2 = y_pred_f
-
-        dice_coeff += (2. * torch.sum(s1 * s2, dim=1)) / \
-                      (epsilon + torch.sum(s1, dim=1) + torch.sum(s2, dim=1))
-
-    dice_coeff /= float(y_pred.size(1))
-
-    return dice_coeff.mean()
+    if reduce:
+        return torch.mean(torch.sum(intersection, dim=0) /
+                          (epsilon+torch.sum(union, dim=0)))
+    else:
+        return intersection, union
 
 
-def dice_coefficient_onehot(y_pred, y_true, epsilon=1e-5):
-    """Reimplementation with matrix operations - with onehot encoding
-       of y_true"""
+# def dice_coefficient_orig(y_pred, y_true, epsilon=1e-5):
+#     """Original version but multiplying probs instead of 0-1 variables"""
+#
+#     y_pred = nn.Softmax(dim=1)(y_pred)
+#
+#     dice_coeff = 0
+#     for i in range(y_pred.size(1)):
+#
+#         y_pred_b = y_pred[:,i,:,:,:]
+#         y_true_b = y_true == i
+#
+#         y_pred_f = y_pred_b.contiguous().view(y_pred.size(0), -1)
+#         y_true_f = y_true_b.contiguous().view(y_true.size(0), -1).float()
+#
+#         s1 = y_true_f
+#         s2 = y_pred_f
+#
+#         dice_coeff += (2. * torch.sum(s1 * s2, dim=1)) / \
+#                       (epsilon + torch.sum(s1, dim=1) + torch.sum(s2, dim=1))
+#
+#     dice_coeff /= float(y_pred.size(1))
+#
+#     return dice_coeff.mean()
 
-    y_pred = nn.Softmax(dim=1)(y_pred)
 
-    y_pred_f = y_pred.view(y_pred.size(0), y_pred.size(1), -1)
-    y_true_f = y_true.view(y_true.size(0), y_true.size(1), -1)
+# def dice_coefficient_onehot(y_pred, y_true, epsilon=1e-5, reduce=True):
+#     """Reimplementation with matrix operations - with onehot encoding
+#        of y_true"""
+#
+#     y_pred = nn.Softmax(dim=1)(y_pred)
+#
+#     y_pred_f = y_pred.view(y_pred.size(0), y_pred.size(1), -1)
+#     y_true_f = y_true.view(y_true.size(0), y_true.size(1), -1)
+#
+#     intersection = torch.sum(y_true_f * y_pred_f, dim=2)
+#     coeff = 2./y_pred.shape[1] * torch.sum(
+#         intersection / (epsilon +
+#                         torch.sum(y_true_f, dim=2) +
+#                         torch.sum(y_pred_f, dim=2)),
+#         dim=1)
+#     return coeff.mean()
 
-    intersection = torch.sum(y_true_f * y_pred_f, dim=2)
-    coeff = 2./y_pred.shape[1] * torch.sum(
-        intersection / (epsilon +
-                        torch.sum(y_true_f, dim=2) +
-                        torch.sum(y_pred_f, dim=2)),
-        dim=1)
-    return coeff.mean()
 
-
-def dice_coefficient(y_pred, y_true, epsilon=1e-5):
+def dice_coefficient(y_pred, y_true, valid=None, reduce=True, epsilon=1e-5):
     """Reimplementation with matrix operations - directly on y_true class
        labels"""
 
     y_pred = nn.Softmax(dim=1)(y_pred)
 
-    y_pred_f = y_pred.view(y_pred.size(0), y_pred.size(1), -1)
-    y_true_f = y_true.view(y_true.size(0), -1)
+    mask = None
+    if valid is not None:
+        mask = get_mask((y_true.size(0), y_true.size(-3), y_true.size(-2), y_true.size(-1)), valid)
 
     all_classes = torch.autograd.Variable(
-        torch.LongTensor(np.arange(y_pred_f.size(1))))
+        torch.LongTensor(np.arange(y_pred.size(1))))
     if torch.cuda.is_available():
         all_classes = all_classes.cuda()
-    coefs = []
+    intersections = []
+    unions = []
     for i in range(y_pred.shape[0]):
-        # Dynamically create one-hot encoding
-        # TODO: is this more memory efficient?
-        class_at_voxel = (all_classes.view(-1, 1) == y_true_f[i]).float()
-        intersection = torch.sum(class_at_voxel * y_pred_f[i],
-                                 dim=1)
-        coefs.append(2./y_pred.shape[1] * torch.sum(
-            intersection / (epsilon +
-                            torch.sum(class_at_voxel, dim=1) +
-                            torch.sum(y_pred_f[i], dim=1)),
-            dim=0))
 
-    return torch.cat(coefs).mean()
+        if mask is not None:
+            y_pred_f = y_pred[i][mask[i]].view(y_pred.size(1), -1)
+            y_true_f = y_true[i][mask[i]].view(-1)
+        else:
+            y_pred_f = y_pred[i].view(y_pred.size(1), -1)
+            y_true_f = y_true[i].view(-1)
+
+        if len(y_true_f.shape) > 0:
+            # Dynamically create one-hot encoding
+            class_at_voxel = (all_classes.view(-1, 1) == y_true_f).float()
+            intersection = torch.sum(class_at_voxel * y_pred_f,
+                                     dim=1)
+            intersections.append(2*intersection)
+            unions.append(torch.sum(class_at_voxel, dim=1) +
+                          torch.sum(y_pred_f, dim=1))
+
+    if len(intersections) > 0:
+        intersections = torch.stack(intersections)
+        unions = torch.stack(unions)
+
+    if reduce:
+        return (torch.mean(torch.sum(intersections, dim=0) /
+                           torch.sum(unions, dim=0)))
+    else:
+        return intersections, unions
 
 
-def cross_entropy_loss(y_pred, y_true):
+def dice_coefficient_loss(y_pred, y_true, valid=None, reduce=True, epsilon=1e-5):
+    if reduce:
+        return -dice_coefficient(y_pred, y_true, valid, reduce, epsilon)
+    else:
+        numerator, denominator = dice_coefficient(y_pred, y_true, valid, reduce, epsilon)
+        return -numerator, denominator
+
+
+def cross_entropy_loss(y_pred, y_true, valid=None, reduce=True):
 
     # Reshape into 2D image, which pytorch can handle
     y_true_f = y_true.view(y_true.size(0), y_true.size(2), -1)
     y_pred_f = y_pred.view(y_pred.size(0), y_pred.size(1), y_pred.size(2), -1)
 
-    return torch.nn.functional.cross_entropy(y_pred_f, y_true_f)
+    loss_per_voxel = torch.nn.functional.cross_entropy(
+        y_pred_f, y_true_f, reduce=False).view(y_true.shape).squeeze()
+
+    if valid is not None:
+        mask = get_mask(loss_per_voxel.shape, valid)
+
+        if reduce:
+            return loss_per_voxel[mask].mean()
+        else:
+            loss_per_voxel_sums = []
+            loss_per_voxel_norm_consts = []
+            for i in range(y_pred.shape[0]):
+                loss_per_voxel_masked = loss_per_voxel[i][mask[i]]
+                if len(loss_per_voxel_masked.shape) > 0:
+                    loss_per_voxel_sums.append(torch.sum(loss_per_voxel_masked))
+                    loss_per_voxel_norm_consts.append(torch.LongTensor([loss_per_voxel_masked.shape[0]]))
+            return (torch.cat(loss_per_voxel_sums),
+                    torch.cat(loss_per_voxel_norm_consts))
+    else:
+        if reduce:
+            return loss_per_voxel.view(-1).mean()
+        else:
+            return (torch.sum(loss_per_voxel, dim=1),
+                    torch.LongTensor([loss_per_voxel.size(0)]).repeat(loss_per_voxel.shape[0]))
+
+
+def get_mask(image_shape, index):
+    if torch.cuda.is_available():
+        mask = torch.cuda.ByteTensor(*image_shape).fill_(0)
+    else:
+        mask = torch.zeros(image_shape).byte()
+
+    for i in range(index.shape[0]):
+        if ((index[i, 1, :] - index[i, 0, :]) > 0).all():
+            mask[i,
+                 index[i, 0, 0]:index[i, 1, 0],
+                 index[i, 0, 1]:index[i, 1, 1],
+                 index[i, 0, 2]:index[i, 1, 2]] = 1
+    return mask
+
+
+def infer(model, loader, loss_function):
+    model.eval()
+    losses_numerator = []
+    losses_denominator = []
+    out_images = []
+    for i in range(len(loader.dataset.unpadded_data_shape)):
+        out_images.append(np.full(loader.dataset.unpadded_data_shape[i], -1))
+    for i, (data, target, img_index, patch_index, valid) in enumerate(loader):
+        if torch.cuda.is_available():
+            data, target = data.cuda(), target.cuda()
+        x = torch.autograd.Variable(data)
+        y = torch.autograd.Variable(target)
+        out = model(x)
+
+        _, out_predict = torch.max(out, 1)
+        mask = get_mask(out_predict.shape, valid)
+        patch_index = patch_index.cpu().numpy()
+        for j in range(out.size(0)):
+            out_predict_masked = out_predict[j][mask[j]]
+            patch_start = patch_index[j,0] + valid[j,0]
+            patch_end = patch_start + (valid[j,1]-valid[j,0])
+            if (patch_end-patch_start > 0).all():
+                out_images[img_index[j]][patch_start[0]:patch_end[0],
+                                         patch_start[1]:patch_end[1],
+                                         patch_start[2]:patch_end[2]] = out_predict_masked.view((valid[j,1] - valid[j,0]).tolist()).data.cpu().numpy()
+
+        numerator, denominator = loss_function(out, y, valid=valid, reduce=False)
+        try:
+            numerator = numerator.data
+            denominator = denominator.data
+        except:
+            pass
+        losses_numerator.append(numerator.cpu().numpy())
+        losses_denominator.append(denominator.cpu().numpy())
+
+        # print(np.mean(np.sum(losses_numerator[-1], axis=0)/np.sum(losses_denominator[-1], axis=0)), loss_function(out, y, valid).data.cpu().numpy())
+
+    # Check that entire image was filled in
+    for out_image in out_images:
+        assert not (out_image == -1).any()
+
+    losses_numerator = np.concatenate(losses_numerator)
+    losses_denominator = np.concatenate(losses_denominator)
+    loss = np.mean(np.sum(losses_numerator, axis=0) / np.sum(losses_denominator, axis=0))
+    return out_images, loss
 
 
 def main(args):
@@ -245,7 +373,8 @@ def main(args):
     if args.mode in ['train', 'validate']:
         validation_set = MRISegmentation(args.data_filename,
                                          patch_shape=args.patch_size,
-                                         filter=validation_filter)
+                                         filter=validation_filter,
+                                         randomize_patch_offsets=False)
         validation_loader = torch.utils.data.DataLoader(validation_set,
                                                         batch_size=args.batch_size,
                                                         shuffle=False,
@@ -256,7 +385,8 @@ def main(args):
     if args.mode == 'test':
         test_set = MRISegmentation(args.data_filename,
                                    patch_shape=args.patch_size,
-                                   filter=test_filter)
+                                   filter=test_filter,
+                                   randomize_patch_offsets=False)
         test_loader = torch.utils.data.DataLoader(test_set,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
@@ -277,15 +407,7 @@ def main(args):
 
     loss_function = None
     if args.loss == "dice":
-        loss_function = lambda *x: -dice_coefficient(*x)
-    elif args.loss == "dice_onehot":
-        loss_function = lambda *x: -dice_coefficient_onehot(*x)
-        target_onehot = torch.FloatTensor(
-            args.batch_size, output_size,
-            args.patch_size, args.patch_size, args.patch_size)
-        if torch.cuda.is_available():
-            target_onehot = target_onehot.cuda()
-        y_onehot = torch.autograd.Variable(target_onehot)
+        loss_function = dice_coefficient_loss
     elif args.loss == "cross_entropy":
         loss_function = cross_entropy_loss
 
@@ -294,7 +416,7 @@ def main(args):
 
         for epoch in range(epoch_start_index, args.training_epochs):
 
-            for batch_idx, (data, target) in enumerate(train_loader):
+            for batch_idx, (data, target, img_index, patch_index, valid) in enumerate(train_loader):
 
                 model.train()
                 if torch.cuda.is_available():
@@ -310,39 +432,51 @@ def main(args):
                 #       dice_coefficient_orig(out, y).data.cpu().numpy())
                 # print("dice original impl - binary: ",
                 #       dice_coefficient_orig_binary(out, y).data.cpu().numpy())
-                # target_onehot = torch.FloatTensor(
-                #     target.size(0), output_size,
-                #     target.size(-3), target.size(-2), target.size(-1))
-                # target_onehot.zero_()
-                # target_onehot.scatter_(1, target.cpu(), 1)
-                # y_onehot = torch.autograd.Variable(target_onehot)
-                # if torch.cuda.is_available():
-                #     y_onehot = y_onehot.cuda()
-                # print("dice new impl - with one hot: ",
-                #       dice_coefficient_onehot(out, y_onehot).data.cpu().numpy())
                 # print("dice new impl - on class label: ",
                 #       dice_coefficient(out, y).data.cpu().numpy())
 
                 time_start = time.perf_counter()
-                if args.loss == "dice_onehot":
-                    target_onehot.zero_()
-                    target_onehot.scatter_(1, target, 1)
-                    loss = loss_function(out, y_onehot)
-                else:
-                    loss = loss_function(out, y)
+                loss = loss_function(out, y)
 
                 loss.backward()
                 optimizer.step()
 
-                if args.loss == "cross_entropy":
-                    acc = dice_coefficient(out, y).data[0]
-                else:
-                    acc = -loss.data[0]
+                binary_dice_acc = dice_coefficient_orig_binary(out, y, y_pred_is_dist=True).data[0]
 
                 print("[{}:{}/{}] loss={:.4} acc={:.4} time={:.2}".format(
                     epoch, batch_idx, len(train_loader),
-                    float(loss.data[0]), acc,
+                    float(loss.data[0]), binary_dice_acc,
                     time.perf_counter() - time_start))
+
+            validation_ys, validation_loss = infer(model,
+                                                   validation_loader,
+                                                   loss_function)
+
+            # Calculate binary dice score on predicted images
+            numerators = []
+            denominators = []
+            for i in range(len(validation_set.data)):
+                y_true = torch.LongTensor(validation_set.get_original(i))
+                y_pred = torch.LongTensor(validation_ys[i])
+                if torch.cuda.is_available():
+                    y_true = y_true.cuda()
+                    y_pred = y_pred.cuda()
+                numerator, denominator = dice_coefficient_orig_binary(
+                    y_pred.unsqueeze(0),
+                    y_true.unsqueeze(0),
+                    classes=output_size,
+                    reduce=False)
+                numerators.append(numerator)
+                denominators.append(denominator)
+            numerators = torch.cat(numerators)
+            denominators = torch.cat(denominators)
+            validation_binary_dice_acc = torch.mean(
+                torch.sum(numerators, dim=0) /
+                (torch.sum(denominators, dim=0)))
+
+            print('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+                epoch, len(train_loader)-1, len(train_loader),
+                validation_loss, validation_binary_dice_acc))
 
             # Adjust patch indices at end of each epoch
             train_set.initialize_patch_indices()
