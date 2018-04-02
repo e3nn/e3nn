@@ -14,7 +14,8 @@ class MRISegmentation(torch.utils.data.Dataset):
     def __init__(self, h5_filename, filter, patch_shape,
                  randomize_patch_offsets=True,
                  pad_mode='constant',
-                 pad_constant=1):
+                 pad_constant=0,
+                 log10_signal=False):
 
         if isinstance(patch_shape, numbers.Integral):
             patch_shape = np.repeat(patch_shape, 3)
@@ -22,6 +23,7 @@ class MRISegmentation(torch.utils.data.Dataset):
         self.randomize_patch_offsets = randomize_patch_offsets
         self.pad_mode = pad_mode
         self.pad_constant = pad_constant
+        self.log10_signal = log10_signal
 
         self.data = []
         self.labels = []
@@ -36,8 +38,11 @@ class MRISegmentation(torch.utils.data.Dataset):
             for name in filter:
                 data = hf[name][:]
                 # Assumption: voxel value and pixel are stored in last dim
-                self.data.append(data[:,:,:,0].squeeze())
-                self.labels.append(data[:,:,:,1].squeeze())
+                signal_volume = data[:,:,:,0].squeeze()
+                label_volume  = data[:,:,:,1].squeeze()
+                signal_volume, label_volume = self._crop_background(signal_volume, label_volume)
+                self.data.append(signal_volume)
+                self.labels.append(label_volume)
                 self.unpadded_data_shape.append(self.data[-1].shape)
                 self.padding_boundary.append(None)
         print("done.")
@@ -59,6 +64,39 @@ class MRISegmentation(torch.utils.data.Dataset):
                                     mode=self.pad_mode,
                                     constant_values=self.pad_constant)
         print("done.")
+        # optionally logarithmize zero shifted input signal
+        if self.log10_signal:
+            signal_min = min([np.min(data_i for data_i in self.data)])
+            for i in range(len(self.data)):
+                self.data[i] = np.log10(self.data[i] + signal_min + 1) # add 1 to prevent -inf from the log
+
+
+    def _crop_background(self, signal_volume, label_volume, signal_bg=0, verbose=True):
+        """Crop out the cube in the signal and label volume in which the signal is non-zero"""
+        bg_mask = signal_volume == signal_bg
+        # the following DOES NOT work since there is skull/skin signal labeled as background
+        # bg_mask = label_volume == bg_label
+        # generate 1d arrays over axes which are false iff only bg is found in the corresponding slice
+        only_bg_x = 1-np.all(bg_mask, axis=(1,2))
+        only_bg_y = 1-np.all(bg_mask, axis=(0,2))
+        only_bg_z = 1-np.all(bg_mask, axis=(0,1))
+        # get start and stop index of non bg mri volume
+        x_start = np.argmax(only_bg_x)
+        x_stop  = np.argmax(1 - only_bg_x[x_start:]) + x_start
+        y_start = np.argmax(only_bg_y)
+        y_stop  = np.argmax(1 - only_bg_y[y_start:]) + y_start
+        z_start = np.argmax(only_bg_z)
+        z_stop  = np.argmax(1 - only_bg_z[z_start:]) + z_start
+        if verbose:
+            print('cropped x ({} - {}), of len {} ({}%)'.format(x_start, x_stop, len(only_bg_x), 100*(x_stop-x_start)/len(only_bg_x)))
+            print('cropped y ({} - {}), of len {} ({}%)'.format(y_start, y_stop, len(only_bg_y), 100*(y_stop-y_start)/len(only_bg_y)))
+            print('cropped z ({} - {}), of len {} ({}%)'.format(z_start, z_stop, len(only_bg_z), 100*(z_stop-z_start)/len(only_bg_z)))
+            print('volume fraction left = {}%'.format(100*(x_stop-x_start)*(y_stop-y_start)*(z_stop-z_start)/np.prod(signal_volume.shape)))
+        # crop out non bg signal
+        signal_volume = signal_volume[x_start:x_stop, y_start:y_stop, z_start:z_stop]
+        label_volume  = label_volume[ x_start:x_stop, y_start:y_stop, z_start:z_stop]
+        return signal_volume, label_volume
+
 
     def get_original(self, dataset_index):
         """Get full input image at specified index"""
@@ -109,24 +147,8 @@ class MRISegmentation(torch.utils.data.Dataset):
         patch_valid = np.stack(patch_index).clip(
             min=0, max=self.unpadded_data_shape[dataset_index]) - patch_index[0]
 
-        # patch_padding_begin = -((patch_index_start < 0) * patch_index_start)
-        # end_from_image_end = (patch_index_end -
-        #                       self.unpadded_data_shape[dataset_index])
-        # patch_padding_end = (end_from_image_end > 0) * end_from_image_end
-        # patch_padding = np.stack((patch_padding_begin, patch_padding_end),
-        #                          axis=1)
-
-        # print("patch_index: ", patch_index_start, patch_index_end)
-
         # Update patch indices to padded image
-        # patch_index_start += self.padding_boundary[dataset_index][:,0]
-        # patch_index_end += self.padding_boundary[dataset_index][:,0]
         patch_index_padded = patch_index + self.padding_boundary[dataset_index][:,0]
-        # patch_index_valid += self.padding_boundary[dataset_index][:,0]
-
-        # print("patch_index2: ", patch_index_padded)
-        # print("patch_padding: ", patch_padding)
-        # print("patch valid: ", patch_valid)
 
         # Lookup image and add channel dimension
         image_patch = np.expand_dims(
