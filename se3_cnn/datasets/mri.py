@@ -5,7 +5,6 @@ import numpy as np
 import numbers
 import sys
 
-
 class MRISegmentation(torch.utils.data.Dataset):
     """Read 3D medical image files in .nii format, and provide it to the
        user as 3D patches of the requested size. Setting
@@ -15,7 +14,7 @@ class MRISegmentation(torch.utils.data.Dataset):
     def __init__(self, h5_filename, filter, patch_shape,
                  randomize_patch_offsets=True,
                  pad_mode='constant',
-                 pad_constant=0):
+                 pad_constant=1):
 
         if isinstance(patch_shape, numbers.Integral):
             patch_shape = np.repeat(patch_shape, 3)
@@ -61,6 +60,16 @@ class MRISegmentation(torch.utils.data.Dataset):
                                     constant_values=self.pad_constant)
         print("done.")
 
+    def get_original(self, dataset_index):
+        """Get full input image at specified index"""
+        size = self.unpadded_data_shape[dataset_index]
+        patch_index_start = self.padding_boundary[dataset_index][:,0]
+        patch_index_end = patch_index_start + size
+        patch_index = np.stack((patch_index_start, patch_index_end))
+        return self.data[dataset_index][patch_index[0, 0]:patch_index[1, 0],
+                                        patch_index[0, 1]:patch_index[1, 1],
+                                        patch_index[0, 2]:patch_index[1, 2]]
+
     def initialize_patch_indices(self):
         """For each image, calculate the indices for each patch, possibly
            shifted by a random offset"""
@@ -96,27 +105,48 @@ class MRISegmentation(torch.utils.data.Dataset):
                                      dtype=np.int16)
         patch_index_end = patch_index_start + self.patch_shape
 
+        patch_index = np.stack((patch_index_start, patch_index_end))
+        patch_valid = np.stack(patch_index).clip(
+            min=0, max=self.unpadded_data_shape[dataset_index]) - patch_index[0]
+
+        # patch_padding_begin = -((patch_index_start < 0) * patch_index_start)
+        # end_from_image_end = (patch_index_end -
+        #                       self.unpadded_data_shape[dataset_index])
+        # patch_padding_end = (end_from_image_end > 0) * end_from_image_end
+        # patch_padding = np.stack((patch_padding_begin, patch_padding_end),
+        #                          axis=1)
+
+        # print("patch_index: ", patch_index_start, patch_index_end)
+
         # Update patch indices to padded image
-        patch_index_start += self.padding_boundary[dataset_index][:,0]
-        patch_index_end += self.padding_boundary[dataset_index][:,0]
+        # patch_index_start += self.padding_boundary[dataset_index][:,0]
+        # patch_index_end += self.padding_boundary[dataset_index][:,0]
+        patch_index_padded = patch_index + self.padding_boundary[dataset_index][:,0]
+        # patch_index_valid += self.padding_boundary[dataset_index][:,0]
+
+        # print("patch_index2: ", patch_index_padded)
+        # print("patch_padding: ", patch_padding)
+        # print("patch valid: ", patch_valid)
 
         # Lookup image and add channel dimension
         image_patch = np.expand_dims(
-            image[patch_index_start[0]:patch_index_end[0],
-                  patch_index_start[1]:patch_index_end[1],
-                  patch_index_start[2]:patch_index_end[2]],
+            image[patch_index_padded[0, 0]:patch_index_padded[1, 0],
+                  patch_index_padded[0, 1]:patch_index_padded[1, 1],
+                  patch_index_padded[0, 2]:patch_index_padded[1, 2]],
             axis=0).astype(np.float32)
         labels_patch = np.expand_dims(
-            labels[patch_index_start[0]:patch_index_end[0],
-                   patch_index_start[1]:patch_index_end[1],
-                   patch_index_start[2]:patch_index_end[2]],
+            labels[patch_index_padded[0, 0]:patch_index_padded[1, 0],
+                   patch_index_padded[0, 1]:patch_index_padded[1, 1],
+                   patch_index_padded[0, 2]:patch_index_padded[1, 2]],
             axis=0)
+
+        # print("image: ", image_patch)
 
         # Check that patch has the correct size
         assert np.all(image_patch[0].shape == self.patch_shape)
         assert np.all(labels_patch[0].shape == self.patch_shape)
 
-        return image_patch, labels_patch
+        return image_patch, labels_patch, dataset_index, patch_index, patch_valid
 
     def __len__(self):
         return len(self.patch_indices)
