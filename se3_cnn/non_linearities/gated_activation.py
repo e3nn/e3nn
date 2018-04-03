@@ -1,6 +1,7 @@
 # pylint: disable=C,R,E1101
+from functools import partial
 import torch
-from se3_cnn import SE3BNConvolution, SE3ConvolutionBN
+from se3_cnn import SE3Convolution, SE3BNConvolution, SE3GNConvolution
 from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 
@@ -9,15 +10,14 @@ class GatedActivation(torch.nn.Module):
     def __init__(self,
                  repr_in, size, radial_window_dict,  # kernel params
                  activation=(None, None),  # nonlinearity
-                 batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):  # batch norm params
+                 normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param int size: the filters are cubes of dimension = size x size x size
         :param radial_window_dict: contains both radial window function and the keyword arguments for the radial window function
         :param activation: (scalar activation, gate activation) which are functions like torch.nn.functional.relu or None
-        :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
-        :param batch_norm_mode: the mode of the batch normalization
-        :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
+        :param str normalization: "batch", "group", "instance" or None
+        :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
         '''
         super().__init__()
 
@@ -38,15 +38,24 @@ class GatedActivation(torch.nn.Module):
 
         if gate_activation is not None and n_non_scalar > 0:
             assert size % 2 == 1, "This size needs to be odd such that the gates matches well with the non-scalar fields"
+
+            if normalization is None:
+                Convolution = SE3Convolution
+            if normalization is "batch":
+                Convolution = partial(SE3BNConvolution, momentum=batch_norm_momentum)
+            if normalization is "group":
+                Convolution = SE3GNConvolution
+            if normalization == "instance":
+                Convolution = partial(SE3GNConvolution, Rs_gn=[(1, 2 * n + 1) for n, mul in enumerate(repr_in) for _ in range(mul)])
+
             self.gates = torch.nn.Sequential(
-                (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
+                Convolution(
                     Rs_in=list(zip(repr_in, irreducible_repr)),
                     Rs_out=[(n_non_scalar, SO3.repr1)],
                     size=size,
                     radial_window_dict=radial_window_dict,
                     padding=size // 2,
-                    momentum=batch_norm_momentum,
-                    mode=batch_norm_mode),
+                ),
                 ScalarActivation([(n_non_scalar, gate_activation)])
             )
         else:
