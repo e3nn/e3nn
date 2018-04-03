@@ -40,11 +40,11 @@ class MRISegmentation(torch.utils.data.Dataset):
                 # Assumption: voxel value and pixel are stored in last dim
                 signal_volume = data[:,:,:,0].squeeze()
                 label_volume  = data[:,:,:,1].squeeze()
-                signal_volume, label_volume = self._crop_background(signal_volume, label_volume)
                 self.data.append(signal_volume)
                 self.labels.append(label_volume)
                 self.unpadded_data_shape.append(self.data[-1].shape)
                 self.padding_boundary.append(None)
+            self.class_count = hf['class_counts'][:]
         print("done.")
 
         # This first call to initialize_patch_indices will calculate the
@@ -62,40 +62,14 @@ class MRISegmentation(torch.utils.data.Dataset):
                                   constant_values=self.pad_constant)
             self.labels[i] = np.pad(self.labels[i], pad_width,
                                     mode=self.pad_mode,
-                                    constant_values=self.pad_constant)
+                                    constant_values=self.pad_constant).astype(np.int64)
         print("done.")
         # optionally logarithmize zero shifted input signal
         if self.log10_signal:
-            signal_min = min([np.min(data_i for data_i in self.data)])
+            print('logarithmize signal')
+            signal_min = min([np.min(data_i) for data_i in self.data])
             for i in range(len(self.data)):
                 self.data[i] = np.log10(self.data[i] + signal_min + 1) # add 1 to prevent -inf from the log
-
-
-    def _crop_background(self, signal_volume, label_volume, signal_bg=0, verbose=True):
-        """Crop out the cube in the signal and label volume in which the signal is non-zero"""
-        bg_mask = signal_volume == signal_bg
-        # the following DOES NOT work since there is skull/skin signal labeled as background
-        # bg_mask = label_volume == bg_label
-        # generate 1d arrays over axes which are false iff only bg is found in the corresponding slice
-        only_bg_x = 1-np.all(bg_mask, axis=(1,2))
-        only_bg_y = 1-np.all(bg_mask, axis=(0,2))
-        only_bg_z = 1-np.all(bg_mask, axis=(0,1))
-        # get start and stop index of non bg mri volume
-        x_start = np.argmax(only_bg_x)
-        x_stop  = np.argmax(1 - only_bg_x[x_start:]) + x_start
-        y_start = np.argmax(only_bg_y)
-        y_stop  = np.argmax(1 - only_bg_y[y_start:]) + y_start
-        z_start = np.argmax(only_bg_z)
-        z_stop  = np.argmax(1 - only_bg_z[z_start:]) + z_start
-        if verbose:
-            print('cropped x ({} - {}), of len {} ({}%)'.format(x_start, x_stop, len(only_bg_x), 100*(x_stop-x_start)/len(only_bg_x)))
-            print('cropped y ({} - {}), of len {} ({}%)'.format(y_start, y_stop, len(only_bg_y), 100*(y_stop-y_start)/len(only_bg_y)))
-            print('cropped z ({} - {}), of len {} ({}%)'.format(z_start, z_stop, len(only_bg_z), 100*(z_stop-z_start)/len(only_bg_z)))
-            print('volume fraction left = {}%'.format(100*(x_stop-x_start)*(y_stop-y_start)*(z_stop-z_start)/np.prod(signal_volume.shape)))
-        # crop out non bg signal
-        signal_volume = signal_volume[x_start:x_stop, y_start:y_stop, z_start:z_stop]
-        label_volume  = label_volume[ x_start:x_stop, y_start:y_stop, z_start:z_stop]
-        return signal_volume, label_volume
 
 
     def get_original(self, dataset_index):
@@ -127,6 +101,7 @@ class MRISegmentation(torch.utils.data.Dataset):
             if self.padding_boundary[i] is None:
                 pad_width = np.stack([overflow, overflow], axis=1)
                 self.padding_boundary[i] = pad_width
+
 
     def __getitem__(self, index):
         """Retrieve a single patch"""
@@ -239,7 +214,6 @@ class MRISegmentation(torch.utils.data.Dataset):
                          start_index[1]:stop_index[1]:step_size[1],
                          start_index[2]:stop_index[2]:step_size[2]].reshape(3, -1).T,
                 overflow)
-
 
 
 
