@@ -26,13 +26,13 @@ class FlattenSpacial(nn.Module):
 
 class Model(nn.Module):
 
-    def __init__(self, output_size, filter_size=5):
+    def __init__(self, output_size, filter_size=7):
         super(Model, self).__init__()
 
         features = [(1,),
                     (4, 4, 4, 4),
                     (4, 4, 4, 4),
-                    (4, 4, 4, 4),
+                    # (4, 4, 4, 4),
                     (output_size,)]
 
         from se3_cnn import basis_kernels
@@ -55,7 +55,7 @@ class Model(nn.Module):
         block_params = [
             {'activation': (F.relu, F.sigmoid)},
             {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
+            # {'activation': (F.relu, F.sigmoid)},
             {'activation': None},
         ]
 
@@ -217,14 +217,15 @@ def dice_coefficient_loss(y_pred, y_true, valid=None, reduce=True, epsilon=1e-5)
         return -numerator, denominator
 
 
-def cross_entropy_loss(y_pred, y_true, valid=None, reduce=True):
+def cross_entropy_loss(y_pred, y_true, valid=None, reduce=True, class_weight=None):
 
     # Reshape into 2D image, which pytorch can handle
     y_true_f = y_true.view(y_true.size(0), y_true.size(2), -1)
     y_pred_f = y_pred.view(y_pred.size(0), y_pred.size(1), y_pred.size(2), -1)
 
+
     loss_per_voxel = torch.nn.functional.cross_entropy(
-        y_pred_f, y_true_f, reduce=False).view(y_true.shape).squeeze()
+        y_pred_f, y_true_f, reduce=False, weight=class_weight).view(y_true.shape).squeeze()
 
     if valid is not None:
         mask = get_mask(loss_per_voxel.shape, valid)
@@ -407,12 +408,20 @@ def main(args):
         sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer.zero_grad()
 
     loss_function = None
     if args.loss == "dice":
         loss_function = dice_coefficient_loss
     elif args.loss == "cross_entropy":
-        loss_function = cross_entropy_loss
+        if args.class_jing:
+            class_weight = torch.Tensor(1/train_set.class_count)
+            class_weight *= np.sum(train_set.class_count)/len(train_set.class_count)
+            if torch.cuda.is_available():
+                class_weight = class_weight.cuda()
+        else:
+            class_weight = None
+        loss_function = lambda *x: cross_entropy_loss(*x, class_weight=class_weight)
 
     epoch_start_index = 0
     if args.mode == 'train':
@@ -427,7 +436,6 @@ def main(args):
 
                 x, y = torch.autograd.Variable(data), torch.autograd.Variable(target)
 
-                optimizer.zero_grad()
                 out = model(x)
 
                 # # Compare dice implementations
@@ -440,9 +448,10 @@ def main(args):
 
                 time_start = time.perf_counter()
                 loss = loss_function(out, y)
-
                 loss.backward()
-                optimizer.step()
+                if batch_idx % args.batchsize_multiplier == args.batchsize_multiplier-1:
+                    optimizer.step()
+                    optimizer.zero_grad()
 
                 binary_dice_acc = dice_coefficient_orig_binary(out, y, y_pred_is_dist=True).data[0]
 
@@ -508,8 +517,12 @@ if __name__ == '__main__':
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
     parser.add_argument("--batch-size", default=2, type=int,
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
-    parser.add_argument("--log10_signal", action="store_true", default=False,
+    parser.add_argument("--log10-signal", action="store_true", default=False,
                         help="Whether to logarithmize the MIR scan signal (default: %(default)s)")
+    parser.add_argument("--batchsize-multiplier", default=1, type=int,
+                        help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
+    parser.add_argument("--class-weighting", action='store_true', default=False,
+                        help="switches on class weighting, only used in cross entropy loss (default: %(default)s)")
 
     args = parser.parse_args()
 
@@ -518,5 +531,4 @@ if __name__ == '__main__':
         print(key, "=", value)
 
     main(args=args)
-
 
