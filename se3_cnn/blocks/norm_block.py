@@ -1,16 +1,17 @@
 # pylint: disable=C,R,E1101
 import torch
-from se3_cnn import SE3BNConvolution, SE3ConvolutionBN
+from se3_cnn import SE3BNConvolution
 from se3_cnn.non_linearities import NormSoftplus
 from se3_cnn import SO3
 from se3_cnn.dropout import SE3Dropout
+
 
 class NormBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window_dict,  # kernel params
                  activation=None, activation_bias_min=0.5, activation_bias_max=2,
                  stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity params
-                 batch_norm_momentum=0.1, batch_norm_mode='normal', batch_norm_before_conv=True):  # batch norm params
+                 batch_norm_momentum=0.1):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -23,8 +24,6 @@ class NormBlock(torch.nn.Module):
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
         :param float conv_dropout_p: Convolution dropout probability
         :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
-        :param batch_norm_mode: the mode of the batch normalization
-        :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
         '''
         super().__init__()
         self.repr_out = repr_out
@@ -34,7 +33,7 @@ class NormBlock(torch.nn.Module):
         Rs_in = list(zip(repr_in, irreducible_repr))
         Rs_out = list(zip(repr_out, irreducible_repr))
 
-        self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
+        self.bn_conv = SE3BNConvolution(
             Rs_in=Rs_in,
             Rs_out=Rs_out,
             size=size,
@@ -42,7 +41,7 @@ class NormBlock(torch.nn.Module):
             stride=stride,
             padding=padding,
             momentum=batch_norm_momentum,
-            mode=batch_norm_mode)
+        )
 
         if capsule_dropout_p is not None:
             Rs_out_without_gate = [(mul, 2 * n + 1) for n, mul in enumerate(repr_out)]  # Rs_out without gates
