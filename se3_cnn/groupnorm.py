@@ -88,9 +88,11 @@ class SE3GNConvolution(torch.nn.Module):
     SE3GroupNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, Rs_gn=None, **kwargs):
         super().__init__()
-        self.gn = SE3GroupNorm([(m, SO3.dim(R)) for m, R in Rs_in], eps=eps)
+        if Rs_gn is None:
+            Rs_gn = [(m, SO3.dim(R)) for m, R in Rs_in]
+        self.gn = SE3GroupNorm(Rs_gn, eps=eps)
         self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
 
     def forward(self, input):  # pylint: disable=W
