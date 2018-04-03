@@ -1,6 +1,7 @@
 # pylint: disable=C,R,E1101
+from functools import partial
 import torch
-from se3_cnn import SE3BNConvolution, SE3ConvolutionBN
+from se3_cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3_cnn.non_linearities import ScalarActivation
 from se3_cnn import SO3
 from se3_cnn.dropout import SE3Dropout
@@ -10,7 +11,7 @@ class GatedBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window_dict,  # kernel params
                  activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
-                 batch_norm_momentum=0.1, batch_norm_before_conv=True):  # batch norm params
+                 normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -19,9 +20,9 @@ class GatedBlock(torch.nn.Module):
         :param activation: (scalar activation, gate activation) which are functions like torch.nn.functional.relu or None
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
-        :param float conv_dropout_p: Convolution dropout probability
-        :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
-        :param bool batch_norm_before_conv: perform the batch normalization before or after the convolution
+        :param float capsule_dropout_p: dropout probability
+        :param str normalization: "batch", "group" or None
+        :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
         '''
         super().__init__()
 
@@ -49,14 +50,21 @@ class GatedBlock(torch.nn.Module):
         else:
             self.gate_act = None
 
-        self.bn_conv = (SE3BNConvolution if batch_norm_before_conv else SE3ConvolutionBN)(
+        if normalization is None:
+            Convolution = SE3Convolution
+        if normalization is "batch":
+            Convolution = partial(SE3BNConvolution, momentum=batch_norm_momentum)
+        if normalization is "group":
+            Convolution = SE3GNConvolution
+
+        self.conv = Convolution(
             Rs_in=Rs_in,
             Rs_out=Rs_out_with_gate,
             size=size,
             radial_window_dict=radial_window_dict,
             stride=stride,
-            padding=padding,
-            momentum=batch_norm_momentum)
+            padding=padding
+        )
 
         self.dropout = None
         if capsule_dropout_p is not None:
@@ -66,7 +74,7 @@ class GatedBlock(torch.nn.Module):
     def forward(self, x):  # pylint: disable=W
 
         # convolution
-        y = self.bn_conv(x)
+        y = self.conv(x)
 
         if self.scalar_act is None and self.gate_act is None:
             z = y

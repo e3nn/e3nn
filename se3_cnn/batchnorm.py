@@ -95,12 +95,13 @@ class SE3BatchNorm(nn.Module):
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
 
-def test_batchnorm():
-    bn = SE3BatchNorm([(3, 1), (4, 3), (1, 5)])
-    bn.bias.data[0] = 42
-    bn.weight.data[1] = 32
+def test_batchnorm(Rs=None):
+    if Rs is None:
+        Rs = [(3, 1), (4, 3), (1, 5)]
 
-    x = torch.autograd.Variable(torch.randn(16, 3 + 12 + 5, 10, 10, 10) * 3 + 12)
+    bn = SE3BatchNorm(Rs)
+
+    x = torch.autograd.Variable(torch.randn(16, sum(m * d for m, d in Rs), 10, 10, 10) * 3 + 12)
 
     bn.train()
     y = bn(x)
@@ -109,3 +110,23 @@ def test_batchnorm():
     z = bn(x)
 
     return y, z
+
+
+from se3_cnn import SE3Convolution
+from se3_cnn import SO3
+
+
+class SE3BNConvolution(torch.nn.Module):
+    '''
+    This class exists to optimize memory consumption.
+    It is simply the concatenation of two operations:
+    SE3BatchNorm followed by SE3Convolution
+    '''
+
+    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, momentum=0.1, **kwargs):
+        super().__init__()
+        self.bn = SE3BatchNorm([(m, SO3.dim(R)) for m, R in Rs_in], eps=eps, momentum=momentum)
+        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
+
+    def forward(self, input):  # pylint: disable=W
+        return self.conv(self.bn(input))
