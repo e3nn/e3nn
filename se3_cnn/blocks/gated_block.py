@@ -21,7 +21,7 @@ class GatedBlock(torch.nn.Module):
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
         :param float capsule_dropout_p: dropout probability
-        :param str normalization: "batch", "group" or None
+        :param str normalization: "batch", "group", "instance" or None
         :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
         '''
         super().__init__()
@@ -56,6 +56,8 @@ class GatedBlock(torch.nn.Module):
             Convolution = partial(SE3BNConvolution, momentum=batch_norm_momentum)
         if normalization is "group":
             Convolution = SE3GNConvolution
+        if normalization == "instance":
+            Convolution = partial(SE3GNConvolution, Rs_gn=[(1, 2 * n + 1) for n, mul in enumerate(repr_in) for _ in range(mul)])
 
         self.conv = Convolution(
             Rs_in=Rs_in,
