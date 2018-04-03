@@ -75,3 +75,23 @@ def test_groupnorm():
 
     y = bn(torch.autograd.Variable(x)).data
     return y
+
+
+from se3_cnn import SE3Convolution
+from se3_cnn import SO3
+
+
+class SE3GNConvolution(torch.nn.Module):
+    '''
+    This class exists to optimize memory consumption.
+    It is simply the concatenation of two operations:
+    SE3GroupNorm followed by SE3Convolution
+    '''
+
+    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, **kwargs):
+        super().__init__()
+        self.gn = SE3GroupNorm([(m, SO3.dim(R)) for m, R in Rs_in], eps=eps)
+        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
+
+    def forward(self, input):  # pylint: disable=W
+        return self.conv(self.gn(input))
