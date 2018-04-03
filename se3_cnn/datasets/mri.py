@@ -41,11 +41,12 @@ class MRISegmentation(torch.utils.data.Dataset):
                 # Assumption: voxel value and pixel are stored in last dim
                 signal_volume = data[:,:,:,0].squeeze()
                 label_volume  = data[:,:,:,1].squeeze()
-                signal_volume, label_volume = self._crop_background(signal_volume, label_volume)
+                # signal_volume, label_volume = self._crop_background(signal_volume, label_volume)
                 self.data.append(signal_volume)
                 self.labels.append(label_volume)
                 self.unpadded_data_shape.append(self.data[-1].shape)
                 self.padding_boundary.append(None)
+            self.class_count = hf['class_counts'][:]
         print("done.")
 
         # This first call to initialize_patch_indices will calculate the
@@ -67,9 +68,15 @@ class MRISegmentation(torch.utils.data.Dataset):
         print("done.")
         # optionally logarithmize zero shifted input signal
         if self.log10_signal:
-            signal_min = min([np.min(data_i for data_i in self.data)])
+            print('logarithmize signal')
+            signal_min = min([np.min(data_i) for data_i in self.data])
             for i in range(len(self.data)):
                 self.data[i] = np.log10(self.data[i] + signal_min + 1) # add 1 to prevent -inf from the log
+        # # count number of occurrences of each class
+        # print('compute class count for class imbalance')
+        # stacked_labels = np.concatenate([label_vol.flatten() for label_vol in self.labels])
+        # labels_unique = np.unique(stacked_labels)
+        # self.class_count = np.array([np.sum(stacked_labels==label) for label in labels_unique])
 
 
     def _crop_background(self, signal_volume, label_volume, signal_bg=0, verbose=True):
@@ -118,6 +125,7 @@ class MRISegmentation(torch.utils.data.Dataset):
             if self.padding_boundary[i] is None:
                 pad_width = np.stack([overflow, overflow], axis=1)
                 self.padding_boundary[i] = pad_width
+
 
     def __getitem__(self, index):
         """Retrieve a single patch"""

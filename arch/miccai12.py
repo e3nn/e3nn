@@ -31,8 +31,8 @@ class Model(nn.Module):
 
         features = [(1,),
                     (4, 4, 4, 4),
-                    (4, 4, 4, 4),
-                    (4, 4, 4, 4),
+                    # (6, 6, 6, 6),
+                    # (8, 8, 6, 6),
                     (output_size,)]
 
         from se3_cnn import basis_kernels
@@ -54,8 +54,8 @@ class Model(nn.Module):
 
         block_params = [
             {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
+            # {'activation': (F.relu, F.sigmoid)},
+            # {'activation': (F.relu, F.sigmoid)},
             {'activation': None},
         ]
 
@@ -83,7 +83,7 @@ def dice_coefficient_orig_binary(y_pred, y_true, epsilon=1e-5):
     dice_coeff = 0
     for i in range(y_pred.size(1)):
 
-        # Convert to binary values
+        # Convert to binary values, [1] gives argmax
         y_pred_b = torch.max(y_pred, dim=1)[1] == i
         y_true_b = y_true == i
 
@@ -174,13 +174,11 @@ def dice_coefficient(y_pred, y_true, epsilon=1e-5):
     return torch.cat(coefs).mean()
 
 
-def cross_entropy_loss(y_pred, y_true):
-
-    # Reshape into 2D image, which pytorch can handle
+def cross_entropy_loss(y_pred, y_true, class_weight=None):
+    # # Reshape into 2D image, which pytorch can handle
     y_true_f = y_true.view(y_true.size(0), y_true.size(2), -1)
     y_pred_f = y_pred.view(y_pred.size(0), y_pred.size(1), y_pred.size(2), -1)
-
-    return torch.nn.functional.cross_entropy(y_pred_f, y_true_f)
+    return torch.nn.functional.cross_entropy(y_pred_f, y_true_f, weight=class_weight)
 
 
 def main(args):
@@ -277,6 +275,7 @@ def main(args):
         sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer.zero_grad()
 
     loss_function = None
     if args.loss == "dice":
@@ -288,7 +287,8 @@ def main(args):
             args.patch_size, args.patch_size, args.patch_size)
         if torch.cuda.is_available():
             target_onehot = target_onehot.cuda()
-        y_onehot = torch.autograd.Variable(target_onehot)
+        # y_onehot = torch.autograd.Variable(target_onehot)
+        target_onehot = torch.autograd.Variable(target_onehot)
     elif args.loss == "cross_entropy":
         loss_function = cross_entropy_loss
 
@@ -303,9 +303,7 @@ def main(args):
                 if torch.cuda.is_available():
                     data, target = data.cuda(), target.cuda()
 
-                x, y = torch.autograd.Variable(data), torch.autograd.Variable(target)
-
-                optimizer.zero_grad()
+                x = torch.autograd.Variable(data)
                 out = model(x)
 
                 # # Compare dice implementations
@@ -327,18 +325,30 @@ def main(args):
                 #       dice_coefficient(out, y).data.cpu().numpy())
 
                 time_start = time.perf_counter()
-                if args.loss == "dice_onehot":
-                    target_onehot.zero_()
-                    target_onehot.scatter_(1, target, 1)
-                    loss = loss_function(out, y_onehot)
-                else:
+                if args.loss == "dice":
+                    y = torch.autograd.Variable(target.long())
                     loss = loss_function(out, y)
+                elif args.loss == "dice_onehot":
+                    target_onehot.data.zero_()
+                    target_onehot.data.scatter_(1, target.long(), 1)
+                    loss = loss_function(out, target_onehot)
+                else:
+                    assert args.loss == 'cross_entropy'
+                    y = torch.autograd.Variable(target)
+                    # loss = loss_function(out, y)
+                    class_weight = torch.Tensor(1/train_set.class_count)
+                    class_weight *= len(class_weight) / np.sum(1/train_set.class_count) # rescale such that sum of weights gives C
+                    if torch.cuda.is_available():
+                        class_weight = class_weight.cuda()
+                    loss = loss_function(out, y.long(), class_weight)
 
                 loss.backward()
-                optimizer.step()
+                if batch_idx % args.batchsize_multiplier == args.batchsize_multiplier-1:
+                    optimizer.step()
+                    optimizer.zero_grad()
 
                 if args.loss == "cross_entropy":
-                    acc = dice_coefficient(out, y).data[0]
+                    acc = dice_coefficient(out, y.long()).data[0]
                 else:
                     acc = -loss.data[0]
 
@@ -376,6 +386,8 @@ if __name__ == '__main__':
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
     parser.add_argument("--log10_signal", action="store_true", default=False,
                         help="Whether to logarithmize the MIR scan signal (default: %(default)s)")
+    parser.add_argument("--batchsize-multiplier", default=1, type=int,
+                        help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
 
     args = parser.parse_args()
 
