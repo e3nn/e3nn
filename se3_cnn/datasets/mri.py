@@ -5,6 +5,7 @@ import numpy as np
 import numbers
 import sys
 
+
 class MRISegmentation(torch.utils.data.Dataset):
     """Read 3D medical image files in .nii format, and provide it to the
        user as 3D patches of the requested size. Setting
@@ -78,9 +79,12 @@ class MRISegmentation(torch.utils.data.Dataset):
         patch_index_start = self.padding_boundary[dataset_index][:,0]
         patch_index_end = patch_index_start + size
         patch_index = np.stack((patch_index_start, patch_index_end))
-        return self.data[dataset_index][patch_index[0, 0]:patch_index[1, 0],
-                                        patch_index[0, 1]:patch_index[1, 1],
-                                        patch_index[0, 2]:patch_index[1, 2]]
+        return (self.data[dataset_index][patch_index[0, 0]:patch_index[1, 0],
+                                         patch_index[0, 1]:patch_index[1, 1],
+                                         patch_index[0, 2]:patch_index[1, 2]],
+                self.labels[dataset_index][patch_index[0, 0]:patch_index[1, 0],
+                                         patch_index[0, 1]:patch_index[1, 1],
+                                         patch_index[0, 2]:patch_index[1, 2]])
 
     def initialize_patch_indices(self):
         """For each image, calculate the indices for each patch, possibly
@@ -101,7 +105,6 @@ class MRISegmentation(torch.utils.data.Dataset):
             if self.padding_boundary[i] is None:
                 pad_width = np.stack([overflow, overflow], axis=1)
                 self.padding_boundary[i] = pad_width
-
 
     def __getitem__(self, index):
         """Retrieve a single patch"""
