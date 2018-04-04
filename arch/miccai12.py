@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 import numpy as np
 import time
+from functools import partial
 
 from se3_cnn.blocks import GatedBlock
 from se3_cnn.datasets import MRISegmentation
@@ -36,20 +37,15 @@ class Model(nn.Module):
                     (output_size,)]
 
         from se3_cnn import basis_kernels
-        radial_window_dict = {
-            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-            'radial_window_fct_kwargs': {
-                'mode': 'compromise',
-                'border_dist': 0.,
-                'sigma': .6
-            }
-        }
+        radial_window = partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                                     mode='compromise', border_dist=0, sigma=0.6),
+
         common_block_params = {
             'size': filter_size,
             'padding': filter_size//2,
             'stride': 1,
             'normalization': "instance",
-            'radial_window_dict': radial_window_dict
+            'radial_window': radial_window
         }
 
         block_params = [

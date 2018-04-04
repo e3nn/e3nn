@@ -8,7 +8,7 @@ from se3_cnn.dropout import SE3Dropout
 
 class NormBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window_dict,  # kernel params
+                 repr_in, repr_out, size, radial_window,  # kernel params
                  activation=None, activation_bias_min=0.5, activation_bias_max=2,
                  stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity params
                  batch_norm_momentum=0.1):  # batch norm params
@@ -16,7 +16,7 @@ class NormBlock(torch.nn.Module):
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
         :param int size: the filters are cubes of dimension = size x size x size
-        :param radial_window_dict: contains both radial window function and the keyword arguments for the radial window function
+        :param radial_window: radial window function
         :param activation: function like for instance torch.nn.functional.relu
         :param activation_bias_min Activation bias is initialized uniformly from [activation_bias_min, activation_bias_max]
         :param activation_bias_max Activation bias is initialized uniformly from [activation_bias_min, activation_bias_max]
@@ -37,7 +37,7 @@ class NormBlock(torch.nn.Module):
             Rs_in=Rs_in,
             Rs_out=Rs_out,
             size=size,
-            radial_window_dict=radial_window_dict,
+            radial_window=radial_window,
             stride=stride,
             padding=padding,
             momentum=batch_norm_momentum,
