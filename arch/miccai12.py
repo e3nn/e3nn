@@ -48,7 +48,7 @@ class Model(nn.Module):
             'size': filter_size,
             'padding': filter_size//2,
             'stride': 1,
-            'batch_norm_before_conv': False,
+            'normalization': "instance",
             'radial_window_dict': radial_window_dict
         }
 
@@ -468,7 +468,7 @@ def main(args):
             numerators = []
             denominators = []
             for i in range(len(validation_set.data)):
-                y_true = torch.LongTensor(validation_set.get_original(i))
+                y_true = torch.LongTensor(validation_set.get_original(i)[1])
                 y_pred = torch.LongTensor(validation_ys[i])
                 if torch.cuda.is_available():
                     y_true = y_true.cuda()
