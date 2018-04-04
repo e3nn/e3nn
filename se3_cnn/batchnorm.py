@@ -149,6 +149,7 @@ class SE3BNConvolution(torch.nn.Module):
             **self.kwargs)
 
     def forward(self, input):  # pylint: disable=W
+        self.combination._cuda_kernels(input.is_cuda)
 
         field_means = []
         field_norms = []
