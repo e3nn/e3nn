@@ -9,14 +9,14 @@ from se3_cnn.dropout import SE3Dropout
 
 class GatedBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window_dict,  # kernel params
+                 repr_in, repr_out, size, radial_window,  # kernel params
                  activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
         :param int size: the filters are cubes of dimension = size x size x size
-        :param radial_window_dict: contains both radial window function and the keyword arguments for the radial window function
+        :param radial_window: radial window function
         :param activation: (scalar activation, gate activation) which are functions like torch.nn.functional.relu or None
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
@@ -63,7 +63,7 @@ class GatedBlock(torch.nn.Module):
             Rs_in=Rs_in,
             Rs_out=Rs_out_with_gate,
             size=size,
-            radial_window_dict=radial_window_dict,
+            radial_window=radial_window,
             stride=stride,
             padding=padding
         )

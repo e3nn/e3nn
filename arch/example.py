@@ -12,6 +12,7 @@ import torch
 import numpy as np
 
 import torch.nn as nn
+import torch.nn.functional as F
 
 # The Highway Block is a way to introduce non linearity into the neural network
 # The class GatedBlock inherit from the class torch.nn.Module.
@@ -22,7 +23,6 @@ from se3_cnn.batchnorm import SE3BatchNorm
 from se3_cnn.convolution import SE3Convolution
 
 from se3_cnn.util.optimizers_L1L2 import Adam
-from se3_cnn.util.lr_schedulers import lr_scheduler_exponential
 
 
 class AvgSpacial(torch.nn.Module):
@@ -52,29 +52,26 @@ class CNN(torch.nn.Module):
         ]
 
         from se3_cnn import basis_kernels
-        radial_window_dict = {
-            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-            'radial_window_fct_kwargs': {
-                'mode': 'compromise',
-                'border_dist': 0.,
-                'sigma': .6
-            }
-        }
+        from functools import partial
+
+        radial_window = partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                            mode='compromise', border_dist=0, sigma=0.6)
+
         common_block_params = {
             'size': 5,
             'stride': 2,
             'padding': 3,
             'batch_norm_before_conv': False,
-            'radial_window_dict': radial_window_dict
+            'radial_window': radial_window
         }
 
         block_params = [
-            {'activation': (None, torch.nn.functional.sigmoid)},
-            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
-            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
-            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
-            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
-            {'activation': (torch.nn.functional.relu, torch.nn.functional.sigmoid)},
+            {'activation': (None, F.sigmoid)},
+            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, F.sigmoid)},
             {'activation': None},
         ]
 
@@ -177,7 +174,7 @@ def main():
         # forward and backward propagation
         optimizer.zero_grad()
         out = model(x)
-        loss = torch.nn.functional.cross_entropy(out, y)
+        loss = F.cross_entropy(out, y)
         loss.backward()
         optimizer.step()
 

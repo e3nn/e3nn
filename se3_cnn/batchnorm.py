@@ -122,13 +122,13 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, verbose=True, eps=1e-5, momentum=0.1, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window, verbose=True, eps=1e-5, momentum=0.1, **kwargs):
         super().__init__()
 
         self.eps = eps
         self.momentum = momentum
 
-        self.combination = SE3KernelCombination(Rs_in, Rs_out, size, radial_window_dict, verbose)
+        self.combination = SE3KernelCombination(Rs_in, Rs_out, size, radial_window, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
 
@@ -149,7 +149,7 @@ class SE3BNConvolution(torch.nn.Module):
             **self.kwargs)
 
     def forward(self, input):  # pylint: disable=W
-        self.combination._cuda_kernels(input.is_cuda)
+        self.combination._cuda_kernels(input.is_cuda)  # pylint: disable=W
 
         field_means = []
         field_norms = []
@@ -220,15 +220,10 @@ class SE3BNConvolution(torch.nn.Module):
 
 def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
     from se3_cnn import basis_kernels, SO3, SE3Convolution
+    from functools import partial
 
-    radial_window_dict = {
-        'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-        'radial_window_fct_kwargs': {
-            'mode': 'sfcnn',
-            'border_dist': 0.,
-            'sigma': .6
-        }
-    }
+    radial_window = partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                            mode='sfcnn', border_dist=0, sigma=0.6)
 
     # input
     n_out = sum([m * SO3.dim(r) for m, r in Rs_out])
@@ -236,7 +231,7 @@ def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
     x = torch.autograd.Variable(torch.rand(batch, n_in, input_size, input_size, input_size) * 2 + 2)
 
     # BNConv
-    bnconv = SE3BNConvolution(Rs_in, Rs_out, kernel_size, radial_window_dict)
+    bnconv = SE3BNConvolution(Rs_in, Rs_out, kernel_size, radial_window)
     bnconv.train()
     y1 = bnconv(x).data
 
@@ -246,7 +241,7 @@ def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
     bn = SE3BatchNorm(bnconv.Rs, affine=False)
     bn.train()
 
-    conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window_dict)
+    conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window)
     conv.train()
     conv.weight = bnconv.weight
 

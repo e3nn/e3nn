@@ -6,7 +6,7 @@ from se3_cnn import SO3
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, verbose=True, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window, verbose=True, **kwargs):
         '''
         :param Rs_in: list of couple (multiplicity, representation)
         :param Rs_out: list of couple (multiplicity, representation)
@@ -17,18 +17,18 @@ class SE3Convolution(torch.nn.Module):
         '''
         super().__init__()
 
-        self.combination = SE3KernelCombination(Rs_in, Rs_out, size, radial_window_dict, verbose)
+        self.combination = SE3KernelCombination(Rs_in, Rs_out, size, radial_window, verbose)
         self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
         self.kwargs = kwargs
-        self.radial_window_dict = radial_window_dict
 
     def __repr__(self):
-        return "{} ({} -> {}, size={}, {})".format(
-            self.__class__.__name__,
-            self.combination.multiplicities_in,
-            self.combination.multiplicities_out,
-            self.combination.size,
-            {**self.kwargs, **self.radial_window_dict})  # TODO: radial_window_dict is perhaps not necessary to print in final version
+        return "{name} ({Rs_in} -> {Rs_out}, size={size}, kwargs={kwargs})".format(
+            name=self.__class__.__name__,
+            Rs_in=self.combination.multiplicities_in,
+            Rs_out=self.combination.multiplicities_out,
+            size=self.combination.size,
+            kwargs=self.kwargs
+        )
 
     def forward(self, input):  # pylint: disable=W
         kernel = self.combination(self.weight)
@@ -39,7 +39,7 @@ class SE3Convolution(torch.nn.Module):
 
 
 class SE3KernelCombination(torch.autograd.Function):
-    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, verbose):
+    def __init__(self, Rs_in, Rs_out, size, radial_window, verbose):
         super().__init__()
 
         self.size = size
@@ -58,15 +58,15 @@ class SE3KernelCombination(torch.autograd.Function):
         for m_out, R_out in Rs_out:
             self.kernels.append([])
             for m_in, R_in in Rs_in:
-                basis = self._generate_basis(R_in, R_out, size, radial_window_dict, verbose)
+                basis = self._generate_basis(R_in, R_out, size, radial_window, verbose)
                 if basis is not None:
                     self.kernels[-1].append(torch.FloatTensor(basis))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
                     self.kernels[-1].append(None)
 
-    def _generate_basis(self, R_in, R_out, size, radial_window_dict, verbose):  # pylint: disable=W0613
-        basis = basis_kernels.cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict)
+    def _generate_basis(self, R_in, R_out, size, radial_window, verbose):  # pylint: disable=W0613
+        basis = basis_kernels.cube_basis_kernels_analytical(size, R_in, R_out, radial_window)
         if basis is not None:
             assert basis.shape[1:] == (SO3.dim(R_out), SO3.dim(R_in), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
             # rescale each basis element such that the weight can be initialized with Normal(0,1)
@@ -179,17 +179,12 @@ class SE3KernelCombination(torch.autograd.Function):
 
 
 def test_normalization(batch, input_size, Rs_in, Rs_out, kernel_size):
-    from se3_cnn import basis_kernels
-    radial_window_dict = {
-        'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-        'radial_window_fct_kwargs': {
-            'mode': 'sfcnn',
-            'border_dist': 0.,
-            'sigma': .6
-        }
-    }
+    from functools import partial
 
-    conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window_dict)
+    radial_window = partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                            mode='sfcnn', border_dist=0, sigma=0.6)
+
+    conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window)
 
     print("Weights Number = {} Mean = {:.3f} Std = {:.3f}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
 
