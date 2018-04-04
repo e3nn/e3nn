@@ -152,7 +152,7 @@ class SE3GatedResBlock(nn.Module):
                  stride=1,
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
-                 batch_norm_before_conv=True,
+                 normalization="batch",
                  capsule_dropout_p=0.1,
                  scalar_gate_activation=(F.relu, F.sigmoid),
                  downsample_by_pooling=False):
@@ -175,7 +175,7 @@ class SE3GatedResBlock(nn.Module):
                            activation=activation,
                            radial_window_dict=radial_window_dict,
                            batch_norm_momentum=batch_norm_momentum,
-                           batch_norm_before_conv=batch_norm_before_conv,
+                           normalization=normalization,
                            capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
                 self.layers.append(nn.AvgPool3d(kernel_size=size,
@@ -199,7 +199,7 @@ class SE3GatedResBlock(nn.Module):
                                activation=None,
                                radial_window_dict=radial_window_dict,
                                batch_norm_momentum=batch_norm_momentum,
-                               batch_norm_before_conv=batch_norm_before_conv,
+                               normalization=normalization,
                                capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,
@@ -212,7 +212,7 @@ class SE3GatedResBlock(nn.Module):
                 size=size,
                 radial_window_dict=radial_window_dict,
                 batch_norm_momentum=batch_norm_momentum,
-                batch_norm_before_conv=batch_norm_before_conv)
+                normalization=normalization)
 
     def forward(self, x):
         out = self.layers(x)
@@ -228,7 +228,6 @@ class SE3NormResBlock(nn.Module):
                  stride=1,
                  radial_window_dict=None,
                  batch_norm_momentum=0.01,
-                 batch_norm_before_conv=True,
                  capsule_dropout_p = 0.1,
                  scalar_activation=F.relu,
                  activation_bias_min=0.5,
@@ -253,7 +252,6 @@ class SE3NormResBlock(nn.Module):
                           activation=activation,
                           radial_window_dict=radial_window_dict,
                           batch_norm_momentum=batch_norm_momentum,
-                          batch_norm_before_conv=batch_norm_before_conv,
                           capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
                 self.layers.append(nn.AvgPool3d(kernel_size=size,
@@ -279,7 +277,6 @@ class SE3NormResBlock(nn.Module):
                               activation_bias_max=activation_bias_max,
                               radial_window_dict=radial_window_dict,
                               batch_norm_momentum=batch_norm_momentum,
-                              batch_norm_before_conv=batch_norm_before_conv,
                               capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,
@@ -396,7 +393,6 @@ class SE3Net(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
             'downsample_by_pooling': downsample_by_pooling,
@@ -431,7 +427,6 @@ class SE3ResNet34(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p, # drop probability of whole capsules
             'downsample_by_pooling': downsample_by_pooling,
@@ -466,7 +461,6 @@ class SE3ResNet34Large(ResNet):
                                              'border_dist': 0.,
                                              'sigma': .6}},
             'batch_norm_momentum': 0.01,
-            'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
             'downsample_by_pooling': downsample_by_pooling,
