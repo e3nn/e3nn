@@ -24,54 +24,91 @@ class FlattenSpacial(nn.Module):
         return x.view(x.size(0), -1, x.size(-3)*x.size(-2)*x.size(-1))
 
 
+# class Model(nn.Module):
+
+#     def __init__(self, output_size, filter_size=5):
+#         super(Model, self).__init__()
+
+#         features = [(1,),
+#                     (4, 4, 4, 4),
+#                     (4, 4, 4, 4),
+#                     # (4, 4, 4, 4),
+#                     (output_size,)]
+
+#         from se3_cnn import basis_kernels
+#         radial_window_dict = {
+#             'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
+#             'radial_window_fct_kwargs': {
+#                 'mode': 'compromise',
+#                 'border_dist': 0.,
+#                 'sigma': .6
+#             }
+#         }
+#         common_block_params = {
+#             'size': filter_size,
+#             'padding': filter_size//2,
+#             'stride': 1,
+
+
+#             'normalization': 'instance',
+
+
+#             'radial_window_dict': radial_window_dict
+#         }
+
+#         block_params = [
+#             {'activation': (F.relu, F.sigmoid)},
+#             {'activation': (F.relu, F.sigmoid)},
+#             # {'activation': (F.relu, F.sigmoid)},
+#             {'activation': None},
+#         ]
+
+#         assert len(block_params) + 1 == len(features)
+
+#         blocks = [GatedBlock(features[i], features[i + 1],
+#                              **common_block_params, **block_params[i])
+#                   for i in range(len(block_params))]
+
+#         self.layers = torch.nn.Sequential(
+#             *blocks,
+#         )
+
+#     def forward(self, x):
+#         out = self.layers(x)
+#         return out
+
+
+
 class Model(nn.Module):
-
-    def __init__(self, output_size, filter_size=7):
+    def __init__(self, output_size, filter_size=5):
         super(Model, self).__init__()
-
-        features = [(1,),
-                    (4, 4, 4, 4),
-                    (4, 4, 4, 4),
-                    # (4, 4, 4, 4),
-                    (output_size,)]
-
-        from se3_cnn import basis_kernels
-        radial_window_dict = {
-            'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-            'radial_window_fct_kwargs': {
-                'mode': 'compromise',
-                'border_dist': 0.,
-                'sigma': .6
-            }
-        }
-        common_block_params = {
-            'size': filter_size,
-            'padding': filter_size//2,
-            'stride': 1,
-            'batch_norm_before_conv': False,
-            'radial_window_dict': radial_window_dict
-        }
-
-        block_params = [
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            # {'activation': (F.relu, F.sigmoid)},
-            {'activation': None},
-        ]
-
-        assert len(block_params) + 1 == len(features)
-
-        blocks = [GatedBlock(features[i], features[i + 1],
-                             **common_block_params, **block_params[i])
-                  for i in range(len(block_params))]
-
-        self.layers = torch.nn.Sequential(
-            *blocks,
-        )
+        size = filter_size
+        bias = True
+        self.layers = nn.Sequential(
+                        nn.Conv3d(1, 8, kernel_size=size, padding=size//2, stride=1, bias=bias),
+                        nn.BatchNorm3d(8),
+                        nn.ReLU(inplace=True),
+                        nn.Conv3d(8, 16, kernel_size=size, padding=size//2, stride=1, bias=bias),
+                        nn.BatchNorm3d(16),
+                        nn.ReLU(inplace=True),
+                        nn.Conv3d(16, 32, kernel_size=size, padding=size//2, stride=1, bias=bias),
+                        nn.BatchNorm3d(32),
+                        nn.ReLU(inplace=True),
+                        nn.Conv3d(32, 64, kernel_size=size, padding=size//2, stride=1, bias=bias),
+                        nn.BatchNorm3d(64),
+                        nn.ReLU(inplace=True),
+                        nn.Conv3d(64, 128, kernel_size=size, padding=size//2, stride=1, bias=bias),
+                        nn.BatchNorm3d(128),
+                        nn.ReLU(inplace=True),
+                        nn.Conv3d(128, 135, kernel_size=1, padding=0, stride=1, bias=bias))
 
     def forward(self, x):
         out = self.layers(x)
         return out
+
+
+
+
 
 
 def dice_coefficient_orig_binary(y_pred, y_true, y_pred_is_dist=False,
@@ -414,14 +451,16 @@ def main(args):
     if args.loss == "dice":
         loss_function = dice_coefficient_loss
     elif args.loss == "cross_entropy":
-        if args.class_jing:
+        if args.class_weighting:
             class_weight = torch.Tensor(1/train_set.class_count)
             class_weight *= np.sum(train_set.class_count)/len(train_set.class_count)
             if torch.cuda.is_available():
                 class_weight = class_weight.cuda()
         else:
             class_weight = None
-        loss_function = lambda *x: cross_entropy_loss(*x, class_weight=class_weight)
+        # loss_function = lambda *x: cross_entropy_loss(*x, class_weight=class_weight)
+        from functools import partial
+        loss_function = partial(cross_entropy_loss, class_weight=class_weight)
 
     epoch_start_index = 0
     if args.mode == 'train':
