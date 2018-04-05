@@ -15,6 +15,7 @@ Therefore
 '''
 import numpy as np
 import scipy.linalg
+import scipy.ndimage
 from se3_cnn.util.cache_file import cached_dirpklgz
 from se3_cnn.SO3 import dim
 
@@ -178,7 +179,6 @@ def gaussian_subsampling(im, M):
     :param im: array of dimentions (d0, d1, d2, ...)
     :return: array of dimentions (d0 / M[0], d1 / M[1], d2 / M[2], ...)
     '''
-    import scipy.ndimage
     M = np.array(M)
     assert M.dtype == np.int
     assert np.all(M % 2 == 1)
@@ -194,7 +194,6 @@ def gaussian_subsampling(im, M):
 # Orthonormalization
 ################################################################################
 def orthonormalize(basis):
-    import scipy.linalg
 
     shape = basis.shape
     basis = basis.reshape((shape[0], -1))
@@ -241,16 +240,14 @@ def cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in):
 # SHOULD MAYBE NOT BE CACHED BUT ONLY THE EXPENSIVE PART INSIDE (_compute_basistrafo)
 # @cached_dirpklgz("kernels_cache_analytical")
 
-def cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict):
+def cube_basis_kernels_analytical(size, R_in, R_out, radial_window):
     '''
     Generate equivariant kernel basis mapping between capsules transforming under R_in and R_out
     :param size: side length of the filter kernel (CURRENTLY ONLY ODD SIZES SUPPORTED)
     :param R_out: output representation
     :param R_in: input representation
-    :param radial_window_dict: dictionary containing radial_window_fct and its keyword arguments with
-                                - radial_window_fct: callable for windowing out radial parts, taking mandatory parameters 'sh_cubes',
-                                                     'r_field' and 'order_irreps' as well as optional kwargs via 'radial_window_fct_kwargs'
-                                - radial_window_fct_kwargs: keyword arguments for the radial window function
+    :param radial_window: callable for windowing out radial parts, taking mandatory parameters
+                          'sh_cubes', 'r_field' and 'order_irreps'
     :return: basis of equivariant kernels of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
     '''
     # TODO: add support for even sidelength kernels
@@ -374,9 +371,7 @@ def cube_basis_kernels_analytical(size, R_in, R_out, radial_window_dict):
     sh_cubes, r_field = _sample_sh_cubes(size, Q_list, order_irreps, order_in, order_out)
     # window out radial parts
     # make sure to remove aliased regions!
-    radial_window_fct = radial_window_dict.get('radial_window_fct')
-    radial_window_fct_kwargs = radial_window_dict.get('radial_window_fct_kwargs')
-    basis = radial_window_fct(sh_cubes, r_field, order_irreps, **radial_window_fct_kwargs)
+    basis = radial_window(sh_cubes, r_field, order_irreps)
     if basis is not None:
         # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
         basis = basis / np.sqrt(np.sum(basis**2, axis=(1, 2, 3, 4, 5), keepdims=True))
