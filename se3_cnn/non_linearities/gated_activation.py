@@ -8,13 +8,13 @@ from se3_cnn import SO3
 
 class GatedActivation(torch.nn.Module):
     def __init__(self,
-                 repr_in, size, radial_window_dict,  # kernel params
+                 repr_in, size, radial_window,  # kernel params
                  activation=(None, None),  # nonlinearity
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param int size: the filters are cubes of dimension = size x size x size
-        :param radial_window_dict: contains both radial window function and the keyword arguments for the radial window function
+        :param radial_window: radial window function
         :param activation: (scalar activation, gate activation) which are functions like torch.nn.functional.relu or None
         :param str normalization: "batch", "group", "instance" or None
         :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
@@ -53,7 +53,7 @@ class GatedActivation(torch.nn.Module):
                     Rs_in=list(zip(repr_in, irreducible_repr)),
                     Rs_out=[(n_non_scalar, SO3.repr1)],
                     size=size,
-                    radial_window_dict=radial_window_dict,
+                    radial_window=radial_window,
                     padding=size // 2,
                 ),
                 ScalarActivation([(n_non_scalar, gate_activation)])

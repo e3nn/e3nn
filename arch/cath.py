@@ -1,4 +1,4 @@
-# pylint: disable=C,R,E1101
+# pylint: disable=C,R,E1101,W0221,W0511,W0601
 '''
 Architecture to predict the structural categories of proteins according to the CATH
 classification (www.cathdb.info).
@@ -137,7 +137,6 @@ class ResBlock(nn.Module):
                 module.weight.data.fill_(1)
                 module.bias.data.zero_()
 
-
     def forward(self, x):
         out = self.layers(x)
         if self.shortcut is not None:
@@ -150,9 +149,9 @@ class SE3GatedResBlock(nn.Module):
     def __init__(self, in_repr, out_reprs,
                  size=3,
                  stride=1,
-                 radial_window_dict=None,
+                 radial_window=None,
                  batch_norm_momentum=0.01,
-                 batch_norm_before_conv=True,
+                 normalization="batch",
                  capsule_dropout_p=0.1,
                  scalar_gate_activation=(F.relu, F.sigmoid),
                  downsample_by_pooling=False):
@@ -173,9 +172,9 @@ class SE3GatedResBlock(nn.Module):
                            size=size, padding=size//2,
                            stride=conv_stride if i == 0 else 1,
                            activation=activation,
-                           radial_window_dict=radial_window_dict,
+                           radial_window=radial_window,
                            batch_norm_momentum=batch_norm_momentum,
-                           batch_norm_before_conv=batch_norm_before_conv,
+                           normalization=normalization,
                            capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
                 self.layers.append(nn.AvgPool3d(kernel_size=size,
@@ -197,9 +196,9 @@ class SE3GatedResBlock(nn.Module):
                                size=size, padding=size//2,
                                stride=conv_stride,
                                activation=None,
-                               radial_window_dict=radial_window_dict,
+                               radial_window=radial_window,
                                batch_norm_momentum=batch_norm_momentum,
-                               batch_norm_before_conv=batch_norm_before_conv,
+                               normalization=normalization,
                                capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,
@@ -210,9 +209,9 @@ class SE3GatedResBlock(nn.Module):
             self.activation = GatedActivation(
                 repr_in=reprs[-1],
                 size=size,
-                radial_window_dict=radial_window_dict,
+                radial_window=radial_window,
                 batch_norm_momentum=batch_norm_momentum,
-                batch_norm_before_conv=batch_norm_before_conv)
+                normalization=normalization)
 
     def forward(self, x):
         out = self.layers(x)
@@ -226,10 +225,9 @@ class SE3NormResBlock(nn.Module):
     def __init__(self, in_repr, out_reprs,
                  size=3,
                  stride=1,
-                 radial_window_dict=None,
+                 radial_window=None,
                  batch_norm_momentum=0.01,
-                 batch_norm_before_conv=True,
-                 capsule_dropout_p = 0.1,
+                 capsule_dropout_p=0.1,
                  scalar_activation=F.relu,
                  activation_bias_min=0.5,
                  activation_bias_max=2,
@@ -251,9 +249,8 @@ class SE3NormResBlock(nn.Module):
                           size=size, padding=size//2,
                           stride=conv_stride if i == 0 else 1,
                           activation=activation,
-                          radial_window_dict=radial_window_dict,
+                          radial_window=radial_window,
                           batch_norm_momentum=batch_norm_momentum,
-                          batch_norm_before_conv=batch_norm_before_conv,
                           capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
                 self.layers.append(nn.AvgPool3d(kernel_size=size,
@@ -277,9 +274,8 @@ class SE3NormResBlock(nn.Module):
                               activation=None,
                               activation_bias_min=activation_bias_min,
                               activation_bias_max=activation_bias_max,
-                              radial_window_dict=radial_window_dict,
+                              radial_window=radial_window,
                               batch_norm_momentum=batch_norm_momentum,
-                              batch_norm_before_conv=batch_norm_before_conv,
                               capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,
@@ -335,10 +331,10 @@ class ResNet(nn.Module):
 class ResNet34(ResNet):
     def __init__(self, n_input, n_output, size, dense_dropout_p=0.5):
 
-        features = [[ [16]],
-                    [ [16] * 2] * 3,
-                    [[ 32] * 2] * 4,
-                    [[ 64] * 2] * 6,
+        features = [[[16]],
+                    [[16] * 2] * 3,
+                    [[32] * 2] * 4,
+                    [[64] * 2] * 6,
                     [[128] * 2] * 3]
 
         global OuterBlock
@@ -358,8 +354,8 @@ class ResNet34(ResNet):
 class ResNet34Large(ResNet):
     def __init__(self, n_input, n_output, size, dense_dropout_p=0.5):
 
-        features = [[ [64]],
-                    [ [64] * 2] * 3,
+        features = [[[64]],
+                    [[64] * 2] * 3,
                     [[128] * 2] * 4,
                     [[256] * 2] * 6,
                     [[512] * 2] * 3]
@@ -383,20 +379,16 @@ class SE3Net(ResNet):
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
                  downsample_by_pooling=False):
 
-        features = [[[( 4,  4,  4,  4)] * 1],  # 64 channels
-                    [[( 4,  4,  4,  4)] * 1],  # 64 channels
-                    [[( 8,  8,  8,  8)] * 1],  # 128 channels
+        features = [[[(4,  4,  4,  4)] * 1],  # 64 channels
+                    [[(4,  4,  4,  4)] * 1],  # 64 channels
+                    [[(8,  8,  8,  8)] * 1],  # 128 channels
                     [[(16, 16, 16, 16)] * 1],  # 256 channels
                     [[(256,)]]]
 
         common_params = {
-            'radial_window_dict': {
-                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-                'radial_window_fct_kwargs': {'mode': 'compromise',
-                                             'border_dist': 0.,
-                                             'sigma': .6}},
+            'radial_window': partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                                     mode='compromise', border_dist=0, sigma=0.6),
             'batch_norm_momentum': 0.01,
-            'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
             'downsample_by_pooling': downsample_by_pooling,
@@ -415,25 +407,22 @@ class SE3Net(ResNet):
             nn.Dropout(p=dense_dropout_p, inplace=True) if dense_dropout_p is not None else None,
             nn.Linear(features[4][-1][-1][0], n_output))
 
+
 class SE3ResNet34(ResNet):
     def __init__(self, res_block, n_input, n_output, size,
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
                  downsample_by_pooling=False):
-        features = [[[( 4,  4,  4,  4)]],          #  64 channels
-                    [[( 4,  4,  4,  4)] * 2] * 3,  #  64 channels
-                    [[( 8,  8,  8,  8)] * 2] * 4,  # 128 channels
+        features = [[[(4,  4,  4,  4)]],  # 64 channels
+                    [[(4,  4,  4,  4)] * 2] * 3,  # 64 channels
+                    [[(8,  8,  8,  8)] * 2] * 4,  # 128 channels
                     [[(16, 16, 16, 16)] * 2] * 6,  # 256 channels
                     [[(32, 32, 32, 32)] * 2] * 2 + [[(32, 32, 32, 32), (512, 0, 0, 0)]]]  # 512 channels
         common_params = {
-            'radial_window_dict': {
-                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-                'radial_window_fct_kwargs': {'mode': 'compromise',
-                                             'border_dist': 0.,
-                                             'sigma': .6}},
+            'radial_window': partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                                     mode='compromise', border_dist=0, sigma=0.6),
             'batch_norm_momentum': 0.01,
-            'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
-            'capsule_dropout_p': capsule_dropout_p, # drop probability of whole capsules
+            'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
             'downsample_by_pooling': downsample_by_pooling,
         }
         global OuterBlock
@@ -454,19 +443,15 @@ class SE3ResNet34Large(ResNet):
     def __init__(self, res_block, n_input, n_output, size,
                  capsule_dropout_p=0.1, dense_dropout_p=0.5,
                  downsample_by_pooling=False):
-        features = [[[( 8,  8,  8,  8)]],          # 128 channels
-                    [[( 8,  8,  8,  8)] * 2] * 3,  # 128 channels
+        features = [[[(8,  8,  8,  8)]],          # 128 channels
+                    [[(8,  8,  8,  8)] * 2] * 3,  # 128 channels
                     [[(16, 16, 16, 16)] * 2] * 4,  # 256 channels
                     [[(32, 32, 32, 32)] * 2] * 6,  # 512 channels
                     [[(64, 64, 64, 64)] * 2] * 2 + [[(64, 64, 64, 64), (1024, 0, 0, 0)]]]  # 1024 channels
         common_params = {
-            'radial_window_dict': {
-                'radial_window_fct': basis_kernels.gaussian_window_fct_convenience_wrapper,
-                'radial_window_fct_kwargs': {'mode': 'compromise',
-                                             'border_dist': 0.,
-                                             'sigma': .6}},
+            'radial_window': partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+                                     mode='compromise', border_dist=0, sigma=0.6),
             'batch_norm_momentum': 0.01,
-            'batch_norm_before_conv': True,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': capsule_dropout_p,  # drop probability of whole capsules
             'downsample_by_pooling': downsample_by_pooling,
@@ -486,8 +471,8 @@ class SE3ResNet34Large(ResNet):
 
 
 model_classes = {"resnet34_k3":
-                     partial(ResNet34, size=3,
-                             dense_dropout_p=0.5),
+                 partial(ResNet34, size=3,
+                         dense_dropout_p=0.5),
                  "resnet34_large_k3":
                      partial(ResNet34Large, size=3,
                              dense_dropout_p=0.5),
@@ -877,22 +862,22 @@ if __name__ == '__main__':
     parser.add_argument("--lamb_softmax_bias_L2", default=0, type=float,
                         help="L2 regularization factor for classification layer biases")
 
-    args = parser.parse_args()
+    args_ = parser.parse_args()
 
     print("# Options")
-    for key, value in sorted(vars(args).items()):
-        print(key, "=", value)
+    for key_, value_ in sorted(vars(args_).items()):
+        print(key_, "=", value_)
 
-    if not os.path.exists(args.model_checkpoint_path):
-        os.mkdir(args.model_checkpoint_path)
+    if not os.path.exists(args_.model_checkpoint_path):
+        os.mkdir(args_.model_checkpoint_path)
 
     main(
-        args=args,
-        data_filename=args.data_filename,
-        model_class=model_classes[args.model],
-        initial_lr=args.initial_lr,
-        lr_decay_start=args.lr_decay_start,
-        lr_decay_base=args.lr_decay_base,
-        batch_size=args.batch_size,
-        randomize_orientation=args.randomize_orientation,
+        args=args_,
+        data_filename=args_.data_filename,
+        model_class=model_classes[args_.model],
+        initial_lr=args_.initial_lr,
+        lr_decay_start=args_.lr_decay_start,
+        lr_decay_base=args_.lr_decay_base,
+        batch_size=args_.batch_size,
+        randomize_orientation=args_.randomize_orientation,
     )

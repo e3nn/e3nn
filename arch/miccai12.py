@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 import numpy as np
 import time
+from functools import partial
 
 from se3_cnn.blocks import GatedBlock
 from se3_cnn.datasets import MRISegmentation
@@ -507,7 +508,7 @@ def main(args):
             numerators = []
             denominators = []
             for i in range(len(validation_set.data)):
-                y_true = torch.LongTensor(validation_set.get_original(i))
+                y_true = torch.LongTensor(validation_set.get_original(i)[1])
                 y_pred = torch.LongTensor(validation_ys[i])
                 if torch.cuda.is_available():
                     y_true = y_true.cuda()

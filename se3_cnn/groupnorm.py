@@ -83,17 +83,17 @@ from se3_cnn import SO3
 
 class SE3GNConvolution(torch.nn.Module):
     '''
-    This class exists to optimize memory consumption.
-    It is simply the concatenation of two operations:
-    SE3GroupNorm followed by SE3Convolution
+    This class is the analog of SE3BNConvolution
+    Unfortunately the optimization done in SE3BNConvolution
+    cannot be ported for group normalization
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window_dict, eps=1e-5, Rs_gn=None, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window, eps=1e-5, Rs_gn=None, **kwargs):
         super().__init__()
         if Rs_gn is None:
             Rs_gn = [(m, SO3.dim(R)) for m, R in Rs_in]
         self.gn = SE3GroupNorm(Rs_gn, eps=eps)
-        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window_dict=radial_window_dict, **kwargs)
+        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window=radial_window, **kwargs)
 
     def forward(self, input):  # pylint: disable=W
         return self.conv(self.gn(input))
