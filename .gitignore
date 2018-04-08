@@ -14,3 +14,5 @@ tmp.*
 .*
 *.png
 */logs
+*/tf_logs
+**/*.log

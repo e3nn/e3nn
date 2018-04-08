@@ -15,8 +15,8 @@ class MRISegmentation(torch.utils.data.Dataset):
     def __init__(self, h5_filename, filter, patch_shape,
                  randomize_patch_offsets=True,
                  pad_mode='constant',
-                 pad_constant=0,
-                 log10_signal=False):
+                 pad_constant=0):
+                 # log10_signal=False):
 
         if isinstance(patch_shape, numbers.Integral):
             patch_shape = np.repeat(patch_shape, 3)
@@ -24,7 +24,7 @@ class MRISegmentation(torch.utils.data.Dataset):
         self.randomize_patch_offsets = randomize_patch_offsets
         self.pad_mode = pad_mode
         self.pad_constant = pad_constant
-        self.log10_signal = log10_signal
+        # self.log10_signal = log10_signal
 
         self.data = []
         self.labels = []
@@ -65,12 +65,12 @@ class MRISegmentation(torch.utils.data.Dataset):
                                     mode=self.pad_mode,
                                     constant_values=self.pad_constant).astype(np.int64)
         print("done.")
-        # optionally logarithmize zero shifted input signal
-        if self.log10_signal:
-            print('logarithmize signal')
-            signal_min = min([np.min(data_i) for data_i in self.data])
-            for i in range(len(self.data)):
-                self.data[i] = np.log10(self.data[i] + signal_min + 1) # add 1 to prevent -inf from the log
+        # # optionally logarithmize zero shifted input signal
+        # if self.log10_signal:
+        #     print('logarithmize signal')
+        #     signal_min = min([np.min(data_i) for data_i in self.data])
+        #     for i in range(len(self.data)):
+        #         self.data[i] = np.log10(self.data[i] + signal_min + 1) # add 1 to prevent -inf from the log
 
 
     def get_original(self, dataset_index):
