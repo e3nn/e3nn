@@ -13,7 +13,7 @@ from functools import partial
 import argparse
 import importlib
 
-from se3_cnn.datasets import MRISegmentation
+from experiments.datasets.MRI.mri import MRISegmentation
 
 from experiments.util import *
 
@@ -119,7 +119,7 @@ def calc_binary_dice_score(dataset, ys):
 def main(network_module):
 
     if args.mode == 'train':
-        train_set = MRISegmentation(h5_filename='data/MICCAI2012/miccai12.h5',
+        train_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
                                     patch_shape=args.patch_size,
                                     filter=train_filter)
                                     # log10_signal=args.log10_signal)
@@ -133,7 +133,7 @@ def main(network_module):
         print(np.unique(train_set.labels[0]))
 
     if args.mode in ['train', 'validate']:
-        validation_set = MRISegmentation(h5_filename='data/MICCAI2012/miccai12.h5',
+        validation_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
                                          patch_shape=args.patch_size,
                                          filter=validation_filter,
                                          randomize_patch_offsets=False)
@@ -146,7 +146,7 @@ def main(network_module):
                                                         drop_last=False)
 
     if args.mode == 'test':
-        test_set = MRISegmentation(h5_filename='data/MICCAI2012/miccai12.h5',
+        test_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
                                    patch_shape=args.patch_size,
                                    filter=test_filter,
                                    randomize_patch_offsets=False)
