@@ -116,7 +116,7 @@ def calc_binary_dice_score(dataset, ys):
 
 
 
-def main(network_module):
+def main():
 
     if args.mode == 'train':
         train_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
@@ -267,7 +267,7 @@ if __name__ == '__main__':
     network_module = importlib.import_module('networks.MICCAI2012.{:s}.{:s}'.format(args.model, args.model))
 
     # instantiate simple logger
-    log_obj = logger.logger('MICCAI2012', args.model)
+    log_obj = logger.logger(path='networks/MICCAI2012/{:s}/logs'.format(args.model), network=args.model)
     log_obj.write('\n# Options')
     for key, value in sorted(vars(args).items()):
         log_obj.write('\t'+str(key)+'\t'+str(value))
@@ -320,4 +320,4 @@ if __name__ == '__main__':
     assert len(set(validation_filter).intersection(train_filter)) == 0
     assert len(set(test_filter).intersection(train_filter)) == 0
 
-    main(network_module=network_module)
+    main()

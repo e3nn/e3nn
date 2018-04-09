@@ -5,6 +5,8 @@ from se3_cnn.blocks import NormBlock
 from se3_cnn import SE3BatchNorm
 from se3_cnn import SE3GroupNorm
 from se3_cnn import SE3Convolution
+from se3_cnn import SE3BNConvolution
+from se3_cnn import SE3GNConvolution
 
 from se3_cnn.non_linearities import NormRelu
 from se3_cnn.non_linearities import NormSoftplus
@@ -34,7 +36,9 @@ def get_param_groups(model, args):
             lamb_dict[k] = vars(args).get(k)
 
     convLayers = [m for m in model.modules()
-                  if isinstance(m, (SE3Convolution, nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d, nn.ConvTranspose2d, nn.ConvTranspose3d))]
+                  if isinstance(m, (SE3Convolution, SE3BNConvolution, SE3GNConvolution,
+                                    nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d,
+                                    nn.ConvTranspose2d, nn.ConvTranspose3d))]
     normActivs = [m for m in model.modules() if isinstance(m, (NormSoftplus, NormRelu, ScalarActivation))]
     normalizationLayers = [m for m in model.modules() if isinstance(m, (SE3BatchNorm, SE3GroupNorm, nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))]
     linearLayers = [m for m in model.modules() if isinstance(m, nn.Linear)]
@@ -69,6 +73,12 @@ def get_param_groups(model, args):
         for name, param in model.named_parameters():
             if id(param) not in params_in_groups:
                 error_msg += "\t" + name + "\n"
+        import ipdb; ipdb.set_trace()
         raise RuntimeError(error_msg)
 
     return param_groups
+
+
+# old version, does not differentiate between parameter groups
+# param_groups = [dict(params=model.parameters(), lamb_L1=lambda_L1,  lamb_L2=lambda_L2)]
+# You can set different regularization for different parameter groups by splitting them up
