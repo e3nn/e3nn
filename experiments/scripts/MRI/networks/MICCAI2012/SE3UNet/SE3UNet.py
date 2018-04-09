@@ -6,10 +6,7 @@ from functools import partial
 
 from se3_cnn.blocks import GatedBlock
 from se3_cnn import basis_kernels
-
-class Merge(nn.Module):
-    def forward(self, x1, x2):
-        return torch.cat([x1, x2], dim=1)
+from experiments.util.arch_blocks import Merge
 
 
 class network(nn.Module):

@@ -13,7 +13,8 @@ class Cath(torch.utils.data.Dataset):
                  discretization_bin_size=2.0,
                  use_density=True,
                  randomize_orientation=False):
-        self.root = os.path.expanduser("cath")
+        # self.root = os.path.expanduser("cath")
+        self.root = os.path.expanduser("../../datasets/cath")
 
         if download:
             self.download(dataset)

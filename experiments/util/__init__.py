@@ -1,4 +1,5 @@
 __all__ = [
+'arch_blocks',
 'get_mask',
 'get_param_groups',
 'logger',
