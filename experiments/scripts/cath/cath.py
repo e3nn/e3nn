@@ -5,19 +5,18 @@ classification (www.cathdb.info).
 
 '''
 import torch
-import torch.nn as nn
 import torch.utils.data
-import torch.nn.functional as F
+import torch.nn as nn
 
 import numpy as np
 import os
 import time
 import importlib
+from shutil import copyfile
+import argparse
 
 from experiments.datasets.cath.cath import Cath
-
 from experiments.util import *
-
 
 
 def get_output_shape(input_size, func):
@@ -47,7 +46,7 @@ def train_loop(model, train_loader, optimizer, epoch):
         y = torch.autograd.Variable(target)
         # forward and backward propagation
         out = model(x)
-        losses = torch.nn.functional.cross_entropy(out, y, reduce=False)
+        losses = nn.functional.cross_entropy(out, y, reduce=False)
         loss = losses.mean()
         loss.backward()
         if batch_idx % args.batchsize_multiplier == args.batchsize_multiplier-1:
@@ -65,6 +64,7 @@ def train_loop(model, train_loader, optimizer, epoch):
             epoch, batch_idx, len(train_loader),
             float(loss.data[0]), float(acc.data[0]),
             time.perf_counter() - time_start))
+
     loss_avg = np.mean(training_losses)
     acc_avg = np.mean(training_accs)
     training_outs = np.concatenate(training_outs)
@@ -77,15 +77,15 @@ def infer(model, loader):
     losses = []
     outs = []
     ys = []
-    for _, (data, target) in enumerate(loader):
+    for data,target in loader:
         if use_gpu:
             data, target = data.cuda(), target.cuda()
         x = torch.autograd.Variable(data, volatile=True)
-        y = torch.autograd.Variable(target)
+        y = torch.autograd.Variable(target, volatile=True)
         out = model(x)
         outs.append(out.data.cpu().numpy())
         ys.append(y.data.cpu().numpy())
-        losses.append(torch.nn.functional.cross_entropy(out, y, reduce=False).data.cpu().numpy())
+        losses.append(nn.functional.cross_entropy(out, y, reduce=False).data.cpu().numpy())
     outs = np.concatenate(outs)
     ys = np.concatenate(ys)
     return outs, ys, np.concatenate(losses)
@@ -93,6 +93,7 @@ def infer(model, loader):
 
 def main():
 
+    # Build datasets
     if args.mode == 'train':
         train_set = torch.utils.data.ConcatDataset([
             Cath(args.data_filename, split=i, download=True,
@@ -124,10 +125,10 @@ def main():
         n_output = len(test_set.datasets[0].label_set)
         log_obj.write("Test set: " + str([len(dataset) for dataset in test_set.datasets]))
 
+    # Build model and set up optimizer
     model = network_module.network(n_input=n_input, n_output=n_output, args=args)
     if use_gpu:
         model.cuda()
-
     log_obj.write(str(model))
     log_obj.write("The model contains {} parameters".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
@@ -136,37 +137,23 @@ def main():
     optimizer.zero_grad()
 
 
-
-
-
-
-
-    # Set up model dumping
+    # restore state from checkpoint
     epoch_start_index = 0
-    if args.read_from_checkpoint is not None:
-        checkpoint_index = args.read_from_checkpoint
-        checkpoint_basename = os.path.join(args.model_checkpoint_path,
-                                           'model_%s' % (model.__class__.__name__))
-        if checkpoint_index == -1:
-            import glob
-            checkpoint_filename = glob.glob(checkpoint_basename + '_*.ckpt')[-1]
-            checkpoint_index = int(checkpoint_filename.split('.')[-2].split('_')[-1])
-        else:
-            checkpoint_filename = checkpoint_basename+'_%d.ckpt' % checkpoint_index
-        log_obj.write("Restoring model from: " + checkpoint_filename)
-        checkpoint = torch.load(checkpoint_filename)
+    best_validation_loss_avg = float('inf')
+    global timestamp
+    if args.restore_checkpoint_filename is not None:
+        checkpoint_path_restore = '{:s}/checkpoints/{:s}'.format(basepath, args.restore_checkpoint_filename)
+        log_obj.write("Restoring model from: " + checkpoint_path_restore)
+        checkpoint = torch.load(checkpoint_path_restore)
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-
-        epoch_start_index = checkpoint_index+1
-
-
-
+        epoch_start_index = checkpoint['epoch']+1
+        best_validation_loss_avg = checkpoint['best_validation_loss_avg']
+        timestamp = checkpoint['timestamp']
 
 
     # Set the logger
-    if args.log_to_tensorboard:
-        tf_logger, tensorflow_available = tensorflow_logger.get_tf_logger(path='networks/{:s}/tf_logs'.format(args.model))
+    tf_logger, tensorflow_available = tensorflow_logger.get_tf_logger(basepath=basepath, timestamp=timestamp)
 
     if args.mode == 'train':
 
@@ -194,45 +181,47 @@ def main():
 
             log_obj.write('VALIDATION losses: ' + str(validation_losses))
 
-            if args.log_to_tensorboard and tensorflow_available:
 
-                # ============ TensorBoard logging ============#
+            # ============ TensorBoard logging ============ #
+            if tensorflow_available:
                 # (1) Log the scalar values
-                info = {
-                    'training set avg loss': loss_avg,
-                    'training set accuracy': acc_avg,
-                    'validation set avg loss': validation_loss_avg,
-                    'validation set accuracy': validation_acc,
-                }
-
-                step = epoch
+                info = {'training set avg loss': loss_avg,
+                        'training set accuracy': acc_avg,
+                        'validation set avg loss': validation_loss_avg,
+                        'validation set accuracy': validation_acc}
                 for tag, value in info.items():
-                    tf_logger.scalar_summary(tag, value, step + 1)
+                    tf_logger.scalar_summary(tag, value, step=epoch+1)
 
                 # (2) Log values and gradients of the parameters (histogram)
                 for tag, value in model.named_parameters():
                     tag = tag.replace('.', '/')
-                    tf_logger.histo_summary(tag, value.data.cpu().numpy(), step + 1)
-                    tf_logger.histo_summary(tag + '/grad', value.grad.data.cpu().numpy(),
-                                         step + 1)
+                    tf_logger.histo_summary(tag,         value.data.cpu().numpy(),      step=epoch+1)
+                    tf_logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), step=epoch+1)
 
                 # (3) Log losses for all datapoints in validation and training set
-                tf_logger.histo_summary("losses/validation/", validation_losses, step+1)
-                tf_logger.histo_summary("losses/training", training_losses, step+1)
+                tf_logger.histo_summary("losses/validation/", validation_losses, step=epoch+1)
+                tf_logger.histo_summary("losses/training",    training_losses,   step=epoch+1)
 
-                # (4) Log losses for all datapoints in validation and training set
+                # (4) Log logits for all datapoints in validation and training set
                 for i in range(n_output):
-                    tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step+1)
-                    tf_logger.histo_summary("logits/%d/training" % i, training_outs[:, i], step+1)
+                    tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step=epoch+1)
+                    tf_logger.histo_summary("logits/%d/training" % i,   training_outs[:, i],   step=epoch+1)
 
-            if args.save_checkpoints:
-                checkpoint_filename = os.path.join(
-                    args.model_checkpoint_path,
-                    'model_%s_%d.ckpt' % (model.__class__.__name__, epoch))
-                torch.save({'state_dict': model.state_dict(),
-                            'optimizer': optimizer.state_dict()},
-                           checkpoint_filename)
-                log_obj.write("Model saved to %s" % checkpoint_filename)
+
+
+            # saving of latest state
+            torch.save({'state_dict': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'epoch': epoch,
+                        'best_validation_loss_avg': best_validation_loss_avg,
+                        'timestamp': timestamp},
+                        checkpoint_path_latest)
+            # optional saving of best validation state
+            if validation_loss_avg < best_validation_loss_avg:
+                best_validation_loss_avg = validation_loss_avg
+                copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
+                log_obj.write('Best validation loss until now - updated best model')
+
 
     elif args.mode == 'validate':
         out, y, validation_loss_sum = infer(model, validation_loader)
@@ -257,8 +246,6 @@ def main():
 
 if __name__ == '__main__':
 
-    import argparse
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz", "cath_3class_backbone.npz", }, required=True,
@@ -277,19 +264,8 @@ if __name__ == '__main__':
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
     parser.add_argument("--batchsize-multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
-    parser.add_argument("--log-to-tensorboard", action="store_true", default=False,
-                        help="Whether to output log information in tensorboard format (default: %(default)s)")
-
-
-    parser.add_argument("--checkpoint-name", type=str,
-                        help="Checkpoint file name (file assumed to be in network folder)")
-    parser.add_argument("--save-checkpoints", action="store_true", default=False,
-                        help="Save model checkpoints at each epoch")
-    parser.add_argument("--read-from-checkpoint", type=int, default=None,
-                        help="Read model from checkpoint given by index")
-
-
-
+    parser.add_argument("--restore-checkpoint-filename", type=str, default=None,
+                        help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
     parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
                         help="Mode of operation (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-3, type=float,
@@ -362,12 +338,19 @@ if __name__ == '__main__':
 
     network_module = importlib.import_module('networks.{:s}.{:s}'.format(args.model, args.model))
 
+    basepath = 'networks/{:s}'.format(args.model)
+    timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+    os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
+    checkpoint_path_latest = '{:s}/checkpoints/{:s}_latest.ckpt'.format(basepath, timestamp)
+    checkpoint_path_best   = '{:s}/checkpoints/{:s}_best.ckpt'.format(basepath, timestamp)
+
     # instantiate simple logger
-    log_obj = logger.logger(path='networks/{:s}/logs'.format(args.model), network=args.model)
+    log_obj = logger.logger(basepath=basepath, timestamp=timestamp)
+    log_obj.write('basepath = {:s}'.format(basepath))
+    log_obj.write('timestamp = {:s}'.format(timestamp))
     log_obj.write('\n# Options')
     for key, value in sorted(vars(args).items()):
         log_obj.write('\t'+str(key)+'\t'+str(value))
-
 
     torch.backends.cudnn.benchmark = True
     use_gpu = torch.cuda.is_available()

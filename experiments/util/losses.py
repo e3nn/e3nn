@@ -159,7 +159,7 @@ def cross_entropy_loss(y_pred, y_true, valid=None, reduce=True, class_weight=Non
         y_pred_f, y_true_f, reduce=False, weight=class_weight).view(y_true.shape).squeeze()
 
     if valid is not None:
-        mask = get_mask(loss_per_voxel.shape, valid)
+        mask = get_mask.get_mask(loss_per_voxel.shape, valid)
 
         if reduce:
             return loss_per_voxel[mask].mean()

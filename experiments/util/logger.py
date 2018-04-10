@@ -2,10 +2,9 @@ import os
 
 # simple logger class that creates a log file and mirrors all inputs to write to the file and stdout
 class logger(object):
-	def __init__(self, path, network):
-		os.makedirs(path, exist_ok=True)
-		from time import gmtime, strftime
-		self.logfile = '{:s}/{:s}_{:s}.log'.format(path, network, strftime("%Y-%m-%d_%H:%M:%S", gmtime()))
+	def __init__(self, basepath, timestamp):
+		os.makedirs('{:s}/logs'.format(basepath), exist_ok=True)
+		self.logfile = '{:s}/logs/{:s}.log'.format(basepath, timestamp)
 
 	def write(self, string, print_bool=True):
 		if print_bool:
