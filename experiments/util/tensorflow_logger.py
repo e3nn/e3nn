@@ -1,6 +1,6 @@
 import numpy as np
 
-def get_tf_logger(path):
+def get_tf_logger(basepath, timestamp):
     tensorflow_available = True
     try:
         import tensorflow as tf
@@ -14,8 +14,7 @@ def get_tf_logger(path):
 
             def scalar_summary(self, tag, value, step):
                 """Log a scalar variable."""
-                summary = tf.Summary(
-                    value=[tf.Summary.Value(tag=tag, simple_value=value)])
+                summary = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=value)])
                 self.writer.add_summary(summary, step)
 
             def histo_summary(self, tag, values, step, bins=1000):
@@ -43,7 +42,7 @@ def get_tf_logger(path):
 
         from datetime import datetime
         now = datetime.now()
-        logger = Logger('{}/{}'.format(path, now.strftime("%Y%m%d_%H%M%S")))
+        logger = Logger('{}/tf_logs/{}'.format(basepath, timestamp))
 
     except:
         tensorflow_available = False

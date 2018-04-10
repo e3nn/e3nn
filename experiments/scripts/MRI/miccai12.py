@@ -7,19 +7,21 @@ import torch
 import torch.utils.data
 
 import numpy as np
+import os
 import time
+import importlib
+from shutil import copyfile
+import argparse
 from functools import partial
 
-import argparse
-import importlib
-
 from experiments.datasets.MRI.mri import MRISegmentation
-
 from experiments.util import *
 
 
 def train_loop(model, train_loader, loss_function, optimizer, epoch):
     model.train()
+    train_losses = []
+    train_dice_accs = []
     for batch_idx, (data, target, img_index, patch_index, valid) in enumerate(train_loader):
         if use_gpu:
             data, target = data.cuda(), target.cuda()
@@ -35,12 +37,17 @@ def train_loop(model, train_loader, loss_function, optimizer, epoch):
             optimizer.step()
             optimizer.zero_grad()
 
+        loss_value = float(loss.data[0])
         binary_dice_acc = losses.dice_coefficient_orig_binary(out, y, y_pred_is_dist=True).data[0]
+        train_losses.append(loss_value)
+        train_dice_accs.append(binary_dice_acc)
 
-        log_obj.write("[{}:{:3}/{:3}] loss={:.4} acc={:.4} time={:.2}".format(
+        log_obj.write("[{}:{:3}/{:3}] loss={:.4} dice_acc={:.4} time={:.2}".format(
             epoch, batch_idx, len(train_loader),
-            float(loss.data[0]), binary_dice_acc,
+            loss_value, binary_dice_acc,
             time.perf_counter() - time_start))
+
+    return np.mean(train_losses), np.mean(train_dice_accs)
 
 
 def infer(model, loader, loss_function):
@@ -56,7 +63,6 @@ def infer(model, loader, loss_function):
         x = torch.autograd.Variable(data, volatile=True)
         y = torch.autograd.Variable(target, volatile=True)
         out = model(x)
-
         _, out_predict = torch.max(out, dim=1)
         mask = get_mask.get_mask(out_predict.shape, valid)
         patch_index = patch_index.cpu().numpy()
@@ -68,7 +74,6 @@ def infer(model, loader, loss_function):
                 out_images[img_index[j]][patch_start[0]:patch_end[0],
                                          patch_start[1]:patch_end[1],
                                          patch_start[2]:patch_end[2]] = out_predict_masked.view((valid[j,1] - valid[j,0]).tolist()).data.cpu().numpy()
-
         numerator, denominator = loss_function(out, y, valid=valid, reduce=False)
         del out, out_predict
         try:
@@ -78,14 +83,11 @@ def infer(model, loader, loss_function):
             pass
         losses_numerator.append(numerator.cpu().numpy())
         losses_denominator.append(denominator.cpu().numpy())
-
         # print(np.mean(np.sum(losses_numerator[-1], axis=0)/np.sum(losses_denominator[-1], axis=0)), loss_function(out, y, valid).data.cpu().numpy())
         # loss_function = lambda *x: cross_entropy_loss(*x, class_weight=class_weight)
-
     # Check that entire image was filled in
     for out_image in out_images:
         assert not (out_image == -1).any()
-
     losses_numerator = np.concatenate(losses_numerator)
     losses_denominator = np.concatenate(losses_denominator)
     loss = np.mean(np.sum(losses_numerator, axis=0) / np.sum(losses_denominator, axis=0))
@@ -118,8 +120,9 @@ def calc_binary_dice_score(dataset, ys):
 
 def main():
 
+    h5_filename = '../../datasets/MRI/MICCAI2012/miccai12.h5'
     if args.mode == 'train':
-        train_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
+        train_set = MRISegmentation(h5_filename=h5_filename,
                                     patch_shape=args.patch_size,
                                     filter=train_filter)
                                     # log10_signal=args.log10_signal)
@@ -131,9 +134,8 @@ def main():
                                                    drop_last=True)
         np.set_printoptions(threshold=np.nan)
         print(np.unique(train_set.labels[0]))
-
     if args.mode in ['train', 'validate']:
-        validation_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
+        validation_set = MRISegmentation(h5_filename=h5_filename,
                                          patch_shape=args.patch_size,
                                          filter=validation_filter,
                                          randomize_patch_offsets=False)
@@ -144,9 +146,8 @@ def main():
                                                         num_workers=8,
                                                         pin_memory=False,
                                                         drop_last=False)
-
     if args.mode == 'test':
-        test_set = MRISegmentation(h5_filename='../../datasets/MRI/MICCAI2012/miccai12.h5',
+        test_set = MRISegmentation(h5_filename=h5_filename,
                                    patch_shape=args.patch_size,
                                    filter=test_filter,
                                    randomize_patch_offsets=False)
@@ -184,19 +185,74 @@ def main():
             class_weight = None
         loss_function = partial(losses.cross_entropy_loss, class_weight=class_weight)
 
-    tf_logger, tensorflow_available = tensorflow_logger.get_tf_logger(path='networks/MICCAI2012/{:s}/tf_logs'.format(args.model))
-
+    # restore state from checkpoint
     epoch_start_index = 0
+    best_validation_loss = float('inf')
+    global timestamp
+    if args.restore_checkpoint_filename is not None:
+        checkpoint_path_restore = '{:s}/checkpoints/{:s}'.format(basepath, args.restore_checkpoint_filename)
+        log_obj.write("Restoring model from: " + checkpoint_path_restore)
+        checkpoint = torch.load(checkpoint_path_restore)
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        epoch_start_index = checkpoint['epoch']+1
+        best_validation_loss = checkpoint['best_validation_loss']
+        timestamp = checkpoint['timestamp']
+
+    tf_logger, tensorflow_available = tensorflow_logger.get_tf_logger(basepath=basepath, timestamp=timestamp)
+
     if args.mode == 'train':
         for epoch in range(epoch_start_index, args.training_epochs):
             optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, args.initial_lr,
                                                                   args.lr_decay_start, args.lr_decay_base, verbose=True)
-            train_loop(model, train_loader, loss_function, optimizer, epoch)
+
+            training_loss, training_binary_dice_acc = train_loop(model, train_loader, loss_function, optimizer, epoch)
+
             validation_ys, validation_loss = infer(model, validation_loader, loss_function)
             validation_binary_dice_acc = calc_binary_dice_score(validation_set, validation_ys)
-            log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+
+            log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} dice_acc={:.2}'.format(
                                         epoch, len(train_loader)-1, len(train_loader),
                                         validation_loss, validation_binary_dice_acc))
+
+            # ============ TensorBoard logging ============ #
+            if tensorflow_available:
+                # (1) Log the scalar values
+                info = {'training set loss': training_loss,
+                        'training set binary dice accuracy': training_binary_dice_acc,
+                        'validation set loss': validation_loss,
+                        'validation set binary dice accuracy': validation_binary_dice_acc}
+                for tag, value in info.items():
+                    tf_logger.scalar_summary(tag, value, step=epoch+1)
+
+                # (2) Log values and gradients of the parameters (histogram)
+                for tag, value in model.named_parameters():
+                    tag = tag.replace('.', '/')
+                    tf_logger.histo_summary(tag,         value.data.cpu().numpy(),      step=epoch+1)
+                    tf_logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), step=epoch+1)
+
+                # # (3) Log losses for all datapoints in validation and training set
+                # tf_logger.histo_summary("losses/validation/", validation_losses, step=epoch+1)
+                # tf_logger.histo_summary("losses/training",    training_losses,   step=epoch+1)
+
+                # # (4) Log logits for all datapoints in validation and training set
+                # for i in range(n_output):
+                #     tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step=epoch+1)
+                #     tf_logger.histo_summary("logits/%d/training" % i,   training_outs[:, i],   step=epoch+1)
+
+            # saving of latest state
+            torch.save({'state_dict': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'epoch': epoch,
+                        'best_validation_loss': best_validation_loss,
+                        'timestamp': timestamp},
+                        checkpoint_path_latest)
+            # optional saving of best validation state
+            if validation_loss < best_validation_loss:
+                best_validation_loss = validation_loss
+                copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
+                log_obj.write('Best validation loss until now - updated best model')
+
             # Adjust patch indices at end of each epoch
             train_set.initialize_patch_indices()
 
@@ -224,6 +280,8 @@ if __name__ == '__main__':
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
     parser.add_argument("--batchsize-multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
+    parser.add_argument("--restore-checkpoint-filename", type=str, default=None,
+                        help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
     parser.add_argument("--class-weighting", action='store_true', default=False,
                         help="switches on class weighting, only used in cross entropy loss (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-2, type=float,
@@ -266,12 +324,19 @@ if __name__ == '__main__':
 
     network_module = importlib.import_module('networks.MICCAI2012.{:s}.{:s}'.format(args.model, args.model))
 
+    basepath = 'networks/MICCAI2012/{:s}'.format(args.model)
+    timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+    os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
+    checkpoint_path_latest = '{:s}/checkpoints/{:s}_latest.ckpt'.format(basepath, timestamp)
+    checkpoint_path_best   = '{:s}/checkpoints/{:s}_best.ckpt'.format(basepath, timestamp)
+
     # instantiate simple logger
-    log_obj = logger.logger(path='networks/MICCAI2012/{:s}/logs'.format(args.model), network=args.model)
+    log_obj = logger.logger(basepath=basepath, timestamp=timestamp)
+    log_obj.write('basepath = {:s}'.format(basepath))
+    log_obj.write('timestamp = {:s}'.format(timestamp))
     log_obj.write('\n# Options')
     for key, value in sorted(vars(args).items()):
         log_obj.write('\t'+str(key)+'\t'+str(value))
-
 
     torch.backends.cudnn.benchmark = True
     use_gpu = torch.cuda.is_available()
@@ -321,3 +386,7 @@ if __name__ == '__main__':
     assert len(set(test_filter).intersection(train_filter)) == 0
 
     main()
+
+
+
+
