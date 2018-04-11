@@ -7,6 +7,7 @@ class logger(object):
 		self.logfile = '{:s}/logs/{:s}.log'.format(basepath, timestamp)
 
 	def write(self, string, print_bool=True):
+		''' append string to log file and optionally print out '''
 		if print_bool:
 			print(string)
 		with open(self.logfile, 'a') as f:
