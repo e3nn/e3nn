@@ -65,6 +65,10 @@ def train_loop(model, train_loader, optimizer, epoch):
             float(loss.data[0]), float(acc.data[0]),
             time.perf_counter() - time_start))
 
+        # for debugging to arrive at validation early...
+        if (batch_idx+1)%4 == 0:
+            break
+
     loss_avg = np.mean(training_losses)
     acc_avg = np.mean(training_accs)
     training_outs = np.concatenate(training_outs)
@@ -91,7 +95,7 @@ def infer(model, loader):
     return outs, ys, np.concatenate(losses)
 
 
-def main():
+def main(checkpoint):
 
     # Build datasets
     if args.mode == 'train':
@@ -141,15 +145,12 @@ def main():
     epoch_start_index = 0
     best_validation_loss_avg = float('inf')
     global timestamp
-    if args.restore_checkpoint_filename is not None:
-        checkpoint_path_restore = '{:s}/checkpoints/{:s}'.format(basepath, args.restore_checkpoint_filename)
+    if checkpoint is not None:
         log_obj.write("Restoring model from: " + checkpoint_path_restore)
-        checkpoint = torch.load(checkpoint_path_restore)
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         epoch_start_index = checkpoint['epoch']+1
         best_validation_loss_avg = checkpoint['best_validation_loss_avg']
-        timestamp = checkpoint['timestamp']
 
 
     # Set the logger
@@ -221,6 +222,8 @@ def main():
                 best_validation_loss_avg = validation_loss_avg
                 copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
                 log_obj.write('Best validation loss until now - updated best model')
+            else:
+                log_obj.write('Validation loss did not improve')
 
 
     elif args.mode == 'validate':
@@ -339,13 +342,25 @@ if __name__ == '__main__':
     network_module = importlib.import_module('networks.{:s}.{:s}'.format(args.model, args.model))
 
     basepath = 'networks/{:s}'.format(args.model)
-    timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
-    os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
+
+    # load checkpoint
+    if args.restore_checkpoint_filename is not None:
+        checkpoint_path_restore = '{:s}/checkpoints/{:s}'.format(basepath, args.restore_checkpoint_filename)
+        checkpoint = torch.load(checkpoint_path_restore)
+        timestamp = checkpoint['timestamp']
+    else:
+        checkpoint = None
+        timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+        os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
+
     checkpoint_path_latest = '{:s}/checkpoints/{:s}_latest.ckpt'.format(basepath, timestamp)
     checkpoint_path_best   = '{:s}/checkpoints/{:s}_best.ckpt'.format(basepath, timestamp)
 
     # instantiate simple logger
     log_obj = logger.logger(basepath=basepath, timestamp=timestamp)
+    if checkpoint != None:
+        log_obj.write('\n' + 42*'=' + '\n')
+        log_obj.write('\n model restored from checkpoint\n')
     log_obj.write('basepath = {:s}'.format(basepath))
     log_obj.write('timestamp = {:s}'.format(timestamp))
     log_obj.write('\n# Options')
@@ -355,4 +370,4 @@ if __name__ == '__main__':
     torch.backends.cudnn.benchmark = True
     use_gpu = torch.cuda.is_available()
 
-    main()
+    main(checkpoint)
