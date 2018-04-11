@@ -65,9 +65,9 @@ def train_loop(model, train_loader, optimizer, epoch):
             float(loss.data[0]), float(acc.data[0]),
             time.perf_counter() - time_start))
 
-        # for debugging to arrive at validation early...
-        if (batch_idx+1)%4 == 0:
-            break
+        # # for debugging to arrive at validation early...
+        # if (batch_idx+1)%4 == 0:
+        #     break
 
     loss_avg = np.mean(training_losses)
     acc_avg = np.mean(training_accs)
@@ -251,14 +251,19 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
+    # required
+    parser.add_argument("--model", required=True,
+                        help="Which model definition to use")
     parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz", "cath_3class_backbone.npz", }, required=True,
                         help="The name of the data file (will automatically downloaded)")
+    # cath specific
     parser.add_argument("--data-discretization-bins", type=int, default=50,
                         help="Number of bins used in each dimension for the discretization of the input data")
     parser.add_argument("--data-discretization-bin-size", type=float, default=2.0,
                         help="Size of bins used in each dimension for the discretization of the input data")
-    parser.add_argument("--model", required=True,
-                        help="Which model definition to use")
+
+    parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
+                        help="Mode of operation (default: %(default)s)")
     parser.add_argument("--training-epochs", default=100, type=int,
                         help="Which model definition to use")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
@@ -269,8 +274,6 @@ if __name__ == '__main__':
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
     parser.add_argument("--restore-checkpoint-filename", type=str, default=None,
                         help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
-    parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
-                        help="Mode of operation (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-3, type=float,
                         help="Initial learning rate (without decay)")
     parser.add_argument("--lr_decay_start", type=int, default=1,
