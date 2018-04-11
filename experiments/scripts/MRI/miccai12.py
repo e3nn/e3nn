@@ -47,6 +47,10 @@ def train_loop(model, train_loader, loss_function, optimizer, epoch):
             loss_value, binary_dice_acc,
             time.perf_counter() - time_start))
 
+        # for debugging to arrive at validation early...
+        if (batch_idx+1)%4 == 0:
+            break
+
     return np.mean(train_losses), np.mean(train_dice_accs)
 
 
@@ -118,7 +122,7 @@ def calc_binary_dice_score(dataset, ys):
 
 
 
-def main():
+def main(checkpoint):
 
     h5_filename = '../../datasets/MRI/MICCAI2012/miccai12.h5'
     if args.mode == 'train':
@@ -189,15 +193,12 @@ def main():
     epoch_start_index = 0
     best_validation_loss = float('inf')
     global timestamp
-    if args.restore_checkpoint_filename is not None:
-        checkpoint_path_restore = '{:s}/checkpoints/{:s}'.format(basepath, args.restore_checkpoint_filename)
+    if checkpoint is not None:
         log_obj.write("Restoring model from: " + checkpoint_path_restore)
-        checkpoint = torch.load(checkpoint_path_restore)
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         epoch_start_index = checkpoint['epoch']+1
         best_validation_loss = checkpoint['best_validation_loss']
-        timestamp = checkpoint['timestamp']
 
     tf_logger, tensorflow_available = tensorflow_logger.get_tf_logger(basepath=basepath, timestamp=timestamp)
 
@@ -256,19 +257,29 @@ def main():
             # Adjust patch indices at end of each epoch
             train_set.initialize_patch_indices()
 
+    elif args.mode == 'validate':
+        raise NotImplementedError('validation mode')
+
+    elif args.mode == 'test':
+        raise NotImplementedError('test mode')
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
+    # required
     parser.add_argument("--model", required=True,
                         help="Which model definition to use")
+    # MRI specific
     parser.add_argument("--patch-size", default=64, type=int,
                         help="Size of patches (default: %(default)s)")
     parser.add_argument("--loss", choices=['dice', 'dice_onehot', 'cross_entropy'],
                         default="cross_entropy",
                         help="Which loss function to use(default: %(default)s)")
+    parser.add_argument("--class-weighting", action='store_true', default=False,
+                        help="switches on class weighting, only used in cross entropy loss (default: %(default)s)")
+
     parser.add_argument("--mode", choices=['train', 'test', 'validate'],
                         default="train",
                         help="Mode of operation (default: %(default)s)")
@@ -282,8 +293,6 @@ if __name__ == '__main__':
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
     parser.add_argument("--restore-checkpoint-filename", type=str, default=None,
                         help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
-    parser.add_argument("--class-weighting", action='store_true', default=False,
-                        help="switches on class weighting, only used in cross entropy loss (default: %(default)s)")
     parser.add_argument("--initial_lr", default=1e-2, type=float,
                         help="Initial learning rate (without decay)")
     parser.add_argument("--lr_decay_start", type=int, default=1,
@@ -325,18 +334,31 @@ if __name__ == '__main__':
     network_module = importlib.import_module('networks.MICCAI2012.{:s}.{:s}'.format(args.model, args.model))
 
     basepath = 'networks/MICCAI2012/{:s}'.format(args.model)
-    timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
-    os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
+
+    # load checkpoint
+    if args.restore_checkpoint_filename is not None:
+        checkpoint_path_restore = '{:s}/checkpoints/{:s}'.format(basepath, args.restore_checkpoint_filename)
+        checkpoint = torch.load(checkpoint_path_restore)
+        timestamp = checkpoint['timestamp']
+    else:
+        checkpoint = None
+        timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+        os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
+
     checkpoint_path_latest = '{:s}/checkpoints/{:s}_latest.ckpt'.format(basepath, timestamp)
     checkpoint_path_best   = '{:s}/checkpoints/{:s}_best.ckpt'.format(basepath, timestamp)
 
     # instantiate simple logger
     log_obj = logger.logger(basepath=basepath, timestamp=timestamp)
+    if checkpoint != None:
+        log_obj.write('\n' + 42*'=' + '\n')
+        log_obj.write('\n model restored from checkpoint\n')
     log_obj.write('basepath = {:s}'.format(basepath))
     log_obj.write('timestamp = {:s}'.format(timestamp))
     log_obj.write('\n# Options')
     for key, value in sorted(vars(args).items()):
         log_obj.write('\t'+str(key)+'\t'+str(value))
+
 
     torch.backends.cudnn.benchmark = True
     use_gpu = torch.cuda.is_available()
@@ -385,8 +407,4 @@ if __name__ == '__main__':
     assert len(set(validation_filter).intersection(train_filter)) == 0
     assert len(set(test_filter).intersection(train_filter)) == 0
 
-    main()
-
-
-
-
+    main(checkpoint)
