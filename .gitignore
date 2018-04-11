@@ -13,6 +13,6 @@ dist
 tmp.*
 .*
 *.png
-*/logs
-*/tf_logs
+**/tf_logs
 **/*.log
+**/*.ckpt
