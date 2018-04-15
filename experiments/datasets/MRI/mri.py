@@ -5,18 +5,224 @@ import numpy as np
 import numbers
 import sys
 
+miccai_filters = {
+    'train': ["1000_3",
+              "1001_3",
+              "1002_3",
+              "1006_3",
+              "1007_3",
+              "1008_3",
+              "1009_3",
+              "1010_3",
+              "1011_3",
+              "1012_3",
+              "1013_3",
+              "1014_3"],
+    'validation': ["1015_3",
+                   "1017_3",
+                   "1036_3"],
+    'test': ["1003_3",
+             "1004_3",
+             "1005_3",
+             "1018_3",
+             "1019_3",
+             "1023_3",
+             "1024_3",
+             "1025_3",
+             "1038_3",
+             "1039_3",
+             "1101_3",
+             "1104_3",
+             "1107_3",
+             "1110_3",
+             "1113_3",
+             "1116_3",
+             "1119_3",
+             "1122_3",
+             "1125_3",
+             "1128_3"]
+    }
+# check that filters are non-overlapping
+assert len(set(miccai_filters['train']).intersection(miccai_filters['validation'])) == 0
+assert len(set(miccai_filters['train']).intersection(miccai_filters['test'])) == 0
+
+def get_miccai_dataloader(dataset,
+                          h5_filename,
+                          mode,
+                          patch_shape,
+                          batch_size,
+                          num_workers,
+                          pin_memory,
+                          **read_data_kwargs):
+    if mode == 'train':
+        data_set = MRISegmentation(dataset=dataset,
+                                   h5_filename=h5_filename,
+                                   mode='train',
+                                   patch_shape=patch_shape,
+                                   **read_data_kwargs)
+        data_loader = torch.utils.data.DataLoader(data_set,
+                                                  batch_size=batch_size,
+                                                  shuffle=True,
+                                                  num_workers=num_workers,
+                                                  pin_memory=pin_memory,
+                                                  drop_last=True)
+        np.set_printoptions(threshold=np.nan)
+        print(np.unique(data_set.labels[0]))
+    if mode in ['train', 'validation']:
+        data_set = MRISegmentation(dataset=dataset,
+                                   h5_filename=h5_filename,
+                                   mode='validation',
+                                   patch_shape=patch_shape,
+                                   randomize_patch_offsets=False,
+                                   **read_data_kwargs)
+        data_loader = torch.utils.data.DataLoader(data_set,
+                                                  batch_size=batch_size,
+                                                  shuffle=False,
+                                                  num_workers=num_workers,
+                                                  pin_memory=pin_memory,
+                                                  drop_last=False)
+    if mode == 'test':
+        data_set = MRISegmentation(dataset=dataset,
+                                   h5_filename=h5_filename,
+                                   mode='test',
+                                   patch_shape=patch_shape,
+                                   randomize_patch_offsets=False,
+                                   **read_data_kwargs)
+        data_loader = torch.utils.data.DataLoader(data_set,
+                                                  batch_size=batch_size,
+                                                  shuffle=False,
+                                                  num_workers=num_workers,
+                                                  pin_memory=pin_memory,
+                                                  drop_last=False)
+    return data_set, data_loader
+
+def get_mrbrains_dataloader(dataset,
+                            h5_filename,
+                            mode,
+                            patch_shape,
+                            batch_size,
+                            num_workers,
+                            pin_memory,
+                            N_train):
+    if mode == 'train':
+        data_set = MRISegmentation(dataset=dataset,
+                                   h5_filename=h5_filename,
+                                   mode='train',
+                                   patch_shape=patch_shape)
+        data_loader = torch.utils.data.DataLoader(data_set,
+                                                  batch_size=batch_size,
+                                                  shuffle=True,
+                                                  num_workers=num_workers,
+                                                  pin_memory=pin_memory,
+                                                  drop_last=True)
+        np.set_printoptions(threshold=np.nan)
+        print(np.unique(data_set.labels[0]))
+    if mode in ['train', 'validation']:
+        data_set = MRISegmentation(dataset=dataset,
+                                   h5_filename=h5_filename,
+                                   mode='validation',
+                                   patch_shape=patch_shape,
+                                   randomize_patch_offsets=False)
+        data_loader = torch.utils.data.DataLoader(data_set,
+                                                  batch_size=batch_size,
+                                                  shuffle=False,
+                                                  num_workers=num_workers,
+                                                  pin_memory=pin_memory,
+                                                  drop_last=False)
+    if mode == 'test':
+        data_set = MRISegmentation(dataset=dataset,
+                                   h5_filename=h5_filename,
+                                   mode='test',
+                                   patch_shape=patch_shape,
+                                   randomize_patch_offsets=False)
+        data_loader = torch.utils.data.DataLoader(data_set,
+                                                  batch_size=batch_size,
+                                                  shuffle=False,
+                                                  num_workers=num_workers,
+                                                  pin_memory=pin_memory,
+                                                  drop_last=False)
+    return data_set, data_loader
+
+def read_h5_data(dataset, h5_filename, mode, **read_data_kwargs):
+    ''' read MRI datasets from h5 files
+        :param dataset: selects miccai or mrbrains, the latter with either reduced or full labels
+        :param h5_filename: path to the h5 file
+        :param mode: load train, validation or test set
+    '''
+    assert dataset in ['miccai', 'mrbrains_reduced', 'mrbrains_full']
+    assert mode in ['train', 'validation', 'test']
+    if dataset == 'miccai':
+        return read_h5_data_miccai(h5_filename, mode, **read_data_kwargs)
+    else:
+        label_mode = dataset.split('_')[-1] # 'reduced' or 'full'
+        return read_h5_data_mrbrains(h5_filename, mode, label_mode, **read_data_kwargs)
+
+def read_h5_data_miccai(h5_filename, mode, filter=None):
+    ''' to be called from read_h5_data '''
+    data = []
+    labels = []
+    unpadded_data_spatial_shape = []
+    padding_boundary = []
+    patch_indices = []
+    if filter == None:
+        filter = miccai_filters.get(mode)
+    with h5py.File(h5_filename, 'r') as hf:
+        for name in filter:
+            # Assumption: voxel value and pixel are stored in last dim
+            signal_volume = hf[name][:][:,:,:,0].squeeze()[np.newaxis,...]
+            label_volume  = hf[name][:][:,:,:,1].squeeze()
+            data.append(signal_volume)
+            labels.append(label_volume)
+            unpadded_data_spatial_shape.append(data[-1].shape[1:])
+            padding_boundary.append(None)
+        class_count = hf['class_counts'][:]
+    return data, labels, unpadded_data_spatial_shape, padding_boundary, class_count
+
+def read_h5_data_mrbrains(h5_filename, mode, label_mode, N_train=4):
+    ''' to be called from read_h5_data
+        training set is split into N_train training samples and 5-N_train validation samples
+    '''
+    with h5py.File(h5_filename, 'r') as hf:
+        if mode == 'train':
+            data   = [hf['train_signal_{}'.format(i)][()]               for i in range(N_train)]
+            labels = [hf['train_label_{}_{}'.format(label_mode, i)][()] for i in range(N_train)]
+        elif mode == 'validation':
+            data   = [hf['train_signal_{}'.format(i)][()]               for i in range(N_train, 5)]
+            labels = [hf['train_label_{}_{}'.format(label_mode, i)][()] for i in range(N_train, 5)]
+        elif mode == 'test':
+            data   = [hf['test_signal_{}'.format(i)][()] for i in range(15)]
+            labels = None
+        class_count = hf['class_counts_{}'.format(label_mode)][:]
+        unpadded_data_spatial_shape = [d.shape[1:] for d in data]
+        padding_boundary = [None for d in data]
+    return data, labels, unpadded_data_spatial_shape, padding_boundary, class_count
+
 
 class MRISegmentation(torch.utils.data.Dataset):
-    """Read 3D medical image files in .nii format, and provide it to the
-       user as 3D patches of the requested size. Setting
-       randomize_patch_offsets=True will add random offsets to the
-       patches to reduce the affect of patch boundaries."""
-
-    def __init__(self, h5_filename, filter, patch_shape,
+    ''' Read 3D medical image files in .nii format, and provide it to the
+        user as 3D patches of the requested size. Setting
+        randomize_patch_offsets=True will add random offsets to the
+        patches to reduce the affect of patch boundaries.
+        :param dataset: dataset to be loaded. options are 'miccai', 'mrbrains_reduced' and 'mrbrains_full'
+        :param h5_filename: path to the hdf5 file
+        :param mode: load 'train', 'validation' or 'test' set
+        :param patch_shape:
+        :param filter: optional - only for miccai select exactly which scans to load
+        :param randomize_patch_offsets:
+        :param pad_mode:
+        :param pad_constant:
+        :param read_data_kwargs: keywordargs options for different datasets
+                                 used to pass `filter` for miccai and `N_train` for mrbrains
+    '''
+    def __init__(self,
+                 dataset,
+                 h5_filename,
+                 mode,
+                 patch_shape,
                  randomize_patch_offsets=True,
                  pad_mode='constant',
-                 pad_constant=0):
-                 # log10_signal=False):
+                 pad_constant=0,
+                 **read_data_kwargs):
 
         if isinstance(patch_shape, numbers.Integral):
             patch_shape = np.repeat(patch_shape, 3)
@@ -26,26 +232,11 @@ class MRISegmentation(torch.utils.data.Dataset):
         self.pad_constant = pad_constant
         # self.log10_signal = log10_signal
 
-        self.data = []
-        self.labels = []
-        self.unpadded_data_shape = []
-        self.padding_boundary = []
-        self.patch_indices = []
-
         # Read H5 file
         print("Reading data...", end="")
         sys.stdout.flush()
-        with h5py.File(h5_filename, 'r') as hf:
-            for name in filter:
-                data = hf[name][:]
-                # Assumption: voxel value and pixel are stored in last dim
-                signal_volume = data[:,:,:,0].squeeze()
-                label_volume  = data[:,:,:,1].squeeze()
-                self.data.append(signal_volume)
-                self.labels.append(label_volume)
-                self.unpadded_data_shape.append(self.data[-1].shape)
-                self.padding_boundary.append(None)
-            self.class_count = hf['class_counts'][:]
+        self.data, self.labels, self.unpadded_data_spatial_shape, self.padding_boundary, self.class_count = \
+             read_h5_data(dataset, h5_filename, mode, **read_data_kwargs)
         print("done.")
 
         # This first call to initialize_patch_indices will calculate the
@@ -58,7 +249,10 @@ class MRISegmentation(torch.utils.data.Dataset):
         sys.stdout.flush()
         for i, image in enumerate(self.data):
             pad_width = self.padding_boundary[i]
-            self.data[i] = np.pad(self.data[i], pad_width,
+            # for data which contains a channel dimension add an entry to pad_width
+            if len(self.data[i].shape) == 4:
+                pad_width_data = np.insert(pad_width, 0, values=0, axis=0)
+            self.data[i] = np.pad(self.data[i], pad_width_data,
                                   mode=self.pad_mode,
                                   constant_values=self.pad_constant)
             self.labels[i] = np.pad(self.labels[i], pad_width,
@@ -75,7 +269,7 @@ class MRISegmentation(torch.utils.data.Dataset):
 
     def get_original(self, dataset_index):
         """Get full input image at specified index"""
-        size = self.unpadded_data_shape[dataset_index]
+        size = self.unpadded_data_spatial_shape[dataset_index]
         patch_index_start = self.padding_boundary[dataset_index][:,0]
         patch_index_end = patch_index_start + size
         patch_index = np.stack((patch_index_start, patch_index_end))
@@ -93,7 +287,7 @@ class MRISegmentation(torch.utils.data.Dataset):
         self.patch_indices = []
         for i, image in enumerate(self.data):
             patch_indices, overflow = self.calc_patch_indices(
-                self.unpadded_data_shape[i],
+                self.unpadded_data_spatial_shape[i],
                 self.patch_shape,
                 randomize_offset=self.randomize_patch_offsets)
             patch_indices = np.append(np.full(shape=(patch_indices.shape[0],1),
@@ -123,17 +317,26 @@ class MRISegmentation(torch.utils.data.Dataset):
 
         patch_index = np.stack((patch_index_start, patch_index_end))
         patch_valid = np.stack(patch_index).clip(
-            min=0, max=self.unpadded_data_shape[dataset_index]) - patch_index[0]
+            min=0, max=self.unpadded_data_spatial_shape[dataset_index]) - patch_index[0]
 
         # Update patch indices to padded image
         patch_index_padded = patch_index + self.padding_boundary[dataset_index][:,0]
 
+
+        # # OLD VERSION
+        # # assumed images not to have channel dimension yet and hence adds it
         # Lookup image and add channel dimension
-        image_patch = np.expand_dims(
-            image[patch_index_padded[0, 0]:patch_index_padded[1, 0],
-                  patch_index_padded[0, 1]:patch_index_padded[1, 1],
-                  patch_index_padded[0, 2]:patch_index_padded[1, 2]],
-            axis=0).astype(np.float32)
+        # image_patch = np.expand_dims(
+        #     image[patch_index_padded[0, 0]:patch_index_padded[1, 0],
+        #           patch_index_padded[0, 1]:patch_index_padded[1, 1],
+        #           patch_index_padded[0, 2]:patch_index_padded[1, 2]],
+        #     axis=0).astype(np.float32)
+
+        # Slice image patch
+        image_patch = image[:, patch_index_padded[0, 0]:patch_index_padded[1, 0],
+                               patch_index_padded[0, 1]:patch_index_padded[1, 1],
+                               patch_index_padded[0, 2]:patch_index_padded[1, 2]].astype(np.float32)
+        # Slice label patch and add dimension
         labels_patch = np.expand_dims(
             labels[patch_index_padded[0, 0]:patch_index_padded[1, 0],
                    patch_index_padded[0, 1]:patch_index_padded[1, 1],
@@ -141,6 +344,7 @@ class MRISegmentation(torch.utils.data.Dataset):
             axis=0)
 
         # print("image: ", image_patch)
+
 
         # Check that patch has the correct size
         assert np.all(image_patch[0].shape == self.patch_shape)
@@ -152,7 +356,8 @@ class MRISegmentation(torch.utils.data.Dataset):
         return len(self.patch_indices)
 
     @staticmethod
-    def calc_patch_indices(image_shape, patch_shape,
+    def calc_patch_indices(image_shape,
+                           patch_shape,
                            overlap=0,
                            randomize_offset=True,
                            minimum_overflow_fraction=0.25):
