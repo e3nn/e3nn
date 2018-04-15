@@ -302,7 +302,7 @@ if __name__ == '__main__':
                         help="L2 regularization factor for convolution biases")
     parser.add_argument("--lamb_norm_activ_bias_L1", default=0, type=float,
                         help="L1 regularization factor for norm activation biases")
-    parser.add_argument("-lamb_norm_activ_bias_L2", default=0, type=float,
+    parser.add_argument("--lamb_norm_activ_bias_L2", default=0, type=float,
                         help="L2 regularization factor for norm activation biases")
     parser.add_argument("--lamb_normalization_bias_L1", default=0, type=float,
                         help="L1 regularization factor for normalization biases")
