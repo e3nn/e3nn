@@ -128,19 +128,7 @@ def main(checkpoint):
     data_loader_kwargs = {'dataset': args.dataset,
                           'patch_shape': args.patch_size,
                           'batch_size': args.batch_size,
-                          # 'num_workers': 8,
-
-
-
-
-
-                          'num_workers': 0,
-
-
-
-
-
-
+                          'num_workers': 8,
                           'pin_memory': False}
     if args.dataset == 'miccai':
         data_loader_kwargs.update({'h5_filename': '../../datasets/MRI/MICCAI2012/miccai12.h5'})
