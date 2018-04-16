@@ -176,6 +176,9 @@ def read_h5_data_miccai(h5_filename, mode, filter=None):
             unpadded_data_spatial_shape.append(data[-1].shape[1:])
             padding_boundary.append(None)
         class_count = hf['class_counts'][:]
+        # signal_mean = hf['signal_mean'][:]
+        # signal_std  = hf['signal_std'][:]
+        # bg_values = -signal_mean/signal_std # since original bg value was zero
     return data, labels, unpadded_data_spatial_shape, padding_boundary, class_count
 
 def read_h5_data_mrbrains(h5_filename, mode, label_mode, N_train=4):
@@ -195,6 +198,8 @@ def read_h5_data_mrbrains(h5_filename, mode, label_mode, N_train=4):
         class_count = hf['class_counts_{}'.format(label_mode)][:]
         unpadded_data_spatial_shape = [d.shape[1:] for d in data]
         padding_boundary = [None for d in data]
+        # channel_means = hf['channel_means'][:]
+        # channel_stds  = hf['channel_stds'][:]
     return data, labels, unpadded_data_spatial_shape, padding_boundary, class_count
 
 
@@ -209,7 +214,7 @@ class MRISegmentation(torch.utils.data.Dataset):
         :param patch_shape:
         :param filter: optional - only for miccai select exactly which scans to load
         :param randomize_patch_offsets:
-        :param pad_mode:
+        # :param pad_mode:
         :param pad_constant:
         :param read_data_kwargs: keywordargs options for different datasets
                                  used to pass `filter` for miccai and `N_train` for mrbrains
@@ -220,16 +225,16 @@ class MRISegmentation(torch.utils.data.Dataset):
                  mode,
                  patch_shape,
                  randomize_patch_offsets=True,
-                 pad_mode='constant',
-                 pad_constant=0,
+                 # pad_mode='constant',
+                 # pad_constant=0,
                  **read_data_kwargs):
 
         if isinstance(patch_shape, numbers.Integral):
             patch_shape = np.repeat(patch_shape, 3)
         self.patch_shape = patch_shape
         self.randomize_patch_offsets = randomize_patch_offsets
-        self.pad_mode = pad_mode
-        self.pad_constant = pad_constant
+        # self.pad_mode = pad_mode
+        # self.pad_constant = pad_constant
         # self.log10_signal = log10_signal
 
         # Read H5 file
@@ -252,12 +257,16 @@ class MRISegmentation(torch.utils.data.Dataset):
             # for data which contains a channel dimension add an entry to pad_width
             if len(self.data[i].shape) == 4:
                 pad_width_data = np.insert(pad_width, 0, values=0, axis=0)
-            self.data[i] = np.pad(self.data[i], pad_width_data,
-                                  mode=self.pad_mode,
-                                  constant_values=self.pad_constant)
-            self.labels[i] = np.pad(self.labels[i], pad_width,
-                                    mode=self.pad_mode,
-                                    constant_values=self.pad_constant).astype(np.int64)
+            # self.data[i] = np.pad(self.data[i], pad_width_data,
+            #                       mode=self.pad_mode,
+            #                       constant_values=self.pad_constant)
+            # self.labels[i] = np.pad(self.labels[i], pad_width,
+            #                         mode=self.pad_mode,
+            #                         constant_values=self.pad_constant).astype(np.int64)
+            pad_mode = 'symmetric' # constant value padding unclear for some signal channels
+            self.data[i]   = np.pad(self.data[i],   pad_width_data, mode=pad_mode)
+            self.labels[i] = np.pad(self.labels[i], pad_width,      mode=pad_mode).astype(np.int64)
+
         print("done.")
         # # optionally logarithmize zero shifted input signal
         # if self.log10_signal:
