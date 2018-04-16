@@ -397,7 +397,7 @@ class MRISegmentation(torch.utils.data.Dataset):
             # Add extra patch for dimensions where minimum is below fraction
             extra_patch = (overflow/patch_shape) < minimum_overflow_fraction
             overflow += extra_patch*eff_patch_shape
-            n_patches += 1
+            # n_patches += 1
 
             # Select random start index so that overlap is spread randomly
             # on both sides. If overflow is larger than patch_shape
