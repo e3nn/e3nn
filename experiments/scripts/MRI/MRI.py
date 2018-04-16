@@ -189,8 +189,8 @@ def main(checkpoint):
 
     if args.mode == 'train':
         for epoch in range(epoch_start_index, args.training_epochs):
-            optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, args.initial_lr,
-                                                                  args.lr_decay_start, args.lr_decay_base, verbose=True)
+            optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, args.initial_lr, args.lr_decay_start,
+                                                                  args.lr_decay_base, verbose=True, printfct=log_obj.write)
 
             training_loss, training_binary_dice_acc = train_loop(model, train_loader, loss_function, optimizer, epoch)
 
