@@ -59,6 +59,7 @@ def infer(model, loader, loss_function):
     losses_numerator = []
     losses_denominator = []
     out_images = []
+    patch_overlap = torch.from_numpy(loader.dataset.patch_overlap)
     for i in range(len(loader.dataset.unpadded_data_shape)):
         out_images.append(np.full(loader.dataset.unpadded_data_shape[i], -1))
     for i, (data, target, img_index, patch_index, valid) in enumerate(loader):
@@ -68,16 +69,28 @@ def infer(model, loader, loss_function):
         y = torch.autograd.Variable(target, volatile=True)
         out = model(x)
         _, out_predict = torch.max(out, dim=1)
-        mask = get_mask.get_mask(out_predict.shape, valid)
         patch_index = patch_index.cpu().numpy()
+        patch_shape = torch.from_numpy(np.array(out_predict[0].shape))
         for j in range(out.size(0)):
-            out_predict_masked = out_predict[j][mask[j]]
-            patch_start = patch_index[j,0] + valid[j,0]
-            patch_end = patch_start + (valid[j,1]-valid[j,0])
+
+            # Initiate selction based on valid region
+            patch_start = valid[j,0]
+            patch_end = valid[j,1]
+
+            # Update selection based on patch overlap
+            patch_start = torch.max(patch_start, torch.ceil(patch_overlap.double() / 2).long())
+            patch_end = patch_shape - torch.max(patch_shape - patch_end, patch_overlap / 2)
+
+            global_patch_start = torch.from_numpy(patch_index[j,0]) + patch_start
+            global_patch_end = torch.from_numpy(patch_index[j,0]) + patch_end
+
             if (patch_end-patch_start > 0).all():
-                out_images[img_index[j]][patch_start[0]:patch_end[0],
-                                         patch_start[1]:patch_end[1],
-                                         patch_start[2]:patch_end[2]] = out_predict_masked.view((valid[j,1] - valid[j,0]).tolist()).data.cpu().numpy()
+                out_images[img_index[j]][global_patch_start[0]:global_patch_end[0],
+                                         global_patch_start[1]:global_patch_end[1],
+                                         global_patch_start[2]:global_patch_end[2]] = out_predict.data.cpu().numpy()[j,
+                                                                                                                     patch_start[0]:patch_end[0],
+                                                                                                                     patch_start[1]:patch_end[1],
+                                                                                                                     patch_start[2]:patch_end[2]]
         numerator, denominator = loss_function(out, y, valid=valid, reduce=False)
         del out, out_predict
         try:
@@ -87,8 +100,6 @@ def infer(model, loader, loss_function):
             pass
         losses_numerator.append(numerator.cpu().numpy())
         losses_denominator.append(denominator.cpu().numpy())
-        # print(np.mean(np.sum(losses_numerator[-1], axis=0)/np.sum(losses_denominator[-1], axis=0)), loss_function(out, y, valid).data.cpu().numpy())
-        # loss_function = lambda *x: cross_entropy_loss(*x, class_weight=class_weight)
     # Check that entire image was filled in
     for out_image in out_images:
         assert not (out_image == -1).any()
@@ -122,46 +133,51 @@ def calc_binary_dice_score(dataset, ys):
 
 
 
-def main(checkpoint):
+def main(args, checkpoint):
 
-    h5_filename = '../../datasets/MRI/MICCAI2012/miccai12.h5'
+    h5_filename = args.data_filename
     if args.mode == 'train':
         train_set = MRISegmentation(h5_filename=h5_filename,
                                     patch_shape=args.patch_size,
+                                    patch_overlap=args.patch_overlap,
                                     filter=train_filter)
                                     # log10_signal=args.log10_signal)
         train_loader = torch.utils.data.DataLoader(train_set,
                                                    batch_size=args.batch_size,
                                                    shuffle=True,
-                                                   num_workers=8,
+                                                   num_workers=args.num_workers,
                                                    pin_memory=False,
                                                    drop_last=True)
-        np.set_printoptions(threshold=np.nan)
-        print(np.unique(train_set.labels[0]))
+        print("Training set size: ", len(train_set))
     if args.mode in ['train', 'validate']:
         validation_set = MRISegmentation(h5_filename=h5_filename,
                                          patch_shape=args.patch_size,
+                                         patch_overlap=args.patch_overlap,
                                          filter=validation_filter,
                                          randomize_patch_offsets=False)
                                          # log10_signal=args.log10_signal)
         validation_loader = torch.utils.data.DataLoader(validation_set,
                                                         batch_size=args.batch_size,
                                                         shuffle=False,
-                                                        num_workers=8,
+                                                        num_workers=args.num_workers,
                                                         pin_memory=False,
                                                         drop_last=False)
+        print("Validation set size: ", len(validation_set))
+
     if args.mode == 'test':
         test_set = MRISegmentation(h5_filename=h5_filename,
                                    patch_shape=args.patch_size,
+                                   patch_overlap=args.patch_overlap,
                                    filter=test_filter,
                                    randomize_patch_offsets=False)
                                    # log10_signal=args.log10_signal)
         test_loader = torch.utils.data.DataLoader(test_set,
                                                   batch_size=args.batch_size,
                                                   shuffle=False,
-                                                  num_workers=8,
+                                                  num_workers=args.num_workers,
                                                   pin_memory=False,
                                                   drop_last=False)
+        print("Validation set size: ", len(test_set))
 
 
     model = network_module.network(output_size=output_size)
@@ -178,7 +194,8 @@ def main(checkpoint):
 
     loss_function = None
     if args.loss == "dice":
-        loss_function = losses.dice_coefficient_loss
+        loss_function = partial(losses.dice_coefficient_loss,
+                                overlap=args.patch_overlap)
     elif args.loss == "cross_entropy":
         if args.class_weighting:
             class_weight = torch.Tensor(1/train_set.class_count)
@@ -187,7 +204,9 @@ def main(checkpoint):
                 class_weight = class_weight.cuda()
         else:
             class_weight = None
-        loss_function = partial(losses.cross_entropy_loss, class_weight=class_weight)
+        loss_function = partial(losses.cross_entropy_loss,
+                                class_weight=class_weight,
+                                overlap=args.patch_overlap)
 
     # restore state from checkpoint
     epoch_start_index = 0
@@ -271,9 +290,13 @@ if __name__ == '__main__':
     # required
     parser.add_argument("--model", required=True,
                         help="Which model definition to use")
+    parser.add_argument("--data-filename", required=True,
+                        help="Location of data file")
     # MRI specific
     parser.add_argument("--patch-size", default=64, type=int,
                         help="Size of patches (default: %(default)s)")
+    parser.add_argument("--patch-overlap", default=0, type=int,
+                        help="Overlap between neighboring patches (default: %(default)s)")
     parser.add_argument("--loss", choices=['dice', 'dice_onehot', 'cross_entropy'],
                         default="cross_entropy",
                         help="Which loss function to use(default: %(default)s)")
@@ -283,6 +306,8 @@ if __name__ == '__main__':
     parser.add_argument("--mode", choices=['train', 'test', 'validate'],
                         default="train",
                         help="Mode of operation (default: %(default)s)")
+    parser.add_argument("--num-workers", default=0, type=int,
+                        help="Number of workers to use")
     parser.add_argument("--training-epochs", default=100, type=int,
                         help="Which model definition to use")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
@@ -407,4 +432,4 @@ if __name__ == '__main__':
     assert len(set(validation_filter).intersection(train_filter)) == 0
     assert len(set(test_filter).intersection(train_filter)) == 0
 
-    main(checkpoint)
+    main(args, checkpoint)
