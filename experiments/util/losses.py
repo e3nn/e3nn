@@ -4,8 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# from experiments.util import get_mask
-
 def dice_coefficient_orig_binary(y_pred, y_true, y_pred_is_dist=False,
                                  classes=None, epsilon=1e-5, reduce=True):
     """As originally specified: using binary vectors and an explicit average
@@ -145,27 +143,6 @@ def dice_coefficient(y_pred, y_true, valid=None, overlap=None, reduce=True, epsi
             unions.append(torch.sum(class_at_voxel, dim=1) +
                           torch.sum(y_pred_f, dim=1))
 
-    # mask = None
-    # if valid is not None:
-    #     mask = get_mask.get_mask((y_true.size(0), y_true.size(-3), y_true.size(-2), y_true.size(-1)), valid)
-    #
-    # for i in range(y_pred.shape[0]):
-    #
-    #     if mask is not None:
-    #         y_pred_f = y_pred[i][mask[i]].view(y_pred.size(1), -1)
-    #         y_true_f = y_true[i][mask[i]].view(-1)
-    #     else:
-    #         y_pred_f = y_pred[i].view(y_pred.size(1), -1)
-    #         y_true_f = y_true[i].view(-1)
-    #     if len(y_true_f.shape) > 0:
-    #         # Dynamically create one-hot encoding
-    #         class_at_voxel = (all_classes.view(-1, 1) == y_true_f).float()
-    #         intersection = torch.sum(class_at_voxel * y_pred_f,
-    #                                  dim=1)
-    #         intersections.append(2*intersection)
-    #         unions.append(torch.sum(class_at_voxel, dim=1) +
-    #                       torch.sum(y_pred_f, dim=1))
-
 
     if len(intersections) > 0:
         intersections = torch.stack(intersections)
@@ -229,31 +206,3 @@ def cross_entropy_loss(y_pred, y_true, valid=None, overlap=None, reduce=True, cl
     else:
         return loss_per_voxel_sums, loss_per_voxel_norm_consts
 
-    # if valid is not None:
-    #
-    #     mask = get_mask.get_mask(loss_per_voxel.shape, valid)
-    #
-    #     if reduce:
-    #         print("1: ", loss_per_voxel[mask].mean())
-    #         return loss_per_voxel[mask].mean()
-    #     else:
-    #         loss_per_voxel_sums = []
-    #         loss_per_voxel_norm_consts = []
-    #         for i in range(y_pred.shape[0]):
-    #             loss_per_voxel_masked = loss_per_voxel[i][mask[i]]
-    #             if len(loss_per_voxel_masked.shape) > 0:
-    #                 loss_per_voxel_sums.append(torch.sum(loss_per_voxel_masked))
-    #                 loss_per_voxel_norm_consts.append(torch.LongTensor([loss_per_voxel_masked.shape[0]]))
-    #         print("2: ", torch.cat(loss_per_voxel_sums),
-    #                 torch.cat(loss_per_voxel_norm_consts))
-    #         return (torch.cat(loss_per_voxel_sums),
-    #                 torch.cat(loss_per_voxel_norm_consts))
-    # else:
-    #     if reduce:
-    #         print("1: ", loss_per_voxel.view(-1).mean())
-    #         return loss_per_voxel.view(-1).mean()
-    #     else:
-    #         print("2: ", torch.sum(loss_per_voxel, dim=1),
-    #                 torch.LongTensor([loss_per_voxel.size(0)]).repeat(loss_per_voxel.shape[0]))
-    #         return (torch.sum(loss_per_voxel, dim=1),
-    #                 torch.LongTensor([loss_per_voxel.size(0)]).repeat(loss_per_voxel.shape[0]))
