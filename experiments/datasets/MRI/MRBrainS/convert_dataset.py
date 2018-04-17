@@ -73,7 +73,9 @@ def normalize_signals(signals_train, signals_test):
         signals_test[i][0] = (signals_test[i][0] - T1_mean)/T1_std
         signals_test[i][1] = (signals_test[i][1] - T1_IR_mean)/T1_IR_std
         signals_test[i][2] = (signals_test[i][2] - T2_FLAIR_mean)/T2_FLAIR_std
-    return signals_train, signals_test
+    channel_means = np.array([T1_mean, T1_IR_mean, T2_FLAIR_mean])
+    channel_stds  = np.array([T1_std , T1_IR_std , T2_FLAIR_std ])
+    return signals_train, signals_test, channel_means, channel_stds
 
 
 def compute_class_counts(labels):
@@ -113,13 +115,15 @@ for dir in mri_dirs_test:
         data = resample_volume(data, order=3)
         signals_test[-1].append(data)
 
+# bg_estimates = np.array([np.array(signals_test)[:,ch,0,:,:].mean() for i in range(3)])
+
 # cropping after resampling is a bit slower but allows for the same border in each axis
 print('crop background in training set...')
 for i,(s,l) in enumerate(zip(signals_train, labels_train)):
     signals_train[i], labels_train[i] = crop_background(s,l)
 
 print('normalize signals...')
-signals_train, signals_test = normalize_signals(signals_train, signals_test)
+signals_train, signals_test, channel_means, channel_stds = normalize_signals(signals_train, signals_test)
 
 print('compute class counts...')
 class_counts_full, class_counts_reduced = compute_class_counts(labels_train)
@@ -138,6 +142,8 @@ with h5py.File('MRBrainS13.h5', 'w') as hf:
         hf.create_dataset('test_signal_{}'.format(i), data=signals_stacked, compression="gzip")
     hf.create_dataset('class_counts_full',    data=class_counts_full,    compression='gzip')
     hf.create_dataset('class_counts_reduced', data=class_counts_reduced, compression='gzip')
+    hf.create_dataset('channel_means', data=channel_means, compression='gzip')
+    hf.create_dataset('channel_stds',  data=channel_stds,  compression='gzip')
 
 
 

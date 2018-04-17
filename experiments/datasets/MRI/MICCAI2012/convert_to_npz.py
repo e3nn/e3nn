@@ -78,7 +78,6 @@ with h5py.File('miccai12.h5', 'w') as hf:
         labels = nib.load(label_file).get_data().squeeze()
         labels = labels.astype(int, copy=False)
         labels = label_filtering(labels, ignored_labels, true_labels)
-
         data, labels = crop_background(data, labels)
         data_list.append(data)
         label_list.append(labels)
@@ -94,7 +93,8 @@ with h5py.File('miccai12.h5', 'w') as hf:
         data_labels = np.stack([data_i, labels_i], axis=-1)
         hf.create_dataset(basename, data=data_labels, compression="gzip")
         print('saved {}, normalized to mean={} and std={}'.format(basename, data_i.mean(), data_i.std()))
-
+    hf.create_dataset('signal_mean', data=np.array([data_mean]), compression='gzip')
+    hf.create_dataset('signal_std',  data=np.array([data_std]),  compression='gzip')
 
     print('compute class count for class imbalance')
     stacked_labels = np.concatenate([label_vol.flatten() for label_vol in label_list])
