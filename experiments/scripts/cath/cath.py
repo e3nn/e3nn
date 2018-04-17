@@ -280,7 +280,7 @@ if __name__ == '__main__':
                         help="epoch after which the exponential learning rate decay starts")
     parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
-    # NEW
+    # model
     parser.add_argument("--kernel_size", type=int, default=5,
                         help="convolution kernel size")
     parser.add_argument("--p-drop-conv", type=float, default=0,

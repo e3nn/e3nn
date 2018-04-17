@@ -159,7 +159,7 @@ def main(args, checkpoint):
         test_set, test_loader = data_loader_getter(**data_loader_kwargs)
 
     # build model
-    model = network_module.network(output_size=output_size)
+    model = network_module.network(output_size=output_size, args=args)
     if use_gpu:
         model.cuda()
     log_obj.write("The model contains {} parameters".format(
@@ -305,6 +305,17 @@ if __name__ == '__main__':
                         help="epoch after which the exponential learning rate decay starts")
     parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
+    # model
+    parser.add_argument("--kernel_size", type=int, default=5,
+                        help="convolution kernel size")
+    parser.add_argument("--p-drop-conv", type=float, default=0,
+                        help="convolution/capsule dropout probability")
+    parser.add_argument("--p-drop-fully", type=float, default=0,
+                        help="fully connected layer / 1x1 conv dropout probability")
+    parser.add_argument("--bandlimit-mode", choices={"conservative", "compromise", "sfcnn"}, default="compromise",
+                        help="bandlimiting heuristic for spherical harmonics")
+    parser.add_argument("--SE3-nonlinearity", choices={"gated", "norm"}, default="gated",
+                        help="Which nonlinearity to use for non-scalar capsules")
     # WEIGHTS
     parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
                         help="L1 regularization factor for convolution weights")
