@@ -67,7 +67,7 @@ def get_miccai_dataloader(dataset,
                                                   pin_memory=pin_memory,
                                                   drop_last=True)
         np.set_printoptions(threshold=np.nan)
-        print(np.unique(data_set.labels[0]))
+
     if mode in ['train', 'validation']:
         data_set = MRISegmentation(dataset=dataset,
                                    h5_filename=h5_filename,
@@ -224,6 +224,7 @@ class MRISegmentation(torch.utils.data.Dataset):
                  h5_filename,
                  mode,
                  patch_shape,
+                 patch_overlap,
                  randomize_patch_offsets=True,
                  # pad_mode='constant',
                  # pad_constant=0,
@@ -231,7 +232,10 @@ class MRISegmentation(torch.utils.data.Dataset):
 
         if isinstance(patch_shape, numbers.Integral):
             patch_shape = np.repeat(patch_shape, 3)
+        if isinstance(patch_overlap, numbers.Integral):
+            patch_overlap = np.repeat(patch_overlap, 3)
         self.patch_shape = patch_shape
+        self.patch_overlap = patch_overlap
         self.randomize_patch_offsets = randomize_patch_offsets
         # self.pad_mode = pad_mode
         # self.pad_constant = pad_constant
@@ -298,6 +302,7 @@ class MRISegmentation(torch.utils.data.Dataset):
             patch_indices, overflow = self.calc_patch_indices(
                 self.unpadded_data_spatial_shape[i],
                 self.patch_shape,
+                overlap=self.patch_overlap,
                 randomize_offset=self.randomize_patch_offsets)
             patch_indices = np.append(np.full(shape=(patch_indices.shape[0],1),
                                               fill_value=i),
@@ -396,7 +401,7 @@ class MRISegmentation(torch.utils.data.Dataset):
         eff_patch_shape = (patch_shape - overlap)
 
         # Number of patches (rounding up)
-        n_patches = np.ceil(image_shape / eff_patch_shape).astype(int)
+        n_patches = np.ceil((image_shape - patch_shape) / eff_patch_shape + 1).astype(int)
 
         # Overflow of voxels beyond image
         overflow = eff_patch_shape * n_patches - image_shape + overlap
@@ -404,28 +409,36 @@ class MRISegmentation(torch.utils.data.Dataset):
         if randomize_offset:
 
             # Add extra patch for dimensions where minimum is below fraction
-            extra_patch = (overflow/patch_shape) < minimum_overflow_fraction
-            overflow += extra_patch*eff_patch_shape
-            # n_patches += 1
+            extra_patch = (overflow / patch_shape) < minimum_overflow_fraction
+            while extra_patch.any():
+                overflow += extra_patch*eff_patch_shape
+                n_patches += extra_patch
+                extra_patch = (overflow / patch_shape) < minimum_overflow_fraction
 
             # Select random start index so that overlap is spread randomly
             # on both sides. If overflow is larger than patch_shape
             max_start_offset = overflow
             start_index = -np.array([np.random.choice(offset + 1)
                                      for offset in max_start_offset])
-            # max_start_offset = np.minimum(overflow, patch_shape-1)
-            # min_start_offset = np.maximum(0, overflow-max_start_offset)
-            # minmax_start_offset = list(zip(min_start_offset, max_start_offset))
-            # start_index = -np.array([np.random.choice(np.arange(offset[0],
-            #                                                     offset[1]+1))
-            #                          for offset in minmax_start_offset])
         else:
 
             # Set start index to overflow is spread evenly on both sides
             start_index = -np.ceil(overflow/2).astype(int)
 
-        stop_index = image_shape + start_index + overflow
+            # In the non-randomize setting, we still one to make sure that the
+            # last patch sticks outside the image with at least overlap/2, i.e,
+            # that overflow/2 > overlap/2 (since the overflow is distributed
+            # evenly on both sides when randomize_offset=True
+            extra_patch = (overflow < overlap)
+            while extra_patch.any():
+                overflow += extra_patch*eff_patch_shape
+                n_patches += extra_patch
+                extra_patch = (overflow < overlap)
+
+
+        # stop_index = image_shape + start_index + overflow
         step_size = eff_patch_shape
+        stop_index = start_index + step_size*n_patches
 
         return (np.mgrid[start_index[0]:stop_index[0]:step_size[0],
                          start_index[1]:stop_index[1]:step_size[1],
