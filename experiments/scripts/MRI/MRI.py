@@ -14,7 +14,7 @@ from shutil import copyfile
 import argparse
 from functools import partial
 
-from experiments.datasets.MRI.mri import MRISegmentation
+from experiments.datasets.MRI.mri import get_miccai_dataloader, get_mrbrains_dataloader
 from experiments.util import *
 
 
@@ -47,9 +47,9 @@ def train_loop(model, train_loader, loss_function, optimizer, epoch):
             loss_value, binary_dice_acc,
             time.perf_counter() - time_start))
 
-        # for debugging to arrive at validation early...
-        if (batch_idx+1)%4 == 0:
-            break
+        # # for debugging to arrive at validation early...
+        # if (batch_idx+1)%4 == 0:
+        #     break
 
     return np.mean(train_losses), np.mean(train_dice_accs)
 
@@ -60,8 +60,8 @@ def infer(model, loader, loss_function):
     losses_denominator = []
     out_images = []
     patch_overlap = torch.from_numpy(loader.dataset.patch_overlap)
-    for i in range(len(loader.dataset.unpadded_data_shape)):
-        out_images.append(np.full(loader.dataset.unpadded_data_shape[i], -1))
+    for i in range(len(loader.dataset.unpadded_data_spatial_shape)):
+        out_images.append(np.full(loader.dataset.unpadded_data_spatial_shape[i], -1))
     for i, (data, target, img_index, patch_index, valid) in enumerate(loader):
         if use_gpu:
             data, target = data.cuda(), target.cuda()
@@ -132,66 +132,45 @@ def calc_binary_dice_score(dataset, ys):
     return binary_dice_acc
 
 
-
 def main(args, checkpoint):
 
-    h5_filename = args.data_filename
+    # load datasets
+    data_loader_kwargs = {'dataset': args.dataset,
+                          'h5_filename': args.data_filename,
+                          'patch_shape': args.patch_size,
+                          'patch_overlap': args.patch_overlap,
+                          'batch_size': args.batch_size,
+                          'num_workers': args.num_workers,
+                          'pin_memory': False}
+    if args.dataset == 'miccai':
+        data_loader_kwargs.update({'filter': None})
+        data_loader_getter = get_miccai_dataloader
+    elif args.dataset in ['mrbrains_reduced', 'mrbrains_full']:
+        data_loader_kwargs.update({'N_train': 4}) # train/validation split for the five training volumes
+        data_loader_getter = get_mrbrains_dataloader
     if args.mode == 'train':
-        train_set = MRISegmentation(h5_filename=h5_filename,
-                                    patch_shape=args.patch_size,
-                                    patch_overlap=args.patch_overlap,
-                                    filter=train_filter)
-                                    # log10_signal=args.log10_signal)
-        train_loader = torch.utils.data.DataLoader(train_set,
-                                                   batch_size=args.batch_size,
-                                                   shuffle=True,
-                                                   num_workers=args.num_workers,
-                                                   pin_memory=False,
-                                                   drop_last=True)
-        print("Training set size: ", len(train_set))
-    if args.mode in ['train', 'validate']:
-        validation_set = MRISegmentation(h5_filename=h5_filename,
-                                         patch_shape=args.patch_size,
-                                         patch_overlap=args.patch_overlap,
-                                         filter=validation_filter,
-                                         randomize_patch_offsets=False)
-                                         # log10_signal=args.log10_signal)
-        validation_loader = torch.utils.data.DataLoader(validation_set,
-                                                        batch_size=args.batch_size,
-                                                        shuffle=False,
-                                                        num_workers=args.num_workers,
-                                                        pin_memory=False,
-                                                        drop_last=False)
-        print("Validation set size: ", len(validation_set))
-
+        data_loader_kwargs.update({'mode': 'train'})
+        train_set, train_loader = data_loader_getter(**data_loader_kwargs)
+    if args.mode in ['train', 'validation']:
+        data_loader_kwargs.update({'mode': 'validation'})
+        validation_set, validation_loader = data_loader_getter(**data_loader_kwargs)
     if args.mode == 'test':
-        test_set = MRISegmentation(h5_filename=h5_filename,
-                                   patch_shape=args.patch_size,
-                                   patch_overlap=args.patch_overlap,
-                                   filter=test_filter,
-                                   randomize_patch_offsets=False)
-                                   # log10_signal=args.log10_signal)
-        test_loader = torch.utils.data.DataLoader(test_set,
-                                                  batch_size=args.batch_size,
-                                                  shuffle=False,
-                                                  num_workers=args.num_workers,
-                                                  pin_memory=False,
-                                                  drop_last=False)
-        print("Validation set size: ", len(test_set))
+        data_loader_kwargs.update({'mode': 'test'})
+        test_set, test_loader = data_loader_getter(**data_loader_kwargs)
 
-
+    # build model
     model = network_module.network(output_size=output_size)
     if use_gpu:
         model.cuda()
-
     log_obj.write("The model contains {} parameters".format(
         sum(p.numel() for p in model.parameters() if p.requires_grad)))
 
-
+    # get optimizer
     param_groups = get_param_groups.get_param_groups(model, args)
     optimizer = optimizers_L1L2.Adam(param_groups, lr=args.initial_lr)
     optimizer.zero_grad()
 
+    # get loss function
     loss_function = None
     if args.loss == "dice":
         loss_function = partial(losses.dice_coefficient_loss,
@@ -223,8 +202,8 @@ def main(args, checkpoint):
 
     if args.mode == 'train':
         for epoch in range(epoch_start_index, args.training_epochs):
-            optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, args.initial_lr,
-                                                                  args.lr_decay_start, args.lr_decay_base, verbose=True)
+            optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, args.initial_lr, args.lr_decay_start,
+                                                                  args.lr_decay_base, verbose=True, printfct=log_obj.write)
 
             training_loss, training_binary_dice_acc = train_loop(model, train_loader, loss_function, optimizer, epoch)
 
@@ -292,6 +271,8 @@ if __name__ == '__main__':
                         help="Which model definition to use")
     parser.add_argument("--data-filename", required=True,
                         help="Location of data file")
+    parser.add_argument("--dataset", choices=['miccai', 'mrbrains_reduced', 'mrbrains_full'], required=True,
+                        help="Which MRI dataset to use")
     # MRI specific
     parser.add_argument("--patch-size", default=64, type=int,
                         help="Size of patches (default: %(default)s)")
@@ -303,7 +284,7 @@ if __name__ == '__main__':
     parser.add_argument("--class-weighting", action='store_true', default=False,
                         help="switches on class weighting, only used in cross entropy loss (default: %(default)s)")
 
-    parser.add_argument("--mode", choices=['train', 'test', 'validate'],
+    parser.add_argument("--mode", choices=['train', 'test', 'validation'],
                         default="train",
                         help="Mode of operation (default: %(default)s)")
     parser.add_argument("--num-workers", default=0, type=int,
@@ -340,7 +321,7 @@ if __name__ == '__main__':
                         help="L2 regularization factor for convolution biases")
     parser.add_argument("--lamb_norm_activ_bias_L1", default=0, type=float,
                         help="L1 regularization factor for norm activation biases")
-    parser.add_argument("-lamb_norm_activ_bias_L2", default=0, type=float,
+    parser.add_argument("--lamb_norm_activ_bias_L2", default=0, type=float,
                         help="L2 regularization factor for norm activation biases")
     parser.add_argument("--lamb_normalization_bias_L1", default=0, type=float,
                         help="L1 regularization factor for normalization biases")
@@ -356,9 +337,16 @@ if __name__ == '__main__':
         print()
         raise ValueError('unparsed / unknown arguments')
 
-    network_module = importlib.import_module('networks.MICCAI2012.{:s}.{:s}'.format(args.model, args.model))
-
-    basepath = 'networks/MICCAI2012/{:s}'.format(args.model)
+    if args.dataset == 'miccai':
+        network_module = importlib.import_module('networks.MICCAI2012.{:s}.{:s}'.format(args.model, args.model))
+        basepath = 'networks/MICCAI2012/{:s}'.format(args.model)
+        output_size = 135
+    elif args.dataset in ['mrbrains_reduced', 'mrbrains_full']:
+        network_module = importlib.import_module('networks.MRBrainS.{:s}.{:s}'.format(args.model, args.model))
+        basepath = 'networks/MRBrainS/{:s}'.format(args.model)
+        output_size = 4 if args.dataset=='mrbrains_reduced' else 9
+    else:
+        raise ValueError('unknown dataset')
 
     # load checkpoint
     if args.restore_checkpoint_filename is not None:
@@ -384,52 +372,7 @@ if __name__ == '__main__':
     for key, value in sorted(vars(args).items()):
         log_obj.write('\t'+str(key)+'\t'+str(value))
 
-
     torch.backends.cudnn.benchmark = True
     use_gpu = torch.cuda.is_available()
-
-    output_size = 135
-
-    train_filter = ["1000_3",
-                    "1001_3",
-                    "1002_3",
-                    "1006_3",
-                    "1007_3",
-                    "1008_3",
-                    "1009_3",
-                    "1010_3",
-                    "1011_3",
-                    "1012_3",
-                    "1013_3",
-                    "1014_3"
-                    ]
-    validation_filter = ["1015_3",
-                         "1017_3",
-                         "1036_3"
-                         ]
-    test_filter = ["1003_3",
-                   "1004_3",
-                   "1005_3",
-                   "1018_3",
-                   "1019_3",
-                   "1023_3",
-                   "1024_3",
-                   "1025_3",
-                   "1038_3",
-                   "1039_3",
-                   "1101_3",
-                   "1104_3",
-                   "1107_3",
-                   "1110_3",
-                   "1113_3",
-                   "1116_3",
-                   "1119_3",
-                   "1122_3",
-                   "1125_3",
-                   "1128_3"]
-
-    # Check that sets are non-overlapping
-    assert len(set(validation_filter).intersection(train_filter)) == 0
-    assert len(set(test_filter).intersection(train_filter)) == 0
 
     main(args, checkpoint)
