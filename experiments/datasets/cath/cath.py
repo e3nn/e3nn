@@ -14,7 +14,9 @@ class Cath(torch.utils.data.Dataset):
                  use_density=True,
                  randomize_orientation=False):
         # self.root = os.path.expanduser("cath")
-        self.root = os.path.expanduser("../../datasets/cath")
+        # self.root = os.path.expanduser("../../datasets/cath")
+        dirname, dataset = os.path.split(dataset)
+        self.root = os.path.expanduser(dirname if dirname != "" else ".")
 
         if download:
             self.download(dataset)

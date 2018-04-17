@@ -254,8 +254,8 @@ if __name__ == '__main__':
     # required
     parser.add_argument("--model", required=True,
                         help="Which model definition to use")
-    parser.add_argument("--data-filename", choices={"cath_3class.npz", "cath_10arch.npz", "cath_3class_backbone.npz", }, required=True,
-                        help="The name of the data file (will automatically downloaded)")
+    parser.add_argument("--data-filename", required=True,
+                        help="The name of the data file, e.g. cath_3class.npz, cath_10arch.npz (will automatically downloaded if not found)")
     # cath specific
     parser.add_argument("--data-discretization-bins", type=int, default=50,
                         help="Number of bins used in each dimension for the discretization of the input data")
@@ -281,7 +281,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
     # NEW
-    parser.add_argument("--kernel_size", type=int, default=5,
+    parser.add_argument("--kernel-size", type=int, default=5,
                         help="convolution kernel size")
     parser.add_argument("--p-drop-conv", type=float, default=0,
                         help="convolution/capsule dropout probability")
