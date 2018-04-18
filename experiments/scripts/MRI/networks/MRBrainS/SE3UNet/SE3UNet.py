@@ -4,83 +4,98 @@ import torch.nn.functional as F
 
 from functools import partial
 
-from se3_cnn.blocks import GatedBlock
 from se3_cnn import basis_kernels
-from experiments.util.arch_blocks import Merge
+from experiments.util.arch_blocks import NonlinearityBlock
+from experiments.util.arch_blocks import SkipSumBlock
+
 
 
 class network(nn.Module):
-    def __init__(self, output_size, filter_size=5):
+    def __init__(self, output_size, args):
         super(network, self).__init__()
-        size = filter_size
 
         common_params = {
             'radial_window': partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
-                                     mode='compromise', border_dist=0, sigma=0.6),
+                                     mode=args.bandlimit_mode, border_dist=0, sigma=0.6),
+            'size': args.kernel_size,
+            'padding': args.kernel_size//2,
+            'activation':(F.relu, F.sigmoid),
+            'normalization': args.normalization,
+            'capsule_dropout_p': args.p_drop_conv,
+            'SE3_nonlinearity': args.SE3_nonlinearity,
             'batch_norm_momentum': 0.01,
         }
 
-        features = [(3,),
-                    # (12, 12, 12),
-                    # (24, 24, 24),
-                    # (48, 48, 48),
-                    # (24, 24, 24),
-                    # (12, 12, 12),
-                    ( 8,  8,  8,  4),
-                    (16, 16, 16,  8),
-                    (32, 32, 32, 16),
-                    (16, 16, 16,  8),
-                    ( 8,  8,  8,  4),
-                    (output_size,)]
+        features = [(3,), # in 
+                    ( 16, 12,  8,  8),     # level 1 (enc and dec)
+                    ( 32, 24, 16,  8, 4), # level 2 (enc and dec)
+                    ( 64, 48, 32, 16, 8), # level 3 (enc and dec)
+                    ( 64, 48, 32, 16, 8), # level 4 (bridge)
+                    (512,), # 1x1 conv
+                    # ( 8,  8,  4),     # level 1 (enc and dec)
+                    # (16,  8,  4), # level 2 (enc and dec)
+                    # (32, 16,  8), # level 3 (enc and dec)
+                    # (48, 32, 16), # level 4 (bridge)
+                    # (256,), # 1x1 conv
+                    (output_size,)] # out
 
-        # TODO: do padding using ReplicationPad3d?
-        # TODO: on validation - use overlapping patches and only use center of patch
+        # encoder pathway
+        self.enc1 = nn.Sequential(
+            NonlinearityBlock(features[0], features[1], stride=1, **common_params),
+            NonlinearityBlock(features[1], features[1], stride=1, **common_params))
+        self.enc2 = nn.Sequential(
+            NonlinearityBlock(features[1], features[2], stride=2, **common_params),
+            NonlinearityBlock(features[2], features[2], stride=1, **common_params))
+        self.enc3 = nn.Sequential(
+            NonlinearityBlock(features[2], features[3], stride=2, **common_params),
+            NonlinearityBlock(features[3], features[3], stride=1, **common_params))
 
-        self.conv1 = nn.Sequential(
-            GatedBlock(features[0], features[1], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params),
-            GatedBlock(features[1], features[1], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
-
-        self.conv2 = nn.Sequential(
-            GatedBlock(features[1], features[2], size=size, padding=size//2, stride=2, activation=(F.relu, F.sigmoid), normalization="instance", **common_params),
-            GatedBlock(features[2], features[2], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
-
-        self.conv3 = nn.Sequential(
-            GatedBlock(features[2], features[3], size=size, padding=size//2, stride=2, activation=(F.relu, F.sigmoid), normalization="instance", **common_params),
-            GatedBlock(features[3], features[3], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
-
-        self.up1 = nn.Sequential(
+        # bridge
+        self.bridge = nn.Sequential(
+            NonlinearityBlock(features[3], features[4], stride=2, **common_params),
+            NonlinearityBlock(features[4], features[4], stride=1, **common_params),
+            NonlinearityBlock(features[4], features[4], stride=1, **common_params),
             nn.Upsample(scale_factor=2, mode="nearest"),
-            GatedBlock(features[3], features[4], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
+            NonlinearityBlock(features[4], features[3], stride=1, **common_params))
 
-        self.merge1 = Merge()
+        # skip connection with convolution and summation
+        self.merge3 = SkipSumBlock(features[3], **common_params)
+        self.merge2 = SkipSumBlock(features[2], **common_params)
+        self.merge1 = SkipSumBlock(features[1], **common_params)
 
-        self.conv4 = nn.Sequential(
-            GatedBlock(features[3], features[4], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params),
-            GatedBlock(features[4], features[4], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
-
-        self.up2 = nn.Sequential(
+        # decoder pathway
+        self.dec3 = nn.Sequential(
+            NonlinearityBlock(features[3], features[3], stride=1, **common_params),
             nn.Upsample(scale_factor=2, mode="nearest"),
-            GatedBlock(features[4], features[5], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
+            NonlinearityBlock(features[3], features[2], stride=1, **common_params))
+        self.dec2 = nn.Sequential(
+            NonlinearityBlock(features[2], features[2], stride=1, **common_params),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            NonlinearityBlock(features[2], features[1], stride=1, **common_params))
+        self.dec1 = nn.Sequential(
+            NonlinearityBlock(features[1], features[ 1], stride=1, **common_params),
+            NonlinearityBlock(features[1], features[-2], stride=1, **common_params))
 
-        self.merge2 = Merge()
-
-        self.conv5 = nn.Sequential(
-            GatedBlock(features[4], features[5], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params),
-            GatedBlock(features[5], features[5], size=size, padding=size//2, stride=1, activation=(F.relu, F.sigmoid), normalization="instance", **common_params))
-
-        self.conv_final = GatedBlock(features[5], features[6], size=1, padding=0, stride=1, activation=None, normalization=None, **common_params)
+        # 1x1 conv
+        self.drop_final = nn.Dropout(p=args.p_drop_fully, inplace=True) if args.p_drop_fully is not None else None
+        self.conv_final = nn.Conv3d(int(features[-2][0]), int(features[-1][0]), kernel_size=1, padding=0, stride=1, bias=True)
 
     def forward(self, x):
-
-        conv1_out  = self.conv1(x)
-        conv2_out  = self.conv2(conv1_out)
-        conv3_out  = self.conv3(conv2_out)
-        up1_out    = self.up1(conv3_out)
-        merge1_out = self.merge1(conv2_out, up1_out)
-        conv4_out  = self.conv4(merge1_out)
-        up2_out    = self.up2(conv4_out)
-        merge2_out = self.merge2(conv1_out, up2_out)
-        conv5_out  = self.conv5(merge2_out)
-        out        = self.conv_final(conv5_out)
-
+        # encoder path
+        enc1_out   = self.enc1(x)
+        enc2_out   = self.enc2(enc1_out)
+        enc3_out   = self.enc3(enc2_out)
+        # bridge
+        bridge_out = self.bridge(enc3_out)
+        # skip connections and decoder
+        merge3_out = self.merge3(enc=enc3_out, dec=bridge_out)
+        dec3_out   = self.dec3(merge3_out)
+        merge2_out = self.merge2(enc=enc2_out, dec=dec3_out)
+        dec2_out   = self.dec2(merge2_out)
+        merge1_out = self.merge1(enc=enc1_out, dec=dec2_out)
+        dec1_out   = self.dec1(merge1_out)
+        # 1x1 convolution mapping scalar capsules to classes
+        if self.drop_final is not None:
+            dec1_out = self.drop_final(dec1_out)
+        out = self.conv_final(dec1_out)
         return out

@@ -293,7 +293,7 @@ if __name__ == '__main__':
                         help="Which model definition to use")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
-    parser.add_argument("--batch-size", default=2, type=int,
+    parser.add_argument("--batch-size", default=1, type=int,
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
     parser.add_argument("--batchsize-multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
