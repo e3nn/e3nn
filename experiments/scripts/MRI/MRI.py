@@ -287,7 +287,7 @@ if __name__ == '__main__':
     parser.add_argument("--mode", choices=['train', 'test', 'validation'],
                         default="train",
                         help="Mode of operation (default: %(default)s)")
-    parser.add_argument("--num-workers", default=0, type=int,
+    parser.add_argument("--num-workers", default=8, type=int,
                         help="Number of workers to use")
     parser.add_argument("--training-epochs", default=100, type=int,
                         help="Which model definition to use")
@@ -308,13 +308,15 @@ if __name__ == '__main__':
     # model
     parser.add_argument("--kernel_size", type=int, default=5,
                         help="convolution kernel size")
-    parser.add_argument("--p-drop-conv", type=float, default=0,
+    parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
-    parser.add_argument("--p-drop-fully", type=float, default=0,
+    parser.add_argument("--p-drop-fully", type=float, default=None,
                         help="fully connected layer / 1x1 conv dropout probability")
     parser.add_argument("--bandlimit-mode", choices={"conservative", "compromise", "sfcnn"}, default="compromise",
                         help="bandlimiting heuristic for spherical harmonics")
     parser.add_argument("--SE3-nonlinearity", choices={"gated", "norm"}, default="gated",
+                        help="Which nonlinearity to use for non-scalar capsules")
+    parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='group',
                         help="Which nonlinearity to use for non-scalar capsules")
     # WEIGHTS
     parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
