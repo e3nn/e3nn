@@ -173,7 +173,7 @@ def cross_entropy_loss(y_pred, y_true, valid=None, overlap=None, reduce=True, cl
         overlap = torch.from_numpy(np.repeat(overlap, 3))
 
     loss_per_voxel = F.cross_entropy(
-        y_pred_f, y_true_f, reduce=False, weight=class_weight).view(y_true.shape).squeeze()
+        y_pred_f, y_true_f, reduce=False, weight=class_weight).view(y_true.shape).squeeze(dim=1)
 
     patch_shape = torch.from_numpy(np.array(y_true.shape[2:]))
     loss_per_voxel_sums = []
