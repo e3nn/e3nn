@@ -25,5 +25,5 @@ class network(ResNet):
             OuterBlock(features[2][-1][-1], features[3], size=args.kernel_size, stride=2),
             OuterBlock(features[3][-1][-1], features[4], size=args.kernel_size, stride=2),
             AvgSpacial(),
-            nn.Dropout(p=args.p_drop_fully, inplace=True) if args.p_drop_fully is not 0 else None,
+            nn.Dropout(p=args.p_drop_fully, inplace=True) if args.p_drop_fully is not None else None,
             nn.Linear(features[4][-1][-1], n_output))
