@@ -254,3 +254,34 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         return self.blocks(x)
+
+
+
+class NonlinearityBlock(nn.Module):
+    ''' wrapper around GatedBlock and NormBlock, selects based on string SE3Nonlniearity '''
+    def __init__(self, features_in, features_out, SE3_nonlinearity, **kwargs):
+        super().__init__()
+        if SE3_nonlinearity == 'gated':
+            conv_block = GatedBlock
+        elif SE3_nonlinearity == 'norm':
+            conv_block = NormBlock
+        else:
+            raise NotImplementedError('unknown SE3_nonlinearity')
+        self.conv_block = conv_block(features_in, features_out, **kwargs)
+    def forward(self, x):
+        return self.conv_block(x)
+
+
+class SkipSumBlock(nn.Module):
+    ''' skip connection module for UNets
+        takes a feature map from the encoder pathway and merges it with the decoder feature map by summation
+        the encoder feature map is convolved before being added to allow for aligned features
+        it is assumed that the shape of both feature maps is equal
+    '''
+    def __init__(self, features, **common_params):
+        super(SkipSumBlock, self).__init__()
+        self.skip_conv = NonlinearityBlock(features, features, **common_params)
+    def forward(self, enc, dec):
+        assert enc.shape == dec.shape
+        enc_res = self.skip_conv(enc)
+        return enc_res + dec
