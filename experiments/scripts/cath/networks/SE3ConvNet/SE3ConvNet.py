@@ -17,11 +17,11 @@ class network(ResNet):
         #             [[(8,  8,  8,  8)] * 1],  # 128 channels
         #             [[(16, 16, 16, 16)] * 1],  # 256 channels
         #             [[(256,)]]]
-        features = [[[(1,  1,  1)] * 1],  # 64 channels
-                    [[(2,  2,  2)] * 1],  # 64 channels
-                    [[(2,  2,  2)] * 1],  # 128 channels
-                    [[(2,  2,  2)] * 1],  # 256 channels
-                    [[(10,)]]]
+        features = [[[(2, 2, 2, 2)] * 1],  #  32 channels
+                    [[(2, 2, 2, 2)] * 1],  #  32 channels
+                    [[(3, 3, 3, 3)] * 1],  #  64 channels
+                    # [[(4, 4, 4, 4)] * 1],  # 128 channels
+                    [[(64,)]]]
         common_params = {
             'radial_window': partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
                                      mode=args.bandlimit_mode, border_dist=0, sigma=0.6),
@@ -42,7 +42,7 @@ class network(ResNet):
             OuterBlock(features[0][-1][-1], features[1], size=args.kernel_size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=args.kernel_size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=args.kernel_size, stride=2),
-            OuterBlock(features[3][-1][-1], features[4], size=args.kernel_size, stride=2),
+            # OuterBlock(features[3][-1][-1], features[4], size=args.kernel_size, stride=2),
             AvgSpacial(),
-            nn.Dropout(p=args.p_drop_fully, inplace=True) if args.p_drop_fully is not 0 else None,
-            nn.Linear(features[4][-1][-1][0], n_output))
+            nn.Dropout(p=args.p_drop_fully, inplace=True) if args.p_drop_fully is not None else None,
+            nn.Linear(features[3][-1][-1][0], n_output))

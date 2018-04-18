@@ -283,9 +283,9 @@ if __name__ == '__main__':
     # NEW
     parser.add_argument("--kernel-size", type=int, default=5,
                         help="convolution kernel size")
-    parser.add_argument("--p-drop-conv", type=float, default=0,
+    parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
-    parser.add_argument("--p-drop-fully", type=float, default=0,
+    parser.add_argument("--p-drop-fully", type=float, default=None,
                         help="fully connected layer dropout probability")
     parser.add_argument("--bandlimit-mode", choices={"conservative", "compromise", "sfcnn"}, default="compromise",
                         help="bandlimiting heuristic for spherical harmonics")
