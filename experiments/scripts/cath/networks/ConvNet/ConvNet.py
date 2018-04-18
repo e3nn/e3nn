@@ -2,7 +2,6 @@ import torch.nn as nn
 from functools import partial
 from experiments.util.arch_blocks import *
 
-
 class network(ResNet):
     def __init__(self,
                  n_input,
@@ -10,10 +9,11 @@ class network(ResNet):
                  args):
 
         features = [[[16]],
-                    [[16] * 2] * 3,
-                    [[32] * 2] * 4,
-                    [[64] * 2] * 6,
-                    [[128] * 2] * 3]
+                    [[16]] * 1,
+                    [[32]] * 1,
+                    [[64]] * 1,
+                    # [[128]] * 1,
+                    ]
 
         global OuterBlock
         OuterBlock = partial(OuterBlock,
@@ -23,7 +23,8 @@ class network(ResNet):
             OuterBlock(features[0][-1][-1], features[1], size=args.kernel_size, stride=1),
             OuterBlock(features[1][-1][-1], features[2], size=args.kernel_size, stride=2),
             OuterBlock(features[2][-1][-1], features[3], size=args.kernel_size, stride=2),
-            OuterBlock(features[3][-1][-1], features[4], size=args.kernel_size, stride=2),
+            # OuterBlock(features[3][-1][-1], features[4], size=args.kernel_size, stride=2),
             AvgSpacial(),
             nn.Dropout(p=args.p_drop_fully, inplace=True) if args.p_drop_fully is not None else None,
-            nn.Linear(features[4][-1][-1], n_output))
+            nn.Linear(features[3][-1][-1], n_output))
+            # nn.Linear(features[4][-1][-1], n_output))
