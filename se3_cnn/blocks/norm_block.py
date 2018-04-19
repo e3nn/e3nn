@@ -1,10 +1,10 @@
 # pylint: disable=C,R,E1101
+from functools import partial
 import torch
-from se3_cnn import SE3BNConvolution
+from se3_cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3_cnn.non_linearities import NormSoftplus
 from se3_cnn import SO3
 from se3_cnn.dropout import SE3Dropout
-
 
 class NormBlock(torch.nn.Module):
     def __init__(self,
