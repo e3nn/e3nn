@@ -11,7 +11,7 @@ class NormBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window,  # kernel params
                  activation=None, activation_bias_min=0.5, activation_bias_max=2,
                  stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity params
-                 batch_norm_momentum=0.1):  # batch norm params
+                 normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -23,6 +23,7 @@ class NormBlock(torch.nn.Module):
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
         :param float conv_dropout_p: Convolution dropout probability
+        :param str normalization: "batch", "group", "instance" or None
         :param float batch_norm_momentum: batch normalization momentum (put it to zero to disable the batch normalization)
         '''
         super().__init__()
@@ -33,7 +34,16 @@ class NormBlock(torch.nn.Module):
         Rs_in = list(zip(repr_in, irreducible_repr))
         Rs_out = list(zip(repr_out, irreducible_repr))
 
-        self.bn_conv = SE3BNConvolution(
+        if normalization is None:
+            Convolution = SE3Convolution
+        if normalization is "batch":
+            Convolution = partial(SE3BNConvolution, momentum=batch_norm_momentum)
+        if normalization is "group":
+            Convolution = SE3GNConvolution
+        if normalization == "instance":
+            Convolution = partial(SE3GNConvolution, Rs_gn=[(1, 2 * n + 1) for n, mul in enumerate(repr_in) for _ in range(mul)])
+
+        self.conv = Convolution(
             Rs_in=Rs_in,
             Rs_out=Rs_out,
             size=size,
