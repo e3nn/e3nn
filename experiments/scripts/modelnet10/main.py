@@ -23,9 +23,11 @@ class CNN(torch.nn.Module):
         super(CNN, self).__init__()
 
         features = [
-            (1, ),
-            (2, 2, 2),
-            (4, 4, 3),
+            (1, ),        # 64
+            (4, 4, 4),    # 32
+            (8, 8, 8),    # 16
+            (16, 16, 16), # 8
+            (32, 32, 32), # 4
             (10, )
         ]
 
@@ -35,12 +37,14 @@ class CNN(torch.nn.Module):
         common_block_params = {
             'size': 5,
             'stride': 2,
-            'padding': 3,
+            'padding': 2,
             'normalization': 'batch',
             'radial_window': radial_window
         }
 
         block_params = [
+            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, F.sigmoid)},
             {'activation': (F.relu, F.sigmoid)},
             {'activation': (F.relu, F.sigmoid)},
             {'activation': None},
@@ -75,9 +79,9 @@ def main():
     if torch.cuda.is_available():
         model.cuda()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-1)
 
-    cache = CacheNPY("v64", repeat=24, transform=Obj2Voxel(64))
+    cache = CacheNPY("v64", repeat=4, transform=Obj2Voxel(64))
 
     def transform(x):
         x = cache(x)
@@ -88,10 +92,11 @@ def main():
         return classes.index(x)
 
     trainset = ModelNet10("./root/", train=True, download=True, transform=transform, target_transform=target_transform)
-    dataloader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True, drop_last=True)
+    dataloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True, drop_last=True)
 
-    for epoch in range(10):
-        for input, target in dataloader:
+    for epoch in range(100):
+        mean_acc = 0
+        for i, (input, target) in enumerate(dataloader):
             input = Variable(input)
             target = Variable(target)
             if torch.cuda.is_available():
@@ -110,10 +115,14 @@ def main():
             output = output.data.cpu().numpy()
             target = target.data.cpu().numpy()
 
+            del input
+
             # compute the accuracy
             acc = np.sum(output.argmax(-1) == target) / output.size
+            mean_acc += acc
 
-            print("{}: acc={}% loss={}".format(epoch, 100 * acc, float(loss)))
+            print("{}:{}/{}: acc={:.4}% loss={}".format(epoch, i, len(dataloader), 100 * acc, float(loss)))
+        print("acc={:.4}%".format(100 * mean_acc / len(dataloader)))
 
 
 if __name__ == '__main__':
