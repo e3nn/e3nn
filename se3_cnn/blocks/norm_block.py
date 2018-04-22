@@ -50,7 +50,6 @@ class NormBlock(torch.nn.Module):
             radial_window=radial_window,
             stride=stride,
             padding=padding,
-            momentum=batch_norm_momentum,
         )
 
         if capsule_dropout_p is not None:
@@ -69,7 +68,7 @@ class NormBlock(torch.nn.Module):
                                     bias_max=activation_bias_max)
 
     def forward(self, x):  # pylint: disable=W
-        y = self.bn_conv(x)
+        y = self.conv(x)
 
         if self.act is not None:
             y = self.act(y)
