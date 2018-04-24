@@ -39,7 +39,7 @@ class SE3DropoutF(torch.autograd.Function):
                 noise.fill_(1)
             else:
                 noise.bernoulli_(1 - self.p).div_(1 - self.p)
-            noise = noise.unsqueeze(2).expand(-1,-1,dim,-1,-1,-1).contiguous().view(N,mul*dim,1,1,1)
+            noise = noise.unsqueeze(2).expand(-1,-1,dim,-1,-1,-1).contiguous().view(size[0],mul*dim,1,1,1)
             noises.append(noise)
             # noises.append(noise.repeat(1, dim, 1, 1, 1)) # DIFFERENT PROBABILITIES WITHIN CAPSULE (WRONG)
         self.noise = torch.cat(noises, dim=1)
