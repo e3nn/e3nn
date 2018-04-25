@@ -31,6 +31,35 @@ def print_layer(layers, input_shape):
     log_obj.write("layer %2d - %20s: %s [output size %s]" % (len(layers), list(layers.named_modules())[-1][0], tuple(shape), "{:,}".format(np.prod(shape))))
 
 
+def calc_normalization_factor(loader):
+
+    # TODO: NOTE THAT THIS CODE CURRENTLY ONLY WORKS FOR 1 INPUT CHANNEL
+    voxel_count = 0.
+    voxel_sum = 0.
+    voxel_var = 0
+    for batch_idx, (data, target) in enumerate(loader):
+
+        image_voxel_sum = torch.sum(data)
+        image_voxel_count = data.numel()
+        image_voxel_var = torch.var(data)
+
+        if batch_idx == 0:
+            voxel_var = image_voxel_var
+        else:
+            delta = (voxel_sum/voxel_count) - (image_voxel_sum/image_voxel_count)
+            M_a = voxel_var * voxel_count
+            M_b = image_voxel_var * image_voxel_count
+            M2 = M_a + M_b + delta ** 2 * voxel_count * image_voxel_count / (voxel_count + image_voxel_count)
+            voxel_var = M2 / (voxel_count + image_voxel_count)
+
+        voxel_count += image_voxel_count
+        voxel_sum += image_voxel_sum
+
+        # print(data.shape, data.numel(), torch.sum(data), (image_voxel_sum/image_voxel_count), (voxel_sum/voxel_count), image_voxel_var, voxel_var)
+
+    return voxel_sum/voxel_count, np.sqrt(voxel_var)
+
+
 def train_loop(model, train_loader, optimizer, epoch):
     model.train()
     training_losses = []
@@ -109,6 +138,11 @@ def main(checkpoint):
         n_output = len(train_set.datasets[0].label_set)
         log_obj.write("Training set: " + str([len(dataset) for dataset in train_set.datasets]))
 
+        # dataset_mean, dataset_std = calc_normalization_factor(train_loader)
+        # for set in train_set.datasets:
+        #     set.set_dataset_normalization(dataset_mean, dataset_std)
+
+
     if args.mode in ['train', 'validate']:
         validation_set = Cath(
             args.data_filename, split=7,
@@ -119,6 +153,9 @@ def main(checkpoint):
         n_output = len(validation_set.label_set)
         log_obj.write("Validation set: " + str(len(validation_set)))
 
+        # dataset_mean, dataset_std = calc_normalization_factor(validation_loader)
+        # validation_set.set_dataset_normalization(dataset_mean, dataset_std)
+
     if args.mode == 'test':
         test_set = torch.utils.data.ConcatDataset([Cath(
             args.data_filename, split=i,
@@ -128,6 +165,11 @@ def main(checkpoint):
         n_input = test_set.datasets[0].n_atom_types
         n_output = len(test_set.datasets[0].label_set)
         log_obj.write("Test set: " + str([len(dataset) for dataset in test_set.datasets]))
+
+        # dataset_mean, dataset_std = calc_normalization_factor(test_loader)
+        # for set in test_set.datasets:
+        #     set.set_dataset_normalization(dataset_mean, dataset_std)
+
 
     # Build model and set up optimizer
     model = network_module.network(n_input=n_input, n_output=n_output, args=args)
@@ -281,7 +323,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
     # model
-    parser.add_argument("--kernel_size", type=int, default=5,
+    parser.add_argument("--kernel-size", type=int, default=5,
                         help="convolution kernel size")
     parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")

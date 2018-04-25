@@ -9,11 +9,11 @@ class network(ResNet):
                  n_output,
                  args):
 
-        features = [[[32]],
-                    [[32] * 2] * 3,
-                    [[64] * 2] * 4,
-                    [[128] * 2] * 6,
-                    [[256] * 2] * 3]
+        features = [[[8]],
+                    [[8] * 2] * 3,
+                    [[16] * 2] * 4,
+                    [[32] * 2] * 6,
+                    [[64] * 2] * 3]
 
         common_params = {
             'downsample_by_pooling': args.downsample_by_pooling,

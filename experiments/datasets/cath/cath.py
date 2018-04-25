@@ -45,6 +45,13 @@ class Cath(torch.utils.data.Dataset):
         self.label_set = sorted(list(set(self.labels)))
         self.label_map = dict(zip(self.label_set, range(len(self.label_set))))
 
+        self.dataset_mean = None
+        self.dataset_std = None
+
+    def set_dataset_normalization(self, mean, std):
+        self.dataset_mean = mean
+        self.dataset_std = std
+
     def __getitem__(self, index):
 
         # time_stamp = timer()
@@ -114,7 +121,7 @@ class Cath(torch.utils.data.Dataset):
                 if torch.cuda.is_available():
                     pos = pos.cuda()
 
-                # Pytorch does not suppoert meshgrid - do the repeats manually
+                # Pytorch does not support meshgrid - do the repeats manually
                 # Numpy equivalent:
                 # posx_posx, xx_xx = np.meshgrid(pos[:,0], xx.reshape(-1))
                 # posy_posy, yy_yy = np.meshgrid(pos[:,1], yy.reshape(-1))
@@ -135,6 +142,7 @@ class Cath(torch.utils.data.Dataset):
 
                 # Sum densities and reshape to original shape
                 fields[i] = torch.sum(density, dim=1).view(xx.shape)
+
         else:
 
             for i, atom_type in enumerate(self.atom_type_set):
@@ -149,6 +157,17 @@ class Cath(torch.utils.data.Dataset):
 
                 # Set values
                 fields[i].view(-1)[indices] = 1
+
+        # mean = torch.mean(fields[i])
+        # stddev = torch.std(fields[i])
+        # fields = (fields - mean) / stddev
+
+        if self.dataset_mean is not None:
+            fields -= self.dataset_mean
+        if self.dataset_std is not None:
+            fields /= self.dataset_std
+                # print(i, "Mean: ", torch.mean(fields[i]))
+                # print(i, "Stddev: ", torch.std(fields[i]))
 
         # assert((np.abs(fields.numpy() - fields_np)<0.001).all())
 
