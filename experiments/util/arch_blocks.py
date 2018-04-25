@@ -25,20 +25,31 @@ class AvgSpacial(nn.Module):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, channels_in, channels_out, size=3, stride=1):
+    def __init__(self, channels_in, channels_out, size=3, stride=1,
+                 downsample_by_pooling=False,
+                 conv_dropout_p=None):
         super().__init__()
 
         channels = [channels_in] + channels_out
 
         self.layers = []
+        conv_stride = 1 if downsample_by_pooling else stride
         for i in range(len(channels) - 1):
             self.layers += [
+                nn.BatchNorm3d(channels[i]),
                 nn.Conv3d(channels[i], channels[i + 1],
                           kernel_size=size,
                           padding=size // 2,
-                          stride=stride if i == 0 else 1,
+                          stride=conv_stride if i == 0 else 1,
                           bias=False),
-                nn.BatchNorm3d(channels[i + 1])]
+                # nn.BatchNorm3d(channels[i + 1])
+            ]
+            if conv_dropout_p is not None:
+                self.layers.append(nn.Dropout3d(p=conv_dropout_p, inplace=True))
+            if downsample_by_pooling and i == 0 and stride > 1:
+                self.layers.append(nn.AvgPool3d(kernel_size=size,
+                                                padding=size//2,
+                                                stride=stride))
             if (i + 1) < len(channels) - 1:
                 self.layers += [nn.ReLU(inplace=True)]
         self.layers = nn.Sequential(*self.layers)
@@ -48,13 +59,24 @@ class ResBlock(nn.Module):
             if channels_in == channels_out[-1] and stride == 1:
                 self.shortcut = lambda x: x
             else:
-                self.shortcut = nn.Sequential(*[
+                self.shortcut = [
+                    nn.BatchNorm3d(channels[0]),
                     nn.Conv3d(channels[0], channels[-1],
                               kernel_size=1,
                               padding=0,
-                              stride=stride,
+                              stride=conv_stride,
                               bias=False),
-                    nn.BatchNorm3d(channels[-1])])
+                    # nn.BatchNorm3d(channels[-1])
+                    ]
+                if conv_dropout_p is not None:
+                    self.shortcut.append(
+                        nn.Dropout3d(p=conv_dropout_p, inplace=True))
+                if downsample_by_pooling and stride > 1:
+                    self.shortcut.append(nn.AvgPool3d(kernel_size=size,
+                                                      padding=size // 2,
+                                                      stride=stride))
+                self.shortcut = nn.Sequential(*self.shortcut)
+
         self.activation = nn.ReLU(inplace=True)
 
         # initialize
