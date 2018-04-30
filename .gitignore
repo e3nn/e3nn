@@ -18,3 +18,4 @@ tf_logs
 checkpoints
 **/*.log
 **/*.ckpt
+root
