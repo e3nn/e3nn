@@ -15,9 +15,13 @@ class network(ResNet):
                     [[256] * 2] * 6,
                     [[512] * 2] * 3]
 
+        common_params = {
+            'downsample_by_pooling': args.downsample_by_pooling,
+            'conv_dropout_p': args.p_drop_conv,
+        }
         global OuterBlock
         OuterBlock = partial(OuterBlock,
-                             res_block=ResBlock)
+                             res_block=partial(ResBlock, **common_params))
         super().__init__(
             OuterBlock(n_input,             features[0], size=7),
             OuterBlock(features[0][-1][-1], features[1], size=args.kernel_size, stride=1),
