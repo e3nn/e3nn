@@ -310,22 +310,22 @@ if __name__ == '__main__':
                         help="Which model definition to use")
     parser.add_argument("--randomize-orientation", action="store_true", default=False,
                         help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
-    parser.add_argument("--batch-size", default=32, type=int,
+    parser.add_argument("--batch-size", default=18, type=int,
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
     parser.add_argument("--batchsize-multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
     parser.add_argument("--restore-checkpoint-filename", type=str, default=None,
                         help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
-    parser.add_argument("--initial_lr", default=1e-3, type=float,
+    parser.add_argument("--initial_lr", default=1e-1, type=float,
                         help="Initial learning rate (without decay)")
-    parser.add_argument("--lr_decay_start", type=int, default=1,
+    parser.add_argument("--lr_decay_start", type=int, default=40,
                         help="epoch after which the exponential learning rate decay starts")
-    parser.add_argument("--lr_decay_base", type=float, default=1,
+    parser.add_argument("--lr_decay_base", type=float, default=.94,
                         help="exponential decay factor per epoch")
     # model
-    parser.add_argument("--kernel-size", type=int, default=5,
+    parser.add_argument("--kernel-size", type=int, default=3,
                         help="convolution kernel size")
-    parser.add_argument("--p-drop-conv", type=float, default=None,
+    parser.add_argument("--p-drop-conv", type=float, default=.1,
                         help="convolution/capsule dropout probability")
     parser.add_argument("--p-drop-fully", type=float, default=None,
                         help="fully connected layer dropout probability")
@@ -333,8 +333,10 @@ if __name__ == '__main__':
                         help="bandlimiting heuristic for spherical harmonics")
     parser.add_argument("--SE3-nonlinearity", choices={"gated", "norm"}, default="gated",
                         help="Which nonlinearity to use for non-scalar capsules")
+    parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='batch',
+                        help="Which nonlinearity to use for non-scalar capsules")
     # TODO: NOT IMPLEMENTED FOR CONVENTONAL NETWORKS YET!
-    parser.add_argument("--downsample-by-pooling", action='store_true', default=False,
+    parser.add_argument("--downsample-by-pooling", action='store_true', default=True,
                         help="Switches from downsampling by striding to downsampling by pooling")
     # WEIGHTS
     parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
