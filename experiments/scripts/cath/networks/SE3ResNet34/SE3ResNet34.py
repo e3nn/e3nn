@@ -24,6 +24,7 @@ class network(ResNet):
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': args.p_drop_conv,  # drop probability of whole capsules
             'downsample_by_pooling': args.downsample_by_pooling,
+            'normalization': args.normalization
         }
         if args.SE3_nonlinearity == 'gated':
             res_block = SE3GatedResBlock
