@@ -177,6 +177,7 @@ class SE3NormResBlock(nn.Module):
                  stride=1,
                  radial_window=None,
                  batch_norm_momentum=0.01,
+                 normalization="batch",
                  capsule_dropout_p=0.1,
                  scalar_activation=F.relu,
                  activation_bias_min=0.5,
@@ -200,6 +201,7 @@ class SE3NormResBlock(nn.Module):
                           stride=conv_stride if i == 0 else 1,
                           activation=activation,
                           radial_window=radial_window,
+                          normalization=normalization,
                           batch_norm_momentum=batch_norm_momentum,
                           capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
@@ -225,6 +227,7 @@ class SE3NormResBlock(nn.Module):
                               activation_bias_min=activation_bias_min,
                               activation_bias_max=activation_bias_max,
                               radial_window=radial_window,
+                              normalization=normalization,
                               batch_norm_momentum=batch_norm_momentum,
                               capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
