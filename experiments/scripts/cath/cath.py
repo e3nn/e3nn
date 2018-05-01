@@ -208,6 +208,9 @@ def main(checkpoint):
 
             loss_avg, acc_avg, training_outs, training_losses = train_loop(model, train_loader, optimizer, epoch)
 
+            if (epoch+1) % args.report_frequency != 0:
+                continue
+
             validation_outs, ys, validation_losses = infer(model, validation_loader)
 
             # compute the accuracy
@@ -260,7 +263,7 @@ def main(checkpoint):
                         'timestamp': timestamp},
                         checkpoint_path_latest)
             # optional saving of best validation state
-            if validation_loss_avg < best_validation_loss_avg:
+            if epoch > args.burnin_epochs and validation_loss_avg < best_validation_loss_avg:
                 best_validation_loss_avg = validation_loss_avg
                 copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
                 log_obj.write('Best validation loss until now - updated best model')
@@ -298,6 +301,10 @@ if __name__ == '__main__':
                         help="Which model definition to use")
     parser.add_argument("--data-filename", required=True,
                         help="The name of the data file, e.g. cath_3class.npz, cath_10arch.npz (will automatically downloaded if not found)")
+    parser.add_argument("--report-frequency", default=1, type=int,
+                        help="The frequency with which status reports will be written")
+    parser.add_argument("--burnin-epochs", default=0, type=int,
+                        help="Number of epochs to discard when dumping the best model")
     # cath specific
     parser.add_argument("--data-discretization-bins", type=int, default=50,
                         help="Number of bins used in each dimension for the discretization of the input data")
