@@ -1,12 +1,8 @@
-# pylint: disable=C,R,E1101,W0221,W0511,W0601
-'''
-Architecture to predict the structural categories of proteins according to the CATH
-classification (www.cathdb.info).
-
-'''
+# pylint: disable=C,R,E1101,W0622
 import torch
+import torch.nn.functional as F
 import torch.utils.data
-import torch.nn as nn
+from torch.autograd import Variable
 
 import numpy as np
 import os
@@ -15,49 +11,9 @@ import importlib
 from shutil import copyfile
 import argparse
 
-from experiments.datasets.cath.cath import Cath
+from experiments.datasets.modelnet.modelnet import ModelNet10, Obj2Voxel, CacheNPY
 from experiments.util import *
 
-
-def get_output_shape(input_size, func):
-    f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
-    return f.size()[1:]
-
-
-def print_layer(layers, input_shape):
-    """"Method for print architecture during model construction"""
-
-    shape = get_output_shape(input_shape, layers)
-    log_obj.write("layer %2d - %20s: %s [output size %s]" % (len(layers), list(layers.named_modules())[-1][0], tuple(shape), "{:,}".format(np.prod(shape))))
-
-
-def calc_normalization_factor(loader):
-
-    # TODO: NOTE THAT THIS CODE CURRENTLY ONLY WORKS FOR 1 INPUT CHANNEL
-    voxel_count = 0.
-    voxel_sum = 0.
-    voxel_var = 0
-    for batch_idx, (data, target) in enumerate(loader):
-
-        image_voxel_sum = torch.sum(data)
-        image_voxel_count = data.numel()
-        image_voxel_var = torch.var(data)
-
-        if batch_idx == 0:
-            voxel_var = image_voxel_var
-        else:
-            delta = (voxel_sum/voxel_count) - (image_voxel_sum/image_voxel_count)
-            M_a = voxel_var * voxel_count
-            M_b = image_voxel_var * image_voxel_count
-            M2 = M_a + M_b + delta ** 2 * voxel_count * image_voxel_count / (voxel_count + image_voxel_count)
-            voxel_var = M2 / (voxel_count + image_voxel_count)
-
-        voxel_count += image_voxel_count
-        voxel_sum += image_voxel_sum
-
-        # print(data.shape, data.numel(), torch.sum(data), (image_voxel_sum/image_voxel_count), (voxel_sum/voxel_count), image_voxel_var, voxel_var)
-
-    return voxel_sum/voxel_count, np.sqrt(voxel_var)
 
 
 def train_loop(model, train_loader, optimizer, epoch):
@@ -67,15 +23,13 @@ def train_loop(model, train_loader, optimizer, epoch):
     training_accs = []
     for batch_idx, (data, target) in enumerate(train_loader):
         time_start = time.perf_counter()
-
-        target = torch.LongTensor(target)
         if use_gpu:
             data, target = data.cuda(), target.cuda()
-        x = torch.autograd.Variable(data)
-        y = torch.autograd.Variable(target)
+        x = Variable(data)
+        y = Variable(target)
         # forward and backward propagation
         out = model(x)
-        losses = nn.functional.cross_entropy(out, y, reduce=False)
+        losses = F.cross_entropy(out, y, reduce=False)
         loss = losses.mean()
         loss.backward()
         if batch_idx % args.batchsize_multiplier == args.batchsize_multiplier-1:
@@ -94,15 +48,12 @@ def train_loop(model, train_loader, optimizer, epoch):
             float(loss.data[0]), float(acc.data[0]),
             time.perf_counter() - time_start))
 
-        # # for debugging to arrive at validation early...
-        # if (batch_idx+1)%4 == 0:
-        #     break
-
     loss_avg = np.mean(training_losses)
     acc_avg = np.mean(training_accs)
     training_outs = np.concatenate(training_outs)
     training_losses = np.concatenate(training_losses)
     return loss_avg, acc_avg, training_outs, training_losses
+
 
 
 def infer(model, loader):
@@ -118,61 +69,28 @@ def infer(model, loader):
         out = model(x)
         outs.append(out.data.cpu().numpy())
         ys.append(y.data.cpu().numpy())
-        losses.append(nn.functional.cross_entropy(out, y, reduce=False).data.cpu().numpy())
+        losses.append(F.cross_entropy(out, y, reduce=False).data.cpu().numpy())
     outs = np.concatenate(outs)
     ys = np.concatenate(ys)
     return outs, ys, np.concatenate(losses)
 
 
+
 def main(checkpoint):
 
-    # Build datasets
-    if args.mode == 'train':
-        train_set = torch.utils.data.ConcatDataset([
-            Cath(args.data_filename, split=i, download=True,
-                 randomize_orientation=args.randomize_orientation,
-                 discretization_bins=args.data_discretization_bins,
-                 discretization_bin_size=args.data_discretization_bin_size) for i in range(7)])
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=0, pin_memory=False, drop_last=True)
-        n_input = train_set.datasets[0].n_atom_types
-        n_output = len(train_set.datasets[0].label_set)
-        log_obj.write("Training set: " + str([len(dataset) for dataset in train_set.datasets]))
-
-        # dataset_mean, dataset_std = calc_normalization_factor(train_loader)
-        # for set in train_set.datasets:
-        #     set.set_dataset_normalization(dataset_mean, dataset_std)
-
-
-    if args.mode in ['train', 'validate']:
-        validation_set = Cath(
-            args.data_filename, split=7,
-            discretization_bins=args.data_discretization_bins,
-            discretization_bin_size=args.data_discretization_bin_size)
-        validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
-        n_input = validation_set.n_atom_types
-        n_output = len(validation_set.label_set)
-        log_obj.write("Validation set: " + str(len(validation_set)))
-
-        # dataset_mean, dataset_std = calc_normalization_factor(validation_loader)
-        # validation_set.set_dataset_normalization(dataset_mean, dataset_std)
-
-    if args.mode == 'test':
-        test_set = torch.utils.data.ConcatDataset([Cath(
-            args.data_filename, split=i,
-            discretization_bins=args.data_discretization_bins,
-            discretization_bin_size=args.data_discretization_bin_size) for i in range(8, 10)])
-        test_loader = torch.utils.data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
-        n_input = test_set.datasets[0].n_atom_types
-        n_output = len(test_set.datasets[0].label_set)
-        log_obj.write("Test set: " + str([len(dataset) for dataset in test_set.datasets]))
-
-        # dataset_mean, dataset_std = calc_normalization_factor(test_loader)
-        # for set in test_set.datasets:
-        #     set.set_dataset_normalization(dataset_mean, dataset_std)
+    cache = CacheNPY("v64", repeat=4, transform=Obj2Voxel(64))
+    def transform(x):
+        x = cache(x)
+        return torch.from_numpy(x.astype(np.float32)).unsqueeze(0)
+    def target_transform(x):
+        classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
+        return classes.index(x)
+    trainset = ModelNet10("./root/", train=True, download=True, transform=transform, target_transform=target_transform)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, drop_last=True)
 
 
     # Build model and set up optimizer
-    model = network_module.network(n_input=n_input, n_output=n_output, args=args)
+    model = network_module.network(args=args)
     if use_gpu:
         model.cuda()
     log_obj.write(str(model))
@@ -208,33 +126,32 @@ def main(checkpoint):
 
             loss_avg, acc_avg, training_outs, training_losses = train_loop(model, train_loader, optimizer, epoch)
 
-            if (epoch+1) % args.report_frequency != 0:
-                continue
+            print('\n\n NO VALIDATION YET \n\n')
+            # validation_outs, ys, validation_losses = infer(model, validation_loader)
 
-            validation_outs, ys, validation_losses = infer(model, validation_loader)
+            # # compute the accuracy
+            # validation_acc = np.sum(validation_outs.argmax(-1) == ys) / len(ys)
 
-            # compute the accuracy
-            validation_acc = np.sum(validation_outs.argmax(-1) == ys) / len(ys)
-
-            validation_loss_avg = np.mean(validation_losses)
+            # validation_loss_avg = np.mean(validation_losses)
 
             log_obj.write('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
                 epoch, len(train_loader)-1, len(train_loader),
                 loss_avg, acc_avg))
-            log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
-                epoch, len(train_loader)-1, len(train_loader),
-                validation_loss_avg, validation_acc))
+            # log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+            #     epoch, len(train_loader)-1, len(train_loader),
+            #     validation_loss_avg, validation_acc))
 
-            log_obj.write('VALIDATION losses: ' + str(validation_losses))
+            # log_obj.write('VALIDATION losses: ' + str(validation_losses))
 
 
             # ============ TensorBoard logging ============ #
             if tensorflow_available:
                 # (1) Log the scalar values
                 info = {'training set avg loss': loss_avg,
-                        'training set accuracy': acc_avg,
-                        'validation set avg loss': validation_loss_avg,
-                        'validation set accuracy': validation_acc}
+                        'training set accuracy': acc_avg
+            #             'validation set avg loss': validation_loss_avg,
+            #             'validation set accuracy': validation_acc
+            }
                 for tag, value in info.items():
                     tf_logger.scalar_summary(tag, value, step=epoch+1)
 
@@ -245,12 +162,12 @@ def main(checkpoint):
                     tf_logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), step=epoch+1)
 
                 # (3) Log losses for all datapoints in validation and training set
-                tf_logger.histo_summary("losses/validation/", validation_losses, step=epoch+1)
+            #     tf_logger.histo_summary("losses/validation/", validation_losses, step=epoch+1)
                 tf_logger.histo_summary("losses/training",    training_losses,   step=epoch+1)
 
                 # (4) Log logits for all datapoints in validation and training set
-                for i in range(n_output):
-                    tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step=epoch+1)
+                for i in range(10):
+            #         tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step=epoch+1)
                     tf_logger.histo_summary("logits/%d/training" % i,   training_outs[:, i],   step=epoch+1)
 
 
@@ -262,13 +179,13 @@ def main(checkpoint):
                         'best_validation_loss_avg': best_validation_loss_avg,
                         'timestamp': timestamp},
                         checkpoint_path_latest)
-            # optional saving of best validation state
-            if epoch > args.burnin_epochs and validation_loss_avg < best_validation_loss_avg:
-                best_validation_loss_avg = validation_loss_avg
-                copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
-                log_obj.write('Best validation loss until now - updated best model')
-            else:
-                log_obj.write('Validation loss did not improve')
+            # # optional saving of best validation state
+            # if validation_loss_avg < best_validation_loss_avg:
+            #     best_validation_loss_avg = validation_loss_avg
+            #     copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
+            #     log_obj.write('Best validation loss until now - updated best model')
+            # else:
+            #     log_obj.write('Validation loss did not improve')
 
 
     elif args.mode == 'validate':
@@ -292,6 +209,17 @@ def main(checkpoint):
             test_loss_avg, test_acc))
 
 
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -299,25 +227,12 @@ if __name__ == '__main__':
     # required
     parser.add_argument("--model", required=True,
                         help="Which model definition to use")
-    parser.add_argument("--data-filename", required=True,
-                        help="The name of the data file, e.g. cath_3class.npz, cath_10arch.npz (will automatically downloaded if not found)")
-    parser.add_argument("--report-frequency", default=1, type=int,
-                        help="The frequency with which status reports will be written")
-    parser.add_argument("--burnin-epochs", default=0, type=int,
-                        help="Number of epochs to discard when dumping the best model")
-    # cath specific
-    parser.add_argument("--data-discretization-bins", type=int, default=50,
-                        help="Number of bins used in each dimension for the discretization of the input data")
-    parser.add_argument("--data-discretization-bin-size", type=float, default=2.0,
-                        help="Size of bins used in each dimension for the discretization of the input data")
 
     parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
                         help="Mode of operation (default: %(default)s)")
     parser.add_argument("--training-epochs", default=100, type=int,
                         help="Which model definition to use")
-    parser.add_argument("--randomize-orientation", action="store_true", default=False,
-                        help="Whether to randomize the orientation of the structural input during training (default: %(default)s)")
-    parser.add_argument("--batch-size", default=18, type=int,
+    parser.add_argument("--batch-size", default=64, type=int,
                         help="Size of mini batches to use per iteration, can be accumulated via argument batchsize_multiplier (default: %(default)s)")
     parser.add_argument("--batchsize-multiplier", default=1, type=int,
                         help="number of minibatch iterations accumulated before applying the update step, effectively multiplying batchsize (default: %(default)s)")
@@ -325,14 +240,14 @@ if __name__ == '__main__':
                         help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
     parser.add_argument("--initial_lr", default=1e-1, type=float,
                         help="Initial learning rate (without decay)")
-    parser.add_argument("--lr_decay_start", type=int, default=40,
+    parser.add_argument("--lr_decay_start", type=int, default=1,
                         help="epoch after which the exponential learning rate decay starts")
-    parser.add_argument("--lr_decay_base", type=float, default=.94,
+    parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
     # model
-    parser.add_argument("--kernel-size", type=int, default=3,
+    parser.add_argument("--kernel-size", type=int, default=5,
                         help="convolution kernel size")
-    parser.add_argument("--p-drop-conv", type=float, default=.1,
+    parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
     parser.add_argument("--p-drop-fully", type=float, default=None,
                         help="fully connected layer dropout probability")
@@ -340,11 +255,8 @@ if __name__ == '__main__':
                         help="bandlimiting heuristic for spherical harmonics")
     parser.add_argument("--SE3-nonlinearity", choices={"gated", "norm"}, default="gated",
                         help="Which nonlinearity to use for non-scalar capsules")
-    parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='batch',
+    parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='group',
                         help="Which nonlinearity to use for non-scalar capsules")
-    # TODO: NOT IMPLEMENTED FOR CONVENTONAL NETWORKS YET!
-    parser.add_argument("--downsample-by-pooling", action='store_true', default=True,
-                        help="Switches from downsampling by striding to downsampling by pooling")
     # WEIGHTS
     parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
                         help="L1 regularization factor for convolution weights")

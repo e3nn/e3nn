@@ -24,7 +24,7 @@ class network(ResNet):
             'batch_norm_momentum': 0.01,
             # TODO: probability needs to be adapted to capsule order
             'capsule_dropout_p': args.p_drop_conv,  # drop probability of whole capsules
-            'normalization': 'batch',
+            'normalization': args.normalization,
             'downsample_by_pooling': args.downsample_by_pooling,
         }
         if args.SE3_nonlinearity == 'gated':
