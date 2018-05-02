@@ -288,7 +288,8 @@ def main(checkpoint):
                     improved = True
                 if latest_validation_accs_avg > best_avg_validation_acc:
                     best_avg_validation_acc = latest_validation_accs_avg
-                    copyfile(src=checkpoint_path_latest_n.replace('__n__', '_0'), dst=checkpoint_path_best_window_avg)
+                    copyfile(src=checkpoint_path_latest_n.replace('__n__', '_'+str(checkpoint_latest_n//2)),
+                             dst=checkpoint_path_best_window_avg)
                     log_obj.write('Best validation accuracy (window average)_until now - updated best (window averaged) model')
                     improved = True
                 if not improved:
