@@ -185,15 +185,18 @@ def main(checkpoint):
 
     # restore state from checkpoint
     epoch_start_index = 0
-    best_validation_loss_avg = float('inf')
+    best_validation_acc = -float('inf')
+    best_avg_validation_acc = -float('inf')
+    latest_validation_accs = []
     global timestamp
     if checkpoint is not None:
         log_obj.write("Restoring model from: " + checkpoint_path_restore)
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         epoch_start_index = checkpoint['epoch']+1
-        best_validation_loss_avg = checkpoint['best_validation_loss_avg']
-
+        best_validation_acc = checkpoint['best_validation_acc']
+        best_avg_validation_acc = checkpoint['best_avg_validation_acc']
+        latest_validation_accs = checkpoint['latest_validation_accs']
 
     # Set the logger
     tf_logger, tensorflow_available = tensorflow_logger.get_tf_logger(basepath=basepath, timestamp=timestamp)
@@ -227,7 +230,6 @@ def main(checkpoint):
 
             log_obj.write('VALIDATION losses: ' + str(validation_losses))
 
-
             # ============ TensorBoard logging ============ #
             if tensorflow_available:
                 # (1) Log the scalar values
@@ -254,21 +256,43 @@ def main(checkpoint):
                     tf_logger.histo_summary("logits/%d/training" % i,   training_outs[:, i],   step=epoch+1)
 
 
-
             # saving of latest state
+            for n in range(0, checkpoint_latest_n-1)[::-1]:
+                source = checkpoint_path_latest_n.replace('__n__', '_'+str(n))
+                target = checkpoint_path_latest_n.replace('__n__', '_'+str(n+1))
+                if os.path.exists(source):
+                    os.rename(source, target)
+
             torch.save({'state_dict': model.state_dict(),
                         'optimizer': optimizer.state_dict(),
                         'epoch': epoch,
-                        'best_validation_loss_avg': best_validation_loss_avg,
+                        'best_validation_acc': best_validation_acc,
+                        'best_avg_validation_acc': best_avg_validation_acc,
                         'timestamp': timestamp},
-                        checkpoint_path_latest)
+                        checkpoint_path_latest_n.replace('__n__', '_0'))
+
+            latest_validation_accs.append(validation_acc)
+            if len(latest_validation_accs) > checkpoint_latest_n:
+                latest_validation_accs.pop(0)
+            latest_validation_accs_avg = -float('inf')
+            if len(latest_validation_accs) == checkpoint_latest_n:
+                latest_validation_accs_avg = np.average(latest_validation_accs)
+
             # optional saving of best validation state
-            if epoch > args.burnin_epochs and validation_loss_avg < best_validation_loss_avg:
-                best_validation_loss_avg = validation_loss_avg
-                copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
-                log_obj.write('Best validation loss until now - updated best model')
-            else:
-                log_obj.write('Validation loss did not improve')
+            improved = False
+            if epoch > args.burnin_epochs:
+                if validation_acc > best_validation_acc:
+                    best_validation_acc = validation_acc
+                    copyfile(src=checkpoint_path_latest_n.replace('__n__', '_0'), dst=checkpoint_path_best)
+                    log_obj.write('Best validation accuracy until now - updated best model')
+                    improved = True
+                if latest_validation_accs_avg > best_avg_validation_acc:
+                    best_avg_validation_acc = latest_validation_accs_avg
+                    copyfile(src=checkpoint_path_latest_n.replace('__n__', '_0'), dst=checkpoint_path_best_window_avg)
+                    log_obj.write('Best validation accuracy (window average)_until now - updated best (window averaged) model')
+                    improved = True
+                if not improved:
+                    log_obj.write('Validation loss did not improve')
 
 
     elif args.mode == 'validate':
@@ -407,8 +431,10 @@ if __name__ == '__main__':
         timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
         os.makedirs('{:s}/checkpoints'.format(basepath), exist_ok=True)
 
-    checkpoint_path_latest = '{:s}/checkpoints/{:s}_latest.ckpt'.format(basepath, timestamp)
+    checkpoint_latest_n = 5
+    checkpoint_path_latest_n = '{:s}/checkpoints/{:s}_latest__n__.ckpt'.format(basepath, timestamp)
     checkpoint_path_best   = '{:s}/checkpoints/{:s}_best.ckpt'.format(basepath, timestamp)
+    checkpoint_path_best_window_avg   = '{:s}/checkpoints/{:s}_best_window_avg.ckpt'.format(basepath, timestamp)
 
     # instantiate simple logger
     log_obj = logger.logger(basepath=basepath, timestamp=timestamp)
