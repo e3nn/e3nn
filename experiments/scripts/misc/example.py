@@ -22,7 +22,7 @@ from se3_cnn.blocks import GatedBlock
 from se3_cnn.batchnorm import SE3BatchNorm
 from se3_cnn.convolution import SE3Convolution
 
-from se3_cnn.util.optimizers_L1L2 import Adam
+from experiments.util.optimizers_L1L2 import Adam
 
 
 class AvgSpacial(torch.nn.Module):
@@ -61,7 +61,6 @@ class CNN(torch.nn.Module):
             'size': 5,
             'stride': 2,
             'padding': 3,
-            'batch_norm_before_conv': False,
             'radial_window': radial_window
         }
 
