@@ -357,7 +357,7 @@ if __name__ == '__main__':
     # model
     parser.add_argument("--kernel-size", type=int, default=3,
                         help="convolution kernel size")
-    parser.add_argument("--p-drop-conv", type=float, default=.1,
+    parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
     parser.add_argument("--p-drop-fully", type=float, default=None,
                         help="fully connected layer dropout probability")
