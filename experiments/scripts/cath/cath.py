@@ -268,6 +268,7 @@ def main(checkpoint):
                         'epoch': epoch,
                         'best_validation_acc': best_validation_acc,
                         'best_avg_validation_acc': best_avg_validation_acc,
+                        'latest_validation_accs': latest_validation_accs,
                         'timestamp': timestamp},
                         checkpoint_path_latest_n.replace('__n__', '_0'))
 
