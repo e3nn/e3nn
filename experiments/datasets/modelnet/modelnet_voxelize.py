@@ -92,7 +92,7 @@ def obj2vox_conversion(size, double, root_dir, dataset):
     voxelize .obj samples
     :param size: grid size on which the dataset is voxelized
     :param double: sample on twice the grid size, then sample down to size
-                   grid values are in 0,..,7 and represent number of face intersections in finer grid
+                   grid values are in 0,..,8 and represent number of face intersections in finer grid
     :param root_dir: dataset root directory
     :param dataset: dataset to be used (str for the dataset directory, either ModelNet10 or ModelNet40)
     '''
