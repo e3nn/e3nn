@@ -268,6 +268,7 @@ def main(checkpoint):
                         'epoch': epoch,
                         'best_validation_acc': best_validation_acc,
                         'best_avg_validation_acc': best_avg_validation_acc,
+                        'latest_validation_accs': latest_validation_accs,
                         'timestamp': timestamp},
                         checkpoint_path_latest_n.replace('__n__', '_0'))
 
@@ -357,7 +358,7 @@ if __name__ == '__main__':
     # model
     parser.add_argument("--kernel-size", type=int, default=3,
                         help="convolution kernel size")
-    parser.add_argument("--p-drop-conv", type=float, default=.1,
+    parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
     parser.add_argument("--p-drop-fully", type=float, default=None,
                         help="fully connected layer dropout probability")
