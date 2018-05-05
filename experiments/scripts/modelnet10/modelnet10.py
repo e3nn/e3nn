@@ -61,7 +61,8 @@ def infer(model, loader):
     losses = []
     outs = []
     ys = []
-    for data,target in loader:
+    for batch_idx, (data,target) in enumerate(loader):
+        print('inference on batch {}/{}'.format(batch_idx,len(loader)), end='\r')
         if use_gpu:
             data, target = data.cuda(), target.cuda()
         x = torch.autograd.Variable(data, volatile=True)
@@ -78,15 +79,38 @@ def infer(model, loader):
 
 def main(checkpoint):
 
-    cache = CacheNPY("v64", repeat=4, transform=Obj2Voxel(64))
+    # classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
+
+    cache = CacheNPY("v64", repeat=32, transform=Obj2Voxel(64), pick_randomly=True)
     def transform(x):
         x = cache(x)
         return torch.from_numpy(x.astype(np.float32)).unsqueeze(0)
     def target_transform(x):
-        classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
         return classes.index(x)
-    trainset = ModelNet10("./root/", train=True, download=True, transform=transform, target_transform=target_transform)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+    trainset = ModelNet10("./root/", mode=args.mode, classes=classes, download=True, transform=transform, target_transform=target_transform)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, drop_last=True,
+
+        # num_workers=16,
+        pin_memory=True
+
+        )
+
+
+
+    # print(' \n\n\n REPEAT AND PICK RANDOMLY FOR TEST TIME DATA AUGMENTATION \n\n\n ')
+
+    # cache = CacheNPY("v64", repeat=1, transform=Obj2Voxel(64))
+    # # cache = CacheNPY("v64", repeat=32, transform=Obj2Voxel(64), pick_randomly=False)
+    # def transform(x):
+    #     x = cache(x)
+    #     return torch.from_numpy(x.astype(np.float32)).unsqueeze(0)
+    # def target_transform(x):
+    #     return classes.index(x)
+    # testset = ModelNet10("./root/", mode=args.mode, classes=classes, download=True, transform=transform, target_transform=target_transform)
+    # test_loader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, drop_last=False)
+
+
+
 
 
     # Build model and set up optimizer
@@ -203,20 +227,10 @@ def main(checkpoint):
 
         # compute the accuracy
         test_acc = np.sum(out.argmax(-1) == y) / len(y)
-        test_loss_avg = test_loss_sum / len(test_loader.dataset)
+        test_loss_avg = test_loss_sum.mean() / len(test_loader.dataset)
 
-        log_obj.write('VALIDATION SET: loss={:.4} acc={:.2}'.format(
+        log_obj.write('TEST SET: loss={:.4} acc={:.2}'.format(
             test_loss_avg, test_acc))
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -228,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument("--model", required=True,
                         help="Which model definition to use")
 
-    parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
+    parser.add_argument("--mode", choices=['train', 'test', 'validate', 'train_full'], default="train",
                         help="Mode of operation (default: %(default)s)")
     parser.add_argument("--training-epochs", default=100, type=int,
                         help="Which model definition to use")
@@ -245,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
     # model
-    parser.add_argument("--kernel-size", type=int, default=5,
+    parser.add_argument("--kernel-size", type=int, default=3,
                         help="convolution kernel size")
     parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
@@ -257,6 +271,8 @@ if __name__ == '__main__':
                         help="Which nonlinearity to use for non-scalar capsules")
     parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='group',
                         help="Which nonlinearity to use for non-scalar capsules")
+    parser.add_argument("--downsample-by-pooling", action='store_true', default=False,
+                        help="Switches from downsampling by striding to downsampling by pooling")
     # WEIGHTS
     parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
                         help="L1 regularization factor for convolution weights")
