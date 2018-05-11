@@ -25,16 +25,23 @@ def target_transform(x):
 dataset = ModelNet10("./modelnet10/", download=True, transform=transform, target_transform=target_transform)
 """
 
+
 class Obj2Voxel:
-    def __init__(self, size, rotate=True, tmpfile="tmp.npy"):
+    def __init__(self, size, rotate=True, double=False, diagonal_bounding_box=False, tmpfile="tmp.npy"):
         self.size = size
         self.rotate = rotate
+        self.double = double
+        self.diagonal_bounding_box = diagonal_bounding_box
         self.tmpfile = tmpfile
 
     def __call__(self, file_path):
         command = ["obj2voxel", "--size", str(self.size), file_path, self.tmpfile]
         if self.rotate:
             command += ["--rotate"]
+        if self.double:
+            command += ["--double"]
+        if self.diagonal_bounding_box:
+            command += ["--diagonal_bounding_box"]
         subprocess.run(command)
         return np.load(self.tmpfile).astype(np.int8).reshape((self.size, self.size, self.size))
 
@@ -127,7 +134,7 @@ class ModelNet10(torch.utils.data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
 
-        if download:
+        if download and not self._check_exists():
             self.download()
 
         if not self._check_exists():
@@ -135,17 +142,17 @@ class ModelNet10(torch.utils.data.Dataset):
                                ' You can use download=True to download it')
 
         if mode == 'train_full':
-            self.files =  sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", 'train', "*.obj")))
+            self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", 'train', "*.obj")))
             self.files += sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", 'validation', "*.obj")))
         else:
             self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", self.mode, "*.obj")))
 
     def __getitem__(self, index):
-        img = self.files[index] # FILENAME of the image
+        img = self.files[index]  # FILENAME of the image
         target = img.split(os.path.sep)[-3]
 
         if self.transform is not None:
-            img = self.transform(img) # apply transformations (and load .npy corresponding to img filename)
+            img = self.transform(img)  # apply transformations (and load .npy corresponding to img filename)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -226,11 +233,7 @@ class ModelNet10(torch.utils.data.Dataset):
                 path_valid = path_train.replace('train', 'validation')
                 shutil.move(src=path_train, dst=path_valid)
 
-
     def download(self):
-
-        if self._check_exists():
-            return
 
         # download files
         try:
