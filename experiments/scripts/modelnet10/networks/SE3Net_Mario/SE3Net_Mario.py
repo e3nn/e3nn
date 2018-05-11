@@ -10,7 +10,7 @@ class network(nn.Module):
         super(network, self).__init__()
 
         features = [
-            ( 1,),
+            ( 1,) if args.add_z_axis is False else (2,),
             ( 4,  4,  4),
             ( 8,  8,  8),
             (16, 16, 16),

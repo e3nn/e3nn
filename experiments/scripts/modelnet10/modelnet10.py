@@ -11,7 +11,7 @@ import importlib
 from shutil import copyfile
 import argparse
 
-from experiments.datasets.modelnet.modelnet import ModelNet10, Obj2Voxel, CacheNPY
+from experiments.datasets.modelnet.modelnet import *
 from experiments.util import *
 
 
@@ -61,7 +61,8 @@ def infer(model, loader):
     losses = []
     outs = []
     ys = []
-    for data,target in loader:
+    for batch_idx, (data,target) in enumerate(loader):
+        print('inference on batch {}/{}'.format(batch_idx,len(loader)), end='\r')
         if use_gpu:
             data, target = data.cuda(), target.cuda()
         x = torch.autograd.Variable(data, volatile=True)
@@ -78,15 +79,33 @@ def infer(model, loader):
 
 def main(checkpoint):
 
-    cache = CacheNPY("v64", repeat=4, transform=Obj2Voxel(64))
-    def transform(x):
-        x = cache(x)
-        return torch.from_numpy(x.astype(np.float32)).unsqueeze(0)
-    def target_transform(x):
-        classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
-        return classes.index(x)
-    trainset = ModelNet10("./root/", train=True, download=True, transform=transform, target_transform=target_transform)
-    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+    # load datasets
+    data_set_kwargs = {'root_dir': args.dataset_root_dir,
+                       'dataset': args.dataset,
+                       'size': args.sample_vol_size}
+    data_loader_kwargs = {'batch_size': args.batch_size,
+                          'num_workers': 32,
+                          'pin_memory': True}
+    if args.mode == 'train_full':
+        data_set_kwargs.update({'mode': 'train_full'})
+        data_loader_kwargs.update({'shuffle': True,
+                                   'drop_last': True})
+        train_set, train_loader = get_modelnet_loader(**data_set_kwargs, data_loader_kwargs=data_loader_kwargs, args=args)
+    if args.mode == 'train':
+        data_set_kwargs.update({'mode': 'train'})
+        data_loader_kwargs.update({'shuffle': True,
+                                   'drop_last': True})
+        train_set, train_loader = get_modelnet_loader(**data_set_kwargs, data_loader_kwargs=data_loader_kwargs, args=args)
+    if args.mode in ['train', 'validation']:
+        data_set_kwargs.update({'mode': 'validation'})
+        data_loader_kwargs.update({'shuffle': False,
+                                   'drop_last': False})
+        validation_set, validation_loader = get_modelnet_loader(**data_set_kwargs, data_loader_kwargs=data_loader_kwargs, args=args)
+    if args.mode == 'test':
+        data_set_kwargs.update({'mode': 'test'})
+        data_loader_kwargs.update({'shuffle': False,
+                                   'drop_last': False})
+        test_set, test_loader = get_modelnet_loader(**data_set_kwargs, data_loader_kwargs=data_loader_kwargs, args=args)
 
 
     # Build model and set up optimizer
@@ -126,31 +145,26 @@ def main(checkpoint):
 
             loss_avg, acc_avg, training_outs, training_losses = train_loop(model, train_loader, optimizer, epoch)
 
-            print('\n\n NO VALIDATION YET \n\n')
-            # validation_outs, ys, validation_losses = infer(model, validation_loader)
-
+            validation_outs, ys, validation_losses = infer(model, validation_loader)
             # # compute the accuracy
-            # validation_acc = np.sum(validation_outs.argmax(-1) == ys) / len(ys)
-
-            # validation_loss_avg = np.mean(validation_losses)
+            validation_acc = np.sum(validation_outs.argmax(-1) == ys) / len(ys)
+            validation_loss_avg = np.mean(validation_losses)
 
             log_obj.write('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
                 epoch, len(train_loader)-1, len(train_loader),
                 loss_avg, acc_avg))
-            # log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
-            #     epoch, len(train_loader)-1, len(train_loader),
-            #     validation_loss_avg, validation_acc))
-
+            log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+                epoch, len(train_loader)-1, len(train_loader),
+                validation_loss_avg, validation_acc))
             # log_obj.write('VALIDATION losses: ' + str(validation_losses))
-
 
             # ============ TensorBoard logging ============ #
             if tensorflow_available:
                 # (1) Log the scalar values
                 info = {'training set avg loss': loss_avg,
-                        'training set accuracy': acc_avg
-            #             'validation set avg loss': validation_loss_avg,
-            #             'validation set accuracy': validation_acc
+                        'training set accuracy': acc_avg,
+                        'validation set avg loss': validation_loss_avg,
+                        'validation set accuracy': validation_acc
             }
                 for tag, value in info.items():
                     tf_logger.scalar_summary(tag, value, step=epoch+1)
@@ -162,12 +176,12 @@ def main(checkpoint):
                     tf_logger.histo_summary(tag+'/grad', value.grad.data.cpu().numpy(), step=epoch+1)
 
                 # (3) Log losses for all datapoints in validation and training set
-            #     tf_logger.histo_summary("losses/validation/", validation_losses, step=epoch+1)
+                tf_logger.histo_summary("losses/validation/", validation_losses, step=epoch+1)
                 tf_logger.histo_summary("losses/training",    training_losses,   step=epoch+1)
 
                 # (4) Log logits for all datapoints in validation and training set
                 for i in range(10):
-            #         tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step=epoch+1)
+                    tf_logger.histo_summary("logits/%d/validation" % i, validation_outs[:, i], step=epoch+1)
                     tf_logger.histo_summary("logits/%d/training" % i,   training_outs[:, i],   step=epoch+1)
 
 
@@ -179,13 +193,19 @@ def main(checkpoint):
                         'best_validation_loss_avg': best_validation_loss_avg,
                         'timestamp': timestamp},
                         checkpoint_path_latest)
-            # # optional saving of best validation state
+
+
+
+
             # if validation_loss_avg < best_validation_loss_avg:
             #     best_validation_loss_avg = validation_loss_avg
             #     copyfile(src=checkpoint_path_latest, dst=checkpoint_path_best)
             #     log_obj.write('Best validation loss until now - updated best model')
             # else:
             #     log_obj.write('Validation loss did not improve')
+
+
+
 
 
     elif args.mode == 'validate':
@@ -203,20 +223,10 @@ def main(checkpoint):
 
         # compute the accuracy
         test_acc = np.sum(out.argmax(-1) == y) / len(y)
-        test_loss_avg = test_loss_sum / len(test_loader.dataset)
+        test_loss_avg = test_loss_sum.mean() / len(test_loader.dataset)
 
-        log_obj.write('VALIDATION SET: loss={:.4} acc={:.2}'.format(
+        log_obj.write('TEST SET: loss={:.4} acc={:.2}'.format(
             test_loss_avg, test_acc))
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -224,12 +234,31 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    # required
+    # model and dataset
     parser.add_argument("--model", required=True,
                         help="Which model definition to use")
-
-    parser.add_argument("--mode", choices=['train', 'test', 'validate'], default="train",
+    parser.add_argument("--dataset_root_dir", required=True,
+                        help="Root directory of dataset")
+    parser.add_argument("--dataset", choices=['ModelNet10', 'ModelNet40'], required=True,
+                        help="Dataset to use")
+    parser.add_argument("--sample_vol_size", required=True, type=int,
+                        help="size of the voxelized volume")
+    parser.add_argument("--mode", choices=['train', 'test', 'validate', 'train_full'], default="train",
                         help="Mode of operation (default: %(default)s)")
+    # augmentation params
+    parser.add_argument("--augment_affine", action='store_true', default=False, 
+                        help="Switch to turn on full affine augmentation (scaling up to 1.1, flipping, translations and rotations)")
+    parser.add_argument("--augment_scales", default=False, 
+                        help="Augment by scaling (value > 1 required since only zooming out is allowed)")
+    parser.add_argument("--augment_flip", action='store_true', default=False,
+                        help="Augment by random flipping")
+    parser.add_argument("--augment_translate", action='store_true', default=False,
+                        help="Augment by random translation")
+    parser.add_argument("--augment_rotate", action='store_true', default=False,
+                        help="Augment by random rotation")
+    parser.add_argument("--add_z_axis", action='store_true', default=False,
+                        help="Augment by adding a z-axis to the data")
+    # training params
     parser.add_argument("--training-epochs", default=100, type=int,
                         help="Which model definition to use")
     parser.add_argument("--batch-size", default=64, type=int,
@@ -240,12 +269,12 @@ if __name__ == '__main__':
                         help="Read model from checkpoint given by filename (assumed to be in checkpoint folder)")
     parser.add_argument("--initial_lr", default=1e-1, type=float,
                         help="Initial learning rate (without decay)")
-    parser.add_argument("--lr_decay_start", type=int, default=1,
+    parser.add_argument("--lr_decay_start", type=int, default=40,
                         help="epoch after which the exponential learning rate decay starts")
-    parser.add_argument("--lr_decay_base", type=float, default=1,
+    parser.add_argument("--lr_decay_base", type=float, default=.94,
                         help="exponential decay factor per epoch")
     # model
-    parser.add_argument("--kernel-size", type=int, default=5,
+    parser.add_argument("--kernel-size", type=int, default=3,
                         help="convolution kernel size")
     parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
@@ -257,6 +286,8 @@ if __name__ == '__main__':
                         help="Which nonlinearity to use for non-scalar capsules")
     parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='group',
                         help="Which nonlinearity to use for non-scalar capsules")
+    parser.add_argument("--downsample-by-pooling", action='store_true', default=False,
+                        help="Switches from downsampling by striding to downsampling by pooling")
     # WEIGHTS
     parser.add_argument("--lamb_conv_weight_L1", default=0, type=float,
                         help="L1 regularization factor for convolution weights")
@@ -304,6 +335,12 @@ if __name__ == '__main__':
             print('  ', u)
         print()
         raise ValueError('unparsed / unknown arguments')
+
+    if args.augment_affine:
+        args.augment_scales = 1.1
+        args.augment_flip = True
+        args.augment_translate = True
+        args.augment_rotate = True
 
     network_module = importlib.import_module('networks.{:s}.{:s}'.format(args.model, args.model))
 

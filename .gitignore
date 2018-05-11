@@ -19,3 +19,4 @@ checkpoints
 **/*.log
 **/*.ckpt
 root
+data

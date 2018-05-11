@@ -4,204 +4,156 @@ import os
 import numpy as np
 import torch
 import torch.utils.data
-import subprocess
+import shutil
+from functools import partial
 
-"""
-typical usage
+from scipy.ndimage import affine_transform
+from se3_cnn.SO3 import rot
 
-https://github.com/antigol/obj2voxel is needed
 
-cache = CacheNPY("v64", repeat=24, transform=Obj2Voxel(64))
 
-def transform(x):
-    x = cache(x)
-    return torch.from_numpy(x.astype(np.float32)).unsqueeze(0)
+def get_modelnet_loader(root_dir, dataset, mode, size, data_loader_kwargs, args):
+    if dataset == 'ModelNet10':
+        classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
+    else:
+        raise NotImplementedError('Other datasets than ModelNet10 not fully implemented yet')
+    def _get_trafo(size, args):
+        trafos = []
+        if args.add_z_axis:
+            trafos.append(AddZAxis(zmin=-size/2, zmax=size/2))
+        affine_trafo_args = {'scale': (1,args.augment_scales) if args.augment_scales is not False else False,
+                             'flip': args.augment_flip,
+                             'translate': args.augment_translate,
+                             'rotate': args.augment_rotate}
+        if not all(False for val in affine_trafo_args.values()):
+            trafos.append(RandomAffine3d(vol_shape=(size,size,size), **affine_trafo_args))
+        if len(trafos) == 0:
+            return None
+        else:
+            from torchvision.transforms import Compose
+            return Compose(trafos)
+    transform = _get_trafo(size, args)
+    dataset = ModelNet(root_dir, dataset, mode, size, classes, transform)
+    data_loader = torch.utils.data.DataLoader(dataset, **data_loader_kwargs)
+    return dataset, data_loader
 
-def target_transform(x):
-    classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
-    return classes.index(x)
 
-dataset = ModelNet10("./modelnet10/", download=True, transform=transform, target_transform=target_transform)
-"""
+class ModelNet(torch.utils.data.Dataset):
+    ''' '''
+    def __init__(self, root_dir, dataset, mode, size, classes, transform=None, target_transform=None):
+        '''
+        :param root: directory to store dataset in
+        :param dataset: 
+        :param mode: dataset to load: 'train', 'validation', 'test' or 'train_full'
+                     the validation set is split from the train set, the full train set can be accessed via 'train_full'
+                    :param transform: transformation applied to image in __getitem__
+                                      currently used to load cached file from string
+                    :param target_transform: transformation applied to target in __getitem__
+        '''
+        self.root = os.path.expanduser(root_dir)
+        assert dataset in ['ModelNet10', 'ModelNet40']
+        self.dataset = dataset
 
-class Obj2Voxel:
-    def __init__(self, size, rotate=True, tmpfile="tmp.npy"):
+        assert mode in ['train', 'validation', 'test', 'train_full']
+        self.mode = mode
         self.size = size
-        self.rotate = rotate
-        self.tmpfile = tmpfile
-
-    def __call__(self, file_path):
-        command = ["obj2voxel", "--size", str(self.size), file_path, self.tmpfile]
-        if self.rotate:
-            command += ["--rotate"]
-        subprocess.run(command)
-        return np.load(self.tmpfile).astype(np.int8).reshape((self.size, self.size, self.size))
-
-
-class CacheNPY:
-    def __init__(self, prefix, repeat, transform, pick_randomly=True):
-        self.transform = transform
-        self.prefix = prefix
-        self.repeat = repeat
-        self.pick_randomly = pick_randomly
-
-    def check_trans(self, file_path):
-        print("transform {}...".format(file_path))
-        try:
-            return self.transform(file_path)
-        except:
-            print("Exception during transform of {}".format(file_path))
-            raise
-
-    def __call__(self, file_path):
-        head, tail = os.path.split(file_path)
-        root, _ = os.path.splitext(tail)
-        npy_path = os.path.join(head, self.prefix + root + '_{0}.npy')
-
-        exists = [os.path.exists(npy_path.format(i)) for i in range(self.repeat)]
-
-        if self.pick_randomly and all(exists):
-            i = np.random.randint(self.repeat)
-            try:
-                return np.load(npy_path.format(i))
-            except OSError:
-                exists[i] = False
-
-        if self.pick_randomly:
-            img = self.check_trans(file_path)
-            np.save(npy_path.format(exists.index(False)), img)
-
-            return img
-
-        output = []
-        for i in range(self.repeat):
-            try:
-                img = np.load(npy_path.format(i))
-            except (OSError, FileNotFoundError):
-                img = self.check_trans(file_path)
-                np.save(npy_path.format(i), img)
-            output.append(img)
-
-        return output
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(prefix={0}, transform={1})'.format(self.prefix, self.transform)
-
-
-class ModelNet10(torch.utils.data.Dataset):
-    '''
-    Download ModelNet and output valid obj files content
-    '''
-
-    url_data = 'http://vision.princeton.edu/projects/2014/3DShapeNets/ModelNet10.zip'
-    # url_data40 = 'http://modelnet.cs.princeton.edu/ModelNet40.zip'
-
-    def __init__(self, root, train=True, download=False, transform=None, target_transform=None):
-        self.root = os.path.expanduser(root)
+        self.classes = classes
 
         self.transform = transform
         self.target_transform = target_transform
 
-        if download:
-            self.download()
-
-        if not self._check_exists():
-            raise RuntimeError('Dataset not found.' +
-                               ' You can use download=True to download it')
-
-        self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", "train" if train else "test", "*.obj")))
+        if mode == 'train_full':
+            self.file_names =  sorted(glob.glob(os.path.join(self.root, self.dataset, '*', 'train',      '*_size{}.npy'.format(self.size))))
+            self.file_names += sorted(glob.glob(os.path.join(self.root, self.dataset, '*', 'validation', '*_size{}.npy'.format(self.size))))
+        else:
+            self.file_names =  sorted(glob.glob(os.path.join(self.root, self.dataset, '*', self.mode,    '*_size{}.npy'.format(self.size))))
+        assert self.__len__() > 0
+        print('Loaded dataset \'{}\', size \'{}\' in mode \'{}\' with {} elements'.format(self.dataset, self.size, self.mode, self.__len__()))
 
     def __getitem__(self, index):
-        img = self.files[index]
-        target = img.split(os.path.sep)[-3]
+        img_fname = self.file_names[index]
+
+        img = np.load(img_fname).astype(np.int8).reshape((1, self.size, self.size, self.size))
+
+        target_class_string = img_fname.split(os.path.sep)[-3]
+        target = self.classes.index(target_class_string)
 
         if self.transform is not None:
             img = self.transform(img)
-
+            img = torch.from_numpy(img.astype(np.float32))
         if self.target_transform is not None:
             target = self.target_transform(target)
 
         return img, target
 
     def __len__(self):
-        return len(self.files)
+        return len(self.file_names)
 
-    def _check_exists(self):
-        files = glob.glob(os.path.join(self.root, "ModelNet10", "*", "*", "*.obj"))
 
-        return len(files) > 0
+class AddZAxis(object):
+    ''' add z-axis as second channel to volume 
+        the scale of the z-axis can be set freely
+        if the volume tensor does not contain a channel dimension, add it
+        the z axis is assumed to be the last axis of the volume tensor
+    '''
+    def __init__(self, zmin, zmax):
+        ''' :param zmin: min z-value
+            :param zmin: max z-value
+        '''
+        self.zmin = zmin
+        self.zmax = zmax
 
-    def _download(self, url):
-        import requests
+    def __call__(self, sample):
+        assert sample.ndim in (3,4)
+        if sample.ndim == 3:
+            sample = sample[np.newaxis,...]
+        broadcast_shape = list(sample.shape)
+        broadcast_shape[0] = 1
+        zsize = sample.shape[-1]
+        zcoords = np.linspace(self.zmin, self.zmax, num=zsize, endpoint=True)
+        zcoords = np.broadcast_to(zcoords, broadcast_shape)
+        return np.concatenate([sample,zcoords], axis=0)
 
-        filename = url.split('/')[-1]
-        file_path = os.path.join(self.root, filename)
 
-        if os.path.exists(file_path):
-            return file_path
+class RandomAffine3d(object):
+    ''' random affine transformation applied to volume center
+        assumes volume with channel dimension, shape (C,X,Y,Z)
+    '''
+    def __init__(self, vol_shape, scale=(.9,1.1), flip=True, translate=True, rotate=True):
+        ''' :param vol_shape: shape of the volumes (X,Y,Z), needed to compute center
+            :param scale: False or tuple giving min and max scale value
+                          VALUES <1 ZOOM IN !!!
+            :param flip: bool controlling random reflection with p=0.5
+            :param trans: bool controlling uniform random translations in (-.5, .5) on all axes
+            :param rotate: bool controlling uniform random rotations
+        '''
+        self.vol_shape = np.array(vol_shape)
+        self.scale = scale if scale is not False else (1,1)
+        self.flip = flip
+        self.translate = translate
+        self.rotate = rotate
 
-        print('Downloading ' + url)
+    def __call__(self, sample):
+        assert sample.ndim == 4
+        trafo = self._get_random_affine_trafo()
+        return np.stack([trafo(channel) for channel in sample])
 
-        r = requests.get(url, stream=True)
-        with open(file_path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=16 * 1024 ** 2):
-                if chunk:  # filter out keep-alive new chunks
-                    f.write(chunk)
-                    f.flush()
-
-        return file_path
-
-    def _unzip(self, file_path):
-        import zipfile
-
-        if os.path.exists(os.path.join(self.root, "ModelNet10")):
-            return
-
-        print('Unzip ' + file_path)
-
-        zip_ref = zipfile.ZipFile(file_path, 'r')
-        zip_ref.extractall(self.root)
-        zip_ref.close()
-        os.unlink(file_path)
-
-    def _off2obj(self):
-        print('Convert OFF into OBJ')
-
-        files = glob.glob(os.path.join(self.root, "ModelNet10", "*", "*", "*.off"))
-        for file_name in files:
-            with open(file_name, "rt") as fi:
-                data = fi.read().split("\n")
-
-            assert data[0] == "OFF"
-            n, m, _ = [int(x) for x in data[1].split()]
-            vertices = data[2: 2 + n]
-            faces = [x.split()[1:] for x in data[2 + n: 2 + n + m]]
-            result = "o object\n"
-            for v in vertices:
-                result += "v " + v + "\n"
-
-            for f in faces:
-                result += "f " + " ".join(str(int(x) + 1) for x in f) + "\n"
-
-            with open(file_name.replace(".off", ".obj"), "wt") as fi:
-                fi.write(result)
-
-    def download(self):
-
-        if self._check_exists():
-            return
-
-        # download files
-        try:
-            os.makedirs(self.root)
-        except OSError as e:
-            if e.errno == os.errno.EEXIST:
-                pass
-            else:
-                raise
-
-        file_path = self._download(self.url_data)
-        self._unzip(file_path)
-        self._off2obj()
-
-        print('Done!')
+    def _get_random_affine_trafo(self):
+        if self.rotate:
+            alpha,beta,gamma = np.pi*np.array([2,1,2])*np.random.rand(3)
+            aff = rot(alpha,beta,gamma)
+        else:
+            aff = np.eye(3) # only non-homogeneous coord part
+        fl = (-1)**np.random.randint(low=0, high=2) if self.flip else 1
+        if self.scale is not None:
+            sx,sy,sz = np.random.uniform(low=self.scale[0], high=self.scale[1], size=3)
+        else:
+            sx,sy,sz = 1
+        aff[:,0] *= sx*fl
+        aff[:,1] *= sy
+        aff[:,2] *= sz
+        center = self.vol_shape/2
+        offset = center - center@aff.T # correct offset to apply trafo around center
+        if self.translate:
+            offset += np.random.uniform(low=-.5, high=.5, size=3)
+        return partial(affine_transform, matrix=aff, offset=offset)
