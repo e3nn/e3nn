@@ -298,23 +298,23 @@ def main(checkpoint):
 
 
     elif args.mode == 'validate':
-        out, y, validation_loss_sum = infer(model, validation_loader)
+        out, y, validation_losses = infer(model, validation_loader)
 
         # compute the accuracy
         validation_acc = np.sum(out.argmax(-1) == y) / len(y)
-        validation_loss_avg = validation_loss_sum / len(validation_loader.dataset)
+        validation_loss_avg = np.mean(validation_losses)
 
         log_obj.write('VALIDATION SET: loss={:.4} acc={:.2}'.format(
             validation_loss_avg, validation_acc))
 
     elif args.mode == 'test':
-        out, y, test_loss_sum = infer(model, test_loader)
+        out, y, test_losses = infer(model, test_loader)
 
         # compute the accuracy
         test_acc = np.sum(out.argmax(-1) == y) / len(y)
-        test_loss_avg = test_loss_sum / len(test_loader.dataset)
+        test_loss_avg = np.mean(test_losses)
 
-        log_obj.write('VALIDATION SET: loss={:.4} acc={:.2}'.format(
+        log_obj.write('TEST SET: loss={:.4} acc={:.2}'.format(
             test_loss_avg, test_acc))
 
 
