@@ -306,7 +306,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr_decay_base", type=float, default=1,
                         help="exponential decay factor per epoch")
     # model
-    parser.add_argument("--kernel_size", type=int, default=5,
+    parser.add_argument("--kernel_size", type=int, default=3,
                         help="convolution kernel size")
     parser.add_argument("--p-drop-conv", type=float, default=None,
                         help="convolution/capsule dropout probability")
