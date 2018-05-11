@@ -314,7 +314,7 @@ def main(checkpoint):
         test_acc = np.sum(out.argmax(-1) == y) / len(y)
         test_loss_avg = np.mean(test_losses)
 
-        log_obj.write('VALIDATION SET: loss={:.4} acc={:.2}'.format(
+        log_obj.write('TEST SET: loss={:.4} acc={:.2}'.format(
             test_loss_avg, test_acc))
 
 
