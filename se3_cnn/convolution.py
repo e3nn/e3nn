@@ -38,7 +38,7 @@ class SE3Convolution(torch.nn.Module):
         return output
 
 
-class SE3KernelCombination(torch.autograd.Function):
+class SE3KernelCombination:
     def __init__(self, Rs_in, Rs_out, size, radial_window, verbose):
         super().__init__()
 
@@ -97,7 +97,7 @@ class SE3KernelCombination(torch.autograd.Function):
 
                 row[i] = ker
 
-    def forward(self, weight):  # pylint: disable=W
+    def __call__(self, weight):  # pylint: disable=W
         """
         :return: [feature_out, feature_in, x, y, z]
         """
@@ -142,40 +142,40 @@ class SE3KernelCombination(torch.autograd.Function):
 
         return kernel
 
-    def backward(self, grad_kernel):  # pylint: disable=W
-        self._cuda_kernels(grad_kernel.is_cuda)
+    # def backward(self, grad_kernel):  # pylint: disable=W
+    #     self._cuda_kernels(grad_kernel.is_cuda)
 
-        if grad_kernel.is_cuda:
-            grad_weight = torch.cuda.FloatTensor(self.nweights)
-        else:
-            grad_weight = torch.FloatTensor(self.nweights)
+    #     if grad_kernel.is_cuda:
+    #         grad_weight = torch.cuda.FloatTensor(self.nweights)
+    #     else:
+    #         grad_weight = torch.FloatTensor(self.nweights)
 
-        weight_index = 0
+    #     weight_index = 0
 
-        begin_i = 0
-        for i, mi in enumerate(self.multiplicities_out):
-            begin_j = 0
-            for j, mj in enumerate(self.multiplicities_in):
-                if self.kernels[i][j] is not None:
-                    b_el = self.kernels[i][j].size(0)
-                    basis_kernels_ij = self.kernels[i][j]  # [beta, i, j, x, y, z]
-                    basis_kernels_ij = basis_kernels_ij.contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
+    #     begin_i = 0
+    #     for i, mi in enumerate(self.multiplicities_out):
+    #         begin_j = 0
+    #         for j, mj in enumerate(self.multiplicities_in):
+    #             if self.kernels[i][j] is not None:
+    #                 b_el = self.kernels[i][j].size(0)
+    #                 basis_kernels_ij = self.kernels[i][j]  # [beta, i, j, x, y, z]
+    #                 basis_kernels_ij = basis_kernels_ij.contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
 
-                    si = slice(begin_i, begin_i + mi * self.dims_out[i])
-                    sj = slice(begin_j, begin_j + mj * self.dims_in[j])
+    #                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
+    #                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
 
-                    grad = grad_kernel[si, sj]  # [I * i, J * j, x, y, z]
-                    grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2)  # [I, J, i, j, x*y*z]
-                    grad = grad.contiguous().view(mi * mj, -1)  # [I*J, i*j*x*y*z]
-                    grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1))  # [I*J, beta]
+    #                 grad = grad_kernel[si, sj]  # [I * i, J * j, x, y, z]
+    #                 grad = grad.contiguous().view(mi, self.dims_out[i], mj, self.dims_in[j], -1).transpose(1, 2)  # [I, J, i, j, x*y*z]
+    #                 grad = grad.contiguous().view(mi * mj, -1)  # [I*J, i*j*x*y*z]
+    #                 grad = torch.mm(grad, basis_kernels_ij.transpose(0, 1))  # [I*J, beta]
 
-                    grad_weight[weight_index: weight_index + mi * mj * b_el] = grad.view(-1)  # [I * J * beta]
-                    weight_index += mi * mj * b_el
+    #                 grad_weight[weight_index: weight_index + mi * mj * b_el] = grad.view(-1)  # [I * J * beta]
+    #                 weight_index += mi * mj * b_el
 
-                begin_j += self.multiplicities_in[j] * self.dims_in[j]
-            begin_i += self.multiplicities_out[i] * self.dims_out[i]
+    #             begin_j += self.multiplicities_in[j] * self.dims_in[j]
+    #         begin_i += self.multiplicities_out[i] * self.dims_out[i]
 
-        return grad_weight
+    #     return grad_weight
 
 
 def test_normalization(batch, input_size, Rs_in, Rs_out, kernel_size):
