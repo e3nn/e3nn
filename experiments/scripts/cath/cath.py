@@ -156,7 +156,7 @@ def main(checkpoint):
         # dataset_mean, dataset_std = calc_normalization_factor(validation_loader)
         # validation_set.set_dataset_normalization(dataset_mean, dataset_std)
 
-    if args.mode == 'test':
+    if args.mode == 'test' or args.report_on_test_set:
         test_set = torch.utils.data.ConcatDataset([Cath(
             args.data_filename, split=i,
             discretization_bins=args.data_discretization_bins,
@@ -230,6 +230,20 @@ def main(checkpoint):
 
             log_obj.write('VALIDATION losses: ' + str(validation_losses))
 
+            if args.report_on_test_set:
+                test_outs, test_ys, test_losses = infer(model,
+                                                   test_loader)
+
+                # compute the accuracy
+                test_acc = np.sum(test_outs.argmax(-1) == test_ys) / len(test_ys)
+
+                test_loss_avg = np.mean(test_losses)
+
+                log_obj.write(
+                    'TEST SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+                        epoch, len(train_loader) - 1, len(train_loader),
+                        test_loss_avg, test_acc))
+
             # ============ TensorBoard logging ============ #
             if tensorflow_available:
                 # (1) Log the scalar values
@@ -237,6 +251,9 @@ def main(checkpoint):
                         'training set accuracy': acc_avg,
                         'validation set avg loss': validation_loss_avg,
                         'validation set accuracy': validation_acc}
+                if args.report_on_test_set:
+                    info.update({'test set avg loss': test_loss_avg,
+                                 'test set accuracy': test_acc})
                 for tag, value in info.items():
                     tf_logger.scalar_summary(tag, value, step=epoch+1)
 
@@ -329,6 +346,8 @@ if __name__ == '__main__':
                         help="The name of the data file, e.g. cath_3class.npz, cath_10arch.npz (will automatically downloaded if not found)")
     parser.add_argument("--report-frequency", default=1, type=int,
                         help="The frequency with which status reports will be written")
+    parser.add_argument("--report-on-test-set", action="store_true", default=False,
+                        help="Whether to include accuracy on test set in output")
     parser.add_argument("--burnin-epochs", default=0, type=int,
                         help="Number of epochs to discard when dumping the best model")
     # cath specific
