@@ -25,7 +25,17 @@ def retrive_dof(matrix):
 
 def conjugate_rot(matrix, alpha, beta, gamma):
     ''' transform cartesian tensor by conjugating it with rotation matrices '''
+
+
+
+
+
     R = rot(alpha,beta,gamma)
+    # R = rot(alpha,beta,gamma).T
+
+
+
+
     conj = R @ matrix @ (R.T)
     assert np.allclose(conj, conj.T), 'conjugation not symmetric'
     assert np.allclose(np.trace(conj), 0), 'conjugation not traceless'
@@ -35,7 +45,17 @@ def solve_Q_C2S():
     def _kron():
         angles = np.pi*np.array([2,1,2])*np.random.rand(3)
         id_ = np.eye(5)
+
+
+
+
         D = wigner_D_matrix(2, *angles)
+        # D = wigner_D_matrix(2, *angles).T
+
+
+
+
+
         A = build_symm_traceless()
         phiA = retrive_dof(A).reshape(-1,1)
         phiRAR = retrive_dof(conjugate_rot(A, *angles)).reshape(-1,1)
@@ -55,10 +75,19 @@ if __name__ == '__main__':
     Q_S2C = np.linalg.inv(Q_C2S)
 
     angles = np.pi*np.random.rand(3)*np.array([2,1,2])
+
+
+    print(np.round(Q_C2S, decimals=2))
+
     D = wigner_D_matrix(2, *angles)
+    # D = wigner_D_matrix(2, *angles).T
+
+
+
+
     A = build_symm_traceless()
     phi = retrive_dof(A)
     phi_R = retrive_dof(conjugate_rot(A, *angles))
 
-    print(np.allclose(Q_S2C@D@Q_C2S@phi, phi_R))
-    print(np.allclose(D@Q_C2S@phi, Q_C2S@phi_R))
+    print(np.allclose(Q_S2C @ D @ Q_C2S @ phi,  phi_R))
+    print(np.allclose(D @ Q_C2S @ phi,  Q_C2S @ phi_R))
