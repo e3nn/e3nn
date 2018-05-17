@@ -95,6 +95,10 @@ setAZRE = ModelNet10("./root/", mode='train_full',
                      transform=compose(cache, to_tensor),
                      target_transform=target_transform)
 
+for _ in range(12):
+    list(torch.utils.data.DataLoader(setAZR, batch_size=16, num_workers=12))
+
+
 skf = StratifiedKFold_Dataset(setAZR, 4)
 
 
