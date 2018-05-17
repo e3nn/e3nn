@@ -6,6 +6,7 @@ import torch
 import torch.utils.data
 import subprocess
 import shutil
+import random
 
 """
 typical usage
@@ -27,13 +28,13 @@ dataset = ModelNet10("./modelnet10/", download=True, transform=transform, target
 
 
 class Obj2Voxel:
-    def __init__(self, size, rotate=True, zrotate=False, double=False, diagonal_bounding_box=False, tmpfile="tmp.npy"):
+    def __init__(self, size, rotate=True, zrotate=False, double=False, diagonal_bounding_box=False, tmpfile=None):
         self.size = size
         self.rotate = rotate
         self.zrotate = zrotate
         self.double = double
         self.diagonal_bounding_box = diagonal_bounding_box
-        self.tmpfile = tmpfile
+        self.tmpfile = tmpfile if tmpfile else '%030x.npy' % random.randrange(16**30)
 
     def __call__(self, file_path):
         command = ["obj2voxel", "--size", str(self.size), file_path, self.tmpfile]
