@@ -27,9 +27,10 @@ dataset = ModelNet10("./modelnet10/", download=True, transform=transform, target
 
 
 class Obj2Voxel:
-    def __init__(self, size, rotate=True, double=False, diagonal_bounding_box=False, tmpfile="tmp.npy"):
+    def __init__(self, size, rotate=True, zrotate=False, double=False, diagonal_bounding_box=False, tmpfile="tmp.npy"):
         self.size = size
         self.rotate = rotate
+        self.zrotate = zrotate
         self.double = double
         self.diagonal_bounding_box = diagonal_bounding_box
         self.tmpfile = tmpfile
@@ -38,6 +39,8 @@ class Obj2Voxel:
         command = ["obj2voxel", "--size", str(self.size), file_path, self.tmpfile]
         if self.rotate:
             command += ["--rotate"]
+        if self.zrotate:
+            command += ["--alpha_rot", str(np.random.rand() * 2 * np.pi)]
         if self.double:
             command += ["--double"]
         if self.diagonal_bounding_box:
