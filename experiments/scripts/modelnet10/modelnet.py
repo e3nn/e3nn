@@ -171,7 +171,7 @@ def train(model, dataset, n_epoch):
     batch_size = 64
 
     model.train()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-1, weight_decay=1e-8)
 
     data = []
@@ -216,7 +216,7 @@ def train(model, dataset, n_epoch):
 
 def test(model, dataset):
     model.eval()
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=False, drop_last=False, num_workers=4)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=False, drop_last=False)
 
     correct = 0
     for i, (input, target) in enumerate(dataloader):
