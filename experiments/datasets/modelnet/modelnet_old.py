@@ -47,7 +47,9 @@ class Obj2Voxel:
         if self.diagonal_bounding_box:
             command += ["--diagonal_bounding_box"]
         subprocess.run(command)
-        return np.load(self.tmpfile).astype(np.int8).reshape((self.size, self.size, self.size))
+        x = np.load(self.tmpfile).astype(np.int8).reshape((self.size, self.size, self.size))
+        os.remove(self.tmpfile)
+        return x
 
 
 class CacheNPY:
