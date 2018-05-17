@@ -148,18 +148,18 @@ def plot_sphere(beta, alpha, f):
     # Turn off the axis planes
     ax.view_init(azim=0, elev=90)
     ax.set_axis_off()
-    a = 0.7
+    a = 0.6
     ax.set_xlim3d(-a, a)
     ax.set_ylim3d(-a, a)
     ax.set_zlim3d(-a, a)
 
 
 def main():
-    b = 20
+    b = 25
     beta = np.linspace(0, np.pi / 2, 2 * b)
     alpha = np.arange(2 * b) * np.pi / b
     beta, alpha = np.meshgrid(beta, alpha, indexing='ij')
-    f = cube_basis_kernels_analytical(SO3.repr3, SO3.repr3, beta.flatten(), alpha.flatten())
+    f = cube_basis_kernels_analytical(SO3.repr3, SO3.repr3, beta.flatten(), alpha.flatten() + np.pi / b / 2)
     f = np.array(f)
     f = (f - np.min(f)) / (np.max(f) - np.min(f))
 
@@ -169,13 +169,13 @@ def main():
     dim_out = f.shape[1]
     dim_in = f.shape[2]
 
-    w = 0.2
-    fig = plt.figure(figsize=(nbase * (dim_in + w), dim_out))
+    w = 1
+    fig = plt.figure(figsize=(nbase * dim_in + (nbase - 1) * w, dim_out))
 
     for base in range(nbase):
         for i in range(dim_out):
             for j in range(dim_in):
-                width = 1 / (dim_in + w) / (nbase)
+                width = 1 / (nbase * dim_in + (nbase - 1) * w)
                 height = 1 / dim_out
                 rect = [
                     (base * (dim_in + w) + j) * width,
