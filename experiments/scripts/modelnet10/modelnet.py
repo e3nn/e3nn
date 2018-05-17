@@ -28,23 +28,23 @@ class _StratifiedKFold_Dataset:
 
 
 class StratifiedKFold_Dataset:
-    def __init__(self, dataset, n_splits):
-        self.dataset = dataset
+    def __init__(self, labels, n_splits):
         self.splits = list(
             StratifiedKFold(
                 n_splits=n_splits,
                 shuffle=True
             ).split(
-                np.zeros(len(dataset)),
-                [y for x, y in dataset]
+                np.zeros(len(labels)),
+                labels
             )
         )
+        self.n_splits = n_splits
 
-    def trainset(self, i, dataset=None):
-        return _StratifiedKFold_Dataset(self.dataset if dataset is None else dataset, self.splits[i][0])
+    def split_trainset(self, dataset, i):
+        return _StratifiedKFold_Dataset(dataset, self.splits[i][0])
 
-    def testset(self, i, dataset=None):
-        return _StratifiedKFold_Dataset(self.dataset if dataset is None else dataset, self.splits[i][1])
+    def split_testset(self, dataset, i):
+        return _StratifiedKFold_Dataset(dataset, self.splits[i][1])
 
 
 def compose(t1, t2):
@@ -99,7 +99,7 @@ for _ in range(12):
     list(torch.utils.data.DataLoader(setAZR, batch_size=16, num_workers=12))
 
 
-skf = StratifiedKFold_Dataset(setAZR, 4)
+skf = StratifiedKFold_Dataset([y for x, y in setAZR], 4)
 
 
 def plot_repr(x):
@@ -293,25 +293,27 @@ def plot(data):
 
 results = []
 
-for i in range(4):
+for i in range(skf.n_splits):
     model = CNN()
     if torch.cuda.is_available():
         model.cuda()
 
-    data = train(model, skf.trainset(i, setAZR), 300)
+    data = train(model, skf.split_trainset(setAZR, i), 300)
     plot(data)
 
     results.append((
-        test(model, skf.trainset(i, setAZRE)),
-        test(model, skf.testset(i, setAZRE))))
+        test(model, skf.split_trainset(setAZRE, i)),
+        test(model, skf.split_testset(setAZRE, i))))
 
     print(results)
 
 results = np.array(results)
+print(results)
+print(results.mean(0))
 
 
 plt.figure()
-cm = confusion_matrix(model, skf.testset(3, setAZRE))
+cm = confusion_matrix(model, skf.split_testset(setAZRE, i))
 plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
 plt.colorbar()
 tick_marks = np.arange(len(classes))
@@ -328,6 +330,3 @@ plt.tight_layout()
 plt.ylabel('True label')
 plt.xlabel('Predicted label')
 plt.savefig("confusion_matrix.pdf")
-
-print(results)
-print(results.mean(0))
