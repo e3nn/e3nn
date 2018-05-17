@@ -28,16 +28,17 @@ dataset = ModelNet10("./modelnet10/", download=True, transform=transform, target
 
 
 class Obj2Voxel:
-    def __init__(self, size, rotate=True, zrotate=False, double=False, diagonal_bounding_box=False, tmpfile=None):
+    def __init__(self, size, rotate=True, zrotate=False, double=False, diagonal_bounding_box=False, diagonal_bounding_box_xy=False):
         self.size = size
         self.rotate = rotate
         self.zrotate = zrotate
         self.double = double
         self.diagonal_bounding_box = diagonal_bounding_box
-        self.tmpfile = tmpfile if tmpfile else '%030x.npy' % random.randrange(16**30)
+        self.diagonal_bounding_box_xy = diagonal_bounding_box_xy
 
     def __call__(self, file_path):
-        command = ["obj2voxel", "--size", str(self.size), file_path, self.tmpfile]
+        tmpfile = '%030x.npy' % random.randrange(16**30)
+        command = ["obj2voxel", "--size", str(self.size), file_path, tmpfile]
         if self.rotate:
             command += ["--rotate"]
         if self.zrotate:
@@ -46,9 +47,11 @@ class Obj2Voxel:
             command += ["--double"]
         if self.diagonal_bounding_box:
             command += ["--diagonal_bounding_box"]
+        if self.diagonal_bounding_box_xy:
+            command += ["--diagonal_bounding_box_xy"]
         subprocess.run(command)
-        x = np.load(self.tmpfile).astype(np.int8).reshape((self.size, self.size, self.size))
-        os.remove(self.tmpfile)
+        x = np.load(tmpfile).astype(np.int8).reshape((self.size, self.size, self.size))
+        os.remove(tmpfile)
         return x
 
 
