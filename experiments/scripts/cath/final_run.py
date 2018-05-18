@@ -1,13 +1,12 @@
 import os
 import argparse
-import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gpu", required=True, type=int)
 args, unparsed = parser.parse_known_args()
 assert args.gpu in [0,1,2,3]
 
-os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
 experiment_calls = [
     'python cath.py --data-filename cath_10arch_ca.npz --model ResNet34 --training-epochs 100 --batch-size 16 --batchsize-multiplier 1 --randomize-orientation --kernel-size 3 --initial_lr=0.0005 --lr_decay_start=40 --burnin-epochs 40 --lr_decay_base=.94 --downsample-by-pooling --p-drop-conv 0.01 --report-frequency 1 --lamb_conv_weight_L1 1e-7 --lamb_conv_weight_L2 1e-7 --lamb_bn_weight_L1 1e-7 --lamb_bn_weight_L2 1e-7 --report-on-test-set',
@@ -23,4 +22,4 @@ experiment_calls = [
     ]
 
 for experiment_call in experiment_calls:
-    subprocess.call(experiment_call)
+    os.system(experiment_call)
