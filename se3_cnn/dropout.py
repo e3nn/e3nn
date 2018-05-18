@@ -8,6 +8,11 @@ class SE3Dropout(torch.nn.Module):
         self.Rs = Rs
         self.p = p
 
+    def __repr__(self):
+        return "{} (p={})".format(
+            self.__class__.__name__,
+            self.p)
+
     def forward(self, x):  # pylint: disable=W
         return SE3DropoutF(self.Rs, self.p if self.training else 0)(x)
 
@@ -19,14 +24,14 @@ class SE3DropoutF(torch.autograd.Function):
         '''
         super().__init__()
         self.p = p
-        self.Rs = Rs
+        self.Rs = [(mul, dim) for mul, dim in Rs if mul * dim > 0]
         self.noise = None
 
     def compute_noise(self, size):
         noises = []
         for mul, dim in self.Rs:
-            noise = torch.FloatTensor(size[0], mul)
-            #noise = torch.FloatTensor(size[0], mul, *size[2:])
+            noise = torch.FloatTensor(size[0], mul, 1, 1, 1)  # independent of spatial position
+            #noise = torch.FloatTensor(size[0], mul, *size[2:]) # SPATIALLY DEPENDENT NOISE (WRONG)
 
             if self.p == 1:
                 noise.fill_(0)
@@ -34,8 +39,9 @@ class SE3DropoutF(torch.autograd.Function):
                 noise.fill_(1)
             else:
                 noise.bernoulli_(1 - self.p).div_(1 - self.p)
-
-            noises.append(noise.repeat(1, dim, *(1,) * (len(size) - 2)))
+            noise = noise.unsqueeze(2).expand(-1,-1,dim,-1,-1,-1).contiguous().view(size[0],mul*dim,1,1,1)
+            noises.append(noise)
+            # noises.append(noise.repeat(1, dim, 1, 1, 1)) # DIFFERENT PROBABILITIES WITHIN CAPSULE (WRONG)
         self.noise = torch.cat(noises, dim=1)
 
     def forward(self, x):  # pylint: disable=W

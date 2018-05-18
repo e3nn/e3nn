@@ -12,3 +12,11 @@ dist
 *.7z
 tmp.*
 .*
+*.png
+logs
+tf_logs
+checkpoints
+**/*.log
+**/*.ckpt
+root
+data
