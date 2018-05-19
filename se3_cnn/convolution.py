@@ -2,14 +2,13 @@
 import numpy as np
 import torch
 from se3_cnn import basis_kernels
-from se3_cnn import SO3
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window, verbose=True, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=True, **kwargs):
         '''
-        :param Rs_in: list of couple (multiplicity, representation)
-        :param Rs_out: list of couple (multiplicity, representation)
+        :param Rs_in: list of couple (multiplicity, representation order)
+        :param Rs_out: list of couple (multiplicity, representation order)
         multiplicity is a positive integer
         representation is a function of SO(3) in Euler ZYZ parametrisation alpha, beta, gamma
 
@@ -24,8 +23,8 @@ class SE3Convolution(torch.nn.Module):
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, size={size}, kwargs={kwargs})".format(
             name=self.__class__.__name__,
-            Rs_in=self.combination.multiplicities_in,
-            Rs_out=self.combination.multiplicities_out,
+            Rs_in=self.combination.Rs_in,
+            Rs_out=self.combination.Rs_out,
             size=self.combination.size,
             kwargs=self.kwargs
         )
@@ -43,45 +42,45 @@ class SE3KernelCombination(torch.autograd.Function):
         super().__init__()
 
         self.size = size
-        Rs_out = [(m, R) for m, R in Rs_out if m >= 1]
-        Rs_in = [(m, R) for m, R in Rs_in if m >= 1]
-        self.multiplicities_out = [m for m, _ in Rs_out]
-        self.multiplicities_in = [m for m, _ in Rs_in]
-        self.dims_out = [SO3.dim(R) for _, R in Rs_out]
-        self.dims_in = [SO3.dim(R) for _, R in Rs_in]
+        self.Rs_out = [(m, l) for m, l in Rs_out if m >= 1]
+        self.Rs_in = [(m, l) for m, l in Rs_in if m >= 1]
+        self.multiplicities_out = [m for m, _ in self.Rs_out]
+        self.multiplicities_in = [m for m, _ in self.Rs_in]
+        self.dims_out = [2 * l + 1 for _, l in self.Rs_out]
+        self.dims_in = [2 * l + 1 for _, l in self.Rs_in]
         self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i in range(len(self.multiplicities_out))])
         self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in range(len(self.multiplicities_in))])
 
         self.kernels = []
         self.nweights = 0
 
-        for m_out, R_out in Rs_out:
+        for m_out, l_out in self.Rs_out:
             self.kernels.append([])
-            for m_in, R_in in Rs_in:
-                basis = self._generate_basis(R_in, R_out, size, radial_window, verbose)
+            for m_in, l_in in self.Rs_in:
+                basis = self._generate_basis(l_in, l_out, size, radial_window, verbose)
                 if basis is not None:
                     self.kernels[-1].append(torch.FloatTensor(basis))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
                     self.kernels[-1].append(None)
 
-    def _generate_basis(self, R_in, R_out, size, radial_window, verbose):  # pylint: disable=W0613
-        basis = basis_kernels.cube_basis_kernels_analytical(size, R_in, R_out, radial_window)
+    def _generate_basis(self, l_in, l_out, size, radial_window, verbose):  # pylint: disable=W0613
+        basis = basis_kernels.cube_basis_kernels_analytical(size, l_in, l_out, radial_window)
         if basis is not None:
-            assert basis.shape[1:] == (SO3.dim(R_out), SO3.dim(R_in), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
+            assert basis.shape[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
             # rescale each basis element such that the weight can be initialized with Normal(0,1)
             # orthonormalization already done in cube_basis_kernels_analytical!
             # ORIGINAL
-            # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in))
+            # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in))
             # EQUAL CONTRIB OF ALL SUPERBLOCKS
             # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
-            # basis *= np.sqrt(SO3.dim(R_out) / (len(basis)*m_in*len(Rs_in)))
+            # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in*len(Rs_in)))
             # EQUAL CONTRIB OF ALL CAPSULES
-            basis *= np.sqrt(SO3.dim(R_out) / (len(basis) * sum(self.multiplicities_in)))
+            basis *= np.sqrt((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in)))
             if verbose:
                 N_sample = 5
-                overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, R_out, R_in, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
-                print("{} -> {} : Created {} basis elements with equivariance {}".format(R_in.__name__, R_out.__name__, len(basis), overlaps))
+                overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
+                print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
         return basis
 
     def _cuda_kernels(self, cuda):
@@ -178,18 +177,13 @@ class SE3KernelCombination(torch.autograd.Function):
         return grad_weight
 
 
-def test_normalization(batch, input_size, Rs_in, Rs_out, kernel_size):
-    from functools import partial
-
-    radial_window = partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
-                            mode='sfcnn', border_dist=0, sigma=0.6)
-
-    conv = SE3Convolution(Rs_in, Rs_out, kernel_size, radial_window)
+def test_normalization(batch, input_size, Rs_in, Rs_out, size):
+    conv = SE3Convolution(Rs_in, Rs_out, size)
 
     print("Weights Number = {} Mean = {:.3f} Std = {:.3f}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
 
-    n_out = sum([m * SO3.dim(r) for m, r in Rs_out])
-    n_in = sum([m * SO3.dim(r) for m, r in Rs_in])
+    n_out = sum([m * (2 * l + 1) for m, l in Rs_out])
+    n_in = sum([m * (2 * l + 1) for m, l in Rs_in])
 
     x = torch.autograd.Variable(torch.randn(batch, n_in, input_size, input_size, input_size))
     print("x Number = {} Mean = {:.3f} Std = {:.3f}".format(x.numel(), x.data.mean(), x.data.std()))
@@ -201,13 +195,8 @@ def test_normalization(batch, input_size, Rs_in, Rs_out, kernel_size):
     return y.data
 
 
-def test_combination_gradient(size, n_radial, upsamplig, Rs_out=None, Rs_in=None, **kargs):
-    if Rs_in is None:
-        Rs_in = [(2, SO3.repr1), (1, SO3.repr3), (1, SO3.repr5)]
-    if Rs_out is None:
-        Rs_out = [(1, SO3.repr3), (1, SO3.repr1)]
-
-    combination = SE3KernelCombination(size, n_radial, upsamplig, Rs_out, Rs_in, **kargs)
+def test_combination_gradient(Rs_in, Rs_out, size):
+    combination = SE3KernelCombination(Rs_in, Rs_out, size, basis_kernels.gaussian_window_fct_convenience_wrapper, True)
 
     w = torch.autograd.Variable(torch.rand(combination.nweights), requires_grad=True)
 

@@ -3,7 +3,6 @@ from functools import partial
 import torch
 from se3_cnn import SE3Convolution, SE3BNConvolution, SE3GNConvolution
 from se3_cnn.non_linearities import ScalarActivation
-from se3_cnn import SO3
 
 
 class GatedActivation(torch.nn.Module):
@@ -25,8 +24,6 @@ class GatedActivation(torch.nn.Module):
             scalar_activation, gate_activation = activation
         else:
             scalar_activation, gate_activation = activation, activation
-
-        irreducible_repr = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
 
         self.repr_in = repr_in
         n_non_scalar = sum(repr_in[1:])
@@ -50,8 +47,8 @@ class GatedActivation(torch.nn.Module):
 
             self.gates = torch.nn.Sequential(
                 Convolution(
-                    Rs_in=list(zip(repr_in, irreducible_repr)),
-                    Rs_out=[(n_non_scalar, SO3.repr1)],
+                    Rs_in=[(m, l) for l, m in enumerate(repr_in)],
+                    Rs_out=[(n_non_scalar, 0)],
                     size=size,
                     radial_window=radial_window,
                     padding=size // 2,

@@ -3,13 +3,13 @@ from functools import partial
 import torch
 from se3_cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3_cnn.non_linearities import ScalarActivation
-from se3_cnn import SO3
 from se3_cnn.dropout import SE3Dropout
+from se3_cnn import basis_kernels
 
 
 class GatedBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window,  # kernel params
+                 repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
@@ -33,10 +33,8 @@ class GatedBlock(torch.nn.Module):
 
         self.repr_out = repr_out
 
-        irreducible_repr = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
-
-        Rs_in = list(zip(repr_in, irreducible_repr))
-        Rs_out_with_gate = list(zip(repr_out, irreducible_repr))
+        Rs_in = [(m, l) for l, m in enumerate(repr_in)]
+        Rs_out_with_gate = [(m, l) for l, m in enumerate(repr_out)]
 
         if (scalar_activation is not None and repr_out[0] > 0):
             self.scalar_act = ScalarActivation([(repr_out[0], scalar_activation)])
@@ -45,7 +43,7 @@ class GatedBlock(torch.nn.Module):
 
         n_non_scalar = sum(repr_out[1:])
         if gate_activation is not None and n_non_scalar > 0:
-            Rs_out_with_gate.append((n_non_scalar, SO3.repr1))  # concatenate scalar gate capsules after normal capsules
+            Rs_out_with_gate.append((n_non_scalar, 0))  # concatenate scalar gate capsules after normal capsules
             self.gate_act = ScalarActivation([(n_non_scalar, gate_activation)])
         else:
             self.gate_act = None
