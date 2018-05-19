@@ -3,12 +3,13 @@ from functools import partial
 import torch
 from se3_cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3_cnn.non_linearities import NormSoftplus
-from se3_cnn import SO3
 from se3_cnn.dropout import SE3Dropout
+from se3_cnn import basis_kernels
+
 
 class NormBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window,  # kernel params
+                 repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=None, activation_bias_min=0.5, activation_bias_max=2,
                  stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity params
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
@@ -29,10 +30,8 @@ class NormBlock(torch.nn.Module):
         super().__init__()
         self.repr_out = repr_out
 
-        irreducible_repr = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
-
-        Rs_in = list(zip(repr_in, irreducible_repr))
-        Rs_out = list(zip(repr_out, irreducible_repr))
+        Rs_in = [(m, l) for l, m in enumerate(repr_in)]
+        Rs_out = [(m, l) for l, m in enumerate(repr_out)]
 
         if normalization == None:
             Convolution = SE3Convolution

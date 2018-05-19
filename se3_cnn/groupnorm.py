@@ -78,7 +78,7 @@ def test_groupnorm():
 
 
 from se3_cnn import SE3Convolution
-from se3_cnn import SO3
+from se3_cnn import basis_kernels
 
 
 class SE3GNConvolution(torch.nn.Module):
@@ -88,10 +88,10 @@ class SE3GNConvolution(torch.nn.Module):
     cannot be ported for group normalization
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window, eps=1e-5, Rs_gn=None, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, eps=1e-5, Rs_gn=None, **kwargs):
         super().__init__()
         if Rs_gn is None:
-            Rs_gn = [(m, SO3.dim(R)) for m, R in Rs_in]
+            Rs_gn = [(m, 2 * l + 1) for m, l in Rs_in]
         self.gn = SE3GroupNorm(Rs_gn, eps=eps)
         self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window=radial_window, **kwargs)
 

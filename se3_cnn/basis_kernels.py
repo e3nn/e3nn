@@ -16,8 +16,10 @@ Therefore
 import numpy as np
 import scipy.linalg
 import scipy.ndimage
+from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+from se3_cnn.SO3 import x_to_alpha_beta
+from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
 from se3_cnn.util.cache_file import cached_dirpklgz
-from se3_cnn.SO3 import dim
 
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
@@ -35,10 +37,14 @@ def get_matrix_kernel(A, eps=1e-10):
 
     >>> A = np.array([[1, -1], [-1, 1]])
     >>> ks = get_matrix_kernel(A)
-    >>> np.linalg.norm(ks[0] - np.array([1, 1]) / np.sqrt(2)) < 1e-10
+    >>> np.linalg.norm(ks[0] - np.array([1, 1]) / np.sqrt(2)) < 1e-10 or np.linalg.norm(ks[0] + np.array([1, 1]) / np.sqrt(2)) < 1e-10
     True
     '''
-    u, s, v = np.linalg.svd(A, full_matrices=False)  # pylint: disable=W0612
+    try:
+        _u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesdd')  # pylint: disable=E1123
+    except:  # pylint: disable=W
+        _u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesvd')  # pylint: disable=E1123
+
     # A = u @ np.diag(s) @ v
     kernel = v[s < eps]
     return kernel
@@ -50,124 +56,6 @@ def get_matrices_kernel(As, eps=1e-10):
     '''
     return get_matrix_kernel(np.concatenate(As, axis=0), eps)
 
-
-def basis_kernels_satisfying_Zrot_constraint(R_out, R_in):
-    '''
-    :return: list of dim(R_out) x dim(R_in) matrices
-
-    Computes a basis of the vector space of matrices K such that
-        R_out(g) K = K R_in(g) for all g in Z rotations (stabilizer of 0 and ez)
-
-    The following is useful to understand how the kroneker product is used
-        R_ij K_jk = K_ij R_jk
-        R_ij K_jk - K_ij R_jk = 0
-        (R_ix delta_ky - delta_ix R_yk) K_xy = 0
-        (kron(R,1)_(ik)(xy) - kron(1,R.T)_(ik)(xy)) K_(xy) = 0
-    We can see the kroneker product simply as regrouping two indices in one
-    '''
-    def kron(gamma, R_out, R_in):
-        return np.kron(R_out(0, 0, gamma), np.eye(dim(R_in))) - np.kron(np.eye(dim(R_out)), R_in(0, 0, gamma).T)
-
-    some_random_angles = [np.pi, 1, np.pi / 7, 1.54321]
-    As = [kron(gamma, R_out, R_in) for gamma in some_random_angles]
-    kA = get_matrices_kernel(As, 1e-10)
-
-    # K_(xy) --> K_xy
-    basis_elements = kA.reshape((-1, dim(R_out), dim(R_in)))
-    #basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
-
-    def check(K, gamma):
-        '''
-        Check that K satifies R_out K = K R_in
-        '''
-        return np.linalg.norm(np.dot(R_out(0, 0, gamma), K) - np.dot(K, R_in(0, 0, gamma))) < 1e-10
-
-    assert all([check(K, gamma) for K in basis_elements for gamma in [0, np.pi / 4, np.pi / 2, np.random.rand(), np.random.rand()]])
-
-    return basis_elements
-
-
-def basis_kernels_satisfying_SO3_constraint(R_out, R_in):
-    '''
-    :return: list of dim(R_out) x dim(R_in) matrices
-
-    Computes a basis of the vector space of matrices K such that
-        R_out(g) K = K R_in(g) for all g in SO(3) (stabilizer of 0)
-
-    The following is useful to understand how the kroneker product is used
-        R_ij K_jk = K_ij R_jk
-        R_ij K_jk - K_ij R_jk = 0
-        (R_ix delta_ky - delta_ix R_yk) K_xy = 0
-        (kron(R,1)_(ik)(xy) - kron(1,R.T)_(ik)(xy)) K_(xy) = 0
-    We can see the kroneker product simply as regrouping two indices in one
-    '''
-    def kron(alpha, beta, gamma, R_out, R_in):
-        return np.kron(R_out(alpha, beta, gamma), np.eye(dim(R_in))) - np.kron(np.eye(dim(R_out)), R_in(alpha, beta, gamma).T)
-
-    some_random_alpha = [np.pi, 1, np.pi / 7, 1.54321]
-    some_random_beta = [1, np.pi / 7, 1.32]
-    some_random_gamma = [np.pi, 1, np.pi / 8, 1.324]
-    As = [kron(alpha, beta, gamma, R_out, R_in) for alpha in some_random_alpha for beta in some_random_beta for gamma in some_random_gamma]
-    kA = get_matrices_kernel(As, 1e-10)
-
-    # K_(xy) --> K_xy
-    basis_elements = kA.reshape((-1, dim(R_out), dim(R_in)))
-    #basis_elements = [x.reshape((dim(R_out), dim(R_in))) for x in kA]
-
-    def check(K, alpha, beta, gamma):
-        '''
-        Check that K satifies R_out K = K R_in
-        '''
-        return np.linalg.norm(np.dot(R_out(alpha, beta, gamma), K) - np.dot(K, R_in(alpha, beta, gamma))) < 1e-10
-
-    assert all([check(K, alpha, beta, gamma) for K in basis_elements
-                for alpha in [0, np.pi / 4, np.pi / 2, np.random.rand(), np.random.rand()]
-                for beta in [1, 2]
-                for gamma in [np.random.rand(), -np.random.rand()]])
-
-    return basis_elements
-
-################################################################################
-# Constructing kernel basis elements
-################################################################################
-
-
-def transport_kernel(x, base0e, R_out, R_in):
-    '''
-    "Transport" the kernel K(0, ez) to K(0, x)
-
-    K(0, x) = K(0, g |x| ez) = R_out(g) K(0, |x| ez) R_in(g)^{-1}
-
-    In this function: K(0, |x| ez) = K(0, ez)
-    '''
-    from se3_cnn.SO3 import x_to_alpha_beta
-    alpha, beta = x_to_alpha_beta(x)
-    # inv(R_in(alpha, beta, 0)) = inv(R_in(Z(alpha) Y(beta))) = R_in(Y(-beta) Z(-alpha))
-    return np.matmul(np.matmul(R_out(alpha, beta, 0), base0e), R_in(0, -beta, -alpha))
-
-
-def cube_basis_kernels(size, R_out, R_in):
-    dim_in = dim(R_in)
-    dim_out = dim(R_out)
-
-    # compute the basis of K(0, ez)
-    basis = basis_kernels_satisfying_Zrot_constraint(R_out, R_in)
-
-    result = np.empty((len(basis), dim_out, dim_in, size, size, size))
-
-    for xi in range(size):
-        for yi in range(size):
-            for zi in range(size):
-                x = xi - size / 2 + 0.5
-                y = yi - size / 2 + 0.5
-                z = zi - size / 2 + 0.5
-                point = np.array([x, y, z])
-
-                if x == 0 and y == 0 and z == 0:
-                    result[:, :, :, xi, yi, zi] = 0
-                else:
-                    result[:, :, :, xi, yi, zi] = transport_kernel(point, basis, R_out, R_in)
-    return result
 
 ################################################################################
 # Subsampling function
@@ -203,172 +91,92 @@ def orthonormalize(basis):
     basis = basis.reshape((-1,) + shape[1:])
     return basis
 
-################################################################################
-# Full generation
-################################################################################
-
-
-@cached_dirpklgz("kernels_cache_hat")
-def cube_basis_kernels_subsampled_hat(size, n_radial, upsampling, R_out, R_in):
-    basis = cube_basis_kernels(size * upsampling, R_out, R_in)
-    rng = np.linspace(start=-1, stop=1, num=size * upsampling, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
-    r = np.sqrt(x**2 + y**2 + z**2)
-
-    kernels = []
-
-    step = 1 / n_radial
-    w = 0.5 / n_radial
-    for i in range(0, n_radial):
-        c = step * i + w
-        mask = w - np.abs(r - c)
-        mask[r > c + w] = 0
-        mask[r < c - w] = 0
-
-        kernels.append(basis * mask)
-    basis = np.concatenate(kernels)
-
-    basis = orthonormalize(basis)
-
-    return gaussian_subsampling(basis, (1, 1, 1, upsampling, upsampling, upsampling))
-
 
 ################################################################################
 # Analytically derived basis
 ################################################################################
 
-# SHOULD MAYBE NOT BE CACHED BUT ONLY THE EXPENSIVE PART INSIDE (_compute_basistrafo)
-# @cached_dirpklgz("kernels_cache_analytical")
+@cached_dirpklgz("Q_cache")
+def _basis_transformation_Q_J(J, order_in, order_out):
+    def _R_tensor(a, b, c): return np.kron(wigner_D_matrix(order_out, a, b, c), wigner_D_matrix(order_in, a, b, c))
 
-def cube_basis_kernels_analytical(size, R_in, R_out, radial_window):
+    def _sylvester_submatrix(J, a, b, c):
+        ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
+        R_tensor = _R_tensor(a, b, c)
+        R_irrep_J = wigner_D_matrix(J, a, b, c)
+        # inverted wrt notes ( R_tensor = Q R_irrep Q^-1 and K = Q K_tilde )
+        return np.kron(np.eye(*R_irrep_J.shape), R_tensor) - np.kron(R_irrep_J.T, np.eye(*R_tensor.shape))
+
+    N_sample = 5  # number of sampled angles for which the linear system is solved simultaneously
+    null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)])
+    assert null_space.shape[0] == 1  # unique subspace solution
+    Q_J = null_space[0]
+    # transposition necessary since 'vec' is defined column major while python is row major
+    Q_J = Q_J.reshape(2 * J + 1, (2 * order_in + 1) * (2 * order_out + 1)).T
+    assert np.allclose(np.dot(_R_tensor(321, 111, 123), Q_J), np.dot(Q_J, wigner_D_matrix(J, 321, 111, 123)))
+    return Q_J
+
+
+def _sample_sh_cubes(size, order_in, order_out, order_irreps):
+    '''
+    Sample spherical harmonics in a cube.
+    No bandlimiting considered, aliased regions need to be cut by windowing!
+    :param size: side length of the kernel
+    :param order_in: order of the input representation
+    :param order_out: order of the output representation
+    :param order_irreps: orders of the irreps in the multiplet
+    :return: sampled equivariant kernel basis of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
+    '''
+    # sample spherical harmonics on cube, ignoring radial part and aliasing
+
+    rng = np.linspace(start=-((size - 1) / 2), stop=(size - 1) / 2, num=size, endpoint=True)
+    z, y, x = np.meshgrid(rng, rng, rng)
+    r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+
+    sh_cubes = []
+    for J in order_irreps:
+        Y_J = np.zeros((2 * J + 1, size, size, size))
+        for idx_m in range(2 * J + 1):
+            m = idx_m - J
+            for idx_x, x in enumerate(rng):
+                for idx_y, y in enumerate(rng):
+                    for idx_z, z in enumerate(rng):
+                        if x == y == z == 0:  # angles at origin are nan, special treatment
+                            if J == 0:  # Y^0 is angularly independent, choose any angle
+                                Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
+                            else:  # insert zeros for Y^J with J!=0
+                                Y_J[idx_m, idx_x, idx_y, idx_z] = 0
+                        else:  # not at the origin, sample spherical harmonic
+                            alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
+                            Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, beta, alpha)
+
+        # compute basis transformation matrix Q_J
+        Q_J = _basis_transformation_Q_J(J, order_in, order_out)
+        K_J = np.einsum('mn,n...->m...', Q_J, Y_J)
+        K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)
+        sh_cubes.append(K_J)
+
+    return sh_cubes, r_field
+
+
+def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
     '''
     Generate equivariant kernel basis mapping between capsules transforming under R_in and R_out
     :param size: side length of the filter kernel (CURRENTLY ONLY ODD SIZES SUPPORTED)
-    :param R_out: output representation
-    :param R_in: input representation
+    :param order_out: output representation order
+    :param order_in: input representation order
     :param radial_window: callable for windowing out radial parts, taking mandatory parameters
                           'sh_cubes', 'r_field' and 'order_irreps'
     :return: basis of equivariant kernels of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
     '''
-    # TODO: add support for even sidelength kernels
     # TODO: add upsampling (?)
 
-    # @cached_dirpklgz("basis_trafo_generation_cache")
-    def _compute_basistrafo(R_in, R_out, order_in, order_out, order_irreps):
-        '''
-        Given the input and output representations compute the J-subspace change of basis matrices Q_J, each associated with one kernel basis element Y_J
-        The direct sum of the Q_J gives the full change of basis matrix Q
-        :param R_in: input capsule representation
-        :param R_out: output capsule representation
-        :param order_in: order of input capsule representation
-        :param order_out: order of output capsule representation
-        :param order_irreps: orders in the irreps in the multiplet
-        :return: list of Q_J basis transforms for subspace J
-        '''
-        from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-
-        def _R_tensor(a, b, c): return np.kron(R_out(a, b, c), R_in(a, b, c))
-
-        def _R_irrep_J(J, a, b, c): return wigner_D_matrix(J, a, b, c)
-
-        def _sylvester_submatrix(J, a, b, c):
-            ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
-            R_tensor = _R_tensor(a, b, c)
-            R_irrep_J = _R_irrep_J(J, a, b, c)
-            # inverted wrt notes ( R_tensor = Q R_irrep Q^-1 and K = Q K_tilde )
-            return np.kron(np.eye(*R_irrep_J.shape), R_tensor) - np.kron(R_irrep_J.T, np.eye(*R_tensor.shape))
-
-        def _nullspace(A, eps=1e-13):
-            # sometimes the svd with gesdd does not converge, fall back to gesvd in this case
-            try:
-                _u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesdd')  # pylint: disable=E1123
-            except:
-                _u, s, v = scipy.linalg.svd(A, full_matrices=False, lapack_driver='gesvd')  # pylint: disable=E1123
-            null_space = v[s < eps]
-            assert null_space.shape[0] == 1  # unique subspace solution
-            return null_space[0]
-
-        @cached_dirpklgz("Q_J_cache")
-        def _solve_Q_J(J, order_in, order_out, N_sample):
-            ''' wrapper to cache expensive solution for J which appears for several j,l combinations
-                order_in and order_out are not actually used but the Q_J are of shape ((2*j+1)*(2*l+1), 2*J+1), which means
-                that the caching needs to differentiate different input / output orders
-             '''
-            A_sylvester = np.vstack([_sylvester_submatrix(J, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)])
-            Q_J = _nullspace(A_sylvester)
-            # transposition necessary since 'vec' is defined column major while python is row major
-            Q_J = Q_J.reshape(2 * J + 1, (2 * order_in + 1) * (2 * order_out + 1)).T
-            assert np.allclose(np.dot(_R_tensor(321, 111, 123), Q_J), np.dot(Q_J, _R_irrep_J(J, 321, 111, 123)))
-            return Q_J
-        N_sample = 5  # number of sampled angles for which the linear system is solved simultaneously
-        Q_list = []
-        for J in order_irreps:
-            Q_J = _solve_Q_J(J, order_in, order_out, N_sample)
-            Q_list.append(Q_J)
-        return Q_list
-
-    def _sample_sh_cubes(size, Q_list, order_irreps, order_in, order_out):
-        '''
-        Sample spherical harmonics in a cube.
-        No bandlimiting considered, aliased regions need to be cut by windowing!
-        :param size: side length of the kernel
-        :param Q: change of basis matrix between tensor representation and irrep representation
-        :param order_irreps: orders of the irreps in the multiplet
-        :param order_in: order of the input representation
-        :param order_out: order of the output representation
-        :return: sampled equivariant kernel basis of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
-        '''
-        # sample spherical harmonics on cube, ignoring radial part and aliasing
-        from se3_cnn.SO3 import x_to_alpha_beta
-        from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
-
-        def _sample_Y_J(J, r_field):
-            ''' sample Y_J on a spatial grid. Returns array of shape (2*J+1, size, size, size) '''
-            size = r_field.shape[0]
-            Y_J = np.zeros((2 * J + 1, size, size, size))
-            for idx_m in range(2 * J + 1):
-                m = idx_m - J
-                for idx_x in range(size):
-                    for idx_y in range(size):
-                        for idx_z in range(size):
-                            x = idx_x - size / 2 + 0.5
-                            y = idx_y - size / 2 + 0.5
-                            z = idx_z - size / 2 + 0.5
-                            if x == y == z == 0:  # angles at origin are nan, special treatment
-                                if J == 0:  # Y^0 is angularly independent, choose any angle
-                                    Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
-                                else:  # insert zeros for Y^J with J!=0
-                                    Y_J[idx_m, idx_x, idx_y, idx_z] = 0
-                            else:  # not at the origin, sample spherical harmonic
-                                alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
-                                Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, beta, alpha)
-            return Y_J
-        rng = np.linspace(start=-(size // 2), stop=size // 2, num=size, endpoint=True)
-        z, y, x = np.meshgrid(rng, rng, rng)
-        r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
-        sh_cubes = []
-        for J, Q_J in zip(order_irreps, Q_list):
-            Y_J = _sample_Y_J(J, r_field)
-            K_J = np.einsum('mn,n...->m...', Q_J, Y_J)
-            K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)
-            sh_cubes.append(K_J)
-        return sh_cubes, r_field
-
-    # only odd sidelength filters supported for now
-    assert size % 2 == 1
     # only irrep representations allowed so far, no tensor representations
-    import se3_cnn.SO3 as SO3
-    admissible_reps = [SO3.repr1, SO3.repr3, SO3.repr5, SO3.repr7, SO3.repr9, SO3.repr11, SO3.repr13, SO3.repr15]
-    assert R_in in admissible_reps and R_out in admissible_reps, 'only irreducible representations allowed with analytical solution, no tensor representations!'
     # hack to get the orders of the in/out reps
-    order_in = (dim(R_in) - 1) // 2  # aka j
-    order_out = (dim(R_out) - 1) // 2  # aka l
     order_irreps = np.arange(abs(order_in - order_out), order_in + order_out + 1)  # J with |j-l|<=J<=j+l
 
-    # compute basis transformation matrices Q_J
-    Q_list = _compute_basistrafo(R_in, R_out, order_in, order_out, order_irreps)
     # sample (basis transformed) spherical harmonics on cube, ignore aliasing
-    sh_cubes, r_field = _sample_sh_cubes(size, Q_list, order_irreps, order_in, order_out)
+    sh_cubes, r_field = _sample_sh_cubes(size, order_in, order_out, order_irreps)
     # window out radial parts
     # make sure to remove aliased regions!
     basis = radial_window(sh_cubes, r_field, order_irreps)
@@ -410,7 +218,7 @@ def gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigm
     return basis
 
 
-def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mode, border_dist=0., sigma=.6):
+def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mode='compromise', border_dist=0., sigma=.6):
     '''
     convenience wrapper for windowing function with three different predefined modes for radii and bandlimits
     :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
@@ -447,13 +255,13 @@ def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mod
 # Measure equivariance
 ################################################################################
 
-def check_basis_equivariance(basis, R_out, R_in, alpha, beta, gamma):
+def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
     from se3_cnn import SO3
     from scipy.ndimage import affine_transform
 
     n = basis.shape[0]
-    dim_in = SO3.dim(R_in)
-    dim_out = SO3.dim(R_out)
+    dim_in = 2 * order_in + 1
+    dim_out = 2 * order_out + 1
     size = basis.shape[-1]
     assert basis.shape == (n, dim_out, dim_in, size, size, size), basis.shape
 
@@ -470,7 +278,7 @@ def check_basis_equivariance(basis, R_out, R_in, alpha, beta, gamma):
 
     y = y.reshape(basis.shape)
 
-    y = np.einsum("ij,bjk...,kl->bil...", R_out(alpha, beta, gamma), y, R_in(-gamma, -beta, -alpha))
+    y = np.einsum("ij,bjk...,kl->bil...", wigner_D_matrix(order_out, alpha, beta, gamma), y, wigner_D_matrix(order_in, -gamma, -beta, -alpha))
 
     return np.array([np.sum(basis[i] * y[i]) for i in range(n)])
 
