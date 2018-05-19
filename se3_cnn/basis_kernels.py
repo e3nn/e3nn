@@ -117,14 +117,13 @@ def _basis_transformation_Q_J(J, order_in, order_out):
     return Q_J
 
 
-def _sample_sh_cubes(size, order_in, order_out, order_irreps):
+def _sample_sh_cubes(size, order_in, order_out):
     '''
     Sample spherical harmonics in a cube.
     No bandlimiting considered, aliased regions need to be cut by windowing!
     :param size: side length of the kernel
     :param order_in: order of the input representation
     :param order_out: order of the output representation
-    :param order_irreps: orders of the irreps in the multiplet
     :return: sampled equivariant kernel basis of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
     '''
     # sample spherical harmonics on cube, ignoring radial part and aliasing
@@ -133,6 +132,7 @@ def _sample_sh_cubes(size, order_in, order_out, order_irreps):
     z, y, x = np.meshgrid(rng, rng, rng)
     r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
 
+    order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
     sh_cubes = []
     for J in order_irreps:
         Y_J = np.zeros((2 * J + 1, size, size, size))
@@ -156,7 +156,7 @@ def _sample_sh_cubes(size, order_in, order_out, order_irreps):
         K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)
         sh_cubes.append(K_J)
 
-    return sh_cubes, r_field
+    return sh_cubes, r_field, order_irreps
 
 
 def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
@@ -171,15 +171,10 @@ def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
     '''
     # TODO: add upsampling (?)
 
-    # only irrep representations allowed so far, no tensor representations
-    # hack to get the orders of the in/out reps
-    order_irreps = np.arange(abs(order_in - order_out), order_in + order_out + 1)  # J with |j-l|<=J<=j+l
-
     # sample (basis transformed) spherical harmonics on cube, ignore aliasing
-    sh_cubes, r_field = _sample_sh_cubes(size, order_in, order_out, order_irreps)
     # window out radial parts
     # make sure to remove aliased regions!
-    basis = radial_window(sh_cubes, r_field, order_irreps)
+    basis = radial_window(*_sample_sh_cubes(size, order_in, order_out))
     if basis is not None:
         # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
         basis = basis / np.sqrt(np.sum(basis**2, axis=(1, 2, 3, 4, 5), keepdims=True))
