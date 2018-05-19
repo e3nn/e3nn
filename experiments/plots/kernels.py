@@ -89,7 +89,6 @@ def cube_basis_kernels_analytical(R_in, R_out, beta, alpha):
         :return: sampled equivariant kernel basis of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
         '''
         # sample spherical harmonics on cube, ignoring radial part and aliasing
-        from se3_cnn.SO3 import x_to_alpha_beta
         from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
 
         def _sample_Y_J(J, beta, alpha):
@@ -155,11 +154,11 @@ def plot_sphere(beta, alpha, f):
 
 
 def main():
-    b = 25
-    beta = np.linspace(0, np.pi / 2, 2 * b)
-    alpha = np.arange(2 * b) * np.pi / b
+    beta = np.linspace(0, np.pi / 2, 60)
+    n = 150
+    alpha = np.arange(n) * 2 * np.pi / n
     beta, alpha = np.meshgrid(beta, alpha, indexing='ij')
-    f = cube_basis_kernels_analytical(SO3.repr3, SO3.repr3, beta.flatten(), alpha.flatten() + np.pi / b / 2)
+    f = cube_basis_kernels_analytical(SO3.repr3, SO3.repr3, beta.flatten(), alpha.flatten() + np.pi / n)
     f = np.array(f)
     f = (f - np.min(f)) / (np.max(f) - np.min(f))
 
@@ -170,7 +169,8 @@ def main():
     dim_in = f.shape[2]
 
     w = 1
-    fig = plt.figure(figsize=(nbase * dim_in + (nbase - 1) * w, dim_out))
+    scale = 1.5
+    fig = plt.figure(figsize=(scale * (nbase * dim_in + (nbase - 1) * w), scale * dim_out))
 
     for base in range(nbase):
         for i in range(dim_out):
