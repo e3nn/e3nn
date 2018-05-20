@@ -107,8 +107,14 @@ def _basis_transformation_Q_J(J, order_in, order_out):
         # inverted wrt notes ( R_tensor = Q R_irrep Q^-1 and K = Q K_tilde )
         return np.kron(np.eye(*R_irrep_J.shape), R_tensor) - np.kron(R_irrep_J.T, np.eye(*R_tensor.shape))
 
-    N_sample = 5  # number of sampled angles for which the linear system is solved simultaneously
-    null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)])
+    random_angles = [
+        [4.41301023, 5.56684102, 4.59384642],
+        [4.93325116, 6.12697327, 4.14574096],
+        [0.53878964, 4.09050444, 5.36539036],
+        [2.16017393, 3.48835314, 5.55174441],
+        [2.52385107, 0.2908958, 3.90040975]
+    ]
+    null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
     assert null_space.shape[0] == 1  # unique subspace solution
     Q_J = null_space[0]
     # transposition necessary since 'vec' is defined column major while python is row major
@@ -180,6 +186,10 @@ def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
         basis = basis / np.sqrt(np.sum(basis**2, axis=(1, 2, 3, 4, 5), keepdims=True))
     return basis
 
+
+################################################################################
+# Radial distribution functions
+################################################################################
 
 def gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma=.6):
     '''
