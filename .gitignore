@@ -2,7 +2,7 @@
 *.nb
 __pycache__
 *.pkl.gz
-*_cache*
+*cache
 *.egg-info
 build
 dist
@@ -18,5 +18,3 @@ tf_logs
 checkpoints
 **/*.log
 **/*.ckpt
-root
-data
