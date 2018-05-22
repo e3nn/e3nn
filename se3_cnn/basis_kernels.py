@@ -21,10 +21,10 @@ from se3_cnn.SO3 import x_to_alpha_beta
 from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
 from se3_cnn.util.cache_file import cached_dirpklgz
 
+
 ################################################################################
 # Solving the constraint coming from the stabilizer of 0 and e
 ################################################################################
-
 
 def get_matrix_kernel(A, eps=1e-10):
     '''
@@ -61,7 +61,6 @@ def get_matrices_kernel(As, eps=1e-10):
 # Subsampling function
 ################################################################################
 
-
 def gaussian_subsampling(im, M):
     '''
     :param im: array of dimentions (d0, d1, d2, ...)
@@ -81,6 +80,7 @@ def gaussian_subsampling(im, M):
 ################################################################################
 # Orthonormalization
 ################################################################################
+
 def orthonormalize(basis):
 
     shape = basis.shape
@@ -96,7 +96,7 @@ def orthonormalize(basis):
 # Analytically derived basis
 ################################################################################
 
-@cached_dirpklgz("Q_cache")
+@cached_dirpklgz("cache/trans_Q")
 def _basis_transformation_Q_J(J, order_in, order_out):
     def _R_tensor(a, b, c): return np.kron(wigner_D_matrix(order_out, a, b, c), wigner_D_matrix(order_in, a, b, c))
 
@@ -123,7 +123,38 @@ def _basis_transformation_Q_J(J, order_in, order_out):
     return Q_J
 
 
-def _sample_sh_cubes(size, order_in, order_out):
+@cached_dirpklgz("cache/sh_cube")
+def _sample_sh_cube(size, J):
+    '''
+    Sample spherical harmonics in a cube.
+    No bandlimiting considered, aliased regions need to be cut by windowing!
+    :param size: side length of the kernel
+    :param J: order of the spherical harmonics
+    '''
+    # sample spherical harmonics on cube, ignoring radial part and aliasing
+
+    rng = np.linspace(start=-((size - 1) / 2), stop=(size - 1) / 2, num=size, endpoint=True)
+    z, y, x = np.meshgrid(rng, rng, rng)
+
+    Y_J = np.zeros((2 * J + 1, size, size, size))
+    for idx_m in range(2 * J + 1):
+        m = idx_m - J
+        for idx_x, x in enumerate(rng):
+            for idx_y, y in enumerate(rng):
+                for idx_z, z in enumerate(rng):
+                    if x == y == z == 0:  # angles at origin are nan, special treatment
+                        if J == 0:  # Y^0 is angularly independent, choose any angle
+                            Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
+                        else:  # insert zeros for Y^J with J!=0
+                            Y_J[idx_m, idx_x, idx_y, idx_z] = 0
+                    else:  # not at the origin, sample spherical harmonic
+                        alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
+                        Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, beta, alpha)
+
+    return Y_J
+
+
+def _sample_cube(size, order_in, order_out):
     '''
     Sample spherical harmonics in a cube.
     No bandlimiting considered, aliased regions need to be cut by windowing!
@@ -136,25 +167,11 @@ def _sample_sh_cubes(size, order_in, order_out):
 
     rng = np.linspace(start=-((size - 1) / 2), stop=(size - 1) / 2, num=size, endpoint=True)
     z, y, x = np.meshgrid(rng, rng, rng)
-    r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
 
     order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
     sh_cubes = []
     for J in order_irreps:
-        Y_J = np.zeros((2 * J + 1, size, size, size))
-        for idx_m in range(2 * J + 1):
-            m = idx_m - J
-            for idx_x, x in enumerate(rng):
-                for idx_y, y in enumerate(rng):
-                    for idx_z, z in enumerate(rng):
-                        if x == y == z == 0:  # angles at origin are nan, special treatment
-                            if J == 0:  # Y^0 is angularly independent, choose any angle
-                                Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
-                            else:  # insert zeros for Y^J with J!=0
-                                Y_J[idx_m, idx_x, idx_y, idx_z] = 0
-                        else:  # not at the origin, sample spherical harmonic
-                            alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
-                            Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, beta, alpha)
+        Y_J = _sample_sh_cube(size, J)
 
         # compute basis transformation matrix Q_J
         Q_J = _basis_transformation_Q_J(J, order_in, order_out)
@@ -162,6 +179,7 @@ def _sample_sh_cubes(size, order_in, order_out):
         K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)
         sh_cubes.append(K_J)
 
+    r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
     return sh_cubes, r_field, order_irreps
 
 
@@ -180,7 +198,7 @@ def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
     # sample (basis transformed) spherical harmonics on cube, ignore aliasing
     # window out radial parts
     # make sure to remove aliased regions!
-    basis = radial_window(*_sample_sh_cubes(size, order_in, order_out))
+    basis = radial_window(*_sample_cube(size, order_in, order_out))
     if basis is not None:
         # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
         basis = basis / np.sqrt(np.sum(basis**2, axis=(1, 2, 3, 4, 5), keepdims=True))
@@ -291,6 +309,7 @@ def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
 ################################################################################
 # Testing
 ################################################################################
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()

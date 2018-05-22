@@ -23,7 +23,7 @@ def cached_dirpklgz(dirname):
             The wrapper of the function
             '''
             try:
-                os.mkdir(dirname)
+                os.makedirs(dirname)
             except FileExistsError:
                 pass
 
@@ -38,12 +38,14 @@ def cached_dirpklgz(dirname):
             try:
                 filename = index[args]
             except KeyError:
-                index[args] = filename = os.path.join(dirname, "{}.pkl.gz".format(len(index)))
+                index[args] = filename = "{}.pkl.gz".format(len(index))
                 with open(indexfile, "wb") as file:
                     pickle.dump(index, file)
 
+            filepath = os.path.join(dirname, filename)
+
             try:
-                with gzip.open(filename, "rb") as file:
+                with gzip.open(filepath, "rb") as file:
                     print("load {}... ".format(filename), end="")
                     result = pickle.load(file)
             except FileNotFoundError:
@@ -51,7 +53,7 @@ def cached_dirpklgz(dirname):
                 sys.stdout.flush()
                 result = func(*args)
                 print("save {}... ".format(filename), end="")
-                with gzip.open(filename, "wb") as file:
+                with gzip.open(filepath, "wb") as file:
                     pickle.dump(result, file)
             print("done")
             return result
