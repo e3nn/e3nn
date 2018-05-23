@@ -42,6 +42,7 @@ def rot_volume_90(vol):
 
 
 def train(network, dataset, N_epochs):
+    network.train()
     volumes, labels = dataset
     volumes = torch.tensor(volumes)
     labels = torch.tensor(labels)
@@ -61,6 +62,7 @@ def train(network, dataset, N_epochs):
 
 
 def test(network, dataset):
+    network.eval()
     volumes, labels = dataset
     volumes = torch.tensor(volumes)
     labels = torch.tensor(labels)
@@ -84,6 +86,7 @@ class SE3Net(torch.nn.Module):
             'size': 3,
             'stride': 1,
             'padding': 1,
+            'capsule_dropout_p': 0.1,
         }
         block_params = [
             {'activation': (F.relu, F.sigmoid)},
