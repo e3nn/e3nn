@@ -58,41 +58,6 @@ def get_matrices_kernel(As, eps=1e-10):
 
 
 ################################################################################
-# Subsampling function
-################################################################################
-
-def gaussian_subsampling(im, M):
-    '''
-    :param im: array of dimentions (d0, d1, d2, ...)
-    :return: array of dimentions (d0 / M[0], d1 / M[1], d2 / M[2], ...)
-    '''
-    M = np.array(M)
-    assert M.dtype == np.int
-    assert np.all(M % 2 == 1)
-
-    sigma = 0.5 * np.sqrt(M**2 - 1)
-    im = scipy.ndimage.filters.gaussian_filter(im, sigma, mode='constant')
-
-    s = [slice(m // 2, None, m) for m in M]
-    return im[s]
-
-
-################################################################################
-# Orthonormalization
-################################################################################
-
-def orthonormalize(basis):
-
-    shape = basis.shape
-    basis = basis.reshape((shape[0], -1))
-
-    basis = scipy.linalg.orth(basis.T).T
-
-    basis = basis.reshape((-1,) + shape[1:])
-    return basis
-
-
-################################################################################
 # Analytically derived basis
 ################################################################################
 
