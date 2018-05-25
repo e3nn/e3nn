@@ -149,8 +149,6 @@ class SE3BNConvolution(torch.nn.Module):
             **self.kwargs)
 
     def forward(self, input):  # pylint: disable=W
-        self.conv.move_kernels_device()
-
         field_means = []
         field_norms = []
 
@@ -195,8 +193,8 @@ class SE3BNConvolution(torch.nn.Module):
             index_mean = 0
             bia = input.data.new_zeros(mi * di)
             for j, (mj, dj, normj) in enumerate(zip(self.conv.multiplicities_in, self.conv.dims_in, field_norms)):
-                if self.conv.kernels[i][j] is not None:
-                    kernel = self.conv.kernels[i][j]  # [basis, dim_out, dim_in, x, y, z]
+                kernel = getattr(self.conv, "kernel_{}_{}".format(i, j))
+                if kernel is not None:
                     b_el = kernel.size(0)
 
                     w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
