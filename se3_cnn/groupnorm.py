@@ -73,7 +73,7 @@ def test_groupnorm():
 
     x = torch.rand(16, 3 + 12 + 5, 10, 10, 10)
 
-    y = bn(torch.autograd.Variable(x)).data
+    y = bn(x).data
     return y
 
 
@@ -97,3 +97,7 @@ class SE3GNConvolution(torch.nn.Module):
 
     def forward(self, input):  # pylint: disable=W
         return self.conv(self.gn(input))
+
+
+if __name__ == "__main__":
+    test_groupnorm()

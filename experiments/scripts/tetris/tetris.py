@@ -86,7 +86,7 @@ class SE3Net(torch.nn.Module):
             'size': 3,
             'stride': 1,
             'padding': 1,
-            'capsule_dropout_p': 0.1,
+            'capsule_dropout_p': 0.01,
         }
         block_params = [
             {'activation': (F.relu, F.sigmoid)},

@@ -16,31 +16,6 @@ class SE3Convolution(torch.nn.Module):
         '''
         super().__init__()
 
-        self.combination = SE3KernelCombination(Rs_in, Rs_out, size, radial_window, verbose)
-        self.weight = torch.nn.Parameter(torch.randn(self.combination.nweights))
-        self.kwargs = kwargs
-
-    def __repr__(self):
-        return "{name} ({Rs_in} -> {Rs_out}, size={size}, kwargs={kwargs})".format(
-            name=self.__class__.__name__,
-            Rs_in=self.combination.Rs_in,
-            Rs_out=self.combination.Rs_out,
-            size=self.combination.size,
-            kwargs=self.kwargs
-        )
-
-    def forward(self, input):  # pylint: disable=W
-        kernel = self.combination(self.weight)
-
-        output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
-
-        return output
-
-
-class SE3KernelCombination:
-    def __init__(self, Rs_in, Rs_out, size, radial_window, verbose):
-        super().__init__()
-
         self.size = size
         self.Rs_out = [(m, l) for m, l in Rs_out if m >= 1]
         self.Rs_in = [(m, l) for m, l in Rs_in if m >= 1]
@@ -57,43 +32,47 @@ class SE3KernelCombination:
         for m_out, l_out in self.Rs_out:
             self.kernels.append([])
             for m_in, l_in in self.Rs_in:
-                basis = self._generate_basis(l_in, l_out, size, radial_window, verbose)
+                basis = basis_kernels.cube_basis_kernels_analytical(size, l_in, l_out, radial_window)
                 if basis is not None:
+                    assert basis.shape[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
+                    # rescale each basis element such that the weight can be initialized with Normal(0,1)
+                    # orthonormalization already done in cube_basis_kernels_analytical!
+                    # ORIGINAL
+                    # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in))
+                    # EQUAL CONTRIB OF ALL SUPERBLOCKS
+                    # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
+                    # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in*len(Rs_in)))
+                    # EQUAL CONTRIB OF ALL CAPSULES
+                    basis *= np.sqrt((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in)))
+                    if verbose:
+                        N_sample = 5
+                        overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
+                        print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
                     self.kernels[-1].append(torch.tensor(basis, dtype=torch.float))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
                     self.kernels[-1].append(None)
 
-    def _generate_basis(self, l_in, l_out, size, radial_window, verbose):  # pylint: disable=W0613
-        basis = basis_kernels.cube_basis_kernels_analytical(size, l_in, l_out, radial_window)
-        if basis is not None:
-            assert basis.shape[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
-            # rescale each basis element such that the weight can be initialized with Normal(0,1)
-            # orthonormalization already done in cube_basis_kernels_analytical!
-            # ORIGINAL
-            # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in))
-            # EQUAL CONTRIB OF ALL SUPERBLOCKS
-            # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
-            # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in*len(Rs_in)))
-            # EQUAL CONTRIB OF ALL CAPSULES
-            basis *= np.sqrt((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in)))
-            if verbose:
-                N_sample = 5
-                overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
-                print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
-        return basis
+        self.weight = torch.nn.Parameter(torch.randn(self.nweights))
+        self.kwargs = kwargs
 
-    def __call__(self, weight):  # pylint: disable=W
-        """
-        :return: [feature_out, feature_in, x, y, z]
-        """
-        assert weight.dim() == 1, "size = {}".format(weight.size())
-        assert weight.size(0) == self.nweights
+    def __repr__(self):
+        return "{name} ({Rs_in} -> {Rs_out}, size={size}, kwargs={kwargs})".format(
+            name=self.__class__.__name__,
+            Rs_in=self.Rs_in,
+            Rs_out=self.Rs_out,
+            size=self.size,
+            kwargs=self.kwargs
+        )
 
+    def move_kernels_device(self):
         for row in self.kernels:
             for i in range(len(row)):
                 if row[i] is not None:
-                    row[i] = row[i].to(weight.device)
+                    row[i] = row[i].to(self.weight.device)
+
+    def combination(self, weight):
+        self.move_kernels_device()
 
         kernel = weight.new_empty(self.n_out, self.n_in, self.size, self.size, self.size)
 
@@ -125,8 +104,14 @@ class SE3KernelCombination:
 
                 begin_j += mj * self.dims_in[j]
             begin_i += mi * self.dims_out[i]
-
         return kernel
+
+    def forward(self, input):  # pylint: disable=W
+        kernel = self.combination(self.weight)
+
+        output = torch.nn.functional.conv3d(input, kernel, **self.kwargs)
+
+        return output
 
 
 def test_normalization(batch, input_size, Rs_in, Rs_out, size):
@@ -148,15 +133,19 @@ def test_normalization(batch, input_size, Rs_in, Rs_out, size):
 
 
 def test_combination_gradient(Rs_in, Rs_out, size):
-    combination = SE3KernelCombination(Rs_in, Rs_out, size, basis_kernels.gaussian_window_fct_convenience_wrapper, True)
+    conv = SE3Convolution(Rs_in, Rs_out, size, basis_kernels.gaussian_window_fct_convenience_wrapper, True)
 
-    w = torch.rand(combination.nweights, requires_grad=True)
+    x = torch.rand(1, sum(m * (2 * l + 1) for m, l in Rs_in), 6, 6, 6, requires_grad=True)
 
-    torch.autograd.gradcheck(combination, (w, ), eps=1)
+    torch.autograd.gradcheck(conv, (x, ), eps=1)
 
 
-if __name__ == "__main__":
+def main():
     Rs_in = [(2, 0), (1, 1)]
     Rs_out = [(2, 0), (2, 1), (1, 2)]
     test_normalization(3, 15, Rs_in, Rs_out, 5)
-    test_combination_gradient(Rs_in, Rs_out, 5)
+    test_combination_gradient([(1, 0), (1, 1)], [(1, 0)], 5)
+
+
+if __name__ == "__main__":
+    main()
