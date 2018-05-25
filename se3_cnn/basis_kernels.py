@@ -150,13 +150,13 @@ def _sample_cube(size, order_in, order_out):
 
 def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
     '''
-    Generate equivariant kernel basis mapping between capsules transforming under R_in and R_out
-    :param size: side length of the filter kernel (CURRENTLY ONLY ODD SIZES SUPPORTED)
+    Generate equivariant kernel basis mapping between capsules transforming under order_in and order_out
+    :param size: side length of the filter kernel
     :param order_out: output representation order
     :param order_in: input representation order
     :param radial_window: callable for windowing out radial parts, taking mandatory parameters
                           'sh_cubes', 'r_field' and 'order_irreps'
-    :return: basis of equivariant kernels of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
+    :return: basis of equivariant kernels of shape (N_basis, 2 * order_out + 1, 2 * order_in + 1, size, size, size)
     '''
     # TODO: add upsampling (?)
 
@@ -166,7 +166,7 @@ def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
     basis = radial_window(*_sample_cube(size, order_in, order_out))
     if basis is not None:
         # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
-        basis = basis / np.sqrt(np.sum(basis**2, axis=(1, 2, 3, 4, 5), keepdims=True))
+        basis = basis / np.sqrt(np.sum(basis ** 2, axis=(1, 2, 3, 4, 5), keepdims=True))
     return basis
 
 
