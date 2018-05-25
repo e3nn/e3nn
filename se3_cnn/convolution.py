@@ -26,12 +26,10 @@ class SE3Convolution(torch.nn.Module):
         self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i in range(len(self.multiplicities_out))])
         self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in range(len(self.multiplicities_in))])
 
-        self.kernels = []
         self.nweights = 0
 
-        for m_out, l_out in self.Rs_out:
-            self.kernels.append([])
-            for m_in, l_in in self.Rs_in:
+        for i, (m_out, l_out) in enumerate(self.Rs_out):
+            for j, (m_in, l_in) in enumerate(self.Rs_in):
                 basis = basis_kernels.cube_basis_kernels_analytical(size, l_in, l_out, radial_window)
                 if basis is not None:
                     assert basis.shape[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
@@ -48,10 +46,10 @@ class SE3Convolution(torch.nn.Module):
                         N_sample = 5
                         overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
                         print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
-                    self.kernels[-1].append(torch.tensor(basis, dtype=torch.float))
+                    self.register_buffer("kernel_{}_{}".format(i, j), torch.tensor(basis, dtype=torch.float))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
-                    self.kernels[-1].append(None)
+                    self.register_buffer("kernel_{}_{}".format(i, j), None)
 
         self.weight = torch.nn.Parameter(torch.randn(self.nweights))
         self.kwargs = kwargs
@@ -65,15 +63,7 @@ class SE3Convolution(torch.nn.Module):
             kwargs=self.kwargs
         )
 
-    def move_kernels_device(self):
-        for row in self.kernels:
-            for i in range(len(row)):
-                if row[i] is not None:
-                    row[i] = row[i].to(self.weight.device)
-
     def combination(self, weight):
-        self.move_kernels_device()
-
         kernel = weight.new_empty(self.n_out, self.n_in, self.size, self.size, self.size)
 
         weight_index = 0
@@ -85,14 +75,15 @@ class SE3Convolution(torch.nn.Module):
                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
 
-                if self.kernels[i][j] is not None:
-                    b_el = self.kernels[i][j].size(0)
-                    b_size = self.kernels[i][j].size()[1:]
+                kij = getattr(self, "kernel_{}_{}".format(i, j))
+                if kij is not None:
+                    b_el = kij.size(0)
+                    b_size = kij.size()[1:]
 
                     w = weight[weight_index: weight_index + mi * mj * b_el].view(mi * mj, b_el)  # [I*J, beta]
                     weight_index += mi * mj * b_el
 
-                    basis_kernels_ij = self.kernels[i][j].contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
+                    basis_kernels_ij = kij.contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
 
                     ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*x*y*z]
                     ker = ker.view(mi, mj, *b_size)  # [I, J, i, j, x, y, z]

@@ -87,6 +87,7 @@ class SE3Net(torch.nn.Module):
             'stride': 1,
             'padding': 1,
             'capsule_dropout_p': 0.01,
+            'normalization': 'batch',
         }
         block_params = [
             {'activation': (F.relu, F.sigmoid)},
@@ -124,7 +125,7 @@ class CNN(torch.nn.Module):
 
 
 def main():
-    N_epochs = 100
+    N_epochs = 200
     N_test = 100
     size = 4
     trainset = get_volumes(size)
