@@ -108,4 +108,5 @@ class GatedActivation(torch.nn.Module):
 
             zs.append(field)
 
+        # TODO change this cat into new_empty and fill
         return torch.cat(zs, dim=1)  # does not contain gates

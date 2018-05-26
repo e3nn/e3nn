@@ -3,7 +3,7 @@ import torch
 
 
 class ScalarActivation(torch.nn.Module):
-    def __init__(self, enable, bias=True):
+    def __init__(self, enable, bias=True, inplace=False):
         '''
         Can be used only with scalar fields
 
@@ -12,6 +12,7 @@ class ScalarActivation(torch.nn.Module):
         '''
         super().__init__()
 
+        self.inplace = inplace
         self.enable = []
         for d, act in enable:
             if d == 0:
@@ -32,9 +33,13 @@ class ScalarActivation(torch.nn.Module):
         '''
         :param input: [batch, feature, x, y, z]
         '''
-        xs = []
         begin1 = 0
         begin2 = 0
+
+        if self.inplace:
+            output = input
+        else:
+            output = torch.empty_like(input)
 
         for d, act in self.enable:
             x = input[:, begin1:begin1 + d]
@@ -46,11 +51,12 @@ class ScalarActivation(torch.nn.Module):
 
                 x = act(x)
 
-            xs.append(x)
+            if not self.inplace or act is not None:
+                output[:, begin1:begin1 + d] = x
 
             begin1 += d
 
         assert begin1 == input.size(1)
         assert self.bias is None or begin2 == self.bias.size(0)
 
-        return torch.cat(xs, dim=1)
+        return output
