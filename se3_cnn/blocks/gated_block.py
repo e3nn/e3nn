@@ -88,14 +88,15 @@ class GatedBlock(torch.nn.Module):
             ny = y.size(3)
             nz = y.size(4)
 
-            begin_y = 0  # index of first non-scalar capsule
+            size_out = sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out))
 
             if self.gate_act is not None:
-                g = y[:, sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out)):]
+                g = y[:, size_out:]
                 g = self.gate_act(g)
                 begin_g = 0  # index of first scalar gate capsule
 
-            zs = []
+            z = y.new_empty((y.size(0), size_out, y.size(2), y.size(3), y.size(4)))
+            begin_y = 0  # index of first capsule
 
             for n, mul in enumerate(self.repr_out):
                 if mul == 0:
@@ -104,7 +105,6 @@ class GatedBlock(torch.nn.Module):
 
                 # crop out capsules of order n
                 field_y = y[:, begin_y: begin_y + mul * dim]  # [batch, feature * repr, x, y, z]
-                begin_y += mul * dim
 
                 if n == 0:
                     # Scalar activation
@@ -128,12 +128,13 @@ class GatedBlock(torch.nn.Module):
                         # scale non-scalar capsules by gate values
                         field = field_y * field_g  # [batch, feature, repr, x, y, z]
                         field = field.view(nbatch, mul * dim, nx, ny, nz)  # [batch, feature * repr, x, y, z]
+                        del field_g
                     else:
                         field = field_y
 
-                zs.append(field)
-
-            z = torch.cat(zs, dim=1)
+                z[:, begin_y: begin_y + mul * dim] = field
+                begin_y += mul * dim
+                del field
 
         # dropout
         if self.dropout is not None:
