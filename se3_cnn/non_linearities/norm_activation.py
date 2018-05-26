@@ -18,7 +18,7 @@ class NormSoftplus(torch.nn.Module):
 
         self.dimensionalities = dimensionalities
         self.scalar_act = scalar_act
-        self.is_scalar = [dim==1 for dim in dimensionalities]
+        self.is_scalar = [dim == 1 for dim in dimensionalities]
         nbias = int(np.sum(np.array(dimensionalities) != 1))
         self.bias = torch.nn.Parameter(torch.FloatTensor(nbias)) if nbias > 0 else None
         self.eps = eps
@@ -28,7 +28,7 @@ class NormSoftplus(torch.nn.Module):
 
     def reset_parameters(self):
         if self.bias is not None:
-            self.bias.data.uniform_(self.bias_min,self.bias_max)
+            self.bias.data.uniform_(self.bias_min, self.bias_max)
 
     def forward(self, input):  # pylint: disable=W
         '''
@@ -38,7 +38,7 @@ class NormSoftplus(torch.nn.Module):
         idx_capsule_begin = 0
         idx_bias = 0
 
-        for dim,scalar_bool in zip(self.dimensionalities,self.is_scalar):
+        for dim, scalar_bool in zip(self.dimensionalities, self.is_scalar):
             # take capsule out of input
             capsule = input[:, idx_capsule_begin:idx_capsule_begin+dim]
             # act on scalar capsules with scalar activation
@@ -49,9 +49,9 @@ class NormSoftplus(torch.nn.Module):
                     capsule_activ = self.scalar_act(capsule)
             # act on norms of higher order capsules
             else:
-                norm = torch.norm(capsule, p=2, dim=1, keepdim=True) + self.eps # [batch, 1, x, y, z]
-                b = self.bias[idx_bias].expand_as(norm) # [batch, 1, x, y, z]
-                activ_factor = torch.nn.Softplus(beta=1, threshold=20)(norm - b) # [batch, 1, x, y, z]
+                norm = torch.norm(capsule, p=2, dim=1, keepdim=True) + self.eps  # [batch, 1, x, y, z]
+                b = self.bias[idx_bias].expand_as(norm)  # [batch, 1, x, y, z]
+                activ_factor = torch.nn.Softplus(beta=1, threshold=20)(norm - b)  # [batch, 1, x, y, z]
                 # activ_factor = 1 + torch.nn.ELU(norm - b.expand_as(norm)) # add 1 to make scaling factor positive
                 capsule_activ = activ_factor * (capsule/norm)
                 idx_bias += 1

@@ -73,7 +73,7 @@ def test_groupnorm():
 
     x = torch.rand(16, 3 + 12 + 5, 10, 10, 10)
 
-    y = bn(x).data
+    y = bn(x)
     return y
 
 

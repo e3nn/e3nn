@@ -54,7 +54,7 @@ class SE3BatchNorm(nn.Module):
             if d == 1:  # scalars
                 if self.training:
                     field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
-                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.data
+                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.detach()
                 else:
                     field_mean = self.running_mean[irm: irm + m]
                 irm += m
@@ -63,7 +63,7 @@ class SE3BatchNorm(nn.Module):
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
                 field_norm = field_norm.mean(0).mean(-1)  # [feature]
-                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.data
+                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
             else:
                 field_norm = self.running_var[irv: irv + m]
             irv += m
@@ -123,7 +123,7 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=True, eps=1e-5, momentum=0.1, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=False, eps=1e-5, momentum=0.1, **kwargs):
         super().__init__()
 
         self.eps = eps
@@ -163,7 +163,7 @@ class SE3BNConvolution(torch.nn.Module):
             if d == 1:  # scalars
                 if self.training:
                     field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
-                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.data
+                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.detach()
                 else:
                     field_mean = self.running_mean[irm: irm + m]
                 irm += m
@@ -173,7 +173,7 @@ class SE3BNConvolution(torch.nn.Module):
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
                 field_norm = field_norm.mean(0).mean(-1)  # [feature]
-                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.data
+                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
             else:
                 field_norm = self.running_var[irv: irv + m]
             irv += m
@@ -191,7 +191,7 @@ class SE3BNConvolution(torch.nn.Module):
         weight_index = 0
         for i, (mi, di) in enumerate(zip(self.conv.multiplicities_out, self.conv.dims_out)):
             index_mean = 0
-            bia = input.data.new_zeros(mi * di)
+            bia = input.new_zeros(mi * di)
             for j, (mj, dj, normj) in enumerate(zip(self.conv.multiplicities_in, self.conv.dims_in, field_norms)):
                 kernel = getattr(self.conv, "kernel_{}_{}".format(i, j))
                 if kernel is not None:
@@ -225,7 +225,7 @@ def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
     # BNConv
     bnconv = SE3BNConvolution(Rs_in, Rs_out, kernel_size)
     bnconv.train()
-    y1 = bnconv(x).data
+    y1 = bnconv(x)
 
     assert y1.size(1) == n_out
 
@@ -237,7 +237,7 @@ def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
     conv.train()
     conv.weight = bnconv.conv.weight
 
-    y2 = conv(bn(x)).data
+    y2 = conv(bn(x))
 
     assert y2.size(1) == n_out
 
