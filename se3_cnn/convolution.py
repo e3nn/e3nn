@@ -5,7 +5,7 @@ from se3_cnn import basis_kernels
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=True, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=False, **kwargs):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
@@ -108,23 +108,23 @@ class SE3Convolution(torch.nn.Module):
 def test_normalization(batch, input_size, Rs_in, Rs_out, size):
     conv = SE3Convolution(Rs_in, Rs_out, size)
 
-    print("Weights Number = {} Mean = {:.3f} Std = {:.3f}".format(conv.weight.numel(), conv.weight.data.mean(), conv.weight.data.std()))
+    print("Weights Number = {} Mean = {:.3f} Std = {:.3f}".format(conv.weight.numel(), conv.weight.mean().item(), conv.weight.std().item()))
 
     n_out = sum([m * (2 * l + 1) for m, l in Rs_out])
     n_in = sum([m * (2 * l + 1) for m, l in Rs_in])
 
     x = torch.randn(batch, n_in, input_size, input_size, input_size)
-    print("x Number = {} Mean = {:.3f} Std = {:.3f}".format(x.numel(), x.data.mean(), x.data.std()))
+    print("x Number = {} Mean = {:.3f} Std = {:.3f}".format(x.numel(), x.mean().item(), x.std().item()))
     y = conv(x)
 
     assert y.size(1) == n_out
 
-    print("y Number = {} Mean = {:.3f} Std = {:.3f}".format(y.numel(), y.data.mean(), y.data.std()))
-    return y.data
+    print("y Number = {} Mean = {:.3f} Std = {:.3f}".format(y.numel(), y.mean().item(), y.std().item()))
+    return y
 
 
 def test_combination_gradient(Rs_in, Rs_out, size):
-    conv = SE3Convolution(Rs_in, Rs_out, size, basis_kernels.gaussian_window_fct_convenience_wrapper, True)
+    conv = SE3Convolution(Rs_in, Rs_out, size)
 
     x = torch.rand(1, sum(m * (2 * l + 1) for m, l in Rs_in), 6, 6, 6, requires_grad=True)
 
@@ -132,9 +132,10 @@ def test_combination_gradient(Rs_in, Rs_out, size):
 
 
 def main():
-    Rs_in = [(2, 0), (1, 1)]
-    Rs_out = [(2, 0), (2, 1), (1, 2)]
-    test_normalization(3, 15, Rs_in, Rs_out, 5)
+    test_normalization(3, 15,
+                       [(2, 0), (1, 1), (3, 4)],
+                       [(2, 0), (2, 1), (1, 2)],
+                       5)
     test_combination_gradient([(1, 0), (1, 1)], [(1, 0)], 5)
 
 

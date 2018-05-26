@@ -11,7 +11,8 @@ class GatedBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
-                 normalization=None, batch_norm_momentum=0.1):  # batch norm params
+                 normalization=None, batch_norm_momentum=0.1,  # batch norm params
+                 verbose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -65,7 +66,8 @@ class GatedBlock(torch.nn.Module):
             size=size,
             radial_window=radial_window,
             stride=stride,
-            padding=padding
+            padding=padding,
+            verbose=verbose,
         )
 
         self.dropout = None

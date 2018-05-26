@@ -24,8 +24,7 @@ class ScalarActivation(torch.nn.Module):
 
         nbias = sum([d for d, act in self.enable if act is not None])
         if bias and nbias > 0:
-            self.bias = torch.nn.Parameter(torch.FloatTensor(nbias))
-            self.bias.data[:] = 0
+            self.bias = torch.nn.Parameter(torch.zeros(nbias))
         else:
             self.bias = None
 
