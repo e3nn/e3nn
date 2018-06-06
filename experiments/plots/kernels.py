@@ -15,7 +15,7 @@ def beta_alpha(n):
     return beta, alpha
 
 
-@cached_dirpklgz("Y_sphere_cache")
+@cached_dirpklgz("cache/sh_sphere")
 def _sample_Y(n, J):
     beta, alpha = beta_alpha(n)
     
