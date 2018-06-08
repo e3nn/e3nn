@@ -28,7 +28,7 @@ class AvgSpacial(nn.Module):
 class CNN(nn.Module):
 
     def __init__(self):
-        super(CNN, self).__init__()
+        super().__init__()
 
         # The parameters of a GatedBlock are:
         # - The representation multiplicities (scalar, vector and dim. 5 repr.) for the input and the output
@@ -131,15 +131,10 @@ def main():
         loss.backward()
         optimizer.step()
 
-        # download results on the CPU
-        loss = loss.item()
-        out = out.detach().cpu().numpy()
-        y = y.detach().cpu().numpy()
-
         # compute the accuracy
-        acc = np.sum(out.argmax(-1) == y) / batch_size
+        acc = out.argmax(1).eq(y).long().sum().item() / batch_size
 
-        print("{}: acc={}% loss={}".format(i, 100 * acc, loss))
+        print("{:d}: acc={:.1f}% loss={:.2e}".format(i, 100 * acc, loss.item()))
 
     for i in range(1000):
         step(i)
