@@ -17,7 +17,7 @@ def beta_alpha(n):
 
 
 @cached_dirpklgz("cache/sh_sphere")
-def _sample_Y(n, J):
+def _sample_Y(n, J, version=1):
     beta, alpha = beta_alpha(n)
 
     Y_J = np.zeros((2 * J + 1, len(beta.flatten())))
