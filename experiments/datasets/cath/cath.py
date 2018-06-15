@@ -13,8 +13,6 @@ class Cath(torch.utils.data.Dataset):
                  discretization_bin_size=2.0,
                  use_density=True,
                  randomize_orientation=False):
-        # self.root = os.path.expanduser("cath")
-        # self.root = os.path.expanduser("../../datasets/cath")
         dirname, dataset = os.path.split(dataset)
         self.root = os.path.expanduser(dirname if dirname != "" else ".")
 
@@ -158,29 +156,10 @@ class Cath(torch.utils.data.Dataset):
                 # Set values
                 fields[i].view(-1)[indices] = 1
 
-        # mean = torch.mean(fields[i])
-        # stddev = torch.std(fields[i])
-        # fields = (fields - mean) / stddev
-
         if self.dataset_mean is not None:
             fields -= self.dataset_mean
         if self.dataset_std is not None:
             fields /= self.dataset_std
-                # print(i, "Mean: ", torch.mean(fields[i]))
-                # print(i, "Stddev: ", torch.std(fields[i]))
-
-        # assert((np.abs(fields.numpy() - fields_np)<0.001).all())
-
-        # import matplotlib.pyplot as plt
-        # from mpl_toolkits.mplot3d import Axes3D
-        # fig = plt.figure()
-        # ax = fig.add_subplot(111, projection='3d')
-        # ax.scatter(xx.reshape(-1), yy.reshape(-1), zz.reshape(-1), s=10*fields.numpy().reshape(-1), c=fields.numpy().reshape(-1), cmap=plt.get_cmap("Blues"))
-        # plt.show()
-        # plt.savefig("grid.png")
-
-        # time_elapsed = timer() - time_stamp
-        # print("Time spent on __getitem__: %.4f sec" % time_elapsed)
 
         return fields, label
 
