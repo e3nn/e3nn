@@ -13,6 +13,15 @@ class Cath(torch.utils.data.Dataset):
                  discretization_bin_size=2.0,
                  use_density=True,
                  randomize_orientation=False):
+        """
+        :param dataset: String specifying name of cath set
+        :param split: Which split to read in (10 in total)
+        :param download: Whether to retrieve dataset automatically
+        :param discretization_bins: Number of bins used in each dimension
+        :param discretization_bin_size: Size of a bin in each dimension (in Angstrom)
+        :param use_density: Whether to populate grid with densities rather than a one-hot encoding
+        :param randomize_orientation: Whether to resample the orientation of each input data point whenever it is requested (i.e. data augmentation)
+        """
         dirname, dataset = os.path.split(dataset)
         self.root = os.path.expanduser(dirname if dirname != "" else ".")
 
@@ -43,16 +52,7 @@ class Cath(torch.utils.data.Dataset):
         self.label_set = sorted(list(set(self.labels)))
         self.label_map = dict(zip(self.label_set, range(len(self.label_set))))
 
-        self.dataset_mean = None
-        self.dataset_std = None
-
-    def set_dataset_normalization(self, mean, std):
-        self.dataset_mean = mean
-        self.dataset_std = std
-
     def __getitem__(self, index):
-
-        # time_stamp = timer()
 
         n_atoms = self.n_atoms[index]
         positions = self.positions[index][:n_atoms]
@@ -155,11 +155,6 @@ class Cath(torch.utils.data.Dataset):
 
                 # Set values
                 fields[i].view(-1)[indices] = 1
-
-        if self.dataset_mean is not None:
-            fields -= self.dataset_mean
-        if self.dataset_std is not None:
-            fields /= self.dataset_std
 
         return fields, label
 
