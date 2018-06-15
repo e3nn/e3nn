@@ -3,11 +3,12 @@ from functools import partial
 import torch
 from se3_cnn import SE3Convolution, SE3BNConvolution, SE3GNConvolution
 from se3_cnn.non_linearities import ScalarActivation
+from se3_cnn import basis_kernels
 
 
 class GatedActivation(torch.nn.Module):
     def __init__(self,
-                 repr_in, size, radial_window,  # kernel params
+                 repr_in, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None),  # nonlinearity
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''
@@ -71,7 +72,8 @@ class GatedActivation(torch.nn.Module):
             g = self.gates(x)
             begin_g = 0  # index of first scalar gate capsule
 
-        zs = []
+        size_out = sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_in))
+        z = x.new_empty((x.size(0), size_out, x.size(2), x.size(3), x.size(4)))
 
         for n, mul in enumerate(self.repr_in):
             if mul == 0:
@@ -80,7 +82,6 @@ class GatedActivation(torch.nn.Module):
 
             # crop out capsules of order n
             field_x = x[:, begin_x: begin_x + mul * dim]  # [batch, feature * repr, x, y, z]
-            begin_x += mul * dim
 
             if n == 0:
                 if self.scalar_act is not None:
@@ -106,7 +107,7 @@ class GatedActivation(torch.nn.Module):
                 else:
                     field = field_x
 
-            zs.append(field)
+            z[:, begin_x: begin_x + mul * dim] = field
+            begin_x += mul * dim
 
-        # TODO change this cat into new_empty and fill
-        return torch.cat(zs, dim=1)  # does not contain gates
+        return z

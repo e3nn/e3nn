@@ -7,19 +7,26 @@ import torch.utils.data
 import numpy as np
 
 from se3_cnn.blocks import GatedBlock
-from experiments.util.arch_blocks import AvgSpacial
+
+
+class AvgSpacial(nn.Module):
+
+    def forward(self, inp):
+        return inp.view(inp.size(0), inp.size(1), -1).mean(-1)
 
 
 def get_volumes(size=4, rotate=False):
     assert size >= 4
-    tetris_tensorfields = [[(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)],  # chiral_shape_1
-                           [(0, 1, 0), (0, 1, 1), (1, 1, 0), (1, 0, 0)],  # chiral_shape_2
-                           [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)],  # square
-                           [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 0, 3)],  # line
-                           [(0, 0, 0), (0, 0, 1), (0, 1, 0), (1, 0, 0)],  # corner
-                           [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 0)],  # L
-                           [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1)],  # T
-                           [(0, 0, 0), (1, 0, 0), (1, 1, 0), (2, 1, 0)]]  # zigzag
+    tetris_tensorfields = [
+        [(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)],  # chiral_shape_1
+        [(0, 1, 0), (0, 1, 1), (1, 1, 0), (1, 0, 0)],  # chiral_shape_2
+        [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)],  # square
+        [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 0, 3)],  # line
+        [(0, 0, 0), (0, 0, 1), (0, 1, 0), (1, 0, 0)],  # corner
+        [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 0)],  # L
+        [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1)],  # T
+        [(0, 0, 0), (1, 0, 0), (1, 1, 0), (2, 1, 0)],  # zigzag
+    ]
     labels = np.arange(len(tetris_tensorfields))
     tetris_vox = []
     for shape in tetris_tensorfields:
@@ -74,13 +81,14 @@ def test(network, dataset):
 
 
 class SE3Net(torch.nn.Module):
+
     def __init__(self):
         super(SE3Net, self).__init__()
         features = [
-            (1, ),
-            (2, 2, 2, 2),
-            (4, 4, 4, 4),
-            (16, )
+            (1,),
+            (2, 2, 2, 2), 
+            (4, 4, 4, 4), 
+            (16,)
         ]
         common_block_params = {
             'size': 3,
@@ -90,21 +98,19 @@ class SE3Net(torch.nn.Module):
             'normalization': 'batch',
         }
         block_params = [
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
+            { 'activation': (F.relu, F.sigmoid) },
+            { 'activation': (F.relu, F.sigmoid) },
+            { 'activation': (F.relu, F.sigmoid) },
         ]
         blocks = [GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(block_params))]
-        self.sequence = torch.nn.Sequential(
-            *blocks,
-            AvgSpacial(),
-            torch.nn.Linear(16, 10))
+        self.sequence = torch.nn.Sequential(*blocks, AvgSpacial(), torch.nn.Linear(16, 10))
 
     def forward(self, inp):  # pylint: disable=W
         return self.sequence(inp)
 
 
 class CNN(torch.nn.Module):
+
     def __init__(self):
         super(CNN, self).__init__()
         self.sequence = torch.nn.Sequential(
@@ -149,12 +155,12 @@ def main():
     print('avg test acc SE3: {}'.format(np.mean(se3_test_accs)))
     print('avg test acc CNN: {}'.format(np.mean(cnn_test_accs)))
     N_classes = len(testset[1])
-    print('random guessing accuracy: {}'.format(1/N_classes))
+    print('random guessing accuracy: {}'.format(1 / N_classes))
     # c=correct, r0=initial rotation
     # assume random rotations p(r0)=1/24
     # p(c) = p(c|r0)p(r0) + p(c|!r0)p(!r0)
     #      =    1    1/24 +  1/N_cl  23/24
-    print('theoretically estimated CNN accuracy: {}'.format((1+23/N_classes)/24))
+    print('theoretically estimated CNN accuracy: {}'.format((1 + 23 / N_classes) / 24))
 
 
 main()
