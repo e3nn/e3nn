@@ -62,7 +62,7 @@ def get_matrices_kernel(As, eps=1e-10):
 ################################################################################
 
 @cached_dirpklgz("cache/trans_Q")
-def _basis_transformation_Q_J(J, order_in, order_out):
+def _basis_transformation_Q_J(J, order_in, order_out, version=1):
     def _R_tensor(a, b, c): return np.kron(wigner_D_matrix(order_out, a, b, c), wigner_D_matrix(order_in, a, b, c))
 
     def _sylvester_submatrix(J, a, b, c):
@@ -89,7 +89,7 @@ def _basis_transformation_Q_J(J, order_in, order_out):
 
 
 @cached_dirpklgz("cache/sh_cube")
-def _sample_sh_cube(size, J):
+def _sample_sh_cube(size, J, version=1):
     '''
     Sample spherical harmonics in a cube.
     No bandlimiting considered, aliased regions need to be cut by windowing!

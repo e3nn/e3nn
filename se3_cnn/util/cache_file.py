@@ -35,10 +35,12 @@ def cached_dirpklgz(dirname):
             except FileNotFoundError:
                 index = {}
 
+            key = args + func.__defaults__
+
             try:
-                filename = index[args]
+                filename = index[key]
             except KeyError:
-                index[args] = filename = "{}.pkl.gz".format(len(index))
+                index[key] = filename = "{}.pkl.gz".format(len(index))
                 with open(indexfile, "wb") as file:
                     pickle.dump(index, file)
 
