@@ -18,49 +18,13 @@ import argparse
 from experiments.datasets.cath.cath import Cath
 from experiments.util import *
 
-
-def get_output_shape(input_size, func):
-    f = func(torch.autograd.Variable(torch.ones(2, *input_size)))
-    return f.size()[1:]
-
-
-def print_layer(layers, input_shape):
-    """"Method for print architecture during model construction"""
-
-    shape = get_output_shape(input_shape, layers)
-    log_obj.write("layer %2d - %20s: %s [output size %s]" % (len(layers), list(layers.named_modules())[-1][0], tuple(shape), "{:,}".format(np.prod(shape))))
-
-
-def calc_normalization_factor(loader):
-
-    # TODO: NOTE THAT THIS CODE CURRENTLY ONLY WORKS FOR 1 INPUT CHANNEL
-    voxel_count = 0.
-    voxel_sum = 0.
-    voxel_var = 0
-    for batch_idx, (data, target) in enumerate(loader):
-
-        image_voxel_sum = torch.sum(data)
-        image_voxel_count = data.numel()
-        image_voxel_var = torch.var(data)
-
-        if batch_idx == 0:
-            voxel_var = image_voxel_var
-        else:
-            delta = (voxel_sum/voxel_count) - (image_voxel_sum/image_voxel_count)
-            M_a = voxel_var * voxel_count
-            M_b = image_voxel_var * image_voxel_count
-            M2 = M_a + M_b + delta ** 2 * voxel_count * image_voxel_count / (voxel_count + image_voxel_count)
-            voxel_var = M2 / (voxel_count + image_voxel_count)
-
-        voxel_count += image_voxel_count
-        voxel_sum += image_voxel_sum
-
-        # print(data.shape, data.numel(), torch.sum(data), (image_voxel_sum/image_voxel_count), (voxel_sum/voxel_count), image_voxel_var, voxel_var)
-
-    return voxel_sum/voxel_count, np.sqrt(voxel_var)
-
-
 def train_loop(model, train_loader, optimizer, epoch):
+    """Main training loop
+    :param model: Model to be trained
+    :param train_loader: DataLoader object for training set
+    :param optimizer: Optimizer object
+    :param epoch: Current epoch index
+    """
     model.train()
     training_losses = []
     training_outs = []
@@ -89,14 +53,10 @@ def train_loop(model, train_loader, optimizer, epoch):
         training_outs.append(out.data.cpu().numpy())
         training_accs.append(acc.data[0])
 
-        log_obj.write("[{}:{}/{}] loss={:.4} acc={:.2} time={:.2}".format(
+        log_obj.write("[{}:{}/{}] loss={:.4} acc={:.3} time={:.2}".format(
             epoch, batch_idx, len(train_loader),
             float(loss.data[0]), float(acc.data[0]),
             time.perf_counter() - time_start))
-
-        # # for debugging to arrive at validation early...
-        # if (batch_idx+1)%4 == 0:
-        #     break
 
     loss_avg = np.mean(training_losses)
     acc_avg = np.mean(training_accs)
@@ -106,6 +66,10 @@ def train_loop(model, train_loader, optimizer, epoch):
 
 
 def infer(model, loader):
+    """Make prediction for all entries in loader
+    :param model: Model used for prediction
+    :param loader: DataLoader object
+    """
     model.eval()
     losses = []
     outs = []
@@ -138,11 +102,6 @@ def main(checkpoint):
         n_output = len(train_set.datasets[0].label_set)
         log_obj.write("Training set: " + str([len(dataset) for dataset in train_set.datasets]))
 
-        # dataset_mean, dataset_std = calc_normalization_factor(train_loader)
-        # for set in train_set.datasets:
-        #     set.set_dataset_normalization(dataset_mean, dataset_std)
-
-
     if args.mode in ['train', 'validate']:
         validation_set = Cath(
             args.data_filename, split=7,
@@ -153,9 +112,6 @@ def main(checkpoint):
         n_output = len(validation_set.label_set)
         log_obj.write("Validation set: " + str(len(validation_set)))
 
-        # dataset_mean, dataset_std = calc_normalization_factor(validation_loader)
-        # validation_set.set_dataset_normalization(dataset_mean, dataset_std)
-
     if args.mode == 'test' or args.report_on_test_set:
         test_set = torch.utils.data.ConcatDataset([Cath(
             args.data_filename, split=i,
@@ -165,11 +121,6 @@ def main(checkpoint):
         n_input = test_set.datasets[0].n_atom_types
         n_output = len(test_set.datasets[0].label_set)
         log_obj.write("Test set: " + str([len(dataset) for dataset in test_set.datasets]))
-
-        # dataset_mean, dataset_std = calc_normalization_factor(test_loader)
-        # for set in test_set.datasets:
-        #     set.set_dataset_normalization(dataset_mean, dataset_std)
-
 
     # Build model and set up optimizer
     model = network_module.network(n_input=n_input, n_output=n_output, args=args)
@@ -221,10 +172,10 @@ def main(checkpoint):
 
             validation_loss_avg = np.mean(validation_losses)
 
-            log_obj.write('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+            log_obj.write('TRAINING SET [{}:{}/{}] loss={:.4} acc={:.3}'.format(
                 epoch, len(train_loader)-1, len(train_loader),
                 loss_avg, acc_avg))
-            log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+            log_obj.write('VALIDATION SET [{}:{}/{}] loss={:.4} acc={:.3}'.format(
                 epoch, len(train_loader)-1, len(train_loader),
                 validation_loss_avg, validation_acc))
 
@@ -240,7 +191,7 @@ def main(checkpoint):
                 test_loss_avg = np.mean(test_losses)
 
                 log_obj.write(
-                    'TEST SET [{}:{}/{}] loss={:.4} acc={:.2}'.format(
+                    'TEST SET [{}:{}/{}] loss={:.4} acc={:.3}'.format(
                         epoch, len(train_loader) - 1, len(train_loader),
                         test_loss_avg, test_acc))
 
@@ -321,7 +272,7 @@ def main(checkpoint):
         validation_acc = np.sum(out.argmax(-1) == y) / len(y)
         validation_loss_avg = np.mean(validation_losses)
 
-        log_obj.write('VALIDATION SET: loss={:.4} acc={:.2}'.format(
+        log_obj.write('VALIDATION SET: loss={:.4} acc={:.3}'.format(
             validation_loss_avg, validation_acc))
 
     elif args.mode == 'test':
@@ -331,7 +282,7 @@ def main(checkpoint):
         test_acc = np.sum(out.argmax(-1) == y) / len(y)
         test_loss_avg = np.mean(test_losses)
 
-        log_obj.write('TEST SET: loss={:.4} acc={:.2}'.format(
+        log_obj.write('TEST SET: loss={:.4} acc={:.3}'.format(
             test_loss_avg, test_acc))
 
 
@@ -387,7 +338,6 @@ if __name__ == '__main__':
                         help="Which nonlinearity to use for non-scalar capsules")
     parser.add_argument("--normalization", choices={'batch', 'group', 'instance', None}, default='batch',
                         help="Which nonlinearity to use for non-scalar capsules")
-    # TODO: NOT IMPLEMENTED FOR CONVENTONAL NETWORKS YET!
     parser.add_argument("--downsample-by-pooling", action='store_true', default=True,
                         help="Switches from downsampling by striding to downsampling by pooling")
     # WEIGHTS
