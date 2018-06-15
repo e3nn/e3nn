@@ -6,6 +6,7 @@ from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
 from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
 from se3_cnn.basis_kernels import _basis_transformation_Q_J
 from se3_cnn.util.cache_file import cached_dirpklgz
+from se3_cnn.SO3 import rot, x_to_alpha_beta
 
 
 def beta_alpha(n):
@@ -18,19 +19,21 @@ def beta_alpha(n):
 @cached_dirpklgz("cache/sh_sphere")
 def _sample_Y(n, J):
     beta, alpha = beta_alpha(n)
-    
+
     Y_J = np.zeros((2 * J + 1, len(beta.flatten())))
     for idx_m in range(2 * J + 1):
         m = idx_m - J
         for idx, (b, a) in enumerate(zip(beta.flatten(), alpha.flatten())):
-            Y_J[idx_m, idx] = sh(J, m, b, a)
-            
+            [x, y, z] = (rot(a, b, 0) @ np.array([[0], [0], [1]])).reshape((-1,))
+            aa, bb = x_to_alpha_beta(np.array([-z, -x, y]))
+            Y_J[idx_m, idx] = sh(J, m, bb, aa)
+
     return Y_J
 
 
 def _sample_sh_sphere(n, order_in, order_out):
     order_irreps = range(abs(order_in - order_out), order_in + order_out + 1)
-    
+
     sh_spheres = []
     for J in order_irreps:
         Y_J = _sample_Y(n, J)
@@ -61,7 +64,7 @@ def plot_sphere(beta, alpha, f):
     ax = plt.gca()
     ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=fc)  # cm.gray(f))
     # Turn off the axis planes
-    ax.view_init(azim=0, elev=90)
+    ax.view_init(azim=-90, elev=90)
     ax.set_axis_off()
     a = 0.6
     ax.set_xlim3d(-a, a)
@@ -73,7 +76,9 @@ def main():
     scale = 1.5
     n = 50
 
-    f = _sample_sh_sphere(n, 1, 1)
+    order_in, order_out = 1, 1
+
+    f = _sample_sh_sphere(n, order_in, order_out)
     f = (f - np.min(f)) / (np.max(f) - np.min(f))
 
     beta, alpha = beta_alpha(n)
@@ -100,7 +105,7 @@ def main():
                 fig.add_axes(rect, projection='3d', aspect=1)
                 plot_sphere(beta, alpha, f[base, i, j])
 
-    plt.savefig("kernels.png")
+    plt.savefig("kernels{}{}.png".format(order_in, order_out))
 
 
 main()
