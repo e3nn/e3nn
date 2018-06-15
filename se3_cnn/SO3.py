@@ -45,3 +45,31 @@ def x_to_alpha_beta(x):
 # rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
 # is proportional to
 # [x, y, z]
+
+
+def compose(a1, b1, c1, a2, b2, c2):
+    """
+    (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
+    """
+    comp = rot(a1, b1, c1) @ rot(a2, b2, c2)
+    xyz = comp @ np.array([0, 0, 1])
+    a, b = x_to_alpha_beta(xyz)
+    rotz = rot(0, -b, -a) @ comp
+    c = np.arctan2(rotz[1, 0], rotz[0, 0])
+    return a, b, c
+
+
+def test_wigner(l=2):
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+
+    a1, b1, c1, a2, b2, c2 = np.random.rand(6)
+
+    r1 = wigner_D_matrix(l, a1, b1, c1)
+    r2 = wigner_D_matrix(l, a2, b2, c2)
+
+    a, b, c = compose(a1, b1, c1, a2, b2, c2)
+    r = wigner_D_matrix(l, a, b, c)
+
+    r_ = r1 @ r2
+
+    print(np.abs(r - r_).max() / r.std())

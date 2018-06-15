@@ -24,7 +24,7 @@ def _sample_Y(n, J):
     for idx_m in range(2 * J + 1):
         m = idx_m - J
         for idx, (b, a) in enumerate(zip(beta.flatten(), alpha.flatten())):
-            [x, y, z] = (rot(a, b, 0) @ np.array([[0], [0], [1]])).reshape((-1,))
+            [x, y, z] = rot(a, b, 0) @ np.array([0, 0, 1])
             aa, bb = x_to_alpha_beta(np.array([-z, -x, y]))
             Y_J[idx_m, idx] = sh(J, m, bb, aa)
 
