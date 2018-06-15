@@ -12,24 +12,24 @@ def rot_z(gamma):
     Rotation around Z axis
     '''
     return np.array([[np.cos(gamma), -np.sin(gamma), 0],
-                     [np.sin(gamma), np.cos(gamma), 0],
-                     [0, 0, 1]])
+                    [np.sin(gamma), np.cos(gamma), 0],
+                    [0, 0, 1]])
 
 
 def rot_y(beta):
     '''
     Rotation around Y axis
     '''
-    return np.array([[np.cos(beta), 0, -np.sin(beta)],
-                     [0, 1, 0],
-                     [np.sin(beta), 0, np.cos(beta)]])
+    return np.array([[np.cos(beta), 0, np.sin(beta)],
+                    [0, 1, 0],
+                    [-np.sin(beta), 0, np.cos(beta)]])
 
 
 def rot(alpha, beta, gamma):
     '''
     ZYZ Eurler angles rotation
     '''
-    return rot_z(alpha).dot(rot_y(beta)).dot(rot_z(gamma))
+    return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)
 
 
 def x_to_alpha_beta(x):
@@ -40,3 +40,8 @@ def x_to_alpha_beta(x):
     beta = np.arccos(x[2])
     alpha = np.arctan2(x[1], x[0])
     return (alpha, beta)
+
+# These functions satisfies that
+# rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
+# is proportional to
+# [x, y, z]

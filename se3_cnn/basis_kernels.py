@@ -96,25 +96,25 @@ def _sample_sh_cube(size, J):
     :param size: side length of the kernel
     :param J: order of the spherical harmonics
     '''
-    # sample spherical harmonics on cube, ignoring radial part and aliasing
-
     rng = np.linspace(start=-((size - 1) / 2), stop=(size - 1) / 2, num=size, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
 
     Y_J = np.zeros((2 * J + 1, size, size, size))
     for idx_m in range(2 * J + 1):
         m = idx_m - J
-        for idx_x, x in enumerate(rng):
+        for idx_z, z in enumerate(rng):
             for idx_y, y in enumerate(rng):
-                for idx_z, z in enumerate(rng):
+                for idx_x, x in enumerate(rng):
                     if x == y == z == 0:  # angles at origin are nan, special treatment
                         if J == 0:  # Y^0 is angularly independent, choose any angle
-                            Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
+                            Y_J[idx_m, idx_z, idx_y, idx_x] = sh(0, 0, 123, 321)
                         else:  # insert zeros for Y^J with J!=0
-                            Y_J[idx_m, idx_x, idx_y, idx_z] = 0
+                            Y_J[idx_m, idx_z, idx_y, idx_x] = 0
                     else:  # not at the origin, sample spherical harmonic
-                        alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
-                        Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, beta, alpha)
+                        # To end up with the convention : vector_field[z, y, x] = np.array([v_x, v_y, v_z])
+                        # Instead of x_to_alpha_beta(np.array([x, y, z]))
+                        # We need to do this (trust me)
+                        alpha, beta = x_to_alpha_beta(np.array([-z, -x, y]))
+                        Y_J[idx_m, idx_z, idx_y, idx_x] = sh(J, m, beta, alpha)
 
     return Y_J
 
@@ -128,10 +128,8 @@ def _sample_cube(size, order_in, order_out):
     :param order_out: order of the output representation
     :return: sampled equivariant kernel basis of shape (N_basis, 2*order_out+1, 2*order_in+1, size, size, size)
     '''
-    # sample spherical harmonics on cube, ignoring radial part and aliasing
 
     rng = np.linspace(start=-((size - 1) / 2), stop=(size - 1) / 2, num=size, endpoint=True)
-    z, y, x = np.meshgrid(rng, rng, rng)
 
     order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
     sh_cubes = []
@@ -144,6 +142,7 @@ def _sample_cube(size, order_in, order_out):
         K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)
         sh_cubes.append(K_J)
 
+    z, y, x = np.meshgrid(rng, rng, rng)
     r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
     return sh_cubes, r_field, order_irreps
 
