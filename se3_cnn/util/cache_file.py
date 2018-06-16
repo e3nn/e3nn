@@ -1,5 +1,5 @@
 '''
-Cache in file
+Cache in files
 '''
 from functools import wraps, lru_cache
 import pickle
@@ -8,17 +8,20 @@ import os
 import sys
 
 
-def cached_dirpklgz(dirname):
+def cached_dirpklgz(dirname, maxsize=128):
     '''
     Cache a function with a directory
+
+    :param dirname: the directory path
+    :param maxsize: maximum size of the RAM cache (there is no limit for the directory cache)
     '''
     def decorator(func):
         '''
         The actual decorator
         '''
-        @lru_cache(maxsize=None)
+        @lru_cache(maxsize=maxsize)
         @wraps(func)
-        def wrapper(*args):
+        def wrapper(*args, **kwargs):
             '''
             The wrapper of the function
             '''
@@ -35,7 +38,7 @@ def cached_dirpklgz(dirname):
             except FileNotFoundError:
                 index = {}
 
-            key = args + func.__defaults__
+            key = (args, frozenset(kwargs), func.__defaults__)
 
             try:
                 filename = index[key]
@@ -52,7 +55,7 @@ def cached_dirpklgz(dirname):
             except FileNotFoundError:
                 print("compute {}... ".format(filename), end="")
                 sys.stdout.flush()
-                result = func(*args)
+                result = func(*args, **kwargs)
                 print("save {}... ".format(filename), end="")
                 sys.stdout.flush()
                 with gzip.open(filepath, "wb") as file:
