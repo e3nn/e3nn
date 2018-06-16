@@ -7,7 +7,8 @@ from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
 from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
 from se3_cnn.basis_kernels import _basis_transformation_Q_J
 from se3_cnn.util.cache_file import cached_dirpklgz
-from se3_cnn.SO3 import rot, x_to_alpha_beta
+from se3_cnn.SO3 import compose
+from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
 
 def beta_alpha(n):
@@ -18,26 +19,25 @@ def beta_alpha(n):
 
 
 @cached_dirpklgz("cache/sh_sphere")
-def _sample_Y(n, J, version=1):
-    beta, alpha = beta_alpha(n)
+def _sample_Y(n, J, alpha, beta, gamma, version=1): # pylint: disable=W0613
+    grid_beta, grid_alpha = beta_alpha(n)
 
-    Y_J = np.zeros((2 * J + 1, len(beta.flatten())))
+    Y_J = np.zeros((2 * J + 1, len(grid_beta.flatten())))
     for idx_m in range(2 * J + 1):
         m = idx_m - J
-        for idx, (b, a) in enumerate(zip(beta.flatten(), alpha.flatten())):
-            [x, y, z] = rot(a, b, 0) @ np.array([0, 0, 1])
-            aa, bb = x_to_alpha_beta(np.array([-z, -x, y]))
-            Y_J[idx_m, idx] = sh(J, m, bb, aa)
+        for idx, (b, a) in enumerate(zip(grid_beta.flatten(), grid_alpha.flatten())):
+            a, b, _ = compose(-gamma, -beta, -alpha, a, b, 0)
+            Y_J[idx_m, idx] = sh(J, m, b, a)
 
     return Y_J
 
 
-def _sample_sh_sphere(n, order_in, order_out):
+def _sample_sh_sphere(n, order_in, order_out, alpha, beta, gamma):
     order_irreps = range(abs(order_in - order_out), order_in + order_out + 1)
 
     sh_spheres = []
     for J in order_irreps:
-        Y_J = _sample_Y(n, J)
+        Y_J = _sample_Y(n, J, alpha, beta, gamma)
 
         # compute basis transformation matrix Q_J
         Q_J = _basis_transformation_Q_J(J, order_in, order_out)
@@ -80,11 +80,22 @@ def main():
     parser.add_argument("--n", type=int, default=50, help="size of the SOFT grid")
     parser.add_argument("--scale", type=float, default=1.5, help="plot size of a sphere")
     parser.add_argument("--sep", type=float, default=1, help="plot separation size")
+    parser.add_argument("--alpha", type=float, default=0)
+    parser.add_argument("--beta", type=float, default=0)
+    parser.add_argument("--gamma", type=float, default=0)
 
     args = parser.parse_args()
 
-    f = _sample_sh_sphere(args.n, args.order_in, args.order_out)
-    f = (f - np.min(f)) / (np.max(f) - np.min(f))
+    f = _sample_sh_sphere(args.n, args.order_in, args.order_out, args.alpha, args.beta, args.gamma)
+    # f(r^-1 x)
+
+    f = np.einsum(
+        "ij,zjkba,kl->zilba", 
+        wigner_D_matrix(args.order_out, args.alpha, args.beta, args.gamma), 
+        f, 
+        wigner_D_matrix(args.order_in, -args.gamma, -args.beta, -args.alpha)
+    )
+    # rho_out(r) f(r^-1 x) rho_in(r^-1)
 
     beta, alpha = beta_alpha(args.n)
     alpha = alpha - np.pi / (2 * args.n)
@@ -92,6 +103,8 @@ def main():
     nbase = f.shape[0]
     dim_out = f.shape[1]
     dim_in = f.shape[2]
+
+    f = (f - np.min(f)) / (np.max(f) - np.min(f))
 
     fig = plt.figure(figsize=(args.scale * (nbase * dim_in + (nbase - 1) * args.sep), args.scale * dim_out))
 
