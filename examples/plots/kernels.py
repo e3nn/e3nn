@@ -1,5 +1,6 @@
 # pylint: disable=C,R,E1101
 import numpy as np
+import argparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
@@ -59,11 +60,9 @@ def plot_sphere(beta, alpha, f):
     fc = cm.gray(f)
     fc = plt.get_cmap("bwr")(f)
 
-    #fig = plt.figure(figsize=(5, 3))
-    #ax = fig.add_subplot(111, projection='3d', aspect=1)
     ax = plt.gca()
-    ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=fc)  # cm.gray(f))
-    # Turn off the axis planes
+    ax.plot_surface(x, y, z, rstride=1, cstride=1, facecolors=fc)
+
     ax.view_init(azim=-90, elev=90)
     ax.set_axis_off()
     a = 0.6
@@ -73,31 +72,36 @@ def plot_sphere(beta, alpha, f):
 
 
 def main():
-    scale = 1.5
-    n = 50
+    parser = argparse.ArgumentParser()
 
-    order_in, order_out = 1, 1
+    # required
+    parser.add_argument("--order_in", type=int, required=True)
+    parser.add_argument("--order_out", type=int, required=True)
+    parser.add_argument("--n", type=int, default=50, help="size of the SOFT grid")
+    parser.add_argument("--scale", type=float, default=1.5, help="plot size of a sphere")
+    parser.add_argument("--sep", type=float, default=1, help="plot separation size")
 
-    f = _sample_sh_sphere(n, order_in, order_out)
+    args = parser.parse_args()
+
+    f = _sample_sh_sphere(args.n, args.order_in, args.order_out)
     f = (f - np.min(f)) / (np.max(f) - np.min(f))
 
-    beta, alpha = beta_alpha(n)
-    alpha = alpha - np.pi / (2 * n)
+    beta, alpha = beta_alpha(args.n)
+    alpha = alpha - np.pi / (2 * args.n)
 
     nbase = f.shape[0]
     dim_out = f.shape[1]
     dim_in = f.shape[2]
 
-    w = 1
-    fig = plt.figure(figsize=(scale * (nbase * dim_in + (nbase - 1) * w), scale * dim_out))
+    fig = plt.figure(figsize=(args.scale * (nbase * dim_in + (nbase - 1) * args.sep), args.scale * dim_out))
 
     for base in range(nbase):
         for i in range(dim_out):
             for j in range(dim_in):
-                width = 1 / (nbase * dim_in + (nbase - 1) * w)
+                width = 1 / (nbase * dim_in + (nbase - 1) * args.sep)
                 height = 1 / dim_out
                 rect = [
-                    (base * (dim_in + w) + j) * width,
+                    (base * (dim_in + args.sep) + j) * width,
                     (dim_out - i - 1) * height,
                     width,
                     height
@@ -105,7 +109,7 @@ def main():
                 fig.add_axes(rect, projection='3d', aspect=1)
                 plot_sphere(beta, alpha, f[base, i, j])
 
-    plt.savefig("kernels{}{}.png".format(order_in, order_out))
+    plt.savefig("kernels{}{}.png".format(args.order_in, args.order_out))
 
 
 main()
