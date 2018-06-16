@@ -54,16 +54,23 @@ def irr_repr(order, alpha, beta, gamma):
     - compatible with compose and spherical_harmonics
     """
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    if order == 1:
+        # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
+        return rot(alpha, beta, gamma)
     return wigner_D_matrix(order, alpha, beta, gamma)
 
 
-def spherical_harmonics(J, alpha, beta):
+def spherical_harmonics(order, alpha, beta):
     """
     spherical harmonics
     - compatible with irr_repr and compose
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
-    return np.array([sh(J, m, np.pi - beta, alpha) for m in range(-J, J + 1)])
+    Y = np.array([sh(order, m, np.pi - beta, alpha) for m in range(-order, order + 1)])
+    if order == 1:
+        # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
+        return np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]]) @ Y
+    return Y
 
 
 def compose(a1, b1, c1, a2, b2, c2):
@@ -78,7 +85,7 @@ def compose(a1, b1, c1, a2, b2, c2):
     return a, b, c
 
 
-def _test_irr_repr_are_representation(l=2):
+def _test_irr_repr_are_representation(order):
     """
     This test tests that 
     - irr_repr
@@ -89,18 +96,20 @@ def _test_irr_repr_are_representation(l=2):
     """
     a1, b1, c1, a2, b2, c2 = np.random.rand(6)
 
-    r1 = irr_repr(l, a1, b1, c1)
-    r2 = irr_repr(l, a2, b2, c2)
+    r1 = irr_repr(order, a1, b1, c1)
+    r2 = irr_repr(order, a2, b2, c2)
 
     a, b, c = compose(a1, b1, c1, a2, b2, c2)
-    r = irr_repr(l, a, b, c)
+    r = irr_repr(order, a, b, c)
 
     r_ = r1 @ r2
 
-    print(np.abs(r - r_).max() / r.std())
+    d, r = np.abs(r - r_).max(), np.abs(r).max()
+    print(d, r)
+    assert d < 1e-10 * r
 
 
-def _test_spherical_harmonics(l=2):
+def _test_spherical_harmonics(order):
     """
     This test tests that 
     - irr_repr
@@ -115,15 +124,18 @@ def _test_spherical_harmonics(l=2):
     alpha, beta, gamma = np.random.rand(3)
 
     ra, rb, _ = compose(alpha, beta, gamma, a, b, 0)
-    Yrx = spherical_harmonics(l, ra, rb)
+    Yrx = spherical_harmonics(order, ra, rb)
 
-    Y = spherical_harmonics(l, a, b)
-    DrY = irr_repr(l, alpha, beta, gamma) @ Y
+    Y = spherical_harmonics(order, a, b)
+    DrY = irr_repr(order, alpha, beta, gamma) @ Y
 
-    print(np.abs(Yrx - DrY).max() / Y.std())
+    d, r = np.abs(Yrx - DrY).max(), np.abs(Y).max()
+    print(d, r)
+    assert d < 1e-10 * r
 
 
-def _test_change_basis_irr_to_rot():
+def _test_change_basis_wigner_to_rot():
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
     A = np.array([
         [0, 1, 0],
@@ -133,17 +145,24 @@ def _test_change_basis_irr_to_rot():
 
     a, b, c = np.random.rand(3)
 
-    r1 = A.T @ irr_repr(1, a, b, c) @ A
+    r1 = A.T @ wigner_D_matrix(1, a, b, c) @ A
     r2 = rot(a, b, c)
 
-    print(np.abs(r1 - r2).max())
+    d = np.abs(r1 - r2).max()
+    print(d)
+    assert d < 1e-10
 
 
 if __name__ == "__main__":
-    _test_change_basis_irr_to_rot()
-    _test_change_basis_irr_to_rot()
-    _test_change_basis_irr_to_rot()
+    print("Change of basis Wigner <-> rot")
+    _test_change_basis_wigner_to_rot()
+    _test_change_basis_wigner_to_rot()
+    _test_change_basis_wigner_to_rot()
+
+    print("Spherical harmonics are solution of Y(rx) = D(r) Y(x)")
     for l in range(7):
-        _test_spherical_harmonics()
+        _test_spherical_harmonics(l)
+
+    print("Irreducible repr are indeed representations")
     for l in range(7):
-        _test_irr_repr_are_representation()
+        _test_irr_repr_are_representation(l)
