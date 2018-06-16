@@ -41,10 +41,12 @@ def x_to_alpha_beta(x):
     alpha = np.arctan2(x[1], x[0])
     return (alpha, beta)
 
+
 # These functions (x_to_alpha_beta and rot) satisfies that
 # rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
 # is proportional to
 # [x, y, z]
+
 
 def irr_repr(order, alpha, beta, gamma):
     """
@@ -61,7 +63,7 @@ def spherical_harmonics(J, alpha, beta):
     - compatible with irr_repr and compose
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
-    return np.array([sh(J, m, np.pi - beta, alpha) for m in range(-J, J+1)])
+    return np.array([sh(J, m, np.pi - beta, alpha) for m in range(-J, J + 1)])
 
 
 def compose(a1, b1, c1, a2, b2, c2):
@@ -76,7 +78,7 @@ def compose(a1, b1, c1, a2, b2, c2):
     return a, b, c
 
 
-def test_irr_repr_are_representation(l=2):
+def _test_irr_repr_are_representation(l=2):
     """
     This test tests that 
     - irr_repr
@@ -98,7 +100,7 @@ def test_irr_repr_are_representation(l=2):
     print(np.abs(r - r_).max() / r.std())
 
 
-def test_spherical_harmonics(l=2):
+def _test_spherical_harmonics(l=2):
     """
     This test tests that 
     - irr_repr
@@ -119,3 +121,29 @@ def test_spherical_harmonics(l=2):
     DrY = irr_repr(l, alpha, beta, gamma) @ Y
 
     print(np.abs(Yrx - DrY).max() / Y.std())
+
+
+def _test_change_basis_irr_to_rot():
+
+    A = np.array([
+        [0, 1, 0],
+        [0, 0, 1], 
+        [1, 0, 0]
+    ])
+
+    a, b, c = np.random.rand(3)
+
+    r1 = A.T @ irr_repr(1, a, b, c) @ A
+    r2 = rot(a, b, c)
+
+    print(np.abs(r1 - r2).max())
+
+
+if __name__ == "__main__":
+    _test_change_basis_irr_to_rot()
+    _test_change_basis_irr_to_rot()
+    _test_change_basis_irr_to_rot()
+    for l in range(7):
+        _test_spherical_harmonics()
+    for l in range(7):
+        _test_irr_repr_are_representation()
