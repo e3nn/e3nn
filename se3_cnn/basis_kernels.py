@@ -16,9 +16,7 @@ Therefore
 import numpy as np
 import scipy.linalg
 import scipy.ndimage
-from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-from se3_cnn.SO3 import x_to_alpha_beta
-from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
+from se3_cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics
 from se3_cnn.util.cache_file import cached_dirpklgz
 
 
@@ -62,15 +60,17 @@ def get_matrices_kernel(As, eps=1e-10):
 ################################################################################
 
 @cached_dirpklgz("cache/trans_Q")
-def _basis_transformation_Q_J(J, order_in, order_out, version=1):
-    def _R_tensor(a, b, c): return np.kron(wigner_D_matrix(order_out, a, b, c), wigner_D_matrix(order_in, a, b, c))
+def _basis_transformation_Q_J(J, order_in, order_out, version=2):  # pylint: disable=W0613
+    """
+    return the Q^-1 of the article
+    """
+    def _R_tensor(a, b, c): return np.kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
 
     def _sylvester_submatrix(J, a, b, c):
         ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
         R_tensor = _R_tensor(a, b, c)
-        R_irrep_J = wigner_D_matrix(J, a, b, c)
-        # inverted wrt notes ( R_tensor = Q R_irrep Q^-1 and K = Q K_tilde )
-        return np.kron(np.eye(*R_irrep_J.shape), R_tensor) - np.kron(R_irrep_J.T, np.eye(*R_tensor.shape))
+        R_irrep_J = irr_repr(J, a, b, c)
+        return np.kron(R_tensor, np.eye(*R_irrep_J.shape)) - np.kron(np.eye(*R_tensor.shape), R_irrep_J.T)
 
     random_angles = [
         [4.41301023, 5.56684102, 4.59384642],
@@ -82,14 +82,13 @@ def _basis_transformation_Q_J(J, order_in, order_out, version=1):
     null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
     assert null_space.shape[0] == 1  # unique subspace solution
     Q_J = null_space[0]
-    # transposition necessary since 'vec' is defined column major while python is row major
-    Q_J = Q_J.reshape(2 * J + 1, (2 * order_in + 1) * (2 * order_out + 1)).T
-    assert np.allclose(np.dot(_R_tensor(321, 111, 123), Q_J), np.dot(Q_J, wigner_D_matrix(J, 321, 111, 123)))
+    Q_J = Q_J.reshape((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)
+    assert np.allclose(np.dot(_R_tensor(321, 111, 123), Q_J), np.dot(Q_J, irr_repr(J, 321, 111, 123)))
     return Q_J
 
 
 @cached_dirpklgz("cache/sh_cube")
-def _sample_sh_cube(size, J, version=1):
+def _sample_sh_cube(size, J, version=2):  # pylint: disable=W0613
     '''
     Sample spherical harmonics in a cube.
     No bandlimiting considered, aliased regions need to be cut by windowing!
@@ -99,22 +98,17 @@ def _sample_sh_cube(size, J, version=1):
     rng = np.linspace(start=-((size - 1) / 2), stop=(size - 1) / 2, num=size, endpoint=True)
 
     Y_J = np.zeros((2 * J + 1, size, size, size))
-    for idx_m in range(2 * J + 1):
-        m = idx_m - J
-        for idx_x, x in enumerate(rng):
-            for idx_y, y in enumerate(rng):
-                for idx_z, z in enumerate(rng):
-                    if x == y == z == 0:  # angles at origin are nan, special treatment
-                        if J == 0:  # Y^0 is angularly independent, choose any angle
-                            Y_J[idx_m, idx_x, idx_y, idx_z] = sh(0, 0, 123, 321)
-                        else:  # insert zeros for Y^J with J!=0
-                            Y_J[idx_m, idx_x, idx_y, idx_z] = 0
-                    else:  # not at the origin, sample spherical harmonic
-                        # To end up with the convention : vector_field[x, y, z] = np.array([v_x, v_y, v_z])
-                        # Instead of x_to_alpha_beta(np.array([x, y, z]))
-                        # We need to do this (trust me)
-                        alpha, beta = x_to_alpha_beta(np.array([-z, -x, y]))
-                        Y_J[idx_m, idx_x, idx_y, idx_z] = sh(J, m, beta, alpha)
+    for idx_x, x in enumerate(rng):
+        for idx_y, y in enumerate(rng):
+            for idx_z, z in enumerate(rng):
+                if x == y == z == 0:  # angles at origin are nan, special treatment
+                    if J == 0:  # Y^0 is angularly independent, choose any angle
+                        Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(0, 123, 321)
+                    else:  # insert zeros for Y^J with J!=0
+                        Y_J[:, idx_x, idx_y, idx_z] = 0
+                else:  # not at the origin, sample spherical harmonic
+                    alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
+                    Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(J, alpha, beta)
 
     return Y_J
 
@@ -265,7 +259,7 @@ def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
 
     y = y.reshape(basis.shape)
 
-    y = np.einsum("ij,bjk...,kl->bil...", wigner_D_matrix(order_out, alpha, beta, gamma), y, wigner_D_matrix(order_in, -gamma, -beta, -alpha))
+    y = np.einsum("ij,bjk...,kl->bil...", irr_repr(order_out, alpha, beta, gamma), y, irr_repr(order_in, -gamma, -beta, -alpha))
 
     return np.array([np.sum(basis[i] * y[i]) for i in range(n)])
 

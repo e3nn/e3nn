@@ -4,11 +4,10 @@ import argparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
-from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
+from se3_cnn.SO3 import irr_repr, spherical_harmonics
 from se3_cnn.basis_kernels import _basis_transformation_Q_J
 from se3_cnn.util.cache_file import cached_dirpklgz
 from se3_cnn.SO3 import compose
-from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
 
 def beta_alpha(n):
@@ -19,15 +18,13 @@ def beta_alpha(n):
 
 
 @cached_dirpklgz("cache/sh_sphere")
-def _sample_Y(n, J, alpha, beta, gamma, version=1): # pylint: disable=W0613
+def _sample_Y(n, J, alpha, beta, gamma, version=2):  # pylint: disable=W0613
     grid_beta, grid_alpha = beta_alpha(n)
 
     Y_J = np.zeros((2 * J + 1, len(grid_beta.flatten())))
-    for idx_m in range(2 * J + 1):
-        m = idx_m - J
-        for idx, (b, a) in enumerate(zip(grid_beta.flatten(), grid_alpha.flatten())):
-            a, b, _ = compose(-gamma, -beta, -alpha, a, b, 0)
-            Y_J[idx_m, idx] = sh(J, m, b, a)
+    for idx, (b, a) in enumerate(zip(grid_beta.flatten(), grid_alpha.flatten())):
+        ra, rb, _ = compose(-gamma, -beta, -alpha, a, b, 0)
+        Y_J[:, idx] = spherical_harmonics(J, ra, rb)
 
     return Y_J
 
@@ -91,9 +88,9 @@ def main():
 
     f = np.einsum(
         "ij,zjkba,kl->zilba", 
-        wigner_D_matrix(args.order_out, args.alpha, args.beta, args.gamma), 
+        irr_repr(args.order_out, args.alpha, args.beta, args.gamma), 
         f, 
-        wigner_D_matrix(args.order_in, -args.gamma, -args.beta, -args.alpha)
+        irr_repr(args.order_in, -args.gamma, -args.beta, -args.alpha)
     )
     # rho_out(r) f(r^-1 x) rho_in(r^-1)
 

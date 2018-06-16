@@ -41,10 +41,27 @@ def x_to_alpha_beta(x):
     alpha = np.arctan2(x[1], x[0])
     return (alpha, beta)
 
-# These functions satisfies that
+# These functions (x_to_alpha_beta and rot) satisfies that
 # rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
 # is proportional to
 # [x, y, z]
+
+def irr_repr(order, alpha, beta, gamma):
+    """
+    irreducible representation of SO3
+    - compatible with compose and spherical_harmonics
+    """
+    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+    return wigner_D_matrix(order, alpha, beta, gamma)
+
+
+def spherical_harmonics(J, alpha, beta):
+    """
+    spherical harmonics
+    - compatible with irr_repr and compose
+    """
+    from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
+    return np.array([sh(J, m, np.pi - beta, alpha) for m in range(-J, J+1)])
 
 
 def compose(a1, b1, c1, a2, b2, c2):
@@ -59,17 +76,46 @@ def compose(a1, b1, c1, a2, b2, c2):
     return a, b, c
 
 
-def test_wigner(l=2):
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
+def test_irr_repr_are_representation(l=2):
+    """
+    This test tests that 
+    - irr_repr
+    - compose
+    are compatible
 
+    D(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = D(Z(a1) Y(b1) Z(c1)) D(Z(a2) Y(b2) Z(c2))
+    """
     a1, b1, c1, a2, b2, c2 = np.random.rand(6)
 
-    r1 = wigner_D_matrix(l, a1, b1, c1)
-    r2 = wigner_D_matrix(l, a2, b2, c2)
+    r1 = irr_repr(l, a1, b1, c1)
+    r2 = irr_repr(l, a2, b2, c2)
 
     a, b, c = compose(a1, b1, c1, a2, b2, c2)
-    r = wigner_D_matrix(l, a, b, c)
+    r = irr_repr(l, a, b, c)
 
     r_ = r1 @ r2
 
     print(np.abs(r - r_).max() / r.std())
+
+
+def test_spherical_harmonics(l=2):
+    """
+    This test tests that 
+    - irr_repr
+    - compose
+    - spherical_harmonics
+    are compatible
+
+    Y(Z(alpha) Y(beta) Z(gamma) x) = D(alpha, beta, gamma) Y(x)
+    with x = Z(a) Y(b) eta
+    """
+    a, b = np.random.rand(2)
+    alpha, beta, gamma = np.random.rand(3)
+
+    ra, rb, _ = compose(alpha, beta, gamma, a, b, 0)
+    Yrx = spherical_harmonics(l, ra, rb)
+
+    Y = spherical_harmonics(l, a, b)
+    DrY = irr_repr(l, alpha, beta, gamma) @ Y
+
+    print(np.abs(Yrx - DrY).max() / Y.std())
