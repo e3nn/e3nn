@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from functools import partial
 
-from se3_cnn import basis_kernels
+from se3cnn import basis_kernels
 from experiments.util.arch_blocks import NonlinearityBlock
 from experiments.util.arch_blocks import SkipSumBlock
 
@@ -26,7 +26,7 @@ class network(nn.Module):
             'batch_norm_momentum': 0.01,
         }
 
-        features = [(3,), # in 
+        features = [(3,), # in
                     ( 16, 12,  8,  8),     # level 1 (enc and dec)
                     ( 32, 24, 16,  8, 4), # level 2 (enc and dec)
                     ( 64, 48, 32, 16, 8), # level 3 (enc and dec)

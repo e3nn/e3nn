@@ -16,8 +16,8 @@ Therefore
 import numpy as np
 import scipy.linalg
 import scipy.ndimage
-from se3_cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics
-from se3_cnn.util.cache_file import cached_dirpklgz
+from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics
+from se3cnn.util.cache_file import cached_dirpklgz
 
 
 ################################################################################
@@ -237,7 +237,7 @@ def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mod
 ################################################################################
 
 def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
-    from se3_cnn import SO3
+    from se3cnn import SO3
     from scipy.ndimage import affine_transform
 
     n = basis.shape[0]

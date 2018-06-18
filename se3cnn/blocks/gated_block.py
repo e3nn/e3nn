@@ -1,10 +1,10 @@
 # pylint: disable=C,R,E1101
 from functools import partial
 import torch
-from se3_cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
-from se3_cnn.non_linearities import ScalarActivation
-from se3_cnn.dropout import SE3Dropout
-from se3_cnn import basis_kernels
+from se3cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
+from se3cnn.non_linearities import ScalarActivation
+from se3cnn.dropout import SE3Dropout
+from se3cnn import basis_kernels
 
 
 class GatedBlock(torch.nn.Module):

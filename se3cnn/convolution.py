@@ -1,7 +1,7 @@
 # pylint: disable=C,R,E1101,E1102
 import numpy as np
 import torch
-from se3_cnn import basis_kernels
+from se3cnn import basis_kernels
 
 
 class SE3Convolution(torch.nn.Module):

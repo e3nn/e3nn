@@ -7,18 +7,18 @@ This library aims to create SE(3) equivariant convolutional neural networks.
 
 ## Hierarchy
 
-- `se3_cnn` contains the library
-  - `se3_cnn/convolution.py` defines `SE3Convolution` the main class of the library
-  - `se3_cnn/blocks` defines ways of introducing non linearity in an equivariant way
-  - `se3_cnn/batchnorm.py` equivariant batch normalization
-  - `se3_cnn/groupnorm.py` equivariant group normalization
-  - `se3_cnn/dropout.py` equivariant dropout
+- `se3cnn` contains the library
+  - `se3cnn/convolution.py` defines `SE3Convolution` the main class of the library
+  - `se3cnn/blocks` defines ways of introducing non linearity in an equivariant way
+  - `se3cnn/batchnorm.py` equivariant batch normalization
+  - `se3cnn/groupnorm.py` equivariant group normalization
+  - `se3cnn/dropout.py` equivariant dropout
 - `experiments` contains experiments made with the library
 - `examples` simple scripts
 
 ## Dependencies
 
-- [pytorch](https://pytorch.org) 
+- [pytorch](https://pytorch.org)
 - [lie_learn](https://github.com/AMLab-Amsterdam/lie_learn) is required to compute the irreducible representations of SO(3)
 - scipy
 

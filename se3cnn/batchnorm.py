@@ -112,8 +112,8 @@ def test_batchnorm(Rs=None):
     return y, z
 
 
-from se3_cnn.convolution import SE3Convolution
-from se3_cnn import basis_kernels
+from se3cnn.convolution import SE3Convolution
+from se3cnn import basis_kernels
 
 
 class SE3BNConvolution(torch.nn.Module):

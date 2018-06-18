@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from se3_cnn.blocks import GatedBlock
+from se3cnn.blocks import GatedBlock
 
 
 class ResNetBlock(nn.Module):

@@ -6,7 +6,7 @@ import torch.utils.data
 
 import numpy as np
 
-from se3_cnn.blocks import GatedBlock
+from se3cnn.blocks import GatedBlock
 
 
 class AvgSpacial(nn.Module):
@@ -86,8 +86,8 @@ class SE3Net(torch.nn.Module):
         super(SE3Net, self).__init__()
         features = [
             (1,),
-            (2, 2, 2, 2), 
-            (4, 4, 4, 4), 
+            (2, 2, 2, 2),
+            (4, 4, 4, 4),
             (16,)
         ]
         common_block_params = {

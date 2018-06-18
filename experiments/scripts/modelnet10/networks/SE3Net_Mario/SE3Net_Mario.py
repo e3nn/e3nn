@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from se3_cnn import basis_kernels
+from se3cnn import basis_kernels
 from functools import partial
-from se3_cnn.blocks import GatedBlock
+from se3cnn.blocks import GatedBlock
 from experiments.util.arch_blocks import *
 
 class network(nn.Module):
