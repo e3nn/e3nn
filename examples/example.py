@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 # The class GatedBlock inherit from the class torch.nn.Module.
 # It contains one convolution, some ReLU and multiplications
-from se3_cnn.blocks import GatedBlock
+from se3cnn.blocks import GatedBlock
 
 
 class AvgSpacial(nn.Module):

@@ -8,7 +8,7 @@ import shutil
 from functools import partial
 
 from scipy.ndimage import affine_transform
-from se3_cnn.SO3 import rot
+from se3cnn.SO3 import rot
 
 
 
@@ -43,7 +43,7 @@ class ModelNet(torch.utils.data.Dataset):
     def __init__(self, root_dir, dataset, mode, size, classes, transform=None, target_transform=None):
         '''
         :param root: directory to store dataset in
-        :param dataset: 
+        :param dataset:
         :param mode: dataset to load: 'train', 'validation', 'test' or 'train_full'
                      the validation set is split from the train set, the full train set can be accessed via 'train_full'
                     :param transform: transformation applied to image in __getitem__
@@ -91,7 +91,7 @@ class ModelNet(torch.utils.data.Dataset):
 
 
 class AddZAxis(object):
-    ''' add z-axis as second channel to volume 
+    ''' add z-axis as second channel to volume
         the scale of the z-axis can be set freely
         if the volume tensor does not contain a channel dimension, add it
         the z axis is assumed to be the last axis of the volume tensor

@@ -4,8 +4,8 @@ Detect Lung nodule
 '''
 import torch
 import torch.nn as nn
-from se3_cnn.batchnorm import SE3BatchNorm
-from se3_cnn.blocks.highway import HighwayBlock
+from se3cnn.batchnorm import SE3BatchNorm
+from se3cnn.blocks.highway import HighwayBlock
 from util_cnn.model_backup import ModelBackup
 import glob
 import os

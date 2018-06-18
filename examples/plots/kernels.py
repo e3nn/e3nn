@@ -4,10 +4,10 @@ import argparse
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
-from se3_cnn.SO3 import irr_repr, spherical_harmonics
-from se3_cnn.basis_kernels import _basis_transformation_Q_J
-from se3_cnn.util.cache_file import cached_dirpklgz
-from se3_cnn.SO3 import compose
+from se3cnn.SO3 import irr_repr, spherical_harmonics
+from se3cnn.basis_kernels import _basis_transformation_Q_J
+from se3cnn.util.cache_file import cached_dirpklgz
+from se3cnn.SO3 import compose
 
 
 def beta_alpha(n):
@@ -87,9 +87,9 @@ def main():
     # f(r^-1 x)
 
     f = np.einsum(
-        "ij,zjkba,kl->zilba", 
-        irr_repr(args.order_out, args.alpha, args.beta, args.gamma), 
-        f, 
+        "ij,zjkba,kl->zilba",
+        irr_repr(args.order_out, args.alpha, args.beta, args.gamma),
+        f,
         irr_repr(args.order_in, -args.gamma, -args.beta, -args.alpha)
     )
     # rho_out(r) f(r^-1 x) rho_in(r^-1)
