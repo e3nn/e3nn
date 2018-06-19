@@ -54,9 +54,10 @@ def irr_repr(order, alpha, beta, gamma):
     - compatible with compose and spherical_harmonics
     """
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    if order == 1:
-        # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
-        return rot(alpha, beta, gamma)
+    # if order == 1:
+    #     # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
+    #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
+    #     return A @ wigner_D_matrix(1, alpha, beta, gamma) @ A.T
     return wigner_D_matrix(order, alpha, beta, gamma)
 
 
@@ -67,9 +68,10 @@ def spherical_harmonics(order, alpha, beta):
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
     Y = np.array([sh(order, m, np.pi - beta, alpha) for m in range(-order, order + 1)])
-    if order == 1:
-        # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
-        return np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]]) @ Y
+    # if order == 1:
+    #     # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
+    #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
+    #     return A @ Y
     return Y
 
 
@@ -87,7 +89,7 @@ def compose(a1, b1, c1, a2, b2, c2):
 
 def _test_irr_repr_are_representation(order):
     """
-    This test tests that 
+    This test tests that
     - irr_repr
     - compose
     are compatible
@@ -111,7 +113,7 @@ def _test_irr_repr_are_representation(order):
 
 def _test_spherical_harmonics(order):
     """
-    This test tests that 
+    This test tests that
     - irr_repr
     - compose
     - spherical_harmonics
@@ -139,7 +141,7 @@ def _test_change_basis_wigner_to_rot():
 
     A = np.array([
         [0, 1, 0],
-        [0, 0, 1], 
+        [0, 0, 1],
         [1, 0, 0]
     ])
 
