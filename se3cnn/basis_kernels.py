@@ -62,15 +62,19 @@ def get_matrices_kernel(As, eps=1e-10):
 @cached_dirpklgz("cache/trans_Q")
 def _basis_transformation_Q_J(J, order_in, order_out, version=2):  # pylint: disable=W0613
     """
-    return the Q^-1 of the article
+    :param J: order of the spherical harmonics
+    :param order_in: order of the input representation
+    :param order_out: order of the output representation
+    :return: one part of the Q^-1 matrix of the article
     """
     def _R_tensor(a, b, c): return np.kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
 
     def _sylvester_submatrix(J, a, b, c):
         ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
-        R_tensor = _R_tensor(a, b, c)
-        R_irrep_J = irr_repr(J, a, b, c)
-        return np.kron(R_tensor, np.eye(*R_irrep_J.shape)) - np.kron(np.eye(*R_tensor.shape), R_irrep_J.T)
+        R_tensor = _R_tensor(a, b, c)  # [m_out * m_in, m_out * m_in]
+        R_irrep_J = irr_repr(J, a, b, c)  # [m, m]
+        return np.kron(R_tensor, np.eye(*R_irrep_J.shape)) - \
+               np.kron(np.eye(*R_tensor.shape), R_irrep_J.T)  # [(m_out * m_in) * m, (m_out * m_in) * m]
 
     random_angles = [
         [4.41301023, 5.56684102, 4.59384642],
@@ -81,10 +85,10 @@ def _basis_transformation_Q_J(J, order_in, order_out, version=2):  # pylint: dis
     ]
     null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
     assert null_space.shape[0] == 1  # unique subspace solution
-    Q_J = null_space[0]
-    Q_J = Q_J.reshape((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)
+    Q_J = null_space[0]  # [(m_out * m_in) * m]
+    Q_J = Q_J.reshape((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
     assert np.allclose(np.dot(_R_tensor(321, 111, 123), Q_J), np.dot(Q_J, irr_repr(J, 321, 111, 123)))
-    return Q_J
+    return Q_J  # [m_out * m_in, m]
 
 
 @cached_dirpklgz("cache/sh_cube")
@@ -103,20 +107,18 @@ def _sample_sh_cube(size, J, version=2):  # pylint: disable=W0613
             for idx_z, z in enumerate(rng):
                 if x == y == z == 0:  # angles at origin are nan, special treatment
                     if J == 0:  # Y^0 is angularly independent, choose any angle
-                        Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(0, 123, 321)
+                        Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(0, 123, 321)  # [m]
                     else:  # insert zeros for Y^J with J!=0
                         Y_J[:, idx_x, idx_y, idx_z] = 0
                 else:  # not at the origin, sample spherical harmonic
                     alpha, beta = x_to_alpha_beta(np.array([x, y, z]))
-                    Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(J, alpha, beta)
+                    Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(J, alpha, beta)  # [m]
 
-    return Y_J
+    return Y_J  # [m, x, y, z]
 
 
 def _sample_cube(size, order_in, order_out):
     '''
-    Sample spherical harmonics in a cube.
-    No bandlimiting considered, aliased regions need to be cut by windowing!
     :param size: side length of the kernel
     :param order_in: order of the input representation
     :param order_out: order of the output representation
@@ -128,34 +130,33 @@ def _sample_cube(size, order_in, order_out):
     order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
     sh_cubes = []
     for J in order_irreps:
-        Y_J = _sample_sh_cube(size, J)
+        Y_J = _sample_sh_cube(size, J)  # [m, x, y, z]
 
         # compute basis transformation matrix Q_J
-        Q_J = _basis_transformation_Q_J(J, order_in, order_out)
-        K_J = np.einsum('mn,n...->m...', Q_J, Y_J)
-        K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)
+        Q_J = _basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
+        K_J = np.einsum('mn,n...->m...', Q_J, Y_J)  # [m_out * m_in, x, y, z]
+        K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
         sh_cubes.append(K_J)
 
+        # check that  rho_out(u) K(u^-1 x) rho_in(u^-1) = K(x) with u = rotation of +pi/2 around y axis
+        tmp = K_J.transpose((0, 1, 4, 3, 2))[:, :, :, :, ::-1]  # K(u^-1 x)
+        tmp = np.einsum("ij,jk...,kl->il...", irr_repr(order_out, 0, np.pi / 2, 0), tmp, irr_repr(order_in, 0, -np.pi / 2, 0))  # rho_out(u) K(u^-1 x) rho_in(u^-1)
+        assert np.allclose(tmp, K_J)
+
     z, y, x = np.meshgrid(rng, rng, rng)
-    r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)
+    r_field = np.sqrt(x ** 2 + y ** 2 + z ** 2)  # [x, y, z]
     return sh_cubes, r_field, order_irreps
 
 
-def cube_basis_kernels_analytical(size, order_in, order_out, radial_window):
+def cube_basis_kernels(size, order_in, order_out, radial_window):
     '''
     Generate equivariant kernel basis mapping between capsules transforming under order_in and order_out
     :param size: side length of the filter kernel
-    :param order_out: output representation order
     :param order_in: input representation order
-    :param radial_window: callable for windowing out radial parts, taking mandatory parameters
-                          'sh_cubes', 'r_field' and 'order_irreps'
+    :param order_out: output representation order
+    :param radial_window: callable for windowing out radial parts, taking mandatory parameters 'sh_cubes', 'r_field' and 'order_irreps'
     :return: basis of equivariant kernels of shape (N_basis, 2 * order_out + 1, 2 * order_in + 1, size, size, size)
     '''
-    # TODO: add upsampling (?)
-
-    # sample (basis transformed) spherical harmonics on cube, ignore aliasing
-    # window out radial parts
-    # make sure to remove aliased regions!
     basis = radial_window(*_sample_cube(size, order_in, order_out))
     if basis is not None:
         # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
