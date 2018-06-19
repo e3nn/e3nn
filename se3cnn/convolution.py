@@ -30,11 +30,11 @@ class SE3Convolution(torch.nn.Module):
 
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
-                basis = basis_kernels.cube_basis_kernels_analytical(size, l_in, l_out, radial_window)
+                basis = basis_kernels.cube_basis_kernels(size, l_in, l_out, radial_window)
                 if basis is not None:
                     assert basis.shape[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
                     # rescale each basis element such that the weight can be initialized with Normal(0,1)
-                    # orthonormalization already done in cube_basis_kernels_analytical!
+                    # orthonormalization already done in cube_basis_kernels!
                     # ORIGINAL
                     # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in))
                     # EQUAL CONTRIB OF ALL SUPERBLOCKS
