@@ -1,5 +1,4 @@
 # pylint: disable=C,R,E1101,E1102
-import numpy as np
 import torch
 from se3cnn import basis_kernels
 
@@ -32,7 +31,7 @@ class SE3Convolution(torch.nn.Module):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
                 basis = basis_kernels.cube_basis_kernels(size, l_in, l_out, radial_window)
                 if basis is not None:
-                    assert basis.shape[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
+                    assert basis.size()[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
                     # rescale each basis element such that the weight can be initialized with Normal(0,1)
                     # orthonormalization already done in cube_basis_kernels!
                     # ORIGINAL
@@ -41,10 +40,9 @@ class SE3Convolution(torch.nn.Module):
                     # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
                     # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in*len(Rs_in)))
                     # EQUAL CONTRIB OF ALL CAPSULES
-                    basis *= np.sqrt((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in)))
+                    basis *= ((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in))) ** 0.5
                     if verbose:
-                        N_sample = 5
-                        overlaps = np.mean([basis_kernels.check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in 2 * np.pi * np.random.rand(N_sample, 3)], axis=0)
+                        overlaps = torch.stack([basis_kernels.check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in torch.rand(5, 3)]).mean(0)
                         print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
                     self.register_buffer("kernel_{}_{}".format(i, j), torch.tensor(basis, dtype=torch.float))
                     self.nweights += m_out * m_in * basis.shape[0]
