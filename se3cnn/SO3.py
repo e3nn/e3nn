@@ -104,6 +104,66 @@ def kron(x, y):
     return torch.einsum("ij,kl->ikjl", (x, y)).view(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
 
+################################################################################
+# Change of basis
+################################################################################
+
+
+def xyz_vector_basis_to_spherical_basis():
+    """
+    to convert a vector [x, y, z] transforming with rot(a, b, c)
+    into a vector transforming with irr_repr(1, a, b, c)
+    see assert for usage
+    """
+    A = torch.tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=torch.get_default_dtype())
+    assert all(torch.allclose(irr_repr(1, a, b, c) @ A, A @ rot(a, b, c)) for a, b, c in torch.rand(10, 3))
+    return A
+
+
+def tensor3x3_repr(a, b, c):
+    """
+    representation of 3x3 tensors
+    T --> R T R^t
+    """
+    r = rot(a, b, c)
+    return kron(r, r)
+
+
+def tensor3x3_repr_basis_to_spherical_basis():
+    """
+    to convert a 3x3 tensor transforming with tensor3x3_repr(a, b, c)
+    into its 1 + 3 + 5 component transforming with irr_repr(0, a, b, c), irr_repr(1, a, b, c), irr_repr(3, a, b, c)
+    see assert for usage
+    """
+    to1 = torch.tensor([
+        [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    ], dtype=torch.get_default_dtype())
+    assert all(torch.allclose(irr_repr(0, a, b, c) @ to1, to1 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+
+    to3 = torch.tensor([
+        [0, 0, -1, 0, 0, 0, 1, 0, 0],
+        [0, 1, 0, -1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, -1, 0],
+    ], dtype=torch.get_default_dtype())
+    assert all(torch.allclose(irr_repr(1, a, b, c) @ to3, to3 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+
+    to5 = torch.tensor([
+        [0, 1, 0, 1, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1, 0],
+        [-3**.5/3, 0, 0, 0, -3**.5/3, 0, 0, 0, 12**.5/3],
+        [0, 0, 1, 0, 0, 0, 1, 0, 0],
+        [1, 0, 0, 0, -1, 0, 0, 0, 0]
+    ], dtype=torch.get_default_dtype())
+    assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+
+    return to1, to3, to5
+
+
+################################################################################
+# Tests
+################################################################################
+
+
 def test_is_representation(rep):
     """
     rep(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = rep(Z(a1) Y(b1) Z(c1)) rep(Z(a2) Y(b2) Z(c2))
@@ -171,6 +231,11 @@ if __name__ == "__main__":
     from functools import partial
 
     torch.set_default_dtype(torch.float64)
+
+    print("Change of basis")
+    xyz_vector_basis_to_spherical_basis()
+    test_is_representation(tensor3x3_repr)
+    tensor3x3_repr_basis_to_spherical_basis()
 
     print("Change of basis Wigner <-> rot")
     _test_change_basis_wigner_to_rot()
