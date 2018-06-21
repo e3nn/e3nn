@@ -1,28 +1,37 @@
-# pylint: disable=C,E1101
+# pylint: disable=C,E1101,E1102
 '''
 Some functions related to SO3 and his usual representations
 
 Using ZYZ Euler angles parametrisation
 '''
-import numpy as np
+import torch
+import math
 
 
 def rot_z(gamma):
     '''
     Rotation around Z axis
     '''
-    return np.array([[np.cos(gamma), -np.sin(gamma), 0],
-                    [np.sin(gamma), np.cos(gamma), 0],
-                    [0, 0, 1]])
+    if not torch.is_tensor(gamma):
+        gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
+    return torch.tensor([
+        [torch.cos(gamma), -torch.sin(gamma), 0],
+        [torch.sin(gamma), torch.cos(gamma), 0],
+        [0, 0, 1]
+    ], dtype=gamma.dtype)
 
 
 def rot_y(beta):
     '''
     Rotation around Y axis
     '''
-    return np.array([[np.cos(beta), 0, np.sin(beta)],
-                    [0, 1, 0],
-                    [-np.sin(beta), 0, np.cos(beta)]])
+    if not torch.is_tensor(beta):
+        beta = torch.tensor(beta, dtype=torch.get_default_dtype())
+    return torch.tensor([
+        [torch.cos(beta), 0, torch.sin(beta)],
+        [0, 1, 0],
+        [-torch.sin(beta), 0, torch.cos(beta)]
+    ], dtype=beta.dtype)
 
 
 def rot(alpha, beta, gamma):
@@ -36,9 +45,11 @@ def x_to_alpha_beta(x):
     '''
     Convert point (x, y, z) on the sphere into (alpha, beta)
     '''
-    x = x / np.linalg.norm(x)
-    beta = np.arccos(x[2])
-    alpha = np.arctan2(x[1], x[0])
+    if not torch.is_tensor(x):
+        x = torch.tensor(x, dtype=torch.get_default_dtype())
+    x = x / torch.norm(x)
+    beta = torch.acos(x[2])
+    alpha = torch.atan2(x[1], x[0])
     return (alpha, beta)
 
 
@@ -48,7 +59,7 @@ def x_to_alpha_beta(x):
 # [x, y, z]
 
 
-def irr_repr(order, alpha, beta, gamma):
+def irr_repr(order, alpha, beta, gamma, dtype=None):
     """
     irreducible representation of SO3
     - compatible with compose and spherical_harmonics
@@ -58,16 +69,16 @@ def irr_repr(order, alpha, beta, gamma):
     #     # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
     #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
     #     return A @ wigner_D_matrix(1, alpha, beta, gamma) @ A.T
-    return wigner_D_matrix(order, alpha, beta, gamma)
+    return torch.tensor(wigner_D_matrix(order, alpha, beta, gamma), dtype=torch.get_default_dtype() if dtype is None else dtype)
 
 
-def spherical_harmonics(order, alpha, beta):
+def spherical_harmonics(order, alpha, beta, dtype=None):
     """
     spherical harmonics
     - compatible with irr_repr and compose
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
-    Y = np.array([sh(order, m, np.pi - beta, alpha) for m in range(-order, order + 1)])
+    Y = torch.tensor([sh(order, m, math.pi - beta, alpha) for m in range(-order, order + 1)], dtype=torch.get_default_dtype() if dtype is None else dtype)
     # if order == 1:
     #     # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
     #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
@@ -80,35 +91,36 @@ def compose(a1, b1, c1, a2, b2, c2):
     (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
     """
     comp = rot(a1, b1, c1) @ rot(a2, b2, c2)
-    xyz = comp @ np.array([0, 0, 1])
+    xyz = comp @ torch.tensor([0, 0, 1.])
     a, b = x_to_alpha_beta(xyz)
     rotz = rot(0, -b, -a) @ comp
-    c = np.arctan2(rotz[1, 0], rotz[0, 0])
+    c = torch.atan2(rotz[1, 0], rotz[0, 0])
     return a, b, c
 
 
-def _test_irr_repr_are_representation(order):
-    """
-    This test tests that
-    - irr_repr
-    - compose
-    are compatible
+def kron(x, y):
+    assert x.ndimension() == 2
+    assert y.ndimension() == 2
+    return torch.einsum("ij,kl->ikjl", (x, y)).view(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
-    D(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = D(Z(a1) Y(b1) Z(c1)) D(Z(a2) Y(b2) Z(c2))
-    """
-    a1, b1, c1, a2, b2, c2 = np.random.rand(6)
 
-    r1 = irr_repr(order, a1, b1, c1)
-    r2 = irr_repr(order, a2, b2, c2)
+def test_is_representation(rep):
+    """
+    rep(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = rep(Z(a1) Y(b1) Z(c1)) rep(Z(a2) Y(b2) Z(c2))
+    """
+    a1, b1, c1, a2, b2, c2 = torch.rand(6)
+
+    r1 = rep(a1, b1, c1)
+    r2 = rep(a2, b2, c2)
 
     a, b, c = compose(a1, b1, c1, a2, b2, c2)
-    r = irr_repr(order, a, b, c)
+    r = rep(a, b, c)
 
     r_ = r1 @ r2
 
-    d, r = np.abs(r - r_).max(), np.abs(r).max()
-    print(d, r)
-    assert d < 1e-10 * r
+    d, r = (r - r_).abs().max(), r.abs().max()
+    print(d.item(), r.item())
+    assert d < 1e-10 * r, d / r
 
 
 def _test_spherical_harmonics(order):
@@ -122,8 +134,8 @@ def _test_spherical_harmonics(order):
     Y(Z(alpha) Y(beta) Z(gamma) x) = D(alpha, beta, gamma) Y(x)
     with x = Z(a) Y(b) eta
     """
-    a, b = np.random.rand(2)
-    alpha, beta, gamma = np.random.rand(3)
+    a, b = torch.rand(2)
+    alpha, beta, gamma = torch.rand(3)
 
     ra, rb, _ = compose(alpha, beta, gamma, a, b, 0)
     Yrx = spherical_harmonics(order, ra, rb)
@@ -131,31 +143,35 @@ def _test_spherical_harmonics(order):
     Y = spherical_harmonics(order, a, b)
     DrY = irr_repr(order, alpha, beta, gamma) @ Y
 
-    d, r = np.abs(Yrx - DrY).max(), np.abs(Y).max()
-    print(d, r)
-    assert d < 1e-10 * r
+    d, r = (Yrx - DrY).abs().max(), Y.abs().max()
+    print(d.item(), r.item())
+    assert d < 1e-10 * r, d / r
 
 
 def _test_change_basis_wigner_to_rot():
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
-    A = np.array([
+    A = torch.tensor([
         [0, 1, 0],
         [0, 0, 1],
         [1, 0, 0]
-    ])
+    ], dtype=torch.float64)
 
-    a, b, c = np.random.rand(3)
+    a, b, c = torch.rand(3, dtype=torch.float64)
 
-    r1 = A.T @ wigner_D_matrix(1, a, b, c) @ A
+    r1 = A.t() @ torch.tensor(wigner_D_matrix(1, a, b, c), dtype=torch.float64) @ A
     r2 = rot(a, b, c)
 
-    d = np.abs(r1 - r2).max()
-    print(d)
+    d = (r1 - r2).abs().max()
+    print(d.item())
     assert d < 1e-10
 
 
 if __name__ == "__main__":
+    from functools import partial
+
+    torch.set_default_dtype(torch.float64)
+
     print("Change of basis Wigner <-> rot")
     _test_change_basis_wigner_to_rot()
     _test_change_basis_wigner_to_rot()
@@ -167,4 +183,4 @@ if __name__ == "__main__":
 
     print("Irreducible repr are indeed representations")
     for l in range(7):
-        _test_irr_repr_are_representation(l)
+        test_is_representation(partial(irr_repr, l))
