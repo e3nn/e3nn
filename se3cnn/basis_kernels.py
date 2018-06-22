@@ -14,7 +14,7 @@ Therefore
     K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import torch
-from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron
+from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, torch_default_dtype
 from se3cnn.util.cache_file import cached_dirpklgz
 import math
 
@@ -58,30 +58,29 @@ def _basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: dis
     :param order_out: order of the output representation
     :return: one part of the Q^-1 matrix of the article
     """
-    dtype = torch.get_default_dtype()
-    torch.set_default_dtype(torch.float64)
-    def _R_tensor(a, b, c): return kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
+    with torch_default_dtype(torch.float64):
+        def _R_tensor(a, b, c): return kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
 
-    def _sylvester_submatrix(J, a, b, c):
-        ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
-        R_tensor = _R_tensor(a, b, c)  # [m_out * m_in, m_out * m_in]
-        R_irrep_J = irr_repr(J, a, b, c)  # [m, m]
-        return kron(R_tensor, torch.eye(R_irrep_J.size(0))) - \
-               kron(torch.eye(R_tensor.size(0)), R_irrep_J.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
+        def _sylvester_submatrix(J, a, b, c):
+            ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
+            R_tensor = _R_tensor(a, b, c)  # [m_out * m_in, m_out * m_in]
+            R_irrep_J = irr_repr(J, a, b, c)  # [m, m]
+            return kron(R_tensor, torch.eye(R_irrep_J.size(0))) - \
+                kron(torch.eye(R_tensor.size(0)), R_irrep_J.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
 
-    random_angles = [
-        [4.41301023, 5.56684102, 4.59384642],
-        [4.93325116, 6.12697327, 4.14574096],
-        [0.53878964, 4.09050444, 5.36539036],
-        [2.16017393, 3.48835314, 5.55174441],
-        [2.52385107, 0.2908958, 3.90040975]
-    ]
-    null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
-    assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
-    Q_J = null_space[0]  # [(m_out * m_in) * m]
-    Q_J = Q_J.view((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
-    assert all(torch.allclose(_R_tensor(a, b, c) @ Q_J, Q_J @ irr_repr(J, a, b, c)) for a, b, c in torch.rand(4, 3))
-    torch.set_default_dtype(dtype)
+        random_angles = [
+            [4.41301023, 5.56684102, 4.59384642],
+            [4.93325116, 6.12697327, 4.14574096],
+            [0.53878964, 4.09050444, 5.36539036],
+            [2.16017393, 3.48835314, 5.55174441],
+            [2.52385107, 0.2908958, 3.90040975]
+        ]
+        null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
+        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
+        Q_J = null_space[0]  # [(m_out * m_in) * m]
+        Q_J = Q_J.view((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
+        assert all(torch.allclose(_R_tensor(a, b, c) @ Q_J, Q_J @ irr_repr(J, a, b, c)) for a, b, c in torch.rand(4, 3))
+
     assert Q_J.dtype == torch.float64
     return Q_J  # [m_out * m_in, m]
 
@@ -94,24 +93,22 @@ def _sample_sh_cube(size, J, version=3):  # pylint: disable=W0613
     :param size: side length of the kernel
     :param J: order of the spherical harmonics
     '''
-    dtype = torch.get_default_dtype()
-    torch.set_default_dtype(torch.float64)
-    rng = torch.linspace(-((size - 1) / 2), (size - 1) / 2, steps=size)
+    with torch_default_dtype(torch.float64):
+        rng = torch.linspace(-((size - 1) / 2), (size - 1) / 2, steps=size)
 
-    Y_J = torch.zeros(2 * J + 1, size, size, size, dtype=torch.get_default_dtype())
-    for idx_x, x in enumerate(rng):
-        for idx_y, y in enumerate(rng):
-            for idx_z, z in enumerate(rng):
-                if x == y == z == 0:  # angles at origin are nan, special treatment
-                    if J == 0:  # Y^0 is angularly independent, choose any angle
-                        Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(0, 123, 321)  # [m]
-                    else:  # insert zeros for Y^J with J!=0
-                        Y_J[:, idx_x, idx_y, idx_z] = 0
-                else:  # not at the origin, sample spherical harmonic
-                    alpha, beta = x_to_alpha_beta([x, y, z])
-                    Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(J, alpha, beta)  # [m]
+        Y_J = torch.zeros(2 * J + 1, size, size, size, dtype=torch.float64)
+        for idx_x, x in enumerate(rng):
+            for idx_y, y in enumerate(rng):
+                for idx_z, z in enumerate(rng):
+                    if x == y == z == 0:  # angles at origin are nan, special treatment
+                        if J == 0:  # Y^0 is angularly independent, choose any angle
+                            Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(0, 123, 321)  # [m]
+                        else:  # insert zeros for Y^J with J!=0
+                            Y_J[:, idx_x, idx_y, idx_z] = 0
+                    else:  # not at the origin, sample spherical harmonic
+                        alpha, beta = x_to_alpha_beta([x, y, z])
+                        Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(J, alpha, beta)  # [m]
 
-    torch.set_default_dtype(dtype)
     assert Y_J.dtype == torch.float64
     return Y_J  # [m, x, y, z]
 
@@ -282,10 +279,10 @@ def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
 
 def _test_basis_equivariance():
     from functools import partial
-    torch.set_default_dtype(torch.float64)
-    basis = cube_basis_kernels(4 * 5, 2, 2, partial(gaussian_window_fct, radii=[5], J_max_list=[999], sigma=2))
-    overlaps = check_basis_equivariance(basis, 2, 2, *torch.rand(3))
-    assert overlaps.gt(0.98).all(), overlaps
+    with torch_default_dtype(torch.float64):
+        basis = cube_basis_kernels(4 * 5, 2, 2, partial(gaussian_window_fct, radii=[5], J_max_list=[999], sigma=2))
+        overlaps = check_basis_equivariance(basis, 2, 2, *torch.rand(3))
+        assert overlaps.gt(0.98).all(), overlaps
 
 
 if __name__ == '__main__':
