@@ -37,7 +37,7 @@ def get_param_groups(model, args):
 
     convLayers = [m for m in model.modules()
                   if isinstance(m, (SE3Convolution,
-                                    SE3BNConvolution, # TO BE INCLUDED SINCE CONVOLUTION DOES NOT USE SE3CONVOLUTION BUT DIRECTLY nn.functional.conv3d AND IS HENCE NOT COVERED
+                                    # SE3BNConvolution, # TO BE INCLUDED SINCE CONVOLUTION DOES NOT USE SE3CONVOLUTION BUT DIRECTLY nn.functional.conv3d AND IS HENCE NOT COVERED
                                     # SE3GNConvolution, # NOT TO BE INCLUDED SINCE SE3CONVOLUTION IS USED
                                     nn.Conv1d, nn.Conv2d, nn.Conv3d, nn.ConvTranspose1d,
                                     nn.ConvTranspose2d, nn.ConvTranspose3d))]
@@ -71,11 +71,25 @@ def get_param_groups(model, args):
     # Check whether all parameters are in groups
     params_in_groups = [id(param) for group in param_groups for param in group['params']]
     if len(list(params_in_groups)) != len(list(model.parameters())):
-        error_msg = "The following parameters will not be optimized:\n"
-        for name, param in model.named_parameters():
-            if id(param) not in params_in_groups:
-                error_msg += "\t" + name + "\n"
-        import ipdb; ipdb.set_trace()
+        error_msg = "Mismatch between number of total parameters and number of parameters in groups. "
+        if len(list(params_in_groups)) < len(list(model.parameters())):
+            error_msg += "The following parameters will not be optimized:\n"
+            for name, param in model.named_parameters():
+                if id(param) not in params_in_groups:
+                    error_msg += "\t" + name + "\n"
+        else:
+            error_msg += "Total number in groups: {}. Total number of parameters: {}\n".format(
+                len(list(params_in_groups)), len(list(model.parameters())))
+            param_names = {id(param): name for name, param in
+                           model.named_parameters()}
+            counter = 0
+            for group_idx, group in enumerate(param_groups):
+                error_msg += "\t{}\n".format(group_idx)
+                for param in group['params']:
+                    counter += 1
+                    error_msg += "\t\t{} {}\n".format(counter,
+                                                      param_names[id(param)])
+        # import ipdb; ipdb.set_trace()
         raise RuntimeError(error_msg)
 
     return param_groups
