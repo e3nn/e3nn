@@ -8,6 +8,20 @@ import torch
 import math
 
 
+class torch_default_dtype:
+
+    def __init__(self, dtype):
+        self.saved_dtype = None
+        self.dtype = dtype
+
+    def __enter__(self):
+        self.saved_dtype = torch.get_default_dtype()
+        torch.set_default_dtype(self.dtype)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        torch.set_default_dtype(self.saved_dtype)
+
+
 def rot_z(gamma):
     '''
     Rotation around Z axis
@@ -115,9 +129,10 @@ def xyz_vector_basis_to_spherical_basis():
     into a vector transforming with irr_repr(1, a, b, c)
     see assert for usage
     """
-    A = torch.tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=torch.get_default_dtype())
-    assert all(torch.allclose(irr_repr(1, a, b, c) @ A, A @ rot(a, b, c)) for a, b, c in torch.rand(10, 3))
-    return A
+    with torch_default_dtype(torch.float64):
+        A = torch.tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=torch.float64)
+        assert all(torch.allclose(irr_repr(1, a, b, c) @ A, A @ rot(a, b, c)) for a, b, c in torch.rand(10, 3))
+    return A.type(torch.get_default_dtype())
 
 
 def tensor3x3_repr(a, b, c):
@@ -135,28 +150,29 @@ def tensor3x3_repr_basis_to_spherical_basis():
     into its 1 + 3 + 5 component transforming with irr_repr(0, a, b, c), irr_repr(1, a, b, c), irr_repr(3, a, b, c)
     see assert for usage
     """
-    to1 = torch.tensor([
-        [1, 0, 0, 0, 1, 0, 0, 0, 1],
-    ], dtype=torch.get_default_dtype())
-    assert all(torch.allclose(irr_repr(0, a, b, c) @ to1, to1 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+    with torch_default_dtype(torch.float64):
+        to1 = torch.tensor([
+            [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        ], dtype=torch.get_default_dtype())
+        assert all(torch.allclose(irr_repr(0, a, b, c) @ to1, to1 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
-    to3 = torch.tensor([
-        [0, 0, -1, 0, 0, 0, 1, 0, 0],
-        [0, 1, 0, -1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, -1, 0],
-    ], dtype=torch.get_default_dtype())
-    assert all(torch.allclose(irr_repr(1, a, b, c) @ to3, to3 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+        to3 = torch.tensor([
+            [0, 0, -1, 0, 0, 0, 1, 0, 0],
+            [0, 1, 0, -1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, -1, 0],
+        ], dtype=torch.get_default_dtype())
+        assert all(torch.allclose(irr_repr(1, a, b, c) @ to3, to3 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
-    to5 = torch.tensor([
-        [0, 1, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 1, 0],
-        [-3**.5/3, 0, 0, 0, -3**.5/3, 0, 0, 0, 12**.5/3],
-        [0, 0, 1, 0, 0, 0, 1, 0, 0],
-        [1, 0, 0, 0, -1, 0, 0, 0, 0]
-    ], dtype=torch.get_default_dtype())
-    assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+        to5 = torch.tensor([
+            [0, 1, 0, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 0, 1, 0],
+            [-3**.5/3, 0, 0, 0, -3**.5/3, 0, 0, 0, 12**.5/3],
+            [0, 0, 1, 0, 0, 0, 1, 0, 0],
+            [1, 0, 0, 0, -1, 0, 0, 0, 0]
+        ], dtype=torch.get_default_dtype())
+        assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
-    return to1, to3, to5
+    return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
 ################################################################################
@@ -168,19 +184,20 @@ def test_is_representation(rep):
     """
     rep(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = rep(Z(a1) Y(b1) Z(c1)) rep(Z(a2) Y(b2) Z(c2))
     """
-    a1, b1, c1, a2, b2, c2 = torch.rand(6)
+    with torch_default_dtype(torch.float64):
+        a1, b1, c1, a2, b2, c2 = torch.rand(6)
 
-    r1 = rep(a1, b1, c1)
-    r2 = rep(a2, b2, c2)
+        r1 = rep(a1, b1, c1)
+        r2 = rep(a2, b2, c2)
 
-    a, b, c = compose(a1, b1, c1, a2, b2, c2)
-    r = rep(a, b, c)
+        a, b, c = compose(a1, b1, c1, a2, b2, c2)
+        r = rep(a, b, c)
 
-    r_ = r1 @ r2
+        r_ = r1 @ r2
 
-    d, r = (r - r_).abs().max(), r.abs().max()
-    print(d.item(), r.item())
-    assert d < 1e-10 * r, d / r
+        d, r = (r - r_).abs().max(), r.abs().max()
+        print(d.item(), r.item())
+        assert d < 1e-10 * r, d / r
 
 
 def _test_spherical_harmonics(order):
@@ -194,43 +211,43 @@ def _test_spherical_harmonics(order):
     Y(Z(alpha) Y(beta) Z(gamma) x) = D(alpha, beta, gamma) Y(x)
     with x = Z(a) Y(b) eta
     """
-    a, b = torch.rand(2)
-    alpha, beta, gamma = torch.rand(3)
+    with torch_default_dtype(torch.float64):
+        a, b = torch.rand(2)
+        alpha, beta, gamma = torch.rand(3)
 
-    ra, rb, _ = compose(alpha, beta, gamma, a, b, 0)
-    Yrx = spherical_harmonics(order, ra, rb)
+        ra, rb, _ = compose(alpha, beta, gamma, a, b, 0)
+        Yrx = spherical_harmonics(order, ra, rb)
 
-    Y = spherical_harmonics(order, a, b)
-    DrY = irr_repr(order, alpha, beta, gamma) @ Y
+        Y = spherical_harmonics(order, a, b)
+        DrY = irr_repr(order, alpha, beta, gamma) @ Y
 
-    d, r = (Yrx - DrY).abs().max(), Y.abs().max()
-    print(d.item(), r.item())
-    assert d < 1e-10 * r, d / r
+        d, r = (Yrx - DrY).abs().max(), Y.abs().max()
+        print(d.item(), r.item())
+        assert d < 1e-10 * r, d / r
 
 
 def _test_change_basis_wigner_to_rot():
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
-    A = torch.tensor([
-        [0, 1, 0],
-        [0, 0, 1],
-        [1, 0, 0]
-    ], dtype=torch.float64)
+    with torch_default_dtype(torch.float64):
+        A = torch.tensor([
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0]
+        ], dtype=torch.float64)
 
-    a, b, c = torch.rand(3, dtype=torch.float64)
+        a, b, c = torch.rand(3)
 
-    r1 = A.t() @ torch.tensor(wigner_D_matrix(1, a, b, c), dtype=torch.float64) @ A
-    r2 = rot(a, b, c)
+        r1 = A.t() @ torch.tensor(wigner_D_matrix(1, a, b, c), dtype=torch.float64) @ A
+        r2 = rot(a, b, c)
 
-    d = (r1 - r2).abs().max()
-    print(d.item())
-    assert d < 1e-10
+        d = (r1 - r2).abs().max()
+        print(d.item())
+        assert d < 1e-10
 
 
 if __name__ == "__main__":
     from functools import partial
-
-    torch.set_default_dtype(torch.float64)
 
     print("Change of basis")
     xyz_vector_basis_to_spherical_basis()
