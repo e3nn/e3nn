@@ -5,6 +5,25 @@ This library aims to create SE(3) equivariant convolutional neural networks.
 
 ![](https://github.com/antigol/se3net/raw/master/examples/plots/kernels.png)
 
+## Example
+```python
+import torch
+from se3cnn import SE3Convolution
+
+size = 32  # space size
+
+scalar_field = torch.randn(1, 1, size, size, size)  # [batch, _, x, y, z]
+
+Rs_in = [(1, 0)]  # 1 scalar field
+Rs_out = [(1, 1)]  # 1 vector field
+conv = SE3Convolution(Rs_in, Rs_out, size=5)
+# conv.weight.size() == [2] (2 radial degrees of freedom)
+
+vector_field = conv(scalar_field)  # [batch, vector component, x, y, z]
+
+# vector_field.size() == [1, 3, 28, 28, 28]
+```
+
 ## Hierarchy
 
 - `se3cnn` contains the library
