@@ -1,4 +1,4 @@
-# pylint: disable=C,R,E1101,E1102
+# pylint: disable=C,R,E1101,E1102,W0221
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,7 +18,7 @@ class Model(nn.Module):
         features = [
             (1,),
             (2, 2, 2, 2),
-            (2, 2, 2, 2),
+            (0, 2, 2, 2),  # no scalar fields here
             (2, 2, 2, 2),
             (1,),
         ]
@@ -68,7 +68,10 @@ def project(x):
 
 
 def main():
+    t = time_logging.start()
     device = torch.device("cuda:0")
+
+    torch.manual_seed(16)
     f = Model().to(device)
 
     x = np.load("{}/119.npy".format(os.path.dirname(__file__)))
@@ -76,15 +79,17 @@ def main():
     x = x.astype(np.float32)
     x = torch.tensor(x, device=device, dtype=torch.float32)
 
-    n = 61
+    # x = x[::2, ::2, ::2]
+
+    n = 361
     angles = np.linspace(0, np.pi, n)
 
     fig = plt.figure(figsize=(13, 13))
 
     ax1 = fig.add_axes([0, 0, .5, .5])  # x
     ax2 = fig.add_axes([0, .5, .5, .5])  # R(x)
-    ax3 = fig.add_axes([.5, 0, .5, .5])  # f(R(x))
-    ax4 = fig.add_axes([.5, .5, .5, .5])  # R-1(f(R(x)))
+    ax3 = fig.add_axes([.5, .5, .5, .5])  # f(R(x))
+    ax4 = fig.add_axes([.5, 0, .5, .5])  # R-1(f(R(x)))
 
     y = f(x)
     image1 = ax1.imshow(project(x), interpolation='none')
@@ -95,11 +100,17 @@ def main():
     for image in [image1, image2, image3, image4]:
         image.set_cmap("summer")
 
-    text = ax1.text(0.5, 0.5, '', horizontalalignment='center', verticalalignment='center', transform=ax1.transAxes, color='white', fontsize=40)
+    ax1.text(0.5, 0.99, 'stabilized input', horizontalalignment='center', verticalalignment='top', transform=ax1.transAxes, color='white', fontsize=30)
+    ax2.text(0.5, 0.99, 'input', horizontalalignment='center', verticalalignment='top', transform=ax2.transAxes, color='white', fontsize=30)
+    ax3.text(0.5, 0.99, 'featuremap', horizontalalignment='center', verticalalignment='top', transform=ax3.transAxes, color='white', fontsize=30)
+    ax4.text(0.5, 0.99, 'stabilized featuremap', horizontalalignment='center', verticalalignment='top', transform=ax4.transAxes, color='white', fontsize=30)
+    text = ax2.text(0.5, 0.8, '', horizontalalignment='center', verticalalignment='center', transform=ax2.transAxes, color='white', fontsize=40)
 
     for ax in [ax1, ax2, ax3, ax4]:
         plt.sca(ax)
         plt.axis('off')
+
+    time_logging.end("init", t)
 
     def init():
         image2.set_data(project(x))
@@ -110,22 +121,23 @@ def main():
         return image2, image3, image4, text
 
     def animate(i):
-        print(i)
+        print("rendering {} / {}".format(i, n))
         alpha = angles[i]
 
         rx = rotate(x, alpha)
         frx = f(rx)
         rfrx = rotate(frx, -alpha)
+
         image2.set_data(project(rx))
         image3.set_data(project(frx))
         image4.set_data(project(rfrx))
-        text.set_text(r"${} \pi / {}$".format(i, n - 1))
+        text.set_text(r"$\frac{{ {} \pi }}{{ {} }}$".format(i, n - 1))
         return image2, image3, image4, text
 
     ani = animation.FuncAnimation(fig, animate, init_func=init, interval=2, blit=True, save_count=n)
 
     from matplotlib.animation import FFMpegWriter
-    writer = FFMpegWriter(fps=2, metadata=dict(artist='Me'), bitrate=1800)
+    writer = FFMpegWriter(fps=12, bitrate=3000)
     ani.save("movie.mp4", writer=writer)
 
     print(time_logging.text_statistics())
