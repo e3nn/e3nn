@@ -1,19 +1,12 @@
 # pylint: disable=E1101,R,C
-import glob
-import os
-import numpy as np
-import torch
-import torch.utils.data
-import subprocess
-import shutil
-import random
-
 """
 typical usage
 
 https://github.com/antigol/obj2voxel is needed
 
-cache = CacheNPY("v64", repeat=24, transform=Obj2Voxel(64))
+from se3cnn.util.dataset.modelnet10 import CacheNPY, Obj2Voxel, ModelNet10
+
+cache = CacheNPY("v64", transform=Obj2Voxel(64))
 
 def transform(x):
     x = cache(x)
@@ -23,12 +16,21 @@ def target_transform(x):
     classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
     return classes.index(x)
 
-dataset = ModelNet10("./modelnet10/", download=True, transform=transform, target_transform=target_transform)
+dataset = ModelNet10("./modelnet10/", "train", download=True, transform=transform, target_transform=target_transform)
 """
+
+import glob
+import os
+import numpy as np
+import torch
+import torch.utils.data
+import subprocess
+import random
+import sys
 
 
 class Obj2Voxel:
-    def __init__(self, size, rotate=True, zrotate=False, double=False, diagonal_bounding_box=False, diagonal_bounding_box_xy=False):
+    def __init__(self, size, rotate=False, zrotate=False, double=False, diagonal_bounding_box=False, diagonal_bounding_box_xy=False):
         self.size = size
         self.rotate = rotate
         self.zrotate = zrotate
@@ -56,16 +58,16 @@ class Obj2Voxel:
 
 
 class CacheNPY:
-    def __init__(self, prefix, repeat, transform, pick_randomly=True):
+    def __init__(self, prefix, transform, repeat=1, pick_randomly=True):
         ''' data loading from .obj, randomized voxelization and caching in .npy files
             :param prefix: cache filename prefix
-            :param repeat: number of transformed instantiations
             :param transform: callable, the transformation applied
                               accepts the file_path as string, returns np.array
+            :param repeat: number of transformed instantiations
             :param pick_randomly: whether to pick a random instantiation or return all instantiations in a list
         '''
-        self.transform = transform
         self.prefix = prefix
+        self.transform = transform
         self.repeat = repeat
         self.pick_randomly = pick_randomly
 
@@ -124,44 +126,37 @@ class ModelNet10(torch.utils.data.Dataset):
     url_data = 'http://vision.princeton.edu/projects/2014/3DShapeNets/ModelNet10.zip'
     # url_data40 = 'http://modelnet.cs.princeton.edu/ModelNet40.zip'
 
-    def __init__(self, root, mode, classes, download=False, transform=None, target_transform=None):
+    def __init__(self, root, mode, download=False, transform=None, target_transform=None):
         '''
         :param root: directory to store dataset in
-        :param mode: dataset to load: 'train', 'validation', 'test' or 'train_full'
-                     the validation set is split from the train set, the full train set can be accessed via 'train_full'
+        :param mode: dataset to load: 'train' or 'test'
         :param download: whether on not to download data
         :param transform: transformation applied to image in __getitem__
-                          currently used to load cached file from string
         :param target_transform: transformation applied to target in __getitem__
         '''
         self.root = os.path.expanduser(root)
 
-        assert mode in ['train', 'validation', 'test', 'train_full']
+        assert mode in ['train', 'test']
         self.mode = mode
-        self.classes = classes
 
         self.transform = transform
         self.target_transform = target_transform
 
         if download and not self._check_exists():
-            self.download()
+            self.download_and_process()
 
         if not self._check_exists():
             raise RuntimeError('Dataset not found.' +
                                ' You can use download=True to download it')
 
-        if mode == 'train_full':
-            self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", 'train', "*.obj")))
-            self.files += sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", 'validation', "*.obj")))
-        else:
-            self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", self.mode, "*.obj")))
+        self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", self.mode, "*.obj")))
 
     def __getitem__(self, index):
         img = self.files[index]  # FILENAME of the image
-        target = img.split(os.path.sep)[-3]
+        target = img.split(os.path.sep)[-3]  # NAME of the class
 
         if self.transform is not None:
-            img = self.transform(img)  # apply transformations (and load .npy corresponding to img filename)
+            img = self.transform(img)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
@@ -193,6 +188,8 @@ class ModelNet10(torch.utils.data.Dataset):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
                     f.flush()
+                print(".", end="")
+                sys.stdout.flush()
 
         return file_path
 
@@ -213,7 +210,10 @@ class ModelNet10(torch.utils.data.Dataset):
         print('Convert OFF into OBJ')
 
         files = glob.glob(os.path.join(self.root, "ModelNet10", "*", "*", "*.off"))
-        for file_name in files:
+        for file_name in sorted(files):
+            print("Convert {}".format(file_name), end="   \r")
+            sys.stdout.flush()
+
             with open(file_name, "rt") as fi:
                 data = fi.read().split("\n")
 
@@ -231,18 +231,7 @@ class ModelNet10(torch.utils.data.Dataset):
             with open(file_name.replace(".off", ".obj"), "wt") as fi:
                 fi.write(result)
 
-    def _split_validation(self, N_valid=20):
-        ''' split full training set in a training set and a validation set '''
-        for cl in self.classes:
-            fnames_cl = sorted(glob.glob(os.path.join(self.root, "ModelNet10", cl, 'train', cl+"*")))
-            valid_dir = os.path.join(self.root, 'ModelNet10', cl, 'validation')
-            if not os.path.exists(valid_dir):
-                os.mkdir(valid_dir)
-            for path_train in fnames_cl[-N_valid:]:
-                path_valid = path_train.replace('train', 'validation')
-                shutil.move(src=path_train, dst=path_valid)
-
-    def download(self):
+    def download_and_process(self):
 
         # download files
         try:
@@ -256,7 +245,5 @@ class ModelNet10(torch.utils.data.Dataset):
         zipfile_path = self._download(self.url_data)
         self._unzip(zipfile_path)
         self._off2obj()
-
-        self._split_validation()
 
         print('Done!')
