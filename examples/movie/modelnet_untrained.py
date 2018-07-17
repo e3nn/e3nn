@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from se3cnn.util import time_logging
-import os
 from se3cnn.SO3 import irr_repr
+from se3cnn.util.dataset.modelnet10 import ModelNet10, Obj2Voxel, CacheNPY
 
 
 class Model(nn.Module):
@@ -101,10 +101,23 @@ def main():
     torch.manual_seed(1)
     f = Model().to(device)
 
-    x = np.load("{}/119.npy".format(os.path.dirname(__file__)))
-    x = np.pad(x, 30, "constant")
-    x = x.astype(np.float32)
-    x = torch.tensor(x, device=device, dtype=torch.float32)
+
+    cache = CacheNPY("v100d", transform=Obj2Voxel(100, double=True))
+
+    def transform(x):
+        x = cache(x)
+        return torch.from_numpy(x.astype(np.float32)).unsqueeze(0) / 8
+
+    dataset = ModelNet10(
+        "./modelnet10/",
+        "train",
+        download=True,
+        transform=transform,
+    )
+
+    x, _ = dataset[119]
+    x = F.pad(x.unsqueeze(0), (30,) * 6)[0, 0]
+    x = x.to(device)
 
     n = 181
     # x = x[::2, ::2, ::2]
