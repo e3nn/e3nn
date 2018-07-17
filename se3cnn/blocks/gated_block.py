@@ -10,7 +10,7 @@ from se3cnn import basis_kernels
 class GatedBlock(torch.nn.Module):
     def __init__(self,
                  repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
-                 activation=(None, None), stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
+                 activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
                  verbose=False):
         '''
@@ -21,6 +21,7 @@ class GatedBlock(torch.nn.Module):
         :param activation: (scalar activation, gate activation) which are functions like torch.nn.functional.relu or None
         :param int stride: stride of the convolution (for torch.nn.functional.conv3d)
         :param int padding: padding of the convolution (for torch.nn.functional.conv3d)
+        :param int dilation: dilation of the convolution (for torch.nn.functional.conv3d)
         :param float capsule_dropout_p: dropout probability
         :param str normalization: "batch", "group", "instance" or None
         :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
@@ -67,6 +68,7 @@ class GatedBlock(torch.nn.Module):
             radial_window=radial_window,
             stride=stride,
             padding=padding,
+            dilation=dilation,
             verbose=verbose,
         )
 
@@ -131,6 +133,7 @@ class GatedBlock(torch.nn.Module):
                         del field_g
                     else:
                         field = field_y
+                del field_y
 
                 z[:, begin_y: begin_y + mul * dim] = field
                 begin_y += mul * dim
