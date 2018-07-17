@@ -162,7 +162,7 @@ class SE3BNConvolution(torch.nn.Module):
 
             if d == 1:  # scalars
                 if self.training:
-                    field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
+                    field_mean = field.mean(-1).mean(0).view(-1)  # [feature]
                     self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.detach()
                 else:
                     field_mean = self.running_mean[irm: irm + m]
@@ -172,7 +172,7 @@ class SE3BNConvolution(torch.nn.Module):
 
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
-                field_norm = field_norm.mean(0).mean(-1)  # [feature]
+                field_norm = field_norm.mean(-1).mean(0)  # [feature]
                 self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
             else:
                 field_norm = self.running_var[irv: irv + m]
@@ -180,6 +180,7 @@ class SE3BNConvolution(torch.nn.Module):
 
             field_norm = (field_norm + self.eps).pow(-0.5)  # [feature]
             field_norms.append(field_norm)  # [feature]
+            del field
 
         assert ix == input.size(1)
         assert irm == self.running_mean.numel()
