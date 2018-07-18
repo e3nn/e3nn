@@ -16,6 +16,36 @@ import os
 from threading import Thread
 
 
+def low_pass_filter(image, scale):
+    """
+    :param image: [..., x, y, z]
+    :param scale: float
+    """
+    if scale >= 1:
+        return image
+
+    dtype = image.dtype
+    device = image.device
+
+    sigma = 0.5 * (1 / scale ** 2 - 1) ** 0.5
+
+    size = int(1 + 2 * 2.5 * sigma)
+    if size % 2 == 0:
+        size += 1
+
+    rng = torch.arange(size, dtype=dtype, device=device) - size // 2  # [-(size // 2), ..., size // 2]
+    x = rng.view(size, 1, 1).expand(size, size, size)
+    y = rng.view(1, size, 1).expand(size, size, size)
+    z = rng.view(1, 1, size).expand(size, size, size)
+
+    kernel = torch.exp(- (x ** 2 + y ** 2 + z ** 2) / (2 * sigma ** 2))
+    kernel = kernel / kernel.sum()
+
+    out = F.conv3d(image.view(-1, 1, image.size(-2), image.size(-1)), kernel.view(1, 1, size, size), padding=size//2)
+    out = out.view(*image.size())
+    return out
+
+
 class Model(torch.nn.Module):
 
     def __init__(self):
@@ -56,6 +86,8 @@ class Model(torch.nn.Module):
         '''
         :param x: [batch, features, x, y, z]
         '''
+        x = low_pass_filter(x, 1 / 3)  # dilation == 3
+
         self.post_activations = []
         for op in self.sequence:
             x = op(x)
