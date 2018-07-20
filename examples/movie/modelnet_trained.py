@@ -41,7 +41,7 @@ def low_pass_filter(image, scale):
     kernel = torch.exp(- (x ** 2 + y ** 2 + z ** 2) / (2 * sigma ** 2))
     kernel = kernel / kernel.sum()
 
-    out = F.conv3d(image.view(-1, 1, image.size(-2), image.size(-1)), kernel.view(1, 1, size, size), padding=size//2)
+    out = F.conv3d(image.view(-1, 1, *image.size()[-3:]), kernel.view(1, 1, size, size, size), padding=size//2)
     out = out.view(*image.size())
     return out
 
@@ -135,6 +135,7 @@ def train(device, file):
 
             t = time_logging.end("load", t)
             output = model(x)
+            model.post_activations = None
             del x
 
             output = output.view(output.size(0), output.size(1), -1).mean(-1)
@@ -185,27 +186,27 @@ def rotate(x, alpha, beta, gamma):
     return x
 
 
-def project(x, dim):
+def project(x, dim, crop=0):
     n = x.size(0)
     assert x.size(1) == n
     assert x.size(2) == n
-    n = int(0.15 * n)
+    n = int(crop * n)
     x = x.mean(dim)
-    x = x[n:-n, n:-n]
+    x = x[n:-n, n:-n] if n > 0 else x
     if dim == 0:
         x = x.t().contiguous()
     return x.detach().cpu().numpy()
 
 
-def project_vector(x, dim):
+def project_vector(x, dim, crop=0):
     A = x.new_tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]]).t()
     x = torch.einsum("ij,jxyz->ixyz", (A, x))
     if dim == 0:
-        return project(x[2], 0), project(x[1], 0)
+        return project(x[2], 0, crop), project(x[1], 0, crop)
     if dim == 1:
-        return project(x[0], 1), project(x[2], 1)
+        return project(x[0], 1, crop), project(x[2], 1, crop)
     if dim == 2:
-        return project(x[0], 2), project(x[1], 2)
+        return project(x[0], 2, crop), project(x[1], 2, crop)
 
 
 def record(device, pickle_file, movie_file, n_frames):
@@ -237,10 +238,8 @@ def record(device, pickle_file, movie_file, n_frames):
         with torch.no_grad():
             x = model(x)
 
-        while x.size(0) == 1:
-            x = x[0]
         time_logging.end("model", t)
-        return model.post_activations[-2][0, 0], model.post_activations[-2][0, 4:7]
+        return x[0, 1], model.post_activations[-2][0, 4:7]
 
     alpha = np.linspace(0, 2 * np.pi, n_frames)
     beta = np.linspace(0, np.pi / 2, n_frames)
@@ -263,7 +262,7 @@ def record(device, pickle_file, movie_file, n_frames):
 
     quiver_param = {
         'units': 'xy',
-        'scale': 0.5,
+        'scale': 0.3,
         'pivot': 'tail',
         'headwidth': 2.5,
         'headlength': 5,
@@ -272,17 +271,23 @@ def record(device, pickle_file, movie_file, n_frames):
     }
 
     print(s.mean().item(), s.std().item())
+    s_crop, v_crop = 0.15, 0.35
 
     for i in range(4):
-        im_input[i] = ax_input[i].imshow(project(x, 0), **imshow_param, vmin=0, vmax=0.1)
-        im_scalar[i] = ax_scalar[i].imshow(project(s, 0), **imshow_param, vmin=-3, vmax=7)
-        im_vector[i] = ax_vector[i].quiver(*project_vector(v, 0), **quiver_param)
+        im_input[i] = ax_input[i].imshow(project(x, 0, s_crop), **imshow_param, vmin=0, vmax=0.1)
+        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, s_crop), **imshow_param, vmin=-15, vmax=15)
+        im_vector[i] = ax_vector[i].quiver(*project_vector(v, 0, v_crop), **quiver_param)
 
     for im in im_input + im_scalar + im_vector:
         im.set_cmap("summer")
 
     for ax in ax_input + ax_scalar + ax_vector:
         ax.set_axis_off()
+
+    ax_input[0].text(0.05, 0.99, 'input', horizontalalignment='left', verticalalignment='top', transform=ax_input[0].transAxes, color='white', fontsize=30)
+    ax_scalar[0].text(0.05, 0.99, 'output', horizontalalignment='left', verticalalignment='top', transform=ax_scalar[0].transAxes, color='white', fontsize=30)
+    ax_vector[0].text(0.05, 0.99, 'vector field from the last hidden layer', horizontalalignment='left', verticalalignment='top', transform=ax_vector[0].transAxes, color='black', fontsize=30)
+    ax_vector[0].text(0.05, 0.05, 'zoom on the center', horizontalalignment='left', verticalalignment='bottom', transform=ax_vector[0].transAxes, color='black', fontsize=30)
 
     time_logging.end("init", t)
 
@@ -291,9 +296,9 @@ def record(device, pickle_file, movie_file, n_frames):
 
         for i in range(4):
             dim = 2 if i % 2 == 0 else 0
-            im_input[i].set_data(project(x, dim))
-            im_scalar[i].set_data(project(s, dim))
-            im_vector[i].set_UVC(*project_vector(v, dim))
+            im_input[i].set_data(project(x, dim, s_crop))
+            im_scalar[i].set_data(project(s, dim, s_crop))
+            im_vector[i].set_UVC(*project_vector(v, dim, v_crop))
 
         return tuple(im_input + im_scalar + im_vector)
 
@@ -308,15 +313,15 @@ def record(device, pickle_file, movie_file, n_frames):
 
         for i in range(0, 2):
             dim = 2 if i % 2 == 0 else 0
-            im_input[i].set_data(project(rx, dim))
-            im_scalar[i].set_data(project(s, dim))
-            im_vector[i].set_UVC(*project_vector(v, dim))
+            im_input[i].set_data(project(rx, dim, s_crop))
+            im_scalar[i].set_data(project(s, dim, s_crop))
+            im_vector[i].set_UVC(*project_vector(v, dim, v_crop))
 
         for i in range(2, 4):
             dim = 2 if i % 2 == 0 else 0
-            im_input[i].set_data(project(x, dim))
-            im_scalar[i].set_data(project(rs, dim))
-            im_vector[i].set_UVC(*project_vector(rv, dim))
+            im_input[i].set_data(project(x, dim, s_crop))
+            im_scalar[i].set_data(project(rs, dim, s_crop))
+            im_vector[i].set_UVC(*project_vector(rv, dim, v_crop))
 
         return tuple(im_input + im_scalar + im_vector)
 
