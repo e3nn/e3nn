@@ -191,8 +191,8 @@ def project(x, dim, crop=0):
     assert x.size(1) == n
     assert x.size(2) == n
     n = int(crop * n)
+    x = x[n:-n, n:-n, n:-n] if n > 0 else x
     x = x.mean(dim)
-    x = x[n:-n, n:-n] if n > 0 else x
     if dim == 0:
         x = x.t().contiguous()
     return x.detach().cpu().numpy()
@@ -230,6 +230,8 @@ def record(device, pickle_file, movie_file, n_frames):
     model = Model().to(device)
     model.load_state_dict(torch.load(pickle_file))
 
+    # from IPython import embed; embed()
+
     def f(x):
         t = time_logging.start()
         while x.ndimension() < 5:
@@ -239,19 +241,37 @@ def record(device, pickle_file, movie_file, n_frames):
             x = model(x)
 
         time_logging.end("model", t)
-        return x[0, 1], model.post_activations[-2][0, 4:7]
+        return x[0, 1] - x[0, 0], model.post_activations[-2][0, 4:7]
 
     alpha = np.linspace(0, 2 * np.pi, n_frames)
-    beta = np.linspace(0, np.pi / 2, n_frames)
+    beta = np.concatenate((np.zeros((n_frames // 2,)), np.linspace(0, np.pi / 2, n_frames - n_frames // 2)))
 
-    fig = plt.figure(figsize=(4 * 6, 3 * 6))
+    a, topmargin, leftmargin = 6, 0.7, 0.7
+    width = 4 * a + leftmargin
+    height = 3 * a + topmargin
+    fig = plt.figure(figsize=(width, height))
 
-    ax_input = [fig.add_axes([x, 2/3, 1/4, 1/3]) for x in [0, 1/4, 1/2, 3/4]]
+    x_a = a / width
+    y_a = a / height
+    x_m = leftmargin / width
+    y_m = topmargin / height
+
+    ax_input = [fig.add_axes([x_m + i * x_a, 2 * y_a, x_a, y_a]) for i in range(4)]
     im_input = [None] * 4
-    ax_scalar = [fig.add_axes([x, 1/3, 1/4, 1/3]) for x in [0, 1/4, 1/2, 3/4]]
+    ax_scalar = [fig.add_axes([x_m + i * x_a, y_a, x_a, y_a]) for i in range(4)]
     im_scalar = [None] * 4
-    ax_vector = [fig.add_axes([x, 0, 1/4, 1/3]) for x in [0, 1/4, 1/2, 3/4]]
+    ax_vector = [fig.add_axes([x_m + i * x_a, 0, x_a, y_a]) for i in range(4)]
     im_vector = [None] * 4
+
+    color, fontsize = 'black', 25
+    fig.text(x_m / 2, 2.5 * y_a, 'input (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
+    fig.text(x_m / 2, 1.5 * y_a, 'output (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
+    fig.text(x_m / 2, 0.5 * y_a, 'vector field in last hidden layer', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
+
+    fig.text(x_m + 0.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 1.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 2.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 3.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
 
     s, v = f(x)
 
@@ -270,24 +290,18 @@ def record(device, pickle_file, movie_file, n_frames):
         'minshaft': 1
     }
 
-    print(s.mean().item(), s.std().item())
-    s_crop, v_crop = 0.15, 0.35
+    s_crop, so_crop, v_crop = 0.15, 0.08, 0.35
 
     for i in range(4):
-        im_input[i] = ax_input[i].imshow(project(x, 0, s_crop), **imshow_param, vmin=0, vmax=0.1)
-        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, s_crop), **imshow_param, vmin=-15, vmax=15)
+        im_input[i] = ax_input[i].imshow(project(x, 0, s_crop), **imshow_param, vmin=0, vmax=0.1, cmap='gray')
+        bg = 6.0165253
+        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-30, vmax=bg+30, cmap='bwr')
         im_vector[i] = ax_vector[i].quiver(*project_vector(v, 0, v_crop), **quiver_param)
 
-    for im in im_input + im_scalar + im_vector:
-        im.set_cmap("summer")
+    # from IPython import embed; embed()
 
     for ax in ax_input + ax_scalar + ax_vector:
         ax.set_axis_off()
-
-    ax_input[0].text(0.05, 0.99, 'input', horizontalalignment='left', verticalalignment='top', transform=ax_input[0].transAxes, color='white', fontsize=30)
-    ax_scalar[0].text(0.05, 0.99, 'output', horizontalalignment='left', verticalalignment='top', transform=ax_scalar[0].transAxes, color='white', fontsize=30)
-    ax_vector[0].text(0.05, 0.99, 'vector field from the last hidden layer', horizontalalignment='left', verticalalignment='top', transform=ax_vector[0].transAxes, color='black', fontsize=30)
-    ax_vector[0].text(0.05, 0.05, 'zoom on the center', horizontalalignment='left', verticalalignment='bottom', transform=ax_vector[0].transAxes, color='black', fontsize=30)
 
     time_logging.end("init", t)
 
@@ -297,7 +311,7 @@ def record(device, pickle_file, movie_file, n_frames):
         for i in range(4):
             dim = 2 if i % 2 == 0 else 0
             im_input[i].set_data(project(x, dim, s_crop))
-            im_scalar[i].set_data(project(s, dim, s_crop))
+            im_scalar[i].set_data(project(s, dim, so_crop))
             im_vector[i].set_UVC(*project_vector(v, dim, v_crop))
 
         return tuple(im_input + im_scalar + im_vector)
@@ -314,13 +328,13 @@ def record(device, pickle_file, movie_file, n_frames):
         for i in range(0, 2):
             dim = 2 if i % 2 == 0 else 0
             im_input[i].set_data(project(rx, dim, s_crop))
-            im_scalar[i].set_data(project(s, dim, s_crop))
+            im_scalar[i].set_data(project(s, dim, so_crop))
             im_vector[i].set_UVC(*project_vector(v, dim, v_crop))
 
         for i in range(2, 4):
             dim = 2 if i % 2 == 0 else 0
             im_input[i].set_data(project(x, dim, s_crop))
-            im_scalar[i].set_data(project(rs, dim, s_crop))
+            im_scalar[i].set_data(project(rs, dim, so_crop))
             im_vector[i].set_UVC(*project_vector(rv, dim, v_crop))
 
         return tuple(im_input + im_scalar + im_vector)
