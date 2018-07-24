@@ -202,11 +202,11 @@ def project_vector(x, dim, crop=0):
     A = x.new_tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]]).t()
     x = torch.einsum("ij,jxyz->ixyz", (A, x))
     if dim == 0:
-        return project(x[2], 0, crop), project(x[1], 0, crop)
+        return project(x[1], 0, crop), project(x[2], 0, crop)
     if dim == 1:
-        return project(x[0], 1, crop), project(x[2], 1, crop)
+        return project(x[2], 1, crop), project(x[0], 1, crop)
     if dim == 2:
-        return project(x[0], 2, crop), project(x[1], 2, crop)
+        return project(x[1], 2, crop), project(x[0], 2, crop)
 
 
 def record(device, pickle_file, movie_file, n_frames):
@@ -343,7 +343,7 @@ def record(device, pickle_file, movie_file, n_frames):
     ani = animation.FuncAnimation(fig, animate, init_func=init, interval=2, blit=True, save_count=n_frames)
 
     from matplotlib.animation import FFMpegWriter
-    writer = FFMpegWriter(fps=12, bitrate=3000)
+    writer = FFMpegWriter(fps=16, bitrate=3000)
     ani.save(movie_file, writer=writer)
 
     print(time_logging.text_statistics())
