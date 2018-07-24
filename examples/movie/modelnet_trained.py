@@ -244,7 +244,7 @@ def record(device, pickle_file, movie_file, n_frames):
         return x[0, 1] - x[0, 0], model.post_activations[-2][0, 4:7]
 
     alpha = np.linspace(0, 2 * np.pi, n_frames)
-    beta = np.concatenate((np.zeros((n_frames // 2,)), np.linspace(0, np.pi / 2, n_frames - n_frames // 2)))
+    beta = np.concatenate((np.zeros((n_frames // 2,)), np.linspace(0, 2 * np.pi, n_frames - n_frames // 2)))
 
     a, topmargin, leftmargin = 6, 0.7, 0.7
     width = 4 * a + leftmargin
@@ -265,15 +265,16 @@ def record(device, pickle_file, movie_file, n_frames):
 
     color, fontsize = 'black', 25
     fig.text(x_m / 2, 2.5 * y_a, 'input (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
-    fig.text(x_m / 2, 1.5 * y_a, 'output (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
+    fig.text(x_m / 2, 1.5 * y_a, 'output (red=table, blue=chair)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
     fig.text(x_m / 2, 0.5 * y_a, 'vector field in last hidden layer', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
 
-    fig.text(x_m + 0.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
-    fig.text(x_m + 1.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
-    fig.text(x_m + 2.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
-    fig.text(x_m + 3.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 0.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 1.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 2.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 3.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
 
     s, v = f(x)
+    print("positive=table, negative=chair : {:.3g}".format(s.mean().item()))
 
     imshow_param = {
         'interpolation': 'none',
@@ -282,7 +283,7 @@ def record(device, pickle_file, movie_file, n_frames):
 
     quiver_param = {
         'units': 'xy',
-        'scale': 0.3,
+        'scale': 1,
         'pivot': 'tail',
         'headwidth': 2.5,
         'headlength': 5,
