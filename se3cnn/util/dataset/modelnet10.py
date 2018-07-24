@@ -146,8 +146,7 @@ class ModelNet10(torch.utils.data.Dataset):
             self.download_and_process()
 
         if not self._check_exists():
-            raise RuntimeError('Dataset not found.' +
-                               ' You can use download=True to download it')
+            print('Dataset not found. You can use download=True to download it')
 
         self.files = sorted(glob.glob(os.path.join(self.root, "ModelNet10", "*", self.mode, "*.obj")))
 
@@ -169,7 +168,7 @@ class ModelNet10(torch.utils.data.Dataset):
     def _check_exists(self):
         files = glob.glob(os.path.join(self.root, "ModelNet10", "*", "*", "*.obj"))
 
-        return len(files) > 0
+        return len(files) == 4899
 
     def _download(self, url):
         import requests
@@ -196,7 +195,8 @@ class ModelNet10(torch.utils.data.Dataset):
     def _unzip(self, file_path):
         import zipfile
 
-        if os.path.exists(os.path.join(self.root, "ModelNet10")):
+        files = glob.glob(os.path.join(self.root, "ModelNet10", "*", "*", "*.off"))
+        if len(files) == 4899:
             return
 
         print('Unzip ' + file_path)
@@ -207,11 +207,13 @@ class ModelNet10(torch.utils.data.Dataset):
         os.unlink(file_path)
 
     def _off2obj(self):
-        print('Convert OFF into OBJ')
-
         files = glob.glob(os.path.join(self.root, "ModelNet10", "*", "*", "*.off"))
         for file_name in sorted(files):
-            print("Convert {}".format(file_name), end="   \r")
+            output_file = file_name.replace(".off", ".obj")
+            if os.path.exists(output_file):
+                continue
+
+            print("Convert {} into {}".format(file_name, output_file))
             sys.stdout.flush()
 
             with open(file_name, "rt") as fi:
@@ -228,7 +230,7 @@ class ModelNet10(torch.utils.data.Dataset):
             for f in faces:
                 result += "f " + " ".join(str(int(x) + 1) for x in f) + "\n"
 
-            with open(file_name.replace(".off", ".obj"), "wt") as fi:
+            with open(output_file, "wt") as fi:
                 fi.write(result)
 
     def download_and_process(self):
@@ -245,5 +247,3 @@ class ModelNet10(torch.utils.data.Dataset):
         zipfile_path = self._download(self.url_data)
         self._unzip(zipfile_path)
         self._off2obj()
-
-        print('Done!')
