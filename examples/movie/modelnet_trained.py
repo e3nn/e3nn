@@ -14,6 +14,7 @@ from se3cnn.SO3 import rot
 from se3cnn.SO3 import irr_repr
 import os
 from threading import Thread
+import random
 
 
 def low_pass_filter(image, scale):
@@ -46,6 +47,34 @@ def low_pass_filter(image, scale):
     return out
 
 
+class EqSampler(torch.utils.data.sampler.Sampler):
+    def __init__(self, data_source):
+        self.data_source = data_source
+
+    def __iter__(self):
+        transform = self.data_source.transform
+        self.data_source.transform = None
+        items = [(i, y) for i, (_, y) in enumerate(self.data_source)]
+        self.data_source.transform = transform
+
+        random.shuffle(items)
+        classes = {y for i, y in items}
+        items = [[i for i, y1 in items if y1 == y2] for y2 in classes]
+        items = [i for i2 in zip(*items) for i in i2]
+        return iter(items)
+
+    def __len__(self):
+        transform = self.data_source.transform
+        self.data_source.transform = None
+        items = [(i, y) for i, (_, y) in enumerate(self.data_source)]
+        self.data_source.transform = transform
+
+        classes = {y for i, y in items}
+        items = [[i for i, y1 in items if y1 == y2] for y2 in classes]
+        items = [i for i2 in zip(*items) for i in i2]
+        return len(items)
+
+
 class Model(torch.nn.Module):
 
     def __init__(self):
@@ -69,7 +98,7 @@ class Model(torch.nn.Module):
             'stride': 1,
             'padding': 9,
             'dilation': 3,
-            'normalization': 'batch',
+            'normalization': None,
         }
 
         assert len(block_params) + 1 == len(features)
@@ -124,12 +153,13 @@ def train(device, file):
         print("load model")
         model.load_state_dict(torch.load(file))
 
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=True, drop_last=True, num_workers=2)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, drop_last=True, num_workers=2, sampler=EqSampler(dataset))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-8)
 
     t = time_logging.end("init", t)
 
     for _ in range(10):
+        correct = 0
         for i, (x, y) in enumerate(dataloader):
             x, y = x.to(device), y.to(device)
 
@@ -140,11 +170,14 @@ def train(device, file):
 
             output = output.view(output.size(0), output.size(1), -1).mean(-1)
             loss = F.cross_entropy(output, y)
-            print("{}/{} loss={:.3g}  {}".format(
+            correct += (output.argmax(1) == y).long().sum().item()
+
+            print("{}/{} loss={:.3g}  {}  {:.1f}%".format(
                 i,
                 len(dataloader),
                 loss.item(),
-                ", ".join("{}:{}".format(a, b) for a, b in zip(output.argmax(1), y))
+                ", ".join("{}:{}".format(a, b) for a, b in zip(output.argmax(1), y)),
+                100 * correct / ((i + 1) * output.size(0)),
             ))
             t = time_logging.end("->", t)
 
@@ -209,7 +242,7 @@ def project_vector(x, dim, crop=0):
         return project(x[1], 2, crop), project(x[0], 2, crop)
 
 
-def record(device, pickle_file, movie_file, n_frames):
+def record(device, pickle_file, movie_file, n_frames, objid):
     t = time_logging.start()
 
     cache = CacheNPY("v128d", transform=Obj2Voxel(128, double=True))
@@ -223,12 +256,13 @@ def record(device, pickle_file, movie_file, n_frames):
         download=True,
         transform=transform,
     )
-    x, _ = dataset[628]
+    x, _ = dataset[objid]
     x = F.pad(x.unsqueeze(0), (45,) * 6)[0, 0]
     x = x.to(device)
 
     model = Model().to(device)
     model.load_state_dict(torch.load(pickle_file))
+    model.eval()
 
     # from IPython import embed; embed()
 
@@ -292,11 +326,13 @@ def record(device, pickle_file, movie_file, n_frames):
     }
 
     s_crop, so_crop, v_crop = 0.15, 0.08, 0.35
+    bg = project(s, 0, so_crop)[0, 0]
+    st = s.std().item()
+    print(bg, st)
 
     for i in range(4):
         im_input[i] = ax_input[i].imshow(project(x, 0, s_crop), **imshow_param, vmin=0, vmax=0.1, cmap='gray')
-        bg = 6.0165253
-        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-30, vmax=bg+30, cmap='bwr')
+        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-3*st, vmax=bg+3*st, cmap='bwr')
         im_vector[i] = ax_vector[i].quiver(*project_vector(v, 0, v_crop), **quiver_param)
 
     # from IPython import embed; embed()
@@ -355,6 +391,7 @@ def main():
     # required
     parser.add_argument("--pickle", type=str, required=True)
     parser.add_argument("--movie", type=str)
+    parser.add_argument("--objid", type=int, default=628)
     parser.add_argument("--n_frames", type=int, default=181)
     parser.add_argument("--action", choices={"train", "record"}, required=True)
 
@@ -368,7 +405,7 @@ def main():
 
     if args.action == "record":
         assert args.movie
-        record(device, args.pickle, args.movie, args.n_frames)
+        record(device, args.pickle, args.movie, args.n_frames, args.objid)
 
 
 main()
