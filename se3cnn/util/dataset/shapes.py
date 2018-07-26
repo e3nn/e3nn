@@ -33,7 +33,7 @@ import re
 
 class EqSampler(torch.utils.data.sampler.Sampler):
     def __init__(self, data_source):
-        super().__init__()
+        super().__init__(data_source)
         self.data_source = data_source
 
     def __iter__(self):
