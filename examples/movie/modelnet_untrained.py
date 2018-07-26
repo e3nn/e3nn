@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from se3cnn.util import time_logging
 from se3cnn.SO3 import irr_repr
-from se3cnn.util.dataset.modelnet10 import ModelNet10, Obj2Voxel, CacheNPY
+from se3cnn.util.dataset.shapes import ModelNet10, Obj2Voxel, CacheNPY
 
 
 class Model(nn.Module):

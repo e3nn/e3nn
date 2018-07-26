@@ -5,7 +5,7 @@ import numpy as np
 import torch.utils.data
 import torch.nn.functional as F
 from se3cnn.blocks import GatedBlock
-from se3cnn.util.dataset.modelnet10 import ModelNet10, Obj2Voxel, CacheNPY
+from se3cnn.util.dataset.shapes import ModelNet10, Obj2Voxel, CacheNPY, EqSampler
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from se3cnn.util import time_logging
@@ -14,7 +14,6 @@ from se3cnn.SO3 import rot
 from se3cnn.SO3 import irr_repr
 import os
 from threading import Thread
-import random
 
 
 def low_pass_filter(image, scale):
@@ -45,34 +44,6 @@ def low_pass_filter(image, scale):
     out = F.conv3d(image.view(-1, 1, *image.size()[-3:]), kernel.view(1, 1, size, size, size), padding=size//2)
     out = out.view(*image.size())
     return out
-
-
-class EqSampler(torch.utils.data.sampler.Sampler):
-    def __init__(self, data_source):
-        self.data_source = data_source
-
-    def __iter__(self):
-        transform = self.data_source.transform
-        self.data_source.transform = None
-        items = [(i, y) for i, (_, y) in enumerate(self.data_source)]
-        self.data_source.transform = transform
-
-        random.shuffle(items)
-        classes = {y for i, y in items}
-        items = [[i for i, y1 in items if y1 == y2] for y2 in classes]
-        items = [i for i2 in zip(*items) for i in i2]
-        return iter(items)
-
-    def __len__(self):
-        transform = self.data_source.transform
-        self.data_source.transform = None
-        items = [(i, y) for i, (_, y) in enumerate(self.data_source)]
-        self.data_source.transform = transform
-
-        classes = {y for i, y in items}
-        items = [[i for i, y1 in items if y1 == y2] for y2 in classes]
-        items = [i for i2 in zip(*items) for i in i2]
-        return len(items)
 
 
 class Model(torch.nn.Module):

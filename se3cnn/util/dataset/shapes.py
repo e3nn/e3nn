@@ -4,7 +4,7 @@ typical usage
 
 https://github.com/antigol/obj2voxel is needed
 
-from se3cnn.util.dataset.modelnet10 import CacheNPY, Obj2Voxel, ModelNet10
+from se3cnn.util.dataset.shapes import CacheNPY, Obj2Voxel, ModelNet10
 
 cache = CacheNPY("v64", transform=Obj2Voxel(64))
 
@@ -27,6 +27,37 @@ import torch.utils.data
 import subprocess
 import random
 import sys
+import csv
+import re
+
+
+class EqSampler(torch.utils.data.sampler.Sampler):
+    def __init__(self, data_source):
+        super().__init__()
+        self.data_source = data_source
+
+    def __iter__(self):
+        transform = self.data_source.transform
+        self.data_source.transform = None
+        items = [(i, y) for i, (_, y) in enumerate(self.data_source)]
+        self.data_source.transform = transform
+
+        random.shuffle(items)
+        classes = {y for i, y in items}
+        items = [[i for i, y1 in items if y1 == y2] for y2 in classes]
+        items = [i for i2 in zip(*items) for i in i2]
+        return iter(items)
+
+    def __len__(self):
+        transform = self.data_source.transform
+        self.data_source.transform = None
+        items = [(i, y) for i, (_, y) in enumerate(self.data_source)]
+        self.data_source.transform = transform
+
+        classes = {y for i, y in items}
+        items = [[i for i, y1 in items if y1 == y2] for y2 in classes]
+        items = [i for i2 in zip(*items) for i in i2]
+        return len(items)
 
 
 class Obj2Voxel:
@@ -247,3 +278,141 @@ class ModelNet10(torch.utils.data.Dataset):
         zipfile_path = self._download(self.url_data)
         self._unzip(zipfile_path)
         self._off2obj()
+
+
+class Shrec17(torch.utils.data.Dataset):
+    '''
+    Download SHREC17 and output valid obj files content
+    '''
+
+    url_data = 'http://3dvision.princeton.edu/ms/shrec17-data/{}.zip'
+    url_label = 'http://3dvision.princeton.edu/ms/shrec17-data/{}.csv'
+
+    def __init__(self, root, mode, perturbed=True, download=False, transform=None, target_transform=None):
+        self.root = os.path.expanduser(root)
+
+        if not mode in ["train", "test", "val"]:
+            raise ValueError("Invalid mode")
+
+        self.dir = os.path.join(self.root, mode + ("_perturbed" if perturbed else ""))
+        self.transform = transform
+        self.target_transform = target_transform
+
+        if download:
+            self.download(mode, perturbed)
+
+        if not self._check_exists():
+            raise RuntimeError('Dataset not found.' +
+                               ' You can use download=True to download it')
+
+        self.files = sorted(glob.glob(os.path.join(self.dir, '*.obj')))
+        if mode != "test":
+            with open(os.path.join(self.root, mode + ".csv"), 'rt') as f:
+                reader = csv.reader(f)
+                self.labels = {}
+                for row in [x for x in reader][1:]:
+                    self.labels[row[0]] = (row[1], row[2])
+        else:
+            self.labels = None
+
+    def __getitem__(self, index):
+        img = f = self.files[index]
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        if self.labels is not None:
+            i = os.path.splitext(os.path.basename(f))[0]
+            target = self.labels[i]
+
+            if self.target_transform is not None:
+                target = self.target_transform(target)
+
+            return img, target
+        else:
+            return img
+
+    def __len__(self):
+        return len(self.files)
+
+    def _check_exists(self):
+        files = glob.glob(os.path.join(self.dir, "*.obj"))
+
+        return len(files) > 0
+
+    def _download(self, url):
+        import requests
+
+        filename = url.split('/')[-1]
+        file_path = os.path.join(self.root, filename)
+
+        if os.path.exists(file_path):
+            return file_path
+
+        print('Downloading ' + url)
+
+        r = requests.get(url, stream=True)
+        with open(file_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=16 * 1024 ** 2):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+                    f.flush()
+
+        return file_path
+
+    def _unzip(self, file_path):
+        import zipfile
+
+        if os.path.exists(self.dir):
+            return
+
+        print('Unzip ' + file_path)
+
+        zip_ref = zipfile.ZipFile(file_path, 'r')
+        zip_ref.extractall(self.root)
+        zip_ref.close()
+        os.unlink(file_path)
+
+    def _fix(self):
+        print("Fix obj files")
+
+        r = re.compile(r'f (\d+)[/\d]* (\d+)[/\d]* (\d+)[/\d]*')
+
+        path = os.path.join(self.dir, "*.obj")
+        files = sorted(glob.glob(path))
+
+        c = 0
+        for i, f in enumerate(files):
+            with open(f, "rt") as x:
+                y = x.read()
+                yy = r.sub(r"f \1 \2 \3", y)
+                if y != yy:
+                    c += 1
+                    with open(f, "wt") as x:
+                        x.write(yy)
+            print("{}/{}  {} fixed    ".format(i + 1, len(files), c), end="\r")
+
+    def download(self, dataset, perturbed):
+
+        if self._check_exists():
+            return
+
+        # download files
+        try:
+            os.makedirs(self.root)
+        except OSError as e:
+            if e.errno == os.errno.EEXIST:
+                pass
+            else:
+                raise
+
+        url = self.url_data.format(dataset + ("_perturbed" if perturbed else ""))
+        file_path = self._download(url)
+        self._unzip(file_path)
+        self._fix()
+
+        if dataset != "test":
+            url = self.url_label.format(dataset)
+            self._download(url)
+
+        print('Done!')
