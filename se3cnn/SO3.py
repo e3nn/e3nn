@@ -28,11 +28,11 @@ def rot_z(gamma):
     '''
     if not torch.is_tensor(gamma):
         gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
-    return torch.tensor([
-        [torch.cos(gamma), -torch.sin(gamma), 0],
-        [torch.sin(gamma), torch.cos(gamma), 0],
+    return gamma.new_tensor([
+        [gamma.cos(), -gamma.sin(), 0],
+        [gamma.sin(), gamma.cos(), 0],
         [0, 0, 1]
-    ], dtype=gamma.dtype)
+    ])
 
 
 def rot_y(beta):
@@ -41,11 +41,11 @@ def rot_y(beta):
     '''
     if not torch.is_tensor(beta):
         beta = torch.tensor(beta, dtype=torch.get_default_dtype())
-    return torch.tensor([
-        [torch.cos(beta), 0, torch.sin(beta)],
+    return beta.new_tensor([
+        [beta.cos(), 0, beta.sin()],
         [0, 1, 0],
-        [-torch.sin(beta), 0, torch.cos(beta)]
-    ], dtype=beta.dtype)
+        [-beta.sin(), 0, beta.cos()]
+    ])
 
 
 def rot(alpha, beta, gamma):
