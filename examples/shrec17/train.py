@@ -14,7 +14,7 @@ import numpy as np
 from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel, EqSampler
 
 
-def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers):
+def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir):
     arguments = copy.deepcopy(locals())
 
     os.mkdir(log_dir)
@@ -41,6 +41,9 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
     loader.exec_module(mod)
 
     model = mod.Model(55).to(device)
+
+    if restore_dir is not None:
+        model.load_state_dict(torch.load(os.path.join(restore_dir, "state.pkl")))
 
     logger.info("{} paramerters in total".format(sum(x.numel() for x in model.parameters())))
 
@@ -91,8 +94,13 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         return lrs[-1] * learning_rate
 
     dynamics = []
+    epoch = 0
 
-    for epoch in range(2000):
+    if restore_dir is not None:
+        dynamics = torch.load(os.path.join(restore_dir, "dynamics.pkl"))
+        epoch = dynamics[-1]['epoch'] + 1
+
+    for epoch in range(epoch, 2000):
 
         lr = get_learning_rate(epoch)
         logger.info("learning rate = {} and batch size = {}".format(lr, train_loader.batch_size))
@@ -150,6 +158,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=0.5)
+    parser.add_argument("--restore_dir", type=str)
 
     args = parser.parse_args()
 
