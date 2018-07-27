@@ -82,7 +82,7 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         return loss.item(), correct
 
     def get_learning_rate(epoch):
-        limits = [100, 200]
+        limits = [500, 1000]
         lrs = [1, 0.1, 0.01]
         assert len(lrs) == len(limits) + 1
         for lim, lr in zip(limits, lrs):
@@ -92,7 +92,7 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
 
     dynamics = []
 
-    for epoch in range(300):
+    for epoch in range(2000):
 
         lr = get_learning_rate(epoch)
         logger.info("learning rate = {} and batch size = {}".format(lr, train_loader.batch_size))
