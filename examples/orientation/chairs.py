@@ -51,10 +51,11 @@ class Model(torch.nn.Module):
         super().__init__()
 
         features = [
-            (1, ),
+            (1, 2),
             (4, 4, 4),
-            (8, 8, 8),
-            (16, 16, 16),
+            (8, 8, 4),
+            (16, 16, 4),
+            (32, 16, 4),
             (0, 2)
         ]
 
@@ -67,10 +68,11 @@ class Model(torch.nn.Module):
         }
 
         block_params = [
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
         ]
 
         assert len(block_params) + 1 == len(features)
@@ -123,11 +125,19 @@ def overlap(a, b):
     return (a * b).sum(-1) / (na * nb + 1e-6)
 
 
-def train_step(item, top, front, model, optimizer, device):
-    model.train()
-    item, top, front = item.to(device), top.to(device), front.to(device)
+def train_step(item, top, front, model, optimizer):
+    from se3cnn.SO3 import rot
 
-    prediction = model(item)
+    model.train()
+
+    abc = 15 * (torch.rand(3) * 2 - 1) / 180 * math.pi
+    r = rot(*abc).to(item.device)
+    tip = torch.cat([torch.einsum("ij,...j->...i", (r, x)) for x in [top, front]], dim=1)
+    tip = tip.view(tip.size(0), tip.size(1), 1, 1, 1).expand(tip.size(0), tip.size(1), item.size(2), item.size(3), item.size(4))
+
+    input = torch.cat([item, tip], dim=1)
+
+    prediction = model(input)
     pred_top, pred_front = prediction[:, :3], prediction[:, 3:]
 
     overlap_top = overlap(pred_top, top)
@@ -175,11 +185,16 @@ def main():
         pin_memory=True,
         drop_last=True
     )
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    for epoch in range(50):
+    for epoch in range(100):
         for (item, (top, front)), _ in train_loader:
 
-            top, front, orth, angle = train_step(item, top, front, model, optimizer, device)
+            item, top, front = item.to(device), top.to(device), front.to(device)
+            top, front, orth, angle = train_step(item, top, front, model, optimizer)
 
-            print("{} avg_top={:.2f} avg_front={:.2f} avg_orth={:.2f} avg_angle={:.2f}".format(epoch, top, front, orth, 180 * angle / 3.14159))
+            print("{} avg_top={:.3f} avg_front={:.3f} avg_orth={:.3f} avg_angle={:.1f}".format(epoch, top, front, orth, 180 * angle / 3.14159))
+
+
+if __name__ == "__main__":
+    main()
