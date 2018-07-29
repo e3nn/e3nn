@@ -6,6 +6,9 @@ import torch.utils.data
 import torch.nn.functional as F
 from se3cnn.blocks import GatedBlock
 from se3cnn.util.dataset.shapes import ModelNet10, Obj2Voxel, CacheNPY, EqSampler
+import matplotlib
+matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from se3cnn.util import time_logging
@@ -206,11 +209,26 @@ def project_vector(x, dim, crop=0):
     A = x.new_tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]]).t()
     x = torch.einsum("ij,jxyz->ixyz", (A, x))
     if dim == 0:
-        return project(x[1], 0, crop), project(x[2], 0, crop)
+        u, v = project(x[1], 0, crop), project(x[2], 0, crop)
     if dim == 1:
-        return project(x[2], 1, crop), project(x[0], 1, crop)
+        u, v = project(x[2], 1, crop), project(x[0], 1, crop)
     if dim == 2:
-        return project(x[1], 2, crop), project(x[0], 2, crop)
+        u, v = project(x[1], 2, crop), project(x[0], 2, crop)
+
+    n = u.shape[0]
+    np.random.seed(15439338)
+    x, y = np.random.rand(2, n, n) * (n - 1)
+
+    ix = np.floor(x).astype(np.int)
+    dx = x - ix
+
+    iy = np.floor(y).astype(np.int)
+    dy = y - iy
+
+    nu = (1-dx)*(1-dy) * u[ix, iy] + (dx)*(1-dy) * u[ix+1, iy] + (dx)*(dy) * u[ix+1, iy+1] + (1-dx)*(dy) * u[ix, iy+1]
+    nv = (1-dx)*(1-dy) * v[ix, iy] + (dx)*(1-dy) * v[ix+1, iy] + (dx)*(dy) * v[ix+1, iy+1] + (1-dx)*(dy) * v[ix, iy+1]
+
+    return y, x, nu, nv
 
 
 def record(device, pickle_file, movie_file, n_frames, objid):
@@ -288,7 +306,7 @@ def record(device, pickle_file, movie_file, n_frames, objid):
 
     quiver_param = {
         'units': 'xy',
-        'scale': 1,
+        'scale': 2,
         'pivot': 'tail',
         'headwidth': 2.5,
         'headlength': 5,
@@ -320,7 +338,7 @@ def record(device, pickle_file, movie_file, n_frames, objid):
             dim = 2 if i % 2 == 0 else 0
             im_input[i].set_data(project(x, dim, s_crop))
             im_scalar[i].set_data(project(s, dim, so_crop))
-            im_vector[i].set_UVC(*project_vector(v, dim, v_crop))
+            im_vector[i].set_UVC(*project_vector(v, dim, v_crop)[2:])
 
         return tuple(im_input + im_scalar + im_vector)
 
@@ -337,13 +355,13 @@ def record(device, pickle_file, movie_file, n_frames, objid):
             dim = 2 if i % 2 == 0 else 0
             im_input[i].set_data(project(rx, dim, s_crop))
             im_scalar[i].set_data(project(s, dim, so_crop))
-            im_vector[i].set_UVC(*project_vector(v, dim, v_crop))
+            im_vector[i].set_UVC(*project_vector(v, dim, v_crop)[2:])
 
         for i in range(2, 4):
             dim = 2 if i % 2 == 0 else 0
             im_input[i].set_data(project(x, dim, s_crop))
             im_scalar[i].set_data(project(rs, dim, so_crop))
-            im_vector[i].set_UVC(*project_vector(rv, dim, v_crop))
+            im_vector[i].set_UVC(*project_vector(rv, dim, v_crop)[2:])
 
         return tuple(im_input + im_scalar + im_vector)
 
