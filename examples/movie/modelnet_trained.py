@@ -266,8 +266,8 @@ def record(device, pickle_file, movie_file, n_frames, objid):
         time_logging.end("model", t)
         return model.post_activations[-2][0, 3], model.post_activations[-2][0, 4:7]
 
-    alpha = np.linspace(0, 2 * np.pi, n_frames)
-    beta = np.concatenate((np.zeros((n_frames // 2,)), np.linspace(0, 2 * np.pi, n_frames - n_frames // 2)))
+    alpha = np.concatenate((np.linspace(0, 2 * np.pi, n_frames - n_frames // 50), np.zeros((n_frames // 50,))))
+    beta = np.concatenate((np.zeros((n_frames // 3,)), np.linspace(0, 2 * np.pi, n_frames - n_frames // 3 - n_frames // 50), np.zeros((n_frames // 50,))))
 
     a, topmargin, leftmargin = 6, 0.7, 0.7
     width = 4 * a + leftmargin
