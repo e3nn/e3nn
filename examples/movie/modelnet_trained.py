@@ -62,8 +62,8 @@ class Model(torch.nn.Module):
         ]
 
         block_params = [
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
             {'activation': None},
         ]
 
@@ -264,7 +264,7 @@ def record(device, pickle_file, movie_file, n_frames, objid):
             x = model(x)
 
         time_logging.end("model", t)
-        return x[0, 1] - x[0, 0], model.post_activations[-2][0, 4:7]
+        return model.post_activations[-2][0, 3], model.post_activations[-2][0, 4:7]
 
     alpha = np.linspace(0, 2 * np.pi, n_frames)
     beta = np.concatenate((np.zeros((n_frames // 2,)), np.linspace(0, 2 * np.pi, n_frames - n_frames // 2)))
@@ -288,8 +288,8 @@ def record(device, pickle_file, movie_file, n_frames, objid):
 
     color, fontsize = 'black', 25
     fig.text(x_m / 2, 2.5 * y_a, 'input (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
-    fig.text(x_m / 2, 1.5 * y_a, 'output (red=table, blue=chair)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
-    fig.text(x_m / 2, 0.5 * y_a, 'vector field in last hidden layer', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
+    fig.text(x_m / 2, 1.5 * y_a, 'output (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
+    fig.text(x_m / 2, 0.5 * y_a, 'output (vector field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
 
     fig.text(x_m + 0.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
     fig.text(x_m + 1.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
@@ -321,7 +321,7 @@ def record(device, pickle_file, movie_file, n_frames, objid):
 
     for i in range(4):
         im_input[i] = ax_input[i].imshow(project(x, 0, s_crop), **imshow_param, vmin=0, vmax=0.1, cmap='gray')
-        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-3*st, vmax=bg+3*st, cmap='bwr')
+        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-3*st, vmax=bg+3*st, cmap='viridis')
         im_vector[i] = ax_vector[i].quiver(*project_vector(v, 0, v_crop), **quiver_param)
 
     # from IPython import embed; embed()
@@ -381,6 +381,10 @@ def main():
     parser.add_argument("--pickle", type=str, required=True)
     parser.add_argument("--movie", type=str)
     parser.add_argument("--objid", type=int, default=628)
+    # office chair : 628
+    # old fancy table: 3265
+    # tri-table : 3644
+
     parser.add_argument("--n_frames", type=int, default=181)
     parser.add_argument("--action", choices={"train", "record"}, required=True)
 
