@@ -12,7 +12,7 @@ class GatedBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
-                 verbose=False):
+                 bias=True, verbose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -39,14 +39,14 @@ class GatedBlock(torch.nn.Module):
         Rs_out_with_gate = [(m, l) for l, m in enumerate(repr_out)]
 
         if (scalar_activation is not None and repr_out[0] > 0):
-            self.scalar_act = ScalarActivation([(repr_out[0], scalar_activation)])
+            self.scalar_act = ScalarActivation([(repr_out[0], scalar_activation)], bias=bias)
         else:
             self.scalar_act = None
 
         n_non_scalar = sum(repr_out[1:])
         if gate_activation is not None and n_non_scalar > 0:
             Rs_out_with_gate.append((n_non_scalar, 0))  # concatenate scalar gate capsules after normal capsules
-            self.gate_act = ScalarActivation([(n_non_scalar, gate_activation)])
+            self.gate_act = ScalarActivation([(n_non_scalar, gate_activation)], bias=bias)
         else:
             self.gate_act = None
 
