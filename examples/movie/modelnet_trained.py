@@ -141,7 +141,7 @@ class BaselineModel(torch.nn.Module):
         return x
 
 
-def train(device, file, modelname, batch_size):
+def train(device, file, modelname, batch_size, rotate):
     # classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
     t = time_logging.start()
 
@@ -151,7 +151,7 @@ def train(device, file, modelname, batch_size):
         else:
             return 1
 
-    cache = CacheNPY("v128d", transform=Obj2Voxel(128, double=True))
+    cache = CacheNPY("v128d" if rotate == 0 else "v128dr", transform=Obj2Voxel(128, double=True, rotate=(rotate > 0)), repeat=rotate)
     def transform(x):
         x = cache(x)
         return torch.from_numpy(x.astype(np.float32)).unsqueeze(0) / 8
@@ -440,6 +440,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--action", choices={"train", "record"}, required=True)
     parser.add_argument("--model", choices={"se3", "baseline"}, required=True)
+    parser.add_argument('--rotate', type=int, default=0)
 
     args = parser.parse_args()
 
@@ -447,7 +448,7 @@ def main():
     device = torch.device('cuda:0')
 
     if args.action == "train":
-        train(device, args.pickle, args.model, args.batch_size)
+        train(device, args.pickle, args.model, args.batch_size, args.rotate)
 
     if args.action == "record":
         assert args.movie
