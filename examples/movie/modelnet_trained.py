@@ -12,12 +12,32 @@ matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.colors as mcolors
 from se3cnn.util import time_logging
 from se3cnn.SE3 import rotate_scalar
 from se3cnn.SO3 import rot
 from se3cnn.SO3 import irr_repr
 import os
 from threading import Thread
+
+
+def make_colormap(seq):
+    """Return a LinearSegmentedColormap
+    seq: a sequence of floats and RGB-tuples. The floats should be increasing
+    and in the interval (0,1).
+
+    https://stackoverflow.com/questions/16834861/create-own-colormap-using-matplotlib-and-plot-color-scale#16836182
+    """
+    seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
+    cdict = {'red': [], 'green': [], 'blue': []}
+    for i, item in enumerate(seq):
+        if isinstance(item, float):
+            r1, g1, b1 = seq[i - 1]
+            r2, g2, b2 = seq[i + 1]
+            cdict['red'].append([item, r1, r2])
+            cdict['green'].append([item, g1, g2])
+            cdict['blue'].append([item, b1, b2])
+    return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
 
 def low_pass_filter(image, scale):
@@ -316,7 +336,13 @@ def record(device, pickle_file, movie_file, n_frames, objid, modelname):
             x = model(x)
 
         time_logging.end("model", t)
-        return model.post_activations[-2][0, 3], model.post_activations[-2][0, 4:7]
+
+        if modelname == "se3":
+            layer = -2
+        if modelname == "baseline":
+            layer = -4
+
+        return model.post_activations[layer][0, 3], model.post_activations[layer][0, 4:7]
 
     alpha = np.concatenate((np.linspace(0, 2 * np.pi, n_frames - n_frames // 50), np.zeros((n_frames // 50,))))
     beta = np.concatenate((np.zeros((n_frames // 3,)), np.linspace(0, 2 * np.pi, n_frames - n_frames // 3 - n_frames // 50), np.zeros((n_frames // 50,))))
@@ -331,25 +357,28 @@ def record(device, pickle_file, movie_file, n_frames, objid, modelname):
     x_m = leftmargin / width
     y_m = topmargin / height
 
-    ax_input = [fig.add_axes([x_m + i * x_a, 2 * y_a, x_a, y_a]) for i in range(4)]
+    ax_input = [fig.add_axes([x_m + i * x_a, 2 * y_a, x_a, y_a], frameon=False) for i in range(4)]
     im_input = [None] * 4
-    ax_scalar = [fig.add_axes([x_m + i * x_a, y_a, x_a, y_a]) for i in range(4)]
+    ax_scalar = [fig.add_axes([x_m + i * x_a, y_a, x_a, y_a], frameon=False) for i in range(4)]
     im_scalar = [None] * 4
-    ax_vector = [fig.add_axes([x_m + i * x_a, 0, x_a, y_a]) for i in range(4)]
+    ax_vector = [fig.add_axes([x_m + i * x_a, 0, x_a, y_a], frameon=False) for i in range(4)]
     im_vector = [None] * 4
 
-    color, fontsize = 'black', 25
+    color, fontsize = 'lightgrey', 25
     fig.text(x_m / 2, 2.5 * y_a, 'input (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
     fig.text(x_m / 2, 1.5 * y_a, 'output (scalar field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
     fig.text(x_m / 2, 0.5 * y_a, 'output (vector field)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=90)
 
-    fig.text(x_m + 0.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
-    fig.text(x_m + 1.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
-    fig.text(x_m + 2.5 * x_a, 3 * y_a + 0.5 * y_m, 'top view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
-    fig.text(x_m + 3.5 * x_a, 3 * y_a + 0.5 * y_m, 'side view stabilized', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 0.5 * x_a, 3 * y_a + 0.5 * y_m, 'raw (top view)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 1.5 * x_a, 3 * y_a + 0.5 * y_m, 'raw (side view)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 2.5 * x_a, 3 * y_a + 0.5 * y_m, 'back-rotated (top view)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
+    fig.text(x_m + 3.5 * x_a, 3 * y_a + 0.5 * y_m, 'back-rotated (side view)', horizontalalignment='center', verticalalignment='center', color=color, fontsize=fontsize, rotation=0)
 
     s, v = f(x)
     print("positive=table, negative=chair : {:.3g}".format(s.mean().item()))
+
+    c = mcolors.ColorConverter().to_rgb
+    cmap = make_colormap([c('white'), c('#56f0ff'), 0.1, c('#56f0ff'), c('black'), 0.5, c('black'), c('#dcf450'), 0.9, c('#dcf450'), c('white')])
 
     imshow_param = {
         'interpolation': 'none',
@@ -358,25 +387,29 @@ def record(device, pickle_file, movie_file, n_frames, objid, modelname):
 
     quiver_param = {
         'units': 'xy',
-        'scale': 2,
         'pivot': 'tail',
         'headwidth': 2.5,
         'headlength': 5,
         'minlength': 0,
-        'minshaft': 1
+        'minshaft': 1,
+        'color': 'white',
+        'alpha': 0.8,
     }
 
-    s_crop, so_crop, v_crop = 0.15, 0.08, 0.35
+    s_crop, so_crop, v_crop = 0.15, 0.08, 0.3
     bg = project(s, 0, so_crop)[0, 0]
     st = s.std().item()
-    print(bg, st)
+    print("scalar = {} +- {}".format(bg, st))
+
+    _, _, U, V = project_vector(v, 0, v_crop)
+    v_norm = (U ** 2 + V ** 2).max() ** 0.5
+    print("v_norm = {}".format(v_norm))
+    quiver_param["scale"] = 0.2 * v_norm
 
     for i in range(4):
         im_input[i] = ax_input[i].imshow(project(x, 0, s_crop), **imshow_param, vmin=0, vmax=0.1, cmap='gray')
-        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-3*st, vmax=bg+3*st, cmap='viridis')
+        im_scalar[i] = ax_scalar[i].imshow(project(s, 0, so_crop), **imshow_param, vmin=bg-3*st, vmax=bg+3*st, cmap=cmap)
         im_vector[i] = ax_vector[i].quiver(*project_vector(v, 0, v_crop), **quiver_param)
-
-    # from IPython import embed; embed()
 
     for ax in ax_input + ax_scalar + ax_vector:
         ax.set_axis_off()
@@ -421,7 +454,7 @@ def record(device, pickle_file, movie_file, n_frames, objid, modelname):
 
     from matplotlib.animation import FFMpegWriter
     writer = FFMpegWriter(fps=16, bitrate=3000)
-    ani.save(movie_file, writer=writer)
+    ani.save(movie_file, writer=writer, savefig_kwargs={"facecolor": "black"})
 
     print(time_logging.text_statistics())
 
