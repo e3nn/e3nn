@@ -3,6 +3,7 @@ import argparse
 import torch
 import numpy as np
 import torch.utils.data
+import torch.nn as nn
 import torch.nn.functional as F
 from se3cnn.blocks import GatedBlock
 from se3cnn.util.dataset.shapes import ModelNet10, Obj2Voxel, CacheNPY, EqSampler
@@ -49,7 +50,7 @@ def low_pass_filter(image, scale):
     return out
 
 
-class Model(torch.nn.Module):
+class SE3Model(torch.nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -98,7 +99,49 @@ class Model(torch.nn.Module):
         return x
 
 
-def train(device, file):
+class BaselineModel(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+        features = [
+            1,
+            15,
+            15,
+            2
+        ]
+
+        common_block_params = {
+            'kernel_size': 7,
+            'stride': 1,
+            'padding': 9,
+            'dilation': 3,
+        }
+
+        blocks = []
+        for i in range(len(features) - 1):
+            blocks += [
+                nn.Conv3d(features[i], features[i + 1], **common_block_params),
+                nn.ReLU(inplace=True)
+            ]
+
+        self.sequence = torch.nn.Sequential(*blocks)
+        self.post_activations = None
+
+    def forward(self, x):  # pylint: disable=W
+        '''
+        :param x: [batch, features, x, y, z]
+        '''
+        x = low_pass_filter(x, 1 / 3)  # dilation == 3
+
+        self.post_activations = []
+        for op in self.sequence:
+            x = op(x)
+            self.post_activations.append(x)
+        return x
+
+
+def train(device, file, modelname, batch_size):
     # classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
     t = time_logging.start()
 
@@ -122,12 +165,16 @@ def train(device, file):
     )
     dataset.files = [x for x in dataset.files if any(cl in x for cl in ["chair", "table", "desk", "dresser"])]
 
-    model = Model().to(device)
+    if modelname == "se3":
+        model = SE3Model().to(device)
+    if modelname == "baseline":
+        model = BaselineModel().to(device)
+
     if os.path.exists(file):
         print("load model")
         model.load_state_dict(torch.load(file))
 
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=4, drop_last=True, num_workers=2, sampler=EqSampler(dataset))
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, drop_last=True, num_workers=2, sampler=EqSampler(dataset))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-8)
 
     t = time_logging.end("init", t)
@@ -231,7 +278,7 @@ def project_vector(x, dim, crop=0):
     return y, x, nu, nv
 
 
-def record(device, pickle_file, movie_file, n_frames, objid):
+def record(device, pickle_file, movie_file, n_frames, objid, modelname):
     t = time_logging.start()
 
     cache = CacheNPY("v128d", transform=Obj2Voxel(128, double=True))
@@ -249,7 +296,11 @@ def record(device, pickle_file, movie_file, n_frames, objid):
     x = F.pad(x.unsqueeze(0), (45,) * 6)[0, 0]
     x = x.to(device)
 
-    model = Model().to(device)
+    if modelname == "se3":
+        model = SE3Model().to(device)
+    if modelname == "baseline":
+        model = BaselineModel().to(device)
+
     model.load_state_dict(torch.load(pickle_file))
     model.eval()
 
@@ -386,7 +437,9 @@ def main():
     # tri-table : 3644
 
     parser.add_argument("--n_frames", type=int, default=181)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--action", choices={"train", "record"}, required=True)
+    parser.add_argument("--model", choices={"se3", "baseline"}, required=True)
 
     args = parser.parse_args()
 
@@ -394,11 +447,11 @@ def main():
     device = torch.device('cuda:0')
 
     if args.action == "train":
-        train(device, args.pickle)
+        train(device, args.pickle, args.model, args.batch_size)
 
     if args.action == "record":
         assert args.movie
-        record(device, args.pickle, args.movie, args.n_frames, args.objid)
+        record(device, args.pickle, args.movie, args.n_frames, args.objid, args.model)
 
 
 main()
