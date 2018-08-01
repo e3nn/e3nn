@@ -122,6 +122,7 @@ class BaselineModel(torch.nn.Module):
         for i in range(len(features) - 1):
             blocks += [
                 nn.Conv3d(features[i], features[i + 1], **common_block_params),
+                nn.BatchNorm3d(features[i + 1]),
                 nn.ReLU(inplace=True)
             ]
 
@@ -141,7 +142,7 @@ class BaselineModel(torch.nn.Module):
         return x
 
 
-def train(device, file, modelname, batch_size, rotate):
+def train(device, file, modelname, batch_size, n_rotate):
     # classes = ["bathtub", "bed", "chair", "desk", "dresser", "monitor", "night_stand", "sofa", "table", "toilet"]
     t = time_logging.start()
 
@@ -151,7 +152,7 @@ def train(device, file, modelname, batch_size, rotate):
         else:
             return 1
 
-    cache = CacheNPY("v128d" if rotate == 0 else "v128dr", transform=Obj2Voxel(128, double=True, rotate=(rotate > 0)), repeat=rotate)
+    cache = CacheNPY("v128d" if n_rotate == 0 else "v128dr", transform=Obj2Voxel(128, double=True, rotate=(n_rotate > 0)), repeat=max(1, n_rotate))
     def transform(x):
         x = cache(x)
         return torch.from_numpy(x.astype(np.float32)).unsqueeze(0) / 8
