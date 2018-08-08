@@ -116,10 +116,11 @@ def main():
                     width,
                     height
                 ]
-                fig.add_axes(rect, projection='3d', aspect=1)
+                ax = fig.add_axes(rect, projection='3d', aspect=1)
+                ax.patch.set_visible(False)
                 plot_sphere(beta, alpha, f[base, i, j])
 
-    plt.savefig("kernels{}{}.png".format(args.order_in, args.order_out))
+    plt.savefig("kernels{}{}.png".format(args.order_in, args.order_out), transparent=True)
 
 
 main()
