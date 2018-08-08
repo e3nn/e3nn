@@ -139,9 +139,9 @@ class SE3Net(torch.nn.Module):
         super(SE3Net, self).__init__()
         features = [
             (1,),
-            (2, 2, 2, 0),
+            (2, 2, 2, 1),
             (4, 4, 4, 0),
-            (4, 4, 4, 0),
+            (6, 4, 4, 0),
             (64,)
         ]
         common_block_params = {
