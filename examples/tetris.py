@@ -7,6 +7,8 @@ import torch.utils.data
 import numpy as np
 from scipy.ndimage import zoom
 
+from experiments.util import lr_schedulers
+
 from se3cnn.blocks import GatedBlock
 from se3cnn.SE3 import rotate_scalar
 from se3cnn.SO3 import rot
@@ -100,9 +102,12 @@ def train(network, dataset, N_epochs):
     volumes = torch.tensor(volumes).cuda()
     labels = torch.tensor(labels).cuda()
 
-    optimizer = torch.optim.Adam(network.parameters(), 3e-2, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(network.parameters(), lr=3e-2, weight_decay=1e-5)
     for epoch in range(N_epochs):
         predictions = network(volumes)
+
+        # decay learning rate
+        optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, init_lr=1e-1, epoch_start=100, base_factor=.98, verbose=True)
 
         optimizer.zero_grad()
         F.cross_entropy(predictions, labels).backward()
@@ -134,8 +139,9 @@ class SE3Net(torch.nn.Module):
         super(SE3Net, self).__init__()
         features = [
             (1,),
-            (4, 4, 4,),
-            (4, 4, 4,),
+            (2, 2, 2, 0),
+            (4, 4, 4, 0),
+            (4, 4, 4, 0),
             (64,)
         ]
         common_block_params = {
@@ -143,10 +149,14 @@ class SE3Net(torch.nn.Module):
             'padding': 4,
             'dilation': 2,
             'activation': (F.relu, torch.sigmoid),
+            'capsule_dropout_p': .0
         }
 
         blocks = [GatedBlock(features[i], features[i + 1], **common_block_params) for i in range(len(features) - 1)]
-        self.sequence = torch.nn.Sequential(*blocks, AvgSpacial(), nn.Linear(64, 10))
+        self.sequence = torch.nn.Sequential(*blocks,
+                                            AvgSpacial(),
+                                            nn.Dropout(p=.2),
+                                            nn.Linear(64, 10))
 
     def forward(self, inp):  # pylint: disable=W
         inp = low_pass_filter(inp, 1 / 2)
@@ -180,7 +190,7 @@ class SE3Net(torch.nn.Module):
 def main():
     torch.backends.cudnn.benchmark = True
 
-    N_epochs = 200
+    N_epochs = 250
     N_test = 100
     trainset = get_volumes(rotate=True)  # train with randomly rotated pieces but only once
 
