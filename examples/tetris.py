@@ -73,7 +73,8 @@ def train(network, dataset, N_epochs):
     volumes = torch.tensor(volumes).cuda()
     labels = torch.tensor(labels).cuda()
 
-    optimizer = torch.optim.Adam(network.parameters(), lr=3e-2, weight_decay=1e-5)
+    # optimizer = torch.optim.Adam(network.parameters(), lr=3e-2, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(network.parameters(), lr=1e-3)
     for epoch in range(N_epochs):
         predictions = network(volumes)
 
@@ -108,22 +109,40 @@ class SE3Net(torch.nn.Module):
 
     def __init__(self):
         super(SE3Net, self).__init__()
+        # features = [
+        #     (1,),
+        #     (2, 2, 2, 1),
+        #     (4, 4, 4, 0),
+        #     (6, 4, 4, 0),
+        #     (64,)
+        # ]
+        # common_block_params = {
+        #     'size': 5,
+        #     'padding': 4,
+        #     'dilation': 2,
+        #     'activation': (F.relu, torch.sigmoid),
+        # }
         features = [
             (1,),
             (2, 2, 2, 1),
-            (4, 4, 4, 0),
-            (6, 4, 4, 0),
+            (8, 8, 8, 0),
+            (16, 8, 8, 0),
             (64,)
         ]
         common_block_params = {
             'size': 5,
             'padding': 4,
-            'dilation': 2,
             'activation': (F.relu, torch.sigmoid),
-            'capsule_dropout_p': .0
+            'smooth_stride': True,
         }
+        block_params = [
+            { 'stride': 1 },
+            { 'stride': 2 },
+            { 'stride': 2 },
+            { 'stride': 1 },
+        ]
 
-        blocks = [GatedBlock(features[i], features[i + 1], **common_block_params) for i in range(len(features) - 1)]
+        blocks = [GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(features) - 1)]
         self.sequence = torch.nn.Sequential(*blocks,
                                             AvgSpacial(),
                                             nn.Dropout(p=.2),
