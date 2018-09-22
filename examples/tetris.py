@@ -12,41 +12,12 @@ from experiments.util import lr_schedulers
 from se3cnn.blocks import GatedBlock
 from se3cnn.SE3 import rotate_scalar
 from se3cnn.SO3 import rot
+from se3cnn.filter import low_pass_filter
 
 
 class AvgSpacial(nn.Module):
     def forward(self, inp):
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)
-
-
-def low_pass_filter(image, scale):
-    """
-    :param image: [..., x, y, z]
-    :param scale: float
-    """
-    if scale >= 1:
-        return image
-
-    dtype = image.dtype
-    device = image.device
-
-    sigma = 0.5 * (1 / scale ** 2 - 1) ** 0.5
-
-    size = int(1 + 2 * 2.5 * sigma)
-    if size % 2 == 0:
-        size += 1
-
-    rng = torch.arange(size, dtype=dtype, device=device) - size // 2  # [-(size // 2), ..., size // 2]
-    x = rng.view(size, 1, 1).expand(size, size, size)
-    y = rng.view(1, size, 1).expand(size, size, size)
-    z = rng.view(1, 1, size).expand(size, size, size)
-
-    kernel = torch.exp(- (x ** 2 + y ** 2 + z ** 2) / (2 * sigma ** 2))
-    kernel = kernel / kernel.sum()
-
-    out = F.conv3d(image.view(-1, 1, *image.size()[-3:]), kernel.view(1, 1, size, size, size), padding=size//2)
-    out = out.view(*image.size())
-    return out
 
 
 def get_volumes(size=20, pad=8, rotate=False, rotate90=False):
@@ -159,7 +130,7 @@ class SE3Net(torch.nn.Module):
                                             nn.Linear(64, 10))
 
     def forward(self, inp):  # pylint: disable=W
-        inp = low_pass_filter(inp, 1 / 2)
+        inp = low_pass_filter(inp, 2)
         return self.sequence(inp)
 
 
