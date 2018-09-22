@@ -12,6 +12,7 @@ import importlib.machinery
 import numpy as np
 
 from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel, EqSampler
+from se3cnn.filter import low_pass_filter
 
 
 def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir):
@@ -52,7 +53,9 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
     cache = CacheNPY("v64d", transform=Obj2Voxel(64, double=True, rotate=True), repeat=augmentation)
     def transform(x):
         x = cache(x)
-        return torch.from_numpy(x.astype(np.float32)).unsqueeze(0) / 8
+        x = torch.from_numpy(x.astype(np.float32)).unsqueeze(0) / 8
+        x = low_pass_filter(x, 2)
+        return x
 
     def target_transform(x):
         classes = ['02691156', '02747177', '02773838', '02801938', '02808440', '02818832', '02828884', '02843684', '02871439', '02876657',

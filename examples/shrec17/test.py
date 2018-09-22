@@ -10,6 +10,7 @@ import types
 import importlib.machinery
 
 from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel
+from se3cnn.filter import low_pass_filter
 
 
 class KeepName:
@@ -32,7 +33,9 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
     def transform(x):
         xs = cache(x)
         xs = [torch.from_numpy(x.astype(np.float32)).unsqueeze(0) / 8 for x in xs]
-        return torch.stack(xs)
+        xs = torch.stack(xs)
+        xs = low_pass_filter(xs, 2)
+        return xs
 
     transform = KeepName(transform)
 
