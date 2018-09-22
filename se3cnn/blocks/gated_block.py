@@ -5,6 +5,7 @@ from se3cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3cnn.non_linearities import ScalarActivation
 from se3cnn.dropout import SE3Dropout
 from se3cnn import basis_kernels
+from se3cnn.filter import low_pass_filter
 
 
 class GatedBlock(torch.nn.Module):
@@ -12,7 +13,7 @@ class GatedBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
-                 bias=True, verbose=False):
+                 bias=True, smooth_stride=False, verbose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -25,6 +26,8 @@ class GatedBlock(torch.nn.Module):
         :param float capsule_dropout_p: dropout probability
         :param str normalization: "batch", "group", "instance" or None
         :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
+        :param bool bias: bias for the gates and scalar fields
+        :param bool smooth_stride: apply a low pass filter before the stride
         '''
         super().__init__()
 
@@ -66,11 +69,13 @@ class GatedBlock(torch.nn.Module):
             Rs_out=Rs_out_with_gate,
             size=size,
             radial_window=radial_window,
-            stride=stride,
+            stride=1 if smooth_stride else stride,
             padding=padding,
             dilation=dilation,
             verbose=verbose,
         )
+
+        self.stride = stride if smooth_stride else 1
 
         self.dropout = None
         if capsule_dropout_p is not None:
@@ -138,6 +143,9 @@ class GatedBlock(torch.nn.Module):
                 z[:, begin_y: begin_y + mul * dim] = field
                 begin_y += mul * dim
                 del field
+
+        if self.stride > 1:
+            z = low_pass_filter(z, self.stride, self.stride)
 
         # dropout
         if self.dropout is not None:

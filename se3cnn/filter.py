@@ -3,10 +3,11 @@ import torch
 import torch.nn.functional as F
 
 
-def low_pass_filter(image, scale):
+def low_pass_filter(image, scale, stride=1):
     """
-    :param image: [..., x, y, z]
-    :param scale: float
+    :param tensor image: [..., x, y, z]
+    :param float scale: 
+    :param int stride:
     """
     if scale <= 1:
         return image
@@ -24,7 +25,8 @@ def low_pass_filter(image, scale):
 
     kernel = torch.exp(- (x ** 2 + y ** 2 + z ** 2) / (2 * sigma ** 2))
     kernel = kernel / kernel.sum()
+    kernel = kernel.view(1, 1, size, size, size)
 
-    out = F.conv3d(image.view(-1, 1, *image.size()[-3:]), kernel.view(1, 1, size, size, size), padding=size//2)
-    out = out.view(*image.size())
+    out = F.conv3d(image.view(-1, 1, *image.size()[-3:]), kernel, padding=size // 2, stride=stride)
+    out = out.view(*image.size()[:-3], *out.size()[-3:])
     return out
