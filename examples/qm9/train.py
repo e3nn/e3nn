@@ -42,7 +42,10 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
     loader.exec_module(mod)
 
     model = mod.Model(5, 1).to(device)
-    perceptron = nn.Linear(5, 1)
+    perceptron = nn.Linear(5, 1).to(device)
+    with torch.no_grad():
+        perceptron.weight.copy_(perceptron.weight.new_tensor([[-38.0770,  -0.6040, -75.2287, -54.7525, -99.8718]]))
+        perceptron.bias.copy_(perceptron.bias.new_tensor([0.0292]))
 
     if restore_dir is not None:
         model.load_state_dict(torch.load(os.path.join(restore_dir, "state.pkl")))
@@ -55,7 +58,7 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
     def transform(positions, qualias, energy):
         positions = random_rotate_translate(center_positions(positions))
         x = render(positions, qualias)
-        return x, energy
+        return x, torch.tensor(energy, dtype=torch.float32)
 
     train_set = QM9("qm9_data", transform=transform)
     torch.manual_seed(5)
@@ -144,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--dataset", choices={"test", "val", "train"}, default="train")
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--num_workers", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=0.5)
     parser.add_argument("--restore_dir", type=str)

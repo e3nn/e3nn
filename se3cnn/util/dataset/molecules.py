@@ -36,14 +36,14 @@ class VoxelizeBlobs:
 
 def center_positions(positions):
     _radius, center = bounding_sphere([pos.numpy() for pos in positions], 1e-6)
-    center = torch.tensor(center)
+    center = torch.tensor(center).type(torch.float32)
     return [pos - center for pos in positions]
 
 
 def random_rotate_translate(positions, rotation=True, translation=1):
     trans = torch.randn(3)
     trans = translation * trans / trans.norm()
-    rot = SO3.rot(*torch.rand(3) * 7)
+    rot = SO3.rot(*torch.rand(3) * 7).type(torch.float32)
     return [rot @ pos + trans for pos in positions]
 
 
