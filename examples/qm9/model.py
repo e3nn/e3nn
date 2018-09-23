@@ -14,35 +14,37 @@ class AvgSpacial(torch.nn.Module):
 
 class Model(torch.nn.Module):
 
-    def __init__(self, n_out):
+    def __init__(self, n_in, n_out):
         super().__init__()
 
         self.int_repr = None
 
-        features = [  # (6) double all channels
-            (1, ),
-            (4, 4, 4),
-            (8, 8, 8),
-            (16, 16, 16),
-            (32, 16, 16),
-            (200, )
+        features = [
+            (n_in, ), # 77
+            (8, 4, 2), (8, 4, 2), # 41, 45
+            (16, 8, 4), (16, 8, 4), # 25, 29
+            (32, 16, 8), (32, 16, 8), # 17, 21
+            (32, 16, 8), # 13
+            (512, )
         ]
 
         common_block_params = {
-            'size': 5,  # (5) = 5->7
-            'stride': 2,
-            'padding': 3,
+            'size': 5,
+            'padding': 4,
             'normalization': 'batch',
-            'capsule_dropout_p': 0.1,  # (4) Maurice suggestion
             'smooth_stride': True,
+            'activation': (F.relu, torch.sigmoid),
         }
 
         block_params = [
-            {'activation': (F.relu, torch.sigmoid)},
-            {'activation': (F.relu, torch.sigmoid)},
-            {'activation': (F.relu, torch.sigmoid)},
-            {'activation': (F.relu, torch.sigmoid)},
-            {'activation': (F.relu, torch.sigmoid)},
+            {'stride': 2},
+            {},
+            {'stride': 2},
+            {},
+            {'stride': 2},
+            {},
+            {'stride': 2},
+            {},
         ]
 
         assert len(block_params) + 1 == len(features)
@@ -52,11 +54,15 @@ class Model(torch.nn.Module):
             for i in range(len(block_params))
         ]
 
+        linear = nn.Linear(features[-1][0], n_out)
         self.sequence = torch.nn.Sequential(
             *blocks,
             AvgSpacial(),
-            nn.Linear(features[-1][0], n_out),
+            linear,
         )
+        nn.init.normal_(linear.weight, std=0.1 / features[-1][0] ** 0.5)
+        nn.init.zeros_(linear.bias)
+
 
     def forward(self, x):  # pylint: disable=W
         '''

@@ -36,14 +36,14 @@ class Model(torch.nn.Module):
         }
 
         block_params = [
-            {'activation': (F.relu, F.sigmoid), 'stride': 2},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid), 'stride': 2},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid), 'stride': 2},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid), 'stride': 2},
-            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
+            {'activation': (F.relu, torch.sigmoid)},
         ]
 
         assert len(block_params) + 1 == len(features)
