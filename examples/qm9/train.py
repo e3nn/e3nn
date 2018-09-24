@@ -119,12 +119,12 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
 
             avg_loss = total_loss / (batch_idx + 1)
 
-            logger.info("[{}:{}/{}] RMSE={:.2} <RMSE>={:.2} time={:.2}+{:.2} perceptron={}+{}".format(
+            logger.info("[{}:{}/{}] RMSE={:.2} <RMSE>={:.2} time={:.2}+{:.2}".format(
                 epoch, batch_idx, len(train_loader),
                 loss, avg_loss,
                 time_after_load - time_before_load,
                 time.perf_counter() - time_before_step,
-                perceptron.weight, perceptron.bias.item()))
+            ))
             time_before_load = time.perf_counter()
 
             dynamics.append({
