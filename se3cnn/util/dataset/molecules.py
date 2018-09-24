@@ -41,10 +41,12 @@ def center_positions(positions):
 
 
 def random_rotate_translate(positions, rotation=True, translation=1):
-    trans = torch.randn(3)
-    trans = translation * trans / trans.norm()
-    rot = SO3.rot(*torch.rand(3) * 7).type(torch.float32)
-    return [rot @ pos + trans for pos in positions]
+    while True:
+        trans = torch.rand(3) * 2 - 1
+        if trans.norm() <= 1:
+            break
+    rot = SO3.rot(*torch.rand(3) * 6.2832).type(torch.float32)
+    return [rot @ pos + translation * trans for pos in positions]
 
 
 class QM7(torch.utils.data.Dataset):
