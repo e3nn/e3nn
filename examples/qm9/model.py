@@ -60,7 +60,7 @@ class Model(torch.nn.Module):
             AvgSpacial(),
             linear,
         )
-        nn.init.normal_(linear.weight, std=0.1 / features[-1][0] ** 0.5)
+        nn.init.normal_(linear.weight, std=1 / features[-1][0] ** 0.5)
         nn.init.zeros_(linear.bias)
 
 

@@ -1,4 +1,4 @@
-# pylint: disable=E1101,R,C,W1202
+# pylint: disable=E1101,E1102,R,C,W1202
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -44,7 +44,8 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
     model = mod.Model(5, 1).to(device)
     perceptron = nn.Linear(5, 1).to(device)
     with torch.no_grad():
-        perceptron.weight.copy_(perceptron.weight.new_tensor([[-38.0770,  -0.6040, -75.2287, -54.7525, -99.8718]]))
+        # perceptron for QM9
+        perceptron.weight.copy_(perceptron.weight.new_tensor([[-38.0770,  -0.6040, -75.2287, -54.7525, -99.8718]])) 
         perceptron.bias.copy_(perceptron.bias.new_tensor([0.0292]))
 
     if restore_dir is not None:
@@ -67,14 +68,16 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
 
-    optimizer = torch.optim.Adam(list(model.parameters()) + list(perceptron.parameters()), lr=0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0)
 
     def train_step(data, target):
         model.train()
         data, target = data.to(device), target.to(device)
 
-        prediction = model(data) + perceptron(data.view(data.size(0), data.size(1), -1).sum(-1))
-        loss = (prediction - target.view(-1)).pow(2).mean()
+        rough = perceptron(data.view(data.size(0), data.size(1), -1).sum(-1))
+        prediction = rough + 0.04 * model(data)
+
+        loss = (prediction.view(-1) - target.view(-1)).pow(2).mean()
 
         optimizer.zero_grad()
         loss.backward()
