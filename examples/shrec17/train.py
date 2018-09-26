@@ -82,7 +82,7 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
             loss = F.cross_entropy(prediction, target)
         if loss_func == "quadratic-hinge":
             b = len(data)
-            f = 3
+            f = 2
             bb = b // f
             assert bb * f == b
 
