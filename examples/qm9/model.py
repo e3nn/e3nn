@@ -13,6 +13,7 @@ class AvgSpacial(torch.nn.Module):
 
 
 class Model(torch.nn.Module):
+    input_size = 77
 
     def __init__(self, n_in, n_out):
         super().__init__()
@@ -21,15 +22,15 @@ class Model(torch.nn.Module):
 
         features = [
             (n_in, ), # 77
-            (6, 3, 1), (6, 3, 1), # 41, 45
-            (14, 6, 3), (14, 6, 3), # 25, 29
-            (30, 12, 6), (30, 12, 6), # 17, 21
-            (32, 16, 8), # 13
-            (512, )
+            (10, 3, 0), 
+            (10, 3, 1),
+            (10, 3, 1),
+            (16, 8, 1),
+            (1, ),
         ]
 
         common_block_params = {
-            'size': 5,
+            'size': 7,
             'padding': 4,
             'normalization': 'batch',
             'smooth_stride': True,
@@ -39,11 +40,8 @@ class Model(torch.nn.Module):
         block_params = [
             {'stride': 2},
             {},
-            {'stride': 2},
             {},
-            {'stride': 2},
             {},
-            {'stride': 2},
             {},
         ]
 
@@ -54,14 +52,13 @@ class Model(torch.nn.Module):
             for i in range(len(block_params))
         ]
 
-        linear = nn.Linear(features[-1][0], n_out)
+        for p in blocks[-1]:
+            nn.init.zeros_(p)
+
         self.sequence = torch.nn.Sequential(
             *blocks,
             AvgSpacial(),
-            linear,
         )
-        nn.init.normal_(linear.weight, std=1 / features[-1][0] ** 0.5)
-        nn.init.zeros_(linear.bias)
 
 
     def forward(self, x):  # pylint: disable=W
