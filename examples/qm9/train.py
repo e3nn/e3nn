@@ -55,7 +55,7 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
     logger.info("{} paramerters in total".format(sum(x.numel() for x in model.parameters())))
 
     # Load the dataset
-    render = VoxelizeBlobs(5, 77, 0.2)
+    render = VoxelizeBlobs(5, model.input_size, 0.2 * 77 / model.input_size)
     def transform(positions, qualias, energy):
         positions = random_rotate_translate(center_positions(positions))
         x = render(positions, qualias)
