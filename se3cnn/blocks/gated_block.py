@@ -57,6 +57,8 @@ class GatedBlock(torch.nn.Module):
             Convolution = SE3Convolution
         elif normalization == "batch":
             Convolution = partial(SE3BNConvolution, momentum=batch_norm_momentum)
+        elif normalization == "batch_max":
+            Convolution = partial(SE3BNConvolution, reduce='max', momentum=batch_norm_momentum)
         elif normalization == "group":
             Convolution = SE3GNConvolution
         elif normalization == "instance":

@@ -30,15 +30,14 @@ class Model(torch.nn.Module):
         common_block_params = {
             'size': 7,
             'padding': 4,
-            'normalization': None,
+            'normalization': 'batch_max',
             'smooth_stride': True,
-            'activation': (F.relu, torch.sigmoid),
         }
 
         block_params = [
-            {'stride': 2},
-            {},
-            {},
+            {'stride': 2, 'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': None},
         ]
 
         assert len(block_params) + 1 == len(features)
