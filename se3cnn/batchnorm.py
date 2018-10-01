@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 class SE3BatchNorm(nn.Module):
-    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True):
+    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean'):
         '''
         :param Rs: list of tuple (multiplicity, dimension)
         '''
@@ -27,6 +27,8 @@ class SE3BatchNorm(nn.Module):
         else:
             self.register_parameter('weight', None)
             self.register_parameter('bias', None)
+
+        self.reduce = reduce
 
     def __repr__(self):
         return "{} (Rs={}, eps={}, momentum={})".format(
@@ -62,7 +64,13 @@ class SE3BatchNorm(nn.Module):
 
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
-                field_norm = field_norm.mean(0).mean(-1)  # [feature]
+                if self.reduce == 'mean':
+                    field_norm = field_norm.mean(-1)  # [batch, feature]
+                elif self.reduce == 'max':
+                    field_norm = field_norm.max(-1)[0]  # [batch, feature]
+                else:
+                    raise ValueError("Invalid reduce option")
+                field_norm = field_norm.mean(0)  # [feature]
                 self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
             else:
                 field_norm = self.running_var[irv: irv + m]
@@ -123,7 +131,7 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=False, eps=1e-5, momentum=0.1, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
         super().__init__()
 
         self.eps = eps
@@ -138,6 +146,8 @@ class SE3BNConvolution(torch.nn.Module):
 
         self.register_buffer('running_mean', torch.zeros(num_scalar))
         self.register_buffer('running_var', torch.ones(num_features))
+        
+        self.reduce = reduce
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, size={size}, eps={eps}, momentum={momentum})".format(
@@ -172,7 +182,13 @@ class SE3BNConvolution(torch.nn.Module):
 
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
-                field_norm = field_norm.mean(-1).mean(0)  # [feature]
+                if self.reduce == 'mean':
+                    field_norm = field_norm.mean(-1)  # [batch, feature]
+                elif self.reduce == 'max':
+                    field_norm = field_norm.max(-1)[0]  # [batch, feature]
+                else:
+                    raise ValueError("Invalid reduce option")
+                field_norm = field_norm.mean(0)  # [feature]
                 self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
             else:
                 field_norm = self.running_var[irv: irv + m]
