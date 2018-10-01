@@ -22,25 +22,21 @@ class Model(torch.nn.Module):
 
         features = [
             (n_in, ), # 77
-            (10, 3, 0), 
-            (10, 3, 1),
-            (10, 3, 1),
-            (16, 8, 1),
-            (1, ),
+            (12, 4, 1), 
+            (24, 8, 2),
+            (n_out, ),
         ]
 
         common_block_params = {
             'size': 7,
             'padding': 4,
-            'normalization': 'batch',
+            'normalization': None,
             'smooth_stride': True,
             'activation': (F.relu, torch.sigmoid),
         }
 
         block_params = [
             {'stride': 2},
-            {},
-            {},
             {},
             {},
         ]
@@ -52,7 +48,7 @@ class Model(torch.nn.Module):
             for i in range(len(block_params))
         ]
 
-        for p in blocks[-1]:
+        for p in blocks[-1].parameters():
             nn.init.zeros_(p)
 
         self.sequence = torch.nn.Sequential(
