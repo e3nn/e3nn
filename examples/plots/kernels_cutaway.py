@@ -1,5 +1,5 @@
 # pylint: disable=C,R,E1101
-from se3cnn import basis_kernels
+from se3cnn import kernel
 from se3cnn import SO3
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,13 +29,13 @@ def main():
     R_in = 2
     R_out = 2
 
-    window = partial(basis_kernels.gaussian_window_fct, radii=[size / 4], J_max_list=[100], sigma=size / 8)
-    basis = basis_kernels.cube_basis_kernels(size, R_in, R_out, window)
+    window = partial(kernel.gaussian_window_fct, radii=[size / 4], J_max_list=[100], sigma=size / 8)
+    basis = kernel.cube_basis_kernels(size, R_in, R_out, window)
 
     print(basis.shape)
 
     # Check equivariance
-    print(basis_kernels.check_basis_equivariance(basis, R_in, R_out, 3.14/4, 0.12, 0.05))
+    print(kernel.check_basis_equivariance(basis, R_in, R_out, 3.14/4, 0.12, 0.05))
 
     for i in range(basis.shape[0]):
         print(i)

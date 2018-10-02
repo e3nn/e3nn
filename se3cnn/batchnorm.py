@@ -120,8 +120,8 @@ def test_batchnorm(Rs=None):
     return y, z
 
 
-from se3cnn.convolution import SE3Convolution
-from se3cnn import basis_kernels
+from se3cnn import SE3Kernel
+from se3cnn import kernel
 
 
 class SE3BNConvolution(torch.nn.Module):
@@ -131,16 +131,16 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
         super().__init__()
 
         self.eps = eps
         self.momentum = momentum
 
-        self.conv = SE3Convolution(Rs_in, Rs_out, size, radial_window, verbose)
+        self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window, verbose)
         self.kwargs = kwargs
 
-        self.Rs = list(zip(self.conv.multiplicities_in, self.conv.dims_in))
+        self.Rs = list(zip(self.kernel.multiplicities_in, self.kernel.dims_in))
         num_scalar = sum(m for m, d in self.Rs if d == 1)
         num_features = sum(m for m, d in self.Rs)
 
@@ -150,11 +150,9 @@ class SE3BNConvolution(torch.nn.Module):
         self.reduce = reduce
 
     def __repr__(self):
-        return "{name} ({Rs_in} -> {Rs_out}, size={size}, eps={eps}, momentum={momentum})".format(
+        return "{name} ({ker}, eps={eps}, momentum={momentum})".format(
             name=self.__class__.__name__,
-            Rs_in=self.conv.Rs_in,
-            Rs_out=self.conv.Rs_out,
-            size=self.conv.size,
+            ker=self.kernel,
             **self.__dict__,
             **self.kwargs)
 
@@ -206,15 +204,15 @@ class SE3BNConvolution(torch.nn.Module):
 
         ws = []
         weight_index = 0
-        for i, (mi, di) in enumerate(zip(self.conv.multiplicities_out, self.conv.dims_out)):
+        for i, (mi, di) in enumerate(zip(self.kernel.multiplicities_out, self.kernel.dims_out)):
             index_mean = 0
             bia = input.new_zeros(mi * di)
-            for j, (mj, dj, normj) in enumerate(zip(self.conv.multiplicities_in, self.conv.dims_in, field_norms)):
-                kernel = getattr(self.conv, "kernel_{}_{}".format(i, j))
+            for j, (mj, dj, normj) in enumerate(zip(self.kernel.multiplicities_in, self.kernel.dims_in, field_norms)):
+                kernel = getattr(self.kernel, "kernel_{}_{}".format(i, j))
                 if kernel is not None:
                     b_el = kernel.size(0)
 
-                    w = self.conv.weight[weight_index: weight_index + mi * mj * b_el]
+                    w = self.kernel.weight[weight_index: weight_index + mi * mj * b_el]
                     weight_index += mi * mj * b_el
 
                     w = w.view(mi, mj, b_el) * normj.view(1, -1, 1)  # [feature_out, feature_in, basis]
@@ -229,11 +227,13 @@ class SE3BNConvolution(torch.nn.Module):
             bias.append(bia)
 
         bias = torch.cat(bias)
-        kernel = self.conv.combination(torch.cat(ws))
+        kernel = self.kernel.combination(torch.cat(ws))
         return torch.nn.functional.conv3d(input, kernel, bias=bias, **self.kwargs)
 
 
 def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
+    from se3cnn import SE3Convolution
+
     # input
     n_out = sum([m * (2 * l + 1) for m, l in Rs_out])
     n_in = sum([m * (2 * l + 1) for m, l in Rs_in])
@@ -252,7 +252,7 @@ def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
 
     conv = SE3Convolution(Rs_in, Rs_out, kernel_size)
     conv.train()
-    conv.weight = bnconv.conv.weight
+    conv.kernel = bnconv.kernel
 
     y2 = conv(bn(x))
 
