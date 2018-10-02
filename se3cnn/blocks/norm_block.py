@@ -9,7 +9,7 @@ from se3cnn import kernel
 
 class NormBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper,  # kernel params
+                 repr_in, repr_out, size, radial_window=kernel.gaussian_window_wrapper,  # kernel params
                  activation=None, activation_bias_min=0.5, activation_bias_max=2,
                  stride=1, padding=0, capsule_dropout_p=None,  # conv/nonlinearity params
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params

@@ -131,7 +131,7 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
         super().__init__()
 
         self.eps = eps

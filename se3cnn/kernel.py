@@ -171,7 +171,7 @@ def cube_basis_kernels(size, order_in, order_out, radial_window):
 # Radial distribution functions
 ################################################################################
 
-def gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma=.6):
+def gaussian_window(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma=.6):
     '''
     gaussian windowing function with manual handling of shell radii, shell bandlimits and shell width
     :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
@@ -201,7 +201,7 @@ def gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigm
     return basis
 
 
-def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mode='compromise', border_dist=0., sigma=.6):
+def gaussian_window_wrapper(sh_cubes, r_field, order_irreps, mode='compromise', border_dist=0., sigma=.6):
     '''
     convenience wrapper for windowing function with three different predefined modes for radii and bandlimits
     :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
@@ -230,7 +230,7 @@ def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mod
     if mode == 'sfcnn':
         J_max_list = [0, 4, 6, 8, 10, 12, 14, 16][:n_radial]
 
-    return gaussian_window_fct(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma)
+    return gaussian_window(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma)
 
 
 ################################################################################
@@ -238,7 +238,7 @@ def gaussian_window_fct_convenience_wrapper(sh_cubes, r_field, order_irreps, mod
 ################################################################################
 
 class SE3Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=gaussian_window_fct_convenience_wrapper, verbose=False):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=gaussian_window_wrapper, verbose=False):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
@@ -378,7 +378,7 @@ def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
 def _test_basis_equivariance():
     from functools import partial
     with torch_default_dtype(torch.float64):
-        basis = cube_basis_kernels(4 * 5, 2, 2, partial(gaussian_window_fct, radii=[5], J_max_list=[999], sigma=2))
+        basis = cube_basis_kernels(4 * 5, 2, 2, partial(gaussian_window, radii=[5], J_max_list=[999], sigma=2))
         overlaps = check_basis_equivariance(basis, 2, 2, *torch.rand(3))
         assert overlaps.gt(0.98).all(), overlaps
 
