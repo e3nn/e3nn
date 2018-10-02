@@ -3,12 +3,12 @@ from functools import partial
 import torch
 from se3cnn import SE3Convolution, SE3BNConvolution, SE3GNConvolution
 from se3cnn.non_linearities import ScalarActivation
-from se3cnn import basis_kernels
+from se3cnn import kernel
 
 
 class GatedActivation(torch.nn.Module):
     def __init__(self,
-                 repr_in, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
+                 repr_in, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None),  # nonlinearity
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''

@@ -6,7 +6,7 @@ from se3cnn.blocks import GatedBlock
 from se3cnn.blocks import NormBlock
 from se3cnn import SE3BatchNorm
 from se3cnn import SE3Convolution
-from se3cnn import basis_kernels
+from se3cnn import kernel
 
 from se3cnn.non_linearities import NormRelu
 from se3cnn.non_linearities import NormSoftplus

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
 from se3cnn.SO3 import irr_repr, spherical_harmonics
-from se3cnn.basis_kernels import _basis_transformation_Q_J
+from se3cnn.kernel import _basis_transformation_Q_J
 from se3cnn.util.cache_file import cached_dirpklgz
 from se3cnn.SO3 import compose
 

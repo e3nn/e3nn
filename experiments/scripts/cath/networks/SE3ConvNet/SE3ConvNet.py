@@ -3,7 +3,7 @@ import torch.nn as nn
 from functools import partial
 
 from experiments.util.arch_blocks import *
-from se3cnn import basis_kernels
+from se3cnn import kernel
 
 
 class network(ResNet):
@@ -23,7 +23,7 @@ class network(ResNet):
                     [[(4, 4, 4, 4)] * 1],  # 128 channels
                     [[(128,)]]]
         common_params = {
-            'radial_window': partial(basis_kernels.gaussian_window_fct_convenience_wrapper,
+            'radial_window': partial(kernel.gaussian_window_fct_convenience_wrapper,
                                      mode=args.bandlimit_mode, border_dist=0, sigma=0.6),
             'batch_norm_momentum': 0.01,
             # TODO: probability needs to be adapted to capsule order

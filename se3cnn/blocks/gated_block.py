@@ -4,13 +4,13 @@ import torch
 from se3cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3cnn.non_linearities import ScalarActivation
 from se3cnn.dropout import SE3Dropout
-from se3cnn import basis_kernels
+from se3cnn import kernel
 from se3cnn.filter import low_pass_filter
 
 
 class GatedBlock(torch.nn.Module):
     def __init__(self,
-                 repr_in, repr_out, size, radial_window=basis_kernels.gaussian_window_fct_convenience_wrapper,  # kernel params
+                 repr_in, repr_out, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
                  bias=True, smooth_stride=False, verbose=False):
