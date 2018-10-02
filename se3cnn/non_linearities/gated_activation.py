@@ -8,7 +8,7 @@ from se3cnn import kernel
 
 class GatedActivation(torch.nn.Module):
     def __init__(self,
-                 repr_in, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper,  # kernel params
+                 repr_in, size, radial_window=kernel.gaussian_window_wrapper,  # kernel params
                  activation=(None, None),  # nonlinearity
                  normalization=None, batch_norm_momentum=0.1):  # batch norm params
         '''

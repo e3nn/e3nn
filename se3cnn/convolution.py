@@ -5,7 +5,7 @@ from se3cnn import kernel
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_fct_convenience_wrapper, verbose=False, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, verbose=False, **kwargs):
         super().__init__()
 
         self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window=radial_window, verbose=verbose)

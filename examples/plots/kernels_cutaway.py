@@ -29,7 +29,7 @@ def main():
     R_in = 2
     R_out = 2
 
-    window = partial(kernel.gaussian_window_fct, radii=[size / 4], J_max_list=[100], sigma=size / 8)
+    window = partial(kernel.gaussian_window, radii=[size / 4], J_max_list=[100], sigma=size / 8)
     basis = kernel.cube_basis_kernels(size, R_in, R_out, window)
 
     print(basis.shape)
