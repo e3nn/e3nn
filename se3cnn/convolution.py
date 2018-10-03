@@ -22,7 +22,7 @@ class SE3Convolution(torch.nn.Module):
         return torch.nn.functional.conv3d(input, self.kernel(), **self.kwargs)
 
 
-def test_equivaraince():
+def test_equivariance():
     torch.set_default_dtype(torch.float64)
 
     f = torch.nn.Sequential(
@@ -41,7 +41,7 @@ def test_equivaraince():
     inp = torch.randn(2, 1, 16, 16, 16)
     inp_r = rotate(inp)
 
-    diff_inp = (inp - unrotate(inp_r)).abs().max()
+    diff_inp = (inp - unrotate(inp_r)).abs().max().item()
     if diff_inp > 1e-10:
         raise AssertionError('Sanity check failed, `unrotate` doesn\'t work')
 
@@ -80,7 +80,7 @@ def test_combination_gradient(Rs_in, Rs_out, size):
 
 
 def main():
-    test_equivaraince()
+    test_equivariance()
     test_normalization(3, 15,
                        [(2, 0), (1, 1), (3, 4)],
                        [(2, 0), (2, 1), (1, 2)],
