@@ -276,7 +276,7 @@ class SE3Kernel(torch.nn.Module):
                     if verbose:
                         overlaps = torch.stack([check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in torch.rand(5, 3)]).mean(0)
                         print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
-                    self.register_buffer("kernel_{}_{}".format(i, j), torch.tensor(basis, dtype=torch.float))
+                    self.register_buffer("kernel_{}_{}".format(i, j), torch.tensor(basis, dtype=torch.get_default_dtype()))
                     self.nweights += m_out * m_in * basis.shape[0]
                 else:
                     self.register_buffer("kernel_{}_{}".format(i, j), None)
