@@ -49,6 +49,7 @@ def test_equivariance():
     out_r = f(inp_r)
 
     diff_out = (out - unrotate(out_r)).abs().max().item()
+    print("diff_out = {}".format(diff_out))
     if diff_out > 1e-10:
         raise AssertionError('Operations are not rotation-equivariant. Diff', diff_out)
 

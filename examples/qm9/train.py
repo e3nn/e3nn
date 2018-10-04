@@ -15,7 +15,7 @@ import numpy as np
 from se3cnn.util.dataset.molecules import QM9, center_positions, random_rotate_translate, VoxelizeBlobs
 
 
-def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, restore_dir):
+def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps):
     arguments = copy.deepcopy(locals())
 
     os.mkdir(log_dir)
@@ -63,8 +63,15 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
 
     train_set = QM9("qm9_data", transform=transform)
     torch.manual_seed(5)
-    indices = torch.randperm(len(train_set))
-    train_set = torch.utils.data.Subset(train_set, indices[:len(train_set) // 2])
+    n = len(train_set)
+    indices = torch.randperm(n)
+    if dataset == "train":
+        indices = indices[:n // 2]
+    elif dataset == "val":
+        indices = indices[n // 2: 7 * n // 10]
+    elif dataset == "test":
+        indices = indices[7 * n // 10:]
+    train_set = torch.utils.data.Subset(train_set, indices)
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
 
@@ -86,13 +93,11 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
         return loss.sqrt().item()
 
     def get_learning_rate(epoch):
-        limits = [500, 1000]
-        lrs = [1, 0.1, 0.01]
-        assert len(lrs) == len(limits) + 1
-        for lim, lr in zip(limits, lrs):
+        assert len(lr_value) == len(lr_steps) + 1
+        for lim, lr in zip(lr_steps, lr_value):
             if epoch < lim:
                 return lr * learning_rate
-        return lrs[-1] * learning_rate
+        return lr_value[-1] * learning_rate
 
     dynamics = []
     epoch = 0
@@ -153,6 +158,8 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--num_workers", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=0.5)
+    parser.add_argument("--lr_value", type=float, nargs='+', default=[1, 0.1, 0.01])
+    parser.add_argument("--lr_steps", type=int, nargs='+', default=[500, 1000])
     parser.add_argument("--restore_dir", type=str)
 
     args = parser.parse_args()

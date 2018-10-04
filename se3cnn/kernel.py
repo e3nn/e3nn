@@ -11,7 +11,7 @@ K must satifies
 Therefore
     K(x, y) = K(0, y-x)
 
-    K(0, x) = K(0, g |x| e)  where e is a prefered chosen unit vector and g is in SO(3)
+    K(0, g |x| e) = R_out(g) K(0, |x| e) R_in(g^{-1})  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import torch
 from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, torch_default_dtype
@@ -135,8 +135,7 @@ def _sample_cube(size, order_in, order_out):
         sh_cubes.append(K_J)
 
         # check that  rho_out(u) K(u^-1 x) rho_in(u^-1) = K(x) with u = rotation of +pi/2 around y axis
-        inv_idx = torch.arange(size - 1, -1, -1, device=K_J.device).long()
-        tmp = K_J.transpose(2, 4)[:, :, :, :, inv_idx]  # K(u^-1 x)
+        tmp = K_J.transpose(2, 4).flip(4)  # K(u^-1 x)
         tmp = torch.einsum(
             "ij,jkxyz,kl->ilxyz",
             (
@@ -161,9 +160,24 @@ def cube_basis_kernels(size, order_in, order_out, radial_window):
     :return: basis of equivariant kernels of shape (N_basis, 2 * order_out + 1, 2 * order_in + 1, size, size, size)
     '''
     basis = radial_window(*_sample_cube(size, order_in, order_out))
-    if basis is not None:
-        # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
-        basis = basis / basis.view(basis.size(0), -1).norm(dim=1).view(-1, 1, 1, 1, 1, 1)
+    if basis is None:
+        return None
+
+    # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
+    basis = basis / basis.view(basis.size(0), -1).norm(dim=1).view(-1, 1, 1, 1, 1, 1)
+
+    # check that  rho_out(u) K(u^-1 x) rho_in(u^-1) = K(x) with u = rotation of +pi/2 around y axis
+    tmp = basis.transpose(3, 5).flip(5)  # K(u^-1 x)
+    tmp = torch.einsum(
+        "ij,bjkxyz,kl->bilxyz",
+        (
+            irr_repr(order_out, 0, math.pi / 2, 0, dtype=basis.dtype),
+            tmp,
+            irr_repr(order_in, 0, -math.pi / 2, 0, dtype=basis.dtype)
+        )
+    )  # rho_out(u) K(u^-1 x) rho_in(u^-1)
+    assert torch.allclose(tmp, basis)
+
     return basis
 
 
@@ -276,8 +290,8 @@ class SE3Kernel(torch.nn.Module):
                     if verbose:
                         overlaps = torch.stack([check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in torch.rand(5, 3)]).mean(0)
                         print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
-                    self.register_buffer("kernel_{}_{}".format(i, j), torch.tensor(basis, dtype=torch.get_default_dtype()))
-                    self.nweights += m_out * m_in * basis.shape[0]
+                    self.register_buffer("kernel_{}_{}".format(i, j), basis.type(torch.get_default_dtype()))
+                    self.nweights += m_out * m_in * basis.size(0)
                 else:
                     self.register_buffer("kernel_{}_{}".format(i, j), None)
 
@@ -305,26 +319,22 @@ class SE3Kernel(torch.nn.Module):
                 si = slice(begin_i, begin_i + mi * self.dims_out[i])
                 sj = slice(begin_j, begin_j + mj * self.dims_in[j])
 
-                kij = getattr(self, "kernel_{}_{}".format(i, j))
+                kij = getattr(self, "kernel_{}_{}".format(i, j))  # [beta, i, j, x, y, z]
                 if kij is not None:
                     b_el = kij.size(0)
-                    b_size = kij.size()[1:]
 
-                    w = weight[weight_index: weight_index + mi * mj * b_el].view(mi * mj, b_el)  # [I*J, beta]
+                    w = weight[weight_index: weight_index + mi * mj * b_el].view(mi, mj, b_el)  # [u, v, beta]
                     weight_index += mi * mj * b_el
 
-                    basis_kernels_ij = kij.contiguous().view(b_el, -1)  # [beta, i*j*x*y*z]
-
-                    ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*x*y*z]
-                    ker = ker.view(mi, mj, *b_size)  # [I, J, i, j, x, y, z]
-                    ker = ker.transpose(1, 2).contiguous()  # [I, i, J, j, x, y, z]
-                    ker = ker.view(mi * self.dims_out[i], mj * self.dims_in[j], *b_size[2:])  # [I*i, J*j, x, y, z]
-                    kernel[si, sj] = ker
+                    ker = torch.einsum("uvb,bijxyz->uivjxyz", (w, kij)).contiguous()  # [u, i, v, j, x, y, z]
+                    kernel[si, sj] = ker.view_as(kernel[si, sj])
                 else:
                     kernel[si, sj] = 0
 
                 begin_j += mj * self.dims_in[j]
             begin_i += mi * self.dims_out[i]
+
+        assert weight_index == self.nweights
         return kernel
 
     def forward(self):  # pylint: disable=W
