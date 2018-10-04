@@ -47,7 +47,9 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
 
     model = mod.Model(55).to(device)
 
-    model.load_state_dict(torch.load(os.path.join(log_dir, "state.pkl")))
+    state = torch.load(os.path.join(log_dir, "state.pkl"))
+    state = { key.replace('conv.kernel', 'kernel.kernel').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
+    model.load_state_dict(state)
 
     resdir = os.path.join(log_dir, dataset + "_perturbed")
     if os.path.isdir(resdir):
@@ -101,12 +103,13 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
     url = "https://shapenet.cs.stanford.edu/shrec17/code/evaluator.zip"
     file_path = "evaluator.zip"
 
-    r = requests.get(url, stream=True)
-    with open(file_path, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=16 * 1024 ** 2):
-            if chunk:  # filter out keep-alive new chunks
-                f.write(chunk)
-                f.flush()
+    if not os.path.isfile(file_path):
+        r = requests.get(url, stream=True)
+        with open(file_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=16 * 1024 ** 2):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+                    f.flush()
 
     zip_ref = zipfile.ZipFile(file_path, 'r')
     zip_ref.extractall(".")

@@ -24,18 +24,22 @@ class Model(torch.nn.Module):
             (n_in, ), # 77
             (12, 4, 1), 
             (24, 8, 2),
+            (24, 8, 2),
+            (24, 8, 2),
             (n_out, ),
         ]
 
         common_block_params = {
             'size': 7,
-            'padding': 4,
+            'padding': 3,
             'normalization': 'batch_max',
             'smooth_stride': True,
         }
 
         block_params = [
-            {'stride': 2, 'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
             {'activation': (F.relu, torch.sigmoid)},
             {'activation': None},
         ]

@@ -52,12 +52,12 @@ class CNN(nn.Module):
         }
 
         block_params = [
-            {'activation': (None, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
-            {'activation': (F.relu, F.sigmoid)},
+            {'activation': (None, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid)},
             {'activation': None},
         ]
 
