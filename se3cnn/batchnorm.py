@@ -131,13 +131,13 @@ class SE3BNConvolution(torch.nn.Module):
     SE3BatchNorm followed by SE3Convolution
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, dyn_iso=False, verbose=False, eps=1e-5, momentum=0.1, reduce='mean', **kwargs):
         super().__init__()
 
         self.eps = eps
         self.momentum = momentum
 
-        self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window, verbose)
+        self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window, dyn_iso, verbose)
         self.kwargs = kwargs
 
         self.Rs = list(zip(self.kernel.multiplicities_in, self.kernel.dims_in))
