@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import se3cnn
 from se3cnn.blocks import GatedBlock
 
 
@@ -19,29 +20,33 @@ class Model(torch.nn.Module):
 
         self.int_repr = None
 
-        features = [  # (6) double all channels
-            (1, ),
-            (4, 4, 4),
-            (8, 8, 8),
-            (16, 16, 16),
-            (32, 16, 16),
-            (200, )
+        features = [
+            (1, ), # 64
+            (8, 4, 2), (8, 4, 2), # 34, 38
+            (16, 8, 4), (16, 8, 4), # 21, 25
+            (32, 16, 8), (32, 16, 8), # 15, 19
+            (32, 16, 8), # 12
+            (512, )
         ]
 
         common_block_params = {
-            'size': 5,  # (5) = 5->7
-            'stride': 2,
-            'padding': 3,
+            'size': 5,
+            'padding': 4,
             'normalization': 'batch',
-            'capsule_dropout_p': 0.1,  # (4) Maurice suggestion
             'smooth_stride': True,
+            'capsule_dropout_p': 0.1,
+            'dyn_iso': True,
+            'radial_window': se3cnn.kernel.sigmoid_window,
         }
 
         block_params = [
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
             {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
             {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
             {'activation': (F.relu, torch.sigmoid)},
-            {'activation': (F.relu, torch.sigmoid)},
+            {'activation': (F.relu, torch.sigmoid), 'stride': 2},
             {'activation': (F.relu, torch.sigmoid)},
         ]
 
