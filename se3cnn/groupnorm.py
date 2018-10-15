@@ -88,12 +88,12 @@ class SE3GNConvolution(torch.nn.Module):
     cannot be ported for group normalization
     '''
 
-    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, eps=1e-5, Rs_gn=None, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, eps=1e-5, Rs_gn=None, **kwargs):
         super().__init__()
         if Rs_gn is None:
             Rs_gn = [(m, 2 * l + 1) for m, l in Rs_in]
         self.gn = SE3GroupNorm(Rs_gn, eps=eps)
-        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, radial_window=radial_window, **kwargs)
+        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, **kwargs)
 
     def forward(self, input):  # pylint: disable=W
         return self.conv(self.gn(input))

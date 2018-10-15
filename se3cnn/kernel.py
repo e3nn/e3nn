@@ -124,15 +124,15 @@ def _sample_cube(size, order_in, order_out):
     rng = torch.linspace(-((size - 1) / 2), (size - 1) / 2, steps=size, dtype=torch.float64)
 
     order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
-    sh_cubes = []
+    solutions = []
     for J in order_irreps:
         Y_J = _sample_sh_cube(size, J)  # [m, x, y, z]
 
         # compute basis transformation matrix Q_J
         Q_J = _basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
         K_J = torch.einsum('mn,nxyz->mxyz', (Q_J, Y_J))  # [m_out * m_in, x, y, z]
-        K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
-        sh_cubes.append(K_J)
+        K_J = K_J.view(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
+        solutions.append(K_J)
 
         # check that  rho_out(u) K(u^-1 x) rho_in(u^-1) = K(x) with u = rotation of +pi/2 around y axis
         tmp = K_J.transpose(2, 4).flip(4)  # K(u^-1 x)
@@ -147,7 +147,7 @@ def _sample_cube(size, order_in, order_out):
         assert torch.allclose(tmp, K_J)
 
     r_field = (rng.view(-1, 1, 1).pow(2) + rng.view(1, -1, 1).pow(2) + rng.view(1, 1, -1).pow(2)).sqrt()  # [x, y, z]
-    return sh_cubes, r_field, order_irreps
+    return solutions, r_field, order_irreps
 
 
 def cube_basis_kernels(size, order_in, order_out, radial_window):
@@ -156,15 +156,12 @@ def cube_basis_kernels(size, order_in, order_out, radial_window):
     :param size: side length of the filter kernel
     :param order_in: input representation order
     :param order_out: output representation order
-    :param radial_window: callable for windowing out radial parts, taking mandatory parameters 'sh_cubes', 'r_field' and 'order_irreps'
+    :param radial_window: callable for windowing out radial parts, taking mandatory parameters 'solutions', 'r_field' and 'order_irreps'
     :return: basis of equivariant kernels of shape (N_basis, 2 * order_out + 1, 2 * order_in + 1, size, size, size)
     '''
     basis = radial_window(*_sample_cube(size, order_in, order_out))
     if basis is None:
         return None
-
-    # normalize filter energy (not over axis 0, i.e. different filters are normalized independently)
-    basis = basis / basis.view(basis.size(0), -1).norm(dim=1).view(-1, 1, 1, 1, 1, 1)
 
     # check that  rho_out(u) K(u^-1 x) rho_in(u^-1) = K(x) with u = rotation of +pi/2 around y axis
     tmp = basis.transpose(3, 5).flip(5)  # K(u^-1 x)
@@ -185,14 +182,34 @@ def cube_basis_kernels(size, order_in, order_out, radial_window):
 # Radial distribution functions
 ################################################################################
 
-def gaussian_window(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma=.6):
+def sigmoid_window(solutions, r_field, order_irreps, sharpness=5):
+    '''
+    sigmoid windowing function
+    takes as input the output of _sample_cube
+    '''
+    size = r_field.size(0)  # 5
+    n_radial = size // 2 + 1  # 3
+    radii = torch.linspace(0.5, size // 2 + 0.5, steps=n_radial, dtype=torch.float64)  # [0.5, 1.5, 2.5]
+
+    basis = []
+    for i, r in enumerate(radii):
+        window = torch.sigmoid(sharpness * (r - r_field))
+        J_max = 2 * i + 1 if i > 0 else 0  # compromise from https://arxiv.org/abs/1711.07289
+
+        for sol, J in zip(solutions, order_irreps):
+            if J <= J_max:
+                x = sol * window  # [m_out, m_in, x, y, z]
+                basis.append(x)
+
+    return torch.stack(basis, dim=0) if len(basis) > 0 else None
+
+
+def gaussian_window(solutions, r_field, order_irreps, radii, J_max_list, sigma=.6):
     '''
     gaussian windowing function with manual handling of shell radii, shell bandlimits and shell width
-    :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
-    :param r_field: np.ndarray containing radial coordinates in the cube, shape (size,size,size)
-    :param order_irreps: np.ndarray with the order J of the irreps in sh_cubes with |j-l|<=J<=j+l
-    :param radii: np.ndarray with radii of the shells, sets mean of the radial gaussians
-    :param J_max_list: np.ndarray with bandlimits of the shells, same length as radii
+    takes as input the output of _sample_cube
+    :param radii: radii of the shells, sets mean of the radial gaussians
+    :param J_max_list: bandlimits of the shells, same length as radii
     :param sigma: width of the shells, corresponds to standard deviation of radial gaussians
     '''
     # run over radial parts and window out non-aliased basis functions
@@ -201,26 +218,19 @@ def gaussian_window(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma=.6
     basis = []
     for r, J_max in zip(radii, J_max_list):
         window = torch.exp(-.5 * ((r_field - r) / sigma)**2) / (math.sqrt(2 * math.pi) * sigma)
-        window = window.unsqueeze(0).unsqueeze(0)
-        # for each spherical shell at radius r window sh_cube if J does not exceed the bandlimit J_max
-        for idx_J, J in enumerate(order_irreps):
-            if J > J_max:
-                break
-            else:
-                basis.append(sh_cubes[idx_J] * window)
-    if len(basis) > 0:
-        basis = torch.stack(basis, dim=0)
-    else:
-        basis = None
-    return basis
+
+        for sol, J in zip(solutions, order_irreps):
+            if J <= J_max:
+                x = sol * window  # [m_out, m_in, x, y, z]
+                basis.append(x)
+
+    return torch.stack(basis, dim=0) if len(basis) > 0 else None
 
 
-def gaussian_window_wrapper(sh_cubes, r_field, order_irreps, mode='compromise', border_dist=0., sigma=.6):
+def gaussian_window_wrapper(solutions, r_field, order_irreps, mode='compromise', border_dist=0., sigma=.6):
     '''
     convenience wrapper for windowing function with three different predefined modes for radii and bandlimits
-    :param sh_cubes: list of spherical harmonic basis cubes which are np.ndarrays of shape (2*l+1, 2*j+1, size, size, size)
-    :param r_field: np.ndarray containing radial coordinates in the cube, shape (size,size,size)
-    :param order_irreps: np.ndarray with the order J of the irreps in sh_cubes with |j-l|<=J<=j+l
+    takes as input the output of _sample_cube
     :param mode: string in ['sfcnn', 'conservative', '']
                  'conservative': radial bandlimits such that equivariance value stays over 90% (for border_dist=0 and except for outer shell)
                           [0,2,4,6,8,10,...]
@@ -244,15 +254,39 @@ def gaussian_window_wrapper(sh_cubes, r_field, order_irreps, mode='compromise', 
     if mode == 'sfcnn':
         J_max_list = [0, 4, 6, 8, 10, 12, 14, 16][:n_radial]
 
-    return gaussian_window(sh_cubes, r_field, order_irreps, radii, J_max_list, sigma)
+    return gaussian_window(solutions, r_field, order_irreps, radii, J_max_list, sigma)
 
 
 ################################################################################
 # Kernel Module
 ################################################################################
 
+def orthogonal_(tensor, gain=1):
+    # proper orthogonal init, see https://github.com/pytorch/pytorch/pull/10672
+    if tensor.ndimension() < 2:
+        raise ValueError("Only tensors with 2 or more dimensions are supported")
+
+    rows = tensor.size(0)
+    cols = tensor[0].numel()
+    flattened = tensor.new_empty(rows, cols).normal_(0, 1)
+
+    for i in range(0, rows, cols):
+        # Compute the qr factorization
+        q, r = torch.qr(flattened[i:i + cols].t())
+        # Make Q uniform according to https://arxiv.org/pdf/math-ph/0609050.pdf
+        q *= torch.diag(r, 0).sign()
+        q.t_()
+
+        with torch.no_grad():
+            tensor[i:i + cols].view_as(q).copy_(q)
+
+    with torch.no_grad():
+        tensor.mul_(gain)
+    return tensor
+
+
 class SE3Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=gaussian_window_wrapper, verbose=False):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=gaussian_window_wrapper, dyn_iso=False, verbose=False):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
@@ -271,31 +305,40 @@ class SE3Kernel(torch.nn.Module):
         self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i in range(len(self.multiplicities_out))])
         self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in range(len(self.multiplicities_in))])
 
-        self.nweights = 0
+        weights = []
 
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
-                basis = cube_basis_kernels(size, l_in, l_out, radial_window)
+                basis = cube_basis_kernels(size, l_in, l_out, radial_window)  # [beta, i, j, x, y, z]
                 if basis is not None:
                     assert basis.size()[1:] == ((2 * l_out + 1), (2 * l_in + 1), size, size, size), "wrong basis shape - your cache files may probably be corrupted"
-                    # rescale each basis element such that the weight can be initialized with Normal(0,1)
-                    # orthonormalization already done in cube_basis_kernels!
-                    # ORIGINAL
-                    # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in))
-                    # EQUAL CONTRIB OF ALL SUPERBLOCKS
-                    # orig normalized for one superblock of nmultiplicities_in capsules, disregarded that there are multiple in-orders -> divide by number of in-orders
-                    # basis *= np.sqrt((2 * l_out + 1) / (len(basis)*m_in*len(Rs_in)))
-                    # EQUAL CONTRIB OF ALL CAPSULES
-                    basis *= ((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in))) ** 0.5
+
                     if verbose:
                         overlaps = torch.stack([check_basis_equivariance(basis, l_in, l_out, a, b, c) for a, b, c in torch.rand(5, 3)]).mean(0)
                         print("{} -> {} : Created {} basis elements with equivariance {}".format(l_in, l_out, len(basis), overlaps))
+
+                    if dyn_iso:
+                        # inspired by Algo. 2 in https://arxiv.org/abs/1806.05393
+
+                        w = torch.zeros(m_out, m_in, basis.size(0))
+                        if abs(l_out - l_in) == min(abs(l_out - l_in_) for _m_in, l_in_ in self.Rs_in):
+                            orthogonal_(w[:, :, 0])  # only the "simplest" base operation has a non-zero init
+                            # TODO this if might be called for multiple l input
+                        weights += [w.flatten()]
+
+                        basis /= basis.flatten(2).norm(dim=2).mean(1).view(basis.size(0), 1, 1, 1, 1, 1)
+                    else:
+                        weights += [torch.randn(m_out * m_in * basis.size(0))]
+
+                        # rescale each basis element such that the weight can be initialized with Normal(0,1)
+                        basis /= basis.flatten(1).norm(dim=1).view(-1, 1, 1, 1, 1, 1)
+                        basis *= ((2 * l_out + 1) / (len(basis) * sum(self.multiplicities_in))) ** 0.5
+
                     self.register_buffer("kernel_{}_{}".format(i, j), basis.type(torch.get_default_dtype()))
-                    self.nweights += m_out * m_in * basis.size(0)
                 else:
                     self.register_buffer("kernel_{}_{}".format(i, j), None)
 
-        self.weight = torch.nn.Parameter(torch.randn(self.nweights))
+        self.weight = torch.nn.Parameter(torch.cat(weights))
 
 
     def __repr__(self):
@@ -334,7 +377,7 @@ class SE3Kernel(torch.nn.Module):
                 begin_j += mj * self.dims_in[j]
             begin_i += mi * self.dims_out[i]
 
-        assert weight_index == self.nweights
+        assert weight_index == weight.size(0)
         return kernel
 
     def forward(self):  # pylint: disable=W

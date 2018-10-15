@@ -13,7 +13,7 @@ class GatedBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window=kernel.gaussian_window_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
-                 bias=True, smooth_stride=False, verbose=False):
+                 bias=True, smooth_stride=False, dyn_iso=False, verbose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -28,6 +28,7 @@ class GatedBlock(torch.nn.Module):
         :param float batch_norm_momentum: batch normalization momentum (ignored if no batch normalization)
         :param bool bias: bias for the gates and scalar fields
         :param bool smooth_stride: apply a low pass filter before the stride
+        :param bool dyn_iso: initialize with some sort of Dynamical Isometry (inspired by Algo. 2 in https://arxiv.org/abs/1806.05393)
         '''
         super().__init__()
 
@@ -74,6 +75,7 @@ class GatedBlock(torch.nn.Module):
             stride=1 if smooth_stride else stride,
             padding=padding,
             dilation=dilation,
+            dyn_iso=dyn_iso,
             verbose=verbose,
         )
 

@@ -5,10 +5,10 @@ from se3cnn import kernel
 
 
 class SE3Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, verbose=False, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, radial_window=kernel.gaussian_window_wrapper, dyn_iso=False, verbose=False, **kwargs):
         super().__init__()
 
-        self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window=radial_window, verbose=verbose)
+        self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window=radial_window, dyn_iso=dyn_iso, verbose=verbose)
         self.kwargs = kwargs
 
     def __repr__(self):
@@ -26,8 +26,8 @@ def test_equivariance():
     torch.set_default_dtype(torch.float64)
 
     f = torch.nn.Sequential(
-        SE3Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
-        SE3Convolution([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
+        SE3Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5, dyn_iso=True),
+        SE3Convolution([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5, dyn_iso=False),
     )
 
     def rotate(t):
@@ -54,8 +54,8 @@ def test_equivariance():
         raise AssertionError('Operations are not rotation-equivariant. Diff', diff_out)
 
 
-def test_normalization(batch, input_size, Rs_in, Rs_out, size):
-    conv = SE3Convolution(Rs_in, Rs_out, size)
+def test_normalization(batch, input_size, Rs_in, Rs_out, size, dyn_iso):
+    conv = SE3Convolution(Rs_in, Rs_out, size, dyn_iso=dyn_iso)
 
     print("Weights Number = {} Mean = {:.3f} Std = {:.3f}".format(conv.kernel.weight.numel(), conv.kernel.weight.mean().item(), conv.kernel.weight.std().item()))
 
@@ -82,10 +82,11 @@ def test_combination_gradient(Rs_in, Rs_out, size):
 
 def main():
     test_equivariance()
-    test_normalization(3, 15,
-                       [(2, 0), (1, 1), (3, 4)],
-                       [(2, 0), (2, 1), (1, 2)],
-                       5)
+    for dyn_iso in [False, True]:
+        test_normalization(3, 15,
+                           [(2, 0), (1, 1), (3, 4)],
+                           [(2, 0), (2, 1), (1, 2)],
+                           5, dyn_iso)
     test_combination_gradient([(1, 0), (1, 1)], [(1, 0)], 5)
 
 
