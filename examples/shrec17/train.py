@@ -15,7 +15,7 @@ from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel, EqSampler
 from se3cnn.filter import low_pass_filter
 
 
-def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps, loss_func):
+def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps):
     arguments = copy.deepcopy(locals())
 
     os.mkdir(log_dir)
@@ -76,44 +76,14 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         model.train()
         data, target = data.to(device), target.to(device)
 
-
-        if loss_func == "cross-entropy":
-            prediction = model(data)
-            loss = F.cross_entropy(prediction, target)
-        if loss_func == "quadratic-hinge":
-            b = len(data)
-            f = 2
-            bb = b // f
-            assert bb * f == b
-
-            with torch.no_grad():
-                prediction = model(data)
-
-            y = -torch.ones_like(prediction)
-            for i in range(len(target)):
-                y[i, target[i]] = 1
-            
-            delta = 1 - prediction * y
-            mask = (delta > 0).any(1)
-
-            data = data[mask][:bb].detach()
-            target = target[mask][:bb].detach()
-            y = y[mask][:bb].detach()
-
-            if len(data) == 0:
-                return 0, b
-
-            prediction = model(data)
-            loss = F.relu(1 - prediction * y).pow(2).mean()
+        prediction = model(data)
+        loss = F.cross_entropy(prediction, target)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         correct = prediction.argmax(1).eq(target).long().sum().item()
-
-        if loss_func == "quadratic-hinge":
-            correct = f * (correct + bb - len(data))
 
         return loss.item(), correct
 
@@ -192,7 +162,6 @@ if __name__ == "__main__":
     parser.add_argument("--restore_dir", type=str)
     parser.add_argument("--lr_value", type=float, nargs='+', default=[1, 0.1, 0.01])
     parser.add_argument("--lr_steps", type=int, nargs='+', default=[500, 1000])
-    parser.add_argument("--loss_func", type=str, default="cross-entropy")
 
     args = parser.parse_args()
 
