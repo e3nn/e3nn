@@ -1,4 +1,5 @@
 import unittest, torch
+import torch.nn as nn
 from convolution import SE3Convolution
 
 class Tests(unittest.TestCase):
@@ -80,5 +81,18 @@ class Tests(unittest.TestCase):
         traced = torch.jit.trace(f, inp)
 
         self.assertTrue(torch.allclose(f(inp), traced(inp)))
+
+    def test_data_parallel(self):
+        f = torch.nn.Sequential(
+            SE3Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
+            SE3Convolution([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
+        ).cuda()
+
+        inp = torch.randn(2, 1, 16, 16, 16).cuda()
+
+        parallel = nn.DataParallel(f).cuda()
+
+        self.assertTrue(torch.allclose(f(inp), parallel(inp)))
+        
 
 unittest.main()
