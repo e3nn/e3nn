@@ -79,7 +79,10 @@ def _basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: dis
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
         Q_J = null_space[0]  # [(m_out * m_in) * m]
         Q_J = Q_J.view((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
-        assert all(torch.allclose(_R_tensor(a, b, c) @ Q_J, Q_J @ irr_repr(J, a, b, c)) for a, b, c in torch.rand(4, 3))
+        assert all(torch.allclose(
+            _R_tensor(a.item(), b.item(), c.item()) @ Q_J,
+            Q_J @ irr_repr(J, a.item(), b.item(), c.item())) for a, b, c in torch.rand(4, 3)
+        )
 
     assert Q_J.dtype == torch.float64
     return Q_J  # [m_out * m_in, m]

@@ -115,7 +115,7 @@ def compose(a1, b1, c1, a2, b2, c2):
 def kron(x, y):
     assert x.ndimension() == 2
     assert y.ndimension() == 2
-    return torch.einsum("ij,kl->ikjl", (x, y)).view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
 
 ################################################################################
