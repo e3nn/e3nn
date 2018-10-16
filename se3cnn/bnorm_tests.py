@@ -5,6 +5,7 @@ from batchnorm import SE3BNConvolution, SE3BatchNorm
 from convolution import SE3Convolution
 
 class JointConvolution(nn.Module):
+    ''' Compose SE3BN with SE3Conv to emulate SE3BNConv '''
     def __init__(self, repr_in, repr_out, size=5):
         super(JointConvolution, self).__init__()
 
