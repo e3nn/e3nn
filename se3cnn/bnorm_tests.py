@@ -101,4 +101,40 @@ class Tests(unittest.TestCase):
         # compare
         self.assertLess((y2 - y1).std() / y2.std(), 1e-4)
 
+    def _test_tracing_jit(self, module):
+        f = torch.nn.Sequential(
+            module([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
+            module([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
+        )
+
+        inp = torch.randn(2, 1, 16, 16, 16)
+
+        traced = torch.jit.trace(f, inp)
+
+        self.assertTrue(torch.allclose(f(inp), traced(inp)))
+
+    def _test_data_parallel(self, module):
+        f = torch.nn.Sequential(
+            module([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
+            module([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
+        ).cuda()
+
+        inp = torch.randn(2, 1, 16, 16, 16).cuda()
+
+        parallel = nn.DataParallel(f).cuda()
+
+        self.assertTrue(torch.allclose(f(inp), parallel(inp)))
+    
+    def test_se3bnconv_jit(self):
+        self._test_tracing_jit(module=SE3BNConvolution)
+
+    def test_se3bnconv_dataparallel(self):
+        self._test_data_parallel(module=SE3BNConvolution)
+
+    def test_se3bn_jit(self):
+        self._test_tracing_jit(module=JointConvolution)
+
+    def test_se3bn_dataparallel(self):
+        self._test_data_parallel(module=JointConvolution)
+
 unittest.main()
