@@ -103,23 +103,6 @@ class SE3BatchNorm(nn.Module):
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
 
-def test_batchnorm(Rs=None):
-    if Rs is None:
-        Rs = [(3, 1), (4, 3), (1, 5)]
-
-    bn = SE3BatchNorm(Rs)
-
-    x = torch.randn(16, sum(m * d for m, d in Rs), 10, 10, 10) * 3 + 12
-
-    bn.train()
-    y = bn(x)
-
-    bn.eval()
-    z = bn(x)
-
-    return y, z
-
-
 from se3cnn import SE3Kernel
 from se3cnn import kernel
 
@@ -229,43 +212,3 @@ class SE3BNConvolution(torch.nn.Module):
         bias = torch.cat(bias)
         kernel = self.kernel.combination(torch.cat(ws))
         return torch.nn.functional.conv3d(input, kernel, bias=bias, **self.kwargs)
-
-
-def test_bn_conv(Rs_in, Rs_out, kernel_size, batch, input_size):
-    from se3cnn import SE3Convolution
-
-    # input
-    n_out = sum([m * (2 * l + 1) for m, l in Rs_out])
-    n_in = sum([m * (2 * l + 1) for m, l in Rs_in])
-    x = torch.rand(batch, n_in, input_size, input_size, input_size) * 2 + 2
-
-    # BNConv
-    bnconv = SE3BNConvolution(Rs_in, Rs_out, kernel_size)
-    bnconv.train()
-    y1 = bnconv(x)
-
-    assert y1.size(1) == n_out
-
-    # BN + Conv
-    bn = SE3BatchNorm(bnconv.Rs, affine=False)
-    bn.train()
-
-    conv = SE3Convolution(Rs_in, Rs_out, kernel_size)
-    conv.train()
-    conv.kernel = bnconv.kernel
-
-    y2 = conv(bn(x))
-
-    assert y2.size(1) == n_out
-
-    # compare
-    assert (y2 - y1).std() / y2.std() < 1e-4
-
-
-def main():
-    test_batchnorm([(2, 1), (1, 3)])
-    test_bn_conv([(2, 0), (2, 1), (1, 2), (1, 3)], [(2, 0), (2, 1), (1, 2)], 5, 4, 10)
-
-
-if __name__ == "__main__":
-    main()

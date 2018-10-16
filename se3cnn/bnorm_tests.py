@@ -67,4 +67,38 @@ class Tests(unittest.TestCase):
     def test_se3bn_equivariance_cpu(self):
         self._test_equivariance(module=JointConvolution, cuda=False)
 
+    def test_does_reduce_variance(self):
+        Rs_in =[(2, 0), (2, 1), (1, 2), (1, 3)]
+        Rs_out = [(2, 0), (2, 1), (1, 2)]
+        kernel_size = 5
+        batch = 4
+        input_size = 10
+
+        # input
+        n_out = sum([m * (2 * l + 1) for m, l in Rs_out])
+        n_in = sum([m * (2 * l + 1) for m, l in Rs_in])
+        x = torch.rand(batch, n_in, input_size, input_size, input_size) * 2 + 2
+
+        # BNConv
+        bnconv = SE3BNConvolution(Rs_in, Rs_out, kernel_size)
+        bnconv.train()
+        y1 = bnconv(x)
+
+        self.assertEqual(y1.size(1), n_out)
+
+        # BN + Conv
+        bn = SE3BatchNorm(bnconv.Rs, affine=False)
+        bn.train()
+
+        conv = SE3Convolution(Rs_in, Rs_out, kernel_size)
+        conv.train()
+        conv.kernel = bnconv.kernel
+
+        y2 = conv(bn(x))
+
+        self.assertEqual(y2.size(1), n_out)
+
+        # compare
+        self.assertLess((y2 - y1).std() / y2.std(), 1e-4)
+
 unittest.main()
