@@ -153,8 +153,8 @@ class SE3BNConvolution(torch.nn.Module):
 
             if d == 1:  # scalars
                 if self.training:
-                    field_mean = field.mean(-1).mean(0).view(-1)  # [feature]
-                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.detach()
+                    field_mean = field.mean(-1).mean(0).view(-1).detach()  # [feature]
+                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean
                 else:
                     field_mean = self.running_mean[irm: irm + m]
                 irm += m
@@ -169,8 +169,8 @@ class SE3BNConvolution(torch.nn.Module):
                     field_norm = field_norm.max(-1)[0]  # [batch, feature]
                 else:
                     raise ValueError("Invalid reduce option")
-                field_norm = field_norm.mean(0)  # [feature]
-                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
+                field_norm = field_norm.mean(0).detach()  # [feature]
+                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm
             else:
                 field_norm = self.running_var[irv: irv + m]
             irv += m
