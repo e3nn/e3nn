@@ -1,8 +1,7 @@
 import unittest, torch
 import torch.nn as nn
 
-from batchnorm import SE3BNConvolution, SE3BatchNorm
-from convolution import SE3Convolution
+from se3cnn import SE3BNConvolution, SE3BatchNorm, SE3Convolution
 
 class JointConvolution(nn.Module):
     ''' Compose SE3BN with SE3Conv to emulate SE3BNConv '''
@@ -67,7 +66,7 @@ class Tests(unittest.TestCase):
     def test_se3bn_equivariance_cpu(self):
         self._test_equivariance(module=JointConvolution, cuda=False)
 
-    def test_does_reduce_variance(self):
+    def test_se3bnconv_same_as_bn_plus_se3conv(self):
         Rs_in =[(2, 0), (2, 1), (1, 2), (1, 3)]
         Rs_out = [(2, 0), (2, 1), (1, 2)]
         kernel_size = 5
@@ -113,28 +112,12 @@ class Tests(unittest.TestCase):
 
         self.assertTrue(torch.allclose(f(inp), traced(inp)))
 
-    def _test_data_parallel(self, module):
-        f = torch.nn.Sequential(
-            module([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
-            module([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
-        ).cuda()
-
-        inp = torch.randn(2, 1, 16, 16, 16).cuda()
-
-        parallel = nn.DataParallel(f).cuda()
-
-        self.assertTrue(torch.allclose(f(inp), parallel(inp)))
-    
+    @unittest.skipUnless(torch.__version__.startswith('1'), "jit requires >1.0")
     def test_se3bnconv_jit(self):
         self._test_tracing_jit(module=SE3BNConvolution)
 
-    def test_se3bnconv_dataparallel(self):
-        self._test_data_parallel(module=SE3BNConvolution)
-
+    @unittest.skipUnless(torch.__version__.startswith('1'), "jit requires >1.0")
     def test_se3bn_jit(self):
         self._test_tracing_jit(module=JointConvolution)
-
-    def test_se3bn_dataparallel(self):
-        self._test_data_parallel(module=JointConvolution)
 
 unittest.main()

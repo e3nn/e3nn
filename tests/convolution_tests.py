@@ -1,6 +1,7 @@
 import unittest, torch
 import torch.nn as nn
-from convolution import SE3Convolution
+
+from se3cnn import SE3Convolution
 
 class Tests(unittest.TestCase):
     def _test_equivariance(self, f):
@@ -70,6 +71,7 @@ class Tests(unittest.TestCase):
 
         self.assertTrue(torch.autograd.gradcheck(conv, (x, ), eps=1))
 
+    @unittest.skipUnless(torch.__version__.startswith('1'), "jit requires >1.0")
     def test_tracing_jit(self):
         f = torch.nn.Sequential(
             SE3Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
