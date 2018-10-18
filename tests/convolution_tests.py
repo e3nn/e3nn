@@ -58,7 +58,6 @@ class Tests(unittest.TestCase):
         self.assertLess(abs(y_mean), 0.1)
         self.assertLess(abs(y_std - 1), 0.3)
 
-
     def test_combination_gradient(self):
         Rs_in = [(1, 0), (1, 1)]
         Rs_out = [(1, 0)]
@@ -84,6 +83,10 @@ class Tests(unittest.TestCase):
 
         self.assertTrue(torch.allclose(f(inp), traced(inp)))
 
+    @unittest.skipUnless(
+        torch.cuda.device_count() > 1,
+        "need at least 2 GPUs to meaningfully test DataParallel"
+    )
     def test_data_parallel(self):
         f = torch.nn.Sequential(
             SE3Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),

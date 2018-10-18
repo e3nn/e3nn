@@ -54,6 +54,19 @@ class Tests(unittest.TestCase):
         diff_out = (out - unrotate(out_r)).abs().max().item()
         self.assertLess(diff_out, 1e-10)
 
+    def test_se3bnconv_gradient(self):
+        ''' Equivalent to convolution_tests.py/test_combination_gradient '''
+        Rs_in = [(1, 0), (1, 1)]
+        Rs_out = [(1, 0)]
+        size = 5
+
+        conv = SE3BNConvolution(Rs_in, Rs_out, size).type(torch.float64)
+
+        x = torch.rand(1, sum(m * (2 * l + 1) for m, l in Rs_in), 6, 6, 6,
+                       requires_grad=True, dtype=torch.float64)
+
+        self.assertTrue(torch.autograd.gradcheck(conv, (x, ), eps=1))
+
     def test_se3bnconv_equivariance_cuda(self):
         self._test_equivariance(module=SE3BNConvolution, cuda=True)
 
