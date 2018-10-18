@@ -375,10 +375,13 @@ class SE3Kernel(torch.nn.Module):
                     weight_index += mi * mj * b_el
 
                     ker = torch.einsum("uvb,bijxyz->uivjxyz", (w, kij)).contiguous()  # [u, i, v, j, x, y, z]
+                    ker = ker.view(i_diff, j_diff, self.size, self.size, self.size)
                 else:
-                    ker = torch.tensor(0.)
+                    ker = torch.zeros(
+                        i_diff, j_diff, self.size, self.size, self.size,
+                        device=weight.device, dtype=weight.dtype
+                    )
 
-                ker = ker.view(i_diff, j_diff, self.size, self.size, self.size)
 
                 sj_kernels.append(ker)
                 begin_j += mj * self.dims_in[j]
