@@ -54,6 +54,19 @@ class Tests(unittest.TestCase):
         diff_out = (out - unrotate(out_r)).abs().max().item()
         self.assertLess(diff_out, 1e-10)
 
+    def test_se3bn_gradient(self):
+        rep = [(1, 0), (1, 1)]
+        mult_dim = [(1, 1), (1, 3)]
+
+        size = 5
+
+        bn = SE3BatchNorm(mult_dim, size).type(torch.float64)
+
+        x = torch.rand(1, 4, 6, 6, 6,
+                       requires_grad=True, dtype=torch.float64)
+
+        self.assertTrue(torch.autograd.gradcheck(bn, (x, ), eps=1))
+
     def test_se3bnconv_gradient(self):
         ''' Equivalent to convolution_tests.py/test_combination_gradient '''
         Rs_in = [(1, 0), (1, 1)]

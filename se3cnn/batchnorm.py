@@ -101,7 +101,11 @@ class SE3BatchNorm(nn.Module):
 
             fields.append(field.view(input.size(0), m * d, *input.size()[2:]))
 
-        assert ix == input.size(1)
+        if ix != input.size(1):
+            fmt = "`ix` should have reached input.size(1) ({}), but it ended at {}"
+            msg = fmt.format(input.size(1), ix)
+            raise AssertionError(msg)
+
         if self.training:
             assert irm == self.running_mean.numel()
             assert irv == self.running_var.size(0)
@@ -199,7 +203,11 @@ class SE3BNConvolution(torch.nn.Module):
             field_norms.append(field_norm)  # [feature]
             del field
 
-        assert ix == input.size(1)
+        if ix != input.size(1):
+            fmt = "`ix` should have reached input.size(1) ({}), but it ended at {}"
+            msg = fmt.format(input.size(1), ix)
+            raise AssertionError(msg)
+
         assert irm == self.running_mean.numel()
         assert irv == self.running_var.size(0)
 
