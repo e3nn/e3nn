@@ -48,8 +48,9 @@ class SE3BatchNorm(nn.Module):
         :param input: [batch, stacked feature, x, y, z]
         '''
 
-        new_means = []
-        new_vars = []
+        if self.training:
+            new_means = []
+            new_vars = []
 
         fields = []
         ix = 0
@@ -123,8 +124,9 @@ class SE3BatchNorm(nn.Module):
             assert iw == self.weight.size(0)
             assert ib == self.bias.numel()
 
-        self.running_mean = torch.cat(new_means) 
-        self.running_var = torch.cat(new_vars)
+        if self.training:
+            self.running_mean = torch.cat(new_means) 
+            self.running_var = torch.cat(new_vars)
 
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
@@ -174,8 +176,9 @@ class SE3BNConvolution(torch.nn.Module):
         field_means = []
         field_norms = []
         
-        new_means = []
-        new_vars = []
+        if self.training:
+            new_means = []
+            new_vars = []
 
         ix = 0
         irm = 0
@@ -227,8 +230,9 @@ class SE3BNConvolution(torch.nn.Module):
         assert irm == self.running_mean.numel()
         assert irv == self.running_var.size(0)
 
-        self.running_mean = torch.cat(new_means)
-        self.running_var = torch.cat(new_vars)
+        if self.training:
+            self.running_mean = torch.cat(new_means)
+            self.running_var = torch.cat(new_vars)
 
         bias = []
 
