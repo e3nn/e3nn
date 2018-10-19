@@ -13,6 +13,7 @@ import numpy as np
 
 from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel, EqSampler
 from se3cnn.filter import low_pass_filter
+from test import main as evaluate
 
 
 def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps):
@@ -101,6 +102,8 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         dynamics = torch.load(os.path.join(restore_dir, "dynamics.pkl"))
         epoch = dynamics[-1]['epoch'] + 1
 
+    best_score = 0
+
     for epoch in range(epoch, 2000):
 
         lr = get_learning_rate(epoch)
@@ -145,6 +148,13 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         torch.save(model.state_dict(), os.path.join(log_dir, "state.pkl"))
         torch.save(dynamics, os.path.join(log_dir, "dynamics.pkl"))
 
+        if epoch % 100 == 0:
+            micro, macro = evaluate(log_dir, 1, "val", 20, 1, "state.pkl")
+            score = micro["mAP"] + macro["mAP"]
+            print("Score={} Best={}".format(score, best_score))
+            if score > best_score:
+                best_score = score
+                torch.save(model.state_dict(), os.path.join(log_dir, "best_state.pkl"))
 
 if __name__ == "__main__":
     import argparse

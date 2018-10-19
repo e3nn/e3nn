@@ -21,7 +21,7 @@ class KeepName:
         return file_name, self.transform(file_name)
 
 
-def main(log_dir, augmentation, dataset, batch_size, num_workers):
+def main(log_dir, augmentation, dataset, batch_size, num_workers, filename):
     print(check_output(["nodejs", "--version"]).decode("utf-8"))
 
     torch.backends.cudnn.benchmark = True
@@ -47,7 +47,7 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
 
     model = mod.Model(55).to(device)
 
-    state = torch.load(os.path.join(log_dir, "state.pkl"))
+    state = torch.load(os.path.join(log_dir, filename))
     #state = { key.replace('conv.kernel', 'kernel.kernel').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
     model.load_state_dict(state)
 
@@ -122,11 +122,11 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
 
     _, p, r, f, mAP, ndcg, _, _ = next(line for line in output.splitlines() if 'microALL' in line).split(',')
     micro = {
-        "P": p, "R": r, "F1": f, "mAP": mAP, "NDCG": ndcg
+        "P": float(p), "R": float(r), "F1": float(f), "mAP": float(mAP), "NDCG": float(ndcg)
     }
     _, p, r, f, mAP, ndcg, _, _ = next(line for line in output.splitlines() if 'macroALL' in line).split(',')
     macro = {
-        "P": p, "R": r, "F1": f, "mAP": mAP, "NDCG": ndcg
+        "P": float(p), "R": float(r), "F1": float(f), "mAP": float(mAP), "NDCG": float(ndcg)
     }
     return micro, macro
 
@@ -142,6 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", choices={"test", "val", "train"}, default="val")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=1)
+    parser.add_argument("--filename", type=str, default="state.pkl")
 
     args = parser.parse_args()
 
