@@ -48,7 +48,7 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
     model = mod.Model(55).to(device)
 
     state = torch.load(os.path.join(log_dir, "state.pkl"))
-    state = { key.replace('conv.kernel', 'kernel.kernel').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
+    #state = { key.replace('conv.kernel', 'kernel.kernel').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
     model.load_state_dict(state)
 
     resdir = os.path.join(log_dir, dataset + "_perturbed")
@@ -116,8 +116,20 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers):
     zip_ref.close()
 
     print("nodejs script...")
-    print(check_output(["nodejs", "evaluate.js", os.path.join("..", log_dir) + "/"], cwd="evaluator").decode("utf-8"))
+    output = check_output(["nodejs", "evaluate.js", os.path.join("..", log_dir) + "/"], cwd="evaluator").decode("utf-8")
+    print(output)
     shutil.copy2(os.path.join("evaluator", log_dir + ".summary.csv"), os.path.join(log_dir, "summary.csv"))
+
+    _, p, r, f, mAP, ndcg, _, _ = next(line for line in output.splitlines() if 'microALL' in line).split(',')
+    micro = {
+        "P": p, "R": r, "F1": f, "mAP": mAP, "NDCG": ndcg
+    }
+    _, p, r, f, mAP, ndcg, _, _ = next(line for line in output.splitlines() if 'macroALL' in line).split(',')
+    macro = {
+        "P": p, "R": r, "F1": f, "mAP": mAP, "NDCG": ndcg
+    }
+    return micro, macro
+
 
 if __name__ == "__main__":
     import argparse
