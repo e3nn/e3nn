@@ -1,8 +1,7 @@
 import unittest, torch
 import torch.nn as nn
 
-from batchnorm import SE3BNConvolution, SE3BatchNorm
-from convolution import SE3Convolution
+from se3cnn import SE3BNConvolution, SE3BatchNorm, SE3Convolution
 
 class JointConvolution(nn.Module):
     ''' Compose SE3BN with SE3Conv to emulate SE3BNConv '''
@@ -55,6 +54,62 @@ class Tests(unittest.TestCase):
         diff_out = (out - unrotate(out_r)).abs().max().item()
         self.assertLess(diff_out, 1e-10)
 
+    def test_se3bn_train_then_eval(self):
+        rep = [(1, 0), (1, 1)]
+        mult_dim = [(1, 1), (1, 3)]
+
+        size = 5
+
+        bn = SE3BatchNorm(mult_dim, size).type(torch.float64)
+        bn.train()
+
+        x = torch.rand(1, 4, 6, 6, 6,
+                       requires_grad=True, dtype=torch.float64)
+        y = bn(x)
+        bn.eval()
+        y = bn(x)
+
+    def test_se3bnconv_train_then_eval(self):
+        Rs_in = [(1, 0), (1, 1)]
+        Rs_out = [(1, 0)]
+        size = 5
+
+        conv = SE3BNConvolution(Rs_in, Rs_out, size).type(torch.float64)
+
+        x = torch.rand(1, sum(m * (2 * l + 1) for m, l in Rs_in), 6, 6, 6,
+                       requires_grad=True, dtype=torch.float64)
+
+        conv.train()
+        y = conv(x)
+        conv.eval()
+        y = conv(x)
+
+    def test_se3bn_gradient(self):
+        rep = [(1, 0), (1, 1)]
+        mult_dim = [(1, 1), (1, 3)]
+
+        size = 5
+
+        bn = SE3BatchNorm(mult_dim, size).type(torch.float64)
+
+        x = torch.rand(1, 4, 6, 6, 6,
+                       requires_grad=True, dtype=torch.float64)
+
+        self.assertTrue(torch.autograd.gradcheck(bn, (x, ), eps=1e-3))
+
+    def test_se3bnconv_gradient(self):
+        ''' Equivalent to convolution_tests.py/test_combination_gradient '''
+        Rs_in = [(1, 0), (1, 1)]
+        Rs_out = [(1, 0)]
+        size = 5
+
+        conv = SE3BNConvolution(Rs_in, Rs_out, size).type(torch.float64)
+
+        x = torch.rand(1, sum(m * (2 * l + 1) for m, l in Rs_in), 6, 6, 6,
+                       requires_grad=True, dtype=torch.float64)
+
+        self.assertTrue(torch.autograd.gradcheck(conv, (x, ), eps=1e-3))
+
     def test_se3bnconv_equivariance_cuda(self):
         self._test_equivariance(module=SE3BNConvolution, cuda=True)
 
@@ -67,7 +122,7 @@ class Tests(unittest.TestCase):
     def test_se3bn_equivariance_cpu(self):
         self._test_equivariance(module=JointConvolution, cuda=False)
 
-    def test_does_reduce_variance(self):
+    def test_se3bnconv_same_as_bn_plus_se3conv(self):
         Rs_in =[(2, 0), (2, 1), (1, 2), (1, 3)]
         Rs_out = [(2, 0), (2, 1), (1, 2)]
         kernel_size = 5
@@ -100,5 +155,25 @@ class Tests(unittest.TestCase):
 
         # compare
         self.assertLess((y2 - y1).std() / y2.std(), 1e-4)
+
+    def _test_tracing_jit(self, module):
+        f = torch.nn.Sequential(
+            module([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
+            module([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
+        )
+
+        inp = torch.randn(2, 1, 16, 16, 16)
+
+        traced = torch.jit.trace(f, inp)
+
+        self.assertTrue(torch.allclose(f(inp), traced(inp)))
+
+    @unittest.skipUnless(torch.__version__.startswith('1'), "jit requires >1.0")
+    def test_se3bnconv_jit(self):
+        self._test_tracing_jit(module=SE3BNConvolution)
+
+    @unittest.skipUnless(torch.__version__.startswith('1'), "jit requires >1.0")
+    def test_se3bn_jit(self):
+        self._test_tracing_jit(module=JointConvolution)
 
 unittest.main()

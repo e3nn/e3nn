@@ -1,0 +1,3 @@
+python convolution_tests.py
+python batchnorm_tests.py
+python kernel_tests.py
