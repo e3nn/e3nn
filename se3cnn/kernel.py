@@ -354,16 +354,18 @@ class SE3Kernel(torch.nn.Module):
 
 
     def combination(self, weight):
-        kernel = weight.new_empty(self.n_out, self.n_in, self.size, self.size, self.size)
-
         weight_index = 0
 
+        si_kernels = []
         begin_i = 0
         for i, mi in enumerate(self.multiplicities_out):
+            i_diff = mi * self.dims_out[i]
+            si = slice(begin_i, begin_i + i_diff)
             begin_j = 0
+            sj_kernels = []
             for j, mj in enumerate(self.multiplicities_in):
-                si = slice(begin_i, begin_i + mi * self.dims_out[i])
-                sj = slice(begin_j, begin_j + mj * self.dims_in[j])
+                j_diff = mj * self.dims_in[j]
+                sj = slice(begin_j, begin_j + j_diff)
 
                 kij = getattr(self, "kernel_{}_{}".format(i, j))  # [beta, i, j, x, y, z]
                 if kij is not None:
@@ -373,12 +375,21 @@ class SE3Kernel(torch.nn.Module):
                     weight_index += mi * mj * b_el
 
                     ker = torch.einsum("uvb,bijxyz->uivjxyz", (w, kij)).contiguous()  # [u, i, v, j, x, y, z]
-                    kernel[si, sj] = ker.view_as(kernel[si, sj])
+                    ker = ker.view(i_diff, j_diff, self.size, self.size, self.size)
                 else:
-                    kernel[si, sj] = 0
+                    ker = torch.zeros(
+                        i_diff, j_diff, self.size, self.size, self.size,
+                        device=weight.device, dtype=weight.dtype
+                    )
 
+
+                sj_kernels.append(ker)
                 begin_j += mj * self.dims_in[j]
+
+            si_kernels.append(torch.cat(sj_kernels, dim=1))
             begin_i += mi * self.dims_out[i]
+
+        kernel = torch.cat(si_kernels, dim=0)
 
         assert weight_index == weight.size(0)
         return kernel

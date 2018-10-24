@@ -30,6 +30,7 @@ class SE3BatchNorm(nn.Module):
 
         self.reduce = reduce
 
+
     def __repr__(self):
         return "{} (Rs={}, eps={}, momentum={})".format(
             self.__class__.__name__,
@@ -37,10 +38,19 @@ class SE3BatchNorm(nn.Module):
             self.eps,
             self.momentum)
 
+
+    def _roll_avg(self, curr, update):
+        return (1 - self.momentum) * curr + self.momentum * update.detach()
+
+
     def forward(self, input):  # pylint: disable=W
         '''
         :param input: [batch, stacked feature, x, y, z]
         '''
+
+        if self.training:
+            new_means = []
+            new_vars = []
 
         fields = []
         ix = 0
@@ -51,16 +61,22 @@ class SE3BatchNorm(nn.Module):
         for m, d in self.Rs:
             field = input[:, ix: ix + m * d]  # [batch, feature * repr, x, y, z]
             ix += m * d
-            field = field.contiguous().view(input.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
+
+            # [batch, feature, repr, x * y * z]
+            field = field.contiguous().view(input.size(0), m, d, -1)
 
             if d == 1:  # scalars
                 if self.training:
                     field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
-                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.detach()
+                    new_means.append(
+                        self._roll_avg(self.running_mean[irm:irm+m], field_mean)
+                    )
                 else:
                     field_mean = self.running_mean[irm: irm + m]
                 irm += m
-                field = field - field_mean.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+
+                # [batch, feature, repr, x * y * z]
+                field = field - field_mean.view(1, m, 1, 1)
 
             if self.training:
                 field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
@@ -69,36 +85,48 @@ class SE3BatchNorm(nn.Module):
                 elif self.reduce == 'max':
                     field_norm = field_norm.max(-1)[0]  # [batch, feature]
                 else:
-                    raise ValueError("Invalid reduce option")
+                    raise ValueError("Invalid reduce option {}".format(self.reduce))
+
                 field_norm = field_norm.mean(0)  # [feature]
-                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
+                new_vars.append(self._roll_avg(self.running_var[irv: irv+m], field_norm))
             else:
                 field_norm = self.running_var[irv: irv + m]
             irv += m
 
-            field_norm = (field_norm + self.eps).pow(-0.5).view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+            # [batch, feature, repr, x * y * z]
+            field_norm = (field_norm + self.eps).pow(-0.5).view(1, m, 1, 1)
 
             if self.affine:
                 weight = self.weight[iw: iw + m]  # [feature]
                 iw += m
-                field_norm = field_norm * weight.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+
+                # [batch, feature, repr, x * y * z]
+                field_norm = field_norm * weight.view(1, m, 1, 1)
 
             field = field * field_norm  # [batch, feature, repr, x * y * z]
 
             if self.affine and d == 1:  # scalars
                 bias = self.bias[ib: ib + m]  # [feature]
                 ib += m
-                field = field + bias.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+                field += bias.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
 
             fields.append(field.view(input.size(0), m * d, *input.size()[2:]))
 
-        assert ix == input.size(1)
+        if ix != input.size(1):
+            fmt = "`ix` should have reached input.size(1) ({}), but it ended at {}"
+            msg = fmt.format(input.size(1), ix)
+            raise AssertionError(msg)
+
         if self.training:
             assert irm == self.running_mean.numel()
             assert irv == self.running_var.size(0)
         if self.affine:
             assert iw == self.weight.size(0)
             assert ib == self.bias.numel()
+
+        if self.training:
+            self.running_mean = torch.cat(new_means) 
+            self.running_var = torch.cat(new_vars)
 
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
@@ -139,9 +167,18 @@ class SE3BNConvolution(torch.nn.Module):
             **self.__dict__,
             **self.kwargs)
 
+
+    def _roll_avg(self, curr, update):
+        return (1 - self.momentum) * curr + self.momentum * update.detach()
+
+
     def forward(self, input):  # pylint: disable=W
         field_means = []
         field_norms = []
+        
+        if self.training:
+            new_means = []
+            new_vars = []
 
         ix = 0
         irm = 0
@@ -149,16 +186,22 @@ class SE3BNConvolution(torch.nn.Module):
         for m, d in self.Rs:
             field = input[:, ix: ix + m * d]  # [batch, feature * repr, x, y, z]
             ix += m * d
-            field = field.contiguous().view(input.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
+
+            # [batch, feature, repr, x * y * z]
+            field = field.contiguous().view(input.size(0), m, d, -1)
 
             if d == 1:  # scalars
                 if self.training:
                     field_mean = field.mean(-1).mean(0).view(-1)  # [feature]
-                    self.running_mean[irm: irm + m] = (1 - self.momentum) * self.running_mean[irm: irm + m] + self.momentum * field_mean.detach()
+                    new_means.append(
+                        self._roll_avg(self.running_mean[irm: irm+m], field_mean)
+                    )
                 else:
                     field_mean = self.running_mean[irm: irm + m]
                 irm += m
-                field = field - field_mean.view(1, m, 1, 1)  # [batch, feature, repr, x * y * z]
+
+                # [batch, feature, repr, x * y * z]
+                field = field - field_mean.view(1, m, 1, 1)
                 field_means.append(field_mean)  # [feature]
 
             if self.training:
@@ -170,7 +213,7 @@ class SE3BNConvolution(torch.nn.Module):
                 else:
                     raise ValueError("Invalid reduce option")
                 field_norm = field_norm.mean(0)  # [feature]
-                self.running_var[irv: irv + m] = (1 - self.momentum) * self.running_var[irv: irv + m] + self.momentum * field_norm.detach()
+                new_vars.append(self._roll_avg(self.running_var[irv: irv+m], field_norm))
             else:
                 field_norm = self.running_var[irv: irv + m]
             irv += m
@@ -179,18 +222,29 @@ class SE3BNConvolution(torch.nn.Module):
             field_norms.append(field_norm)  # [feature]
             del field
 
-        assert ix == input.size(1)
+        if ix != input.size(1):
+            fmt = "`ix` should have reached input.size(1) ({}), but it ended at {}"
+            msg = fmt.format(input.size(1), ix)
+            raise AssertionError(msg)
+
         assert irm == self.running_mean.numel()
         assert irv == self.running_var.size(0)
+
+        if self.training:
+            self.running_mean = torch.cat(new_means)
+            self.running_var = torch.cat(new_vars)
 
         bias = []
 
         ws = []
         weight_index = 0
-        for i, (mi, di) in enumerate(zip(self.kernel.multiplicities_out, self.kernel.dims_out)):
+        for i, (mi, di) in enumerate(zip(self.kernel.multiplicities_out,
+                                         self.kernel.dims_out)):
             index_mean = 0
             bia = input.new_zeros(mi * di)
-            for j, (mj, dj, normj) in enumerate(zip(self.kernel.multiplicities_in, self.kernel.dims_in, field_norms)):
+            for j, (mj, dj, normj) in enumerate(zip(self.kernel.multiplicities_in,
+                                                    self.kernel.dims_in,
+                                                    field_norms)):
                 kernel = getattr(self.kernel, "kernel_{}_{}".format(i, j))
                 if kernel is not None:
                     b_el = kernel.size(0)
@@ -198,15 +252,21 @@ class SE3BNConvolution(torch.nn.Module):
                     w = self.kernel.weight[weight_index: weight_index + mi * mj * b_el]
                     weight_index += mi * mj * b_el
 
-                    w = w.view(mi, mj, b_el) * normj.view(1, -1, 1)  # [feature_out, feature_in, basis]
+                    # [feature_out, feature_in, basis]
+                    w = w.view(mi, mj, b_el) * normj.view(1, -1, 1)
+
                     ws.append(w.view(-1))
 
                     if di == 1 and dj == 1:
                         mean = field_means[index_mean]  # [feature_in]
                         index_mean += 1
 
-                        identity = kernel.view(b_el, -1).sum(-1)  # [basis]
-                        bia -= torch.mm(torch.mm(w.view(-1, b_el), identity.view(b_el, 1)).view(mi, mj), mean.view(-1, 1)).view(-1)  # [feature_out]
+                        identity = kernel.view(b_el, -1).sum(-1).view(b_el, 1)  # [basis]
+                        bia -= torch.mm(
+                            torch.mm(w.view(-1, b_el), identity).view(mi, mj),
+                            mean.view(-1, 1)
+                        ).view(-1)  # [feature_out]
+
             bias.append(bia)
 
         bias = torch.cat(bias)
