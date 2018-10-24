@@ -1,3 +1,4 @@
+# pylint: disable=C,E1101,E1102
 import unittest, torch
 import torch.nn as nn
 
@@ -16,6 +17,7 @@ class JointConvolution(nn.Module):
     def forward(self, inp):
         y = self.bn(inp)
         return self.conv(y)
+
 
 class Tests(unittest.TestCase):
     def _test_equivariance(self, module, cuda=True):
@@ -55,7 +57,6 @@ class Tests(unittest.TestCase):
         self.assertLess(diff_out, 1e-10)
 
     def test_se3bn_train_then_eval(self):
-        rep = [(1, 0), (1, 1)]
         mult_dim = [(1, 1), (1, 3)]
 
         size = 5
@@ -65,9 +66,9 @@ class Tests(unittest.TestCase):
 
         x = torch.rand(1, 4, 6, 6, 6,
                        requires_grad=True, dtype=torch.float64)
-        y = bn(x)
+        bn(x)
         bn.eval()
-        y = bn(x)
+        bn(x)
 
     def test_se3bnconv_train_then_eval(self):
         Rs_in = [(1, 0), (1, 1)]
@@ -80,12 +81,11 @@ class Tests(unittest.TestCase):
                        requires_grad=True, dtype=torch.float64)
 
         conv.train()
-        y = conv(x)
+        conv(x)
         conv.eval()
-        y = conv(x)
+        conv(x)
 
     def test_se3bn_gradient(self):
-        rep = [(1, 0), (1, 1)]
         mult_dim = [(1, 1), (1, 3)]
 
         size = 5
