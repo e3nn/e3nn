@@ -95,7 +95,7 @@ class Tests(unittest.TestCase):
         x = torch.rand(1, 4, 6, 6, 6,
                        requires_grad=True, dtype=torch.float64)
 
-        self.assertTrue(torch.autograd.gradcheck(bn, (x, ), eps=1))
+        self.assertTrue(torch.autograd.gradcheck(bn, (x, ), eps=1e-3))
 
     def test_se3bnconv_gradient(self):
         ''' Equivalent to convolution_tests.py/test_combination_gradient '''
@@ -108,7 +108,7 @@ class Tests(unittest.TestCase):
         x = torch.rand(1, sum(m * (2 * l + 1) for m, l in Rs_in), 6, 6, 6,
                        requires_grad=True, dtype=torch.float64)
 
-        self.assertTrue(torch.autograd.gradcheck(conv, (x, ), eps=1))
+        self.assertTrue(torch.autograd.gradcheck(conv, (x, ), eps=1e-3))
 
     def test_se3bnconv_equivariance_cuda(self):
         self._test_equivariance(module=SE3BNConvolution, cuda=True)
