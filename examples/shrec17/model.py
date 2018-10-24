@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import se3cnn
 from se3cnn.blocks import GatedBlock
 
 
@@ -35,8 +34,6 @@ class Model(torch.nn.Module):
             'normalization': 'batch',
             'smooth_stride': True,
             'capsule_dropout_p': 0.1,
-            'dyn_iso': True,
-            'radial_window': se3cnn.kernel.sigmoid_window,
         }
 
         block_params = [

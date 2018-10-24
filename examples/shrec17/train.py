@@ -42,7 +42,9 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)
 
-    model = mod.Model(55).to(device)
+    model = mod.Model(55)
+    model = torch.nn.DataParallel(model)
+    model.to(device)
 
     if restore_dir is not None:
         model.load_state_dict(torch.load(os.path.join(restore_dir, "state.pkl")))
@@ -102,7 +104,7 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         dynamics = torch.load(os.path.join(restore_dir, "dynamics.pkl"))
         epoch = dynamics[-1]['epoch'] + 1
 
-    best_score = 0
+    score = best_score = 0
 
     for epoch in range(epoch, 2000):
 
@@ -143,6 +145,8 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
                 'correct': correct,
                 'avg_loss': avg_loss,
                 'avg_correct': avg_correct,
+                'best_score': best_score,
+                'score': score,
             })
 
         torch.save(model.state_dict(), os.path.join(log_dir, "state.pkl"))
@@ -151,7 +155,7 @@ def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, 
         if epoch % 100 == 0:
             micro, macro = evaluate(log_dir, 1, "val", 20, 1, "state.pkl")
             score = micro["mAP"] + macro["mAP"]
-            print("Score={} Best={}".format(score, best_score))
+            logger.info("Score={} Best={}".format(score, best_score))
             if score > best_score:
                 best_score = score
                 torch.save(model.state_dict(), os.path.join(log_dir, "best_state.pkl"))
