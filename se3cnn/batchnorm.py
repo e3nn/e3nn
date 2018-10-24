@@ -125,8 +125,8 @@ class SE3BatchNorm(nn.Module):
             assert ib == self.bias.numel()
 
         if self.training:
-            self.running_mean = torch.cat(new_means) 
-            self.running_var = torch.cat(new_vars)
+            self.running_mean.copy_(torch.cat(new_means))
+            self.running_var.copy_(torch.cat(new_vars))
 
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
@@ -231,8 +231,8 @@ class SE3BNConvolution(torch.nn.Module):
         assert irv == self.running_var.size(0)
 
         if self.training:
-            self.running_mean = torch.cat(new_means)
-            self.running_var = torch.cat(new_vars)
+            self.running_mean.copy_(torch.cat(new_means))
+            self.running_var.copy_(torch.cat(new_vars))
 
         bias = []
 

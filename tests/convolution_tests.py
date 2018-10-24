@@ -1,3 +1,4 @@
+# pylint: disable=C,E1101,E1102
 import unittest, torch
 import torch.nn as nn
 

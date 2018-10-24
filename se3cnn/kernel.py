@@ -357,15 +357,11 @@ class SE3Kernel(torch.nn.Module):
         weight_index = 0
 
         si_kernels = []
-        begin_i = 0
         for i, mi in enumerate(self.multiplicities_out):
             i_diff = mi * self.dims_out[i]
-            si = slice(begin_i, begin_i + i_diff)
-            begin_j = 0
             sj_kernels = []
             for j, mj in enumerate(self.multiplicities_in):
                 j_diff = mj * self.dims_in[j]
-                sj = slice(begin_j, begin_j + j_diff)
 
                 kij = getattr(self, "kernel_{}_{}".format(i, j))  # [beta, i, j, x, y, z]
                 if kij is not None:
@@ -382,12 +378,9 @@ class SE3Kernel(torch.nn.Module):
                         device=weight.device, dtype=weight.dtype
                     )
 
-
                 sj_kernels.append(ker)
-                begin_j += mj * self.dims_in[j]
 
             si_kernels.append(torch.cat(sj_kernels, dim=1))
-            begin_i += mi * self.dims_out[i]
 
         kernel = torch.cat(si_kernels, dim=0)
 
