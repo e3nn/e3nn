@@ -20,6 +20,16 @@ class AvgSpacial(nn.Module):
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)
 
 
+class LowPass(nn.Module):
+    def __init__(self, scale, stride):
+        super().__init__()
+        self.scale = scale 
+        self.stride = stride
+        
+    def forward(self, inp):
+        return low_pass_filter(inp, self.scale, self.stride)
+
+
 def get_volumes(size=20, pad=8, rotate=False, rotate90=False):
     assert size >= 4
     tetris_tensorfields = [
@@ -107,21 +117,9 @@ def test(network, dataset):
 
 class SE3Net(torch.nn.Module):
 
-    def __init__(self):
-        super(SE3Net, self).__init__()
-        # features = [
-        #     (1,),
-        #     (2, 2, 2, 1),
-        #     (4, 4, 4, 0),
-        #     (6, 4, 4, 0),
-        #     (64,)
-        # ]
-        # common_block_params = {
-        #     'size': 5,
-        #     'padding': 4,
-        #     'dilation': 2,
-        #     'activation': (F.relu, torch.sigmoid),
-        # }
+    def __init__(self, smooth_stride):
+        super().__init__()
+
         features = [
             (1,),
             (2, 2, 2, 1),
@@ -133,7 +131,7 @@ class SE3Net(torch.nn.Module):
             'size': 5,
             'padding': 4,
             'activation': (F.relu, torch.sigmoid),
-            'smooth_stride': True,
+            'smooth_stride': smooth_stride,
         }
         block_params = [
             { 'stride': 1 },
@@ -142,7 +140,10 @@ class SE3Net(torch.nn.Module):
             { 'stride': 1 },
         ]
 
-        blocks = [GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) for i in range(len(features) - 1)]
+        blocks = [
+            GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) 
+            for i in range(len(features) - 1)
+        ]
         self.sequence = torch.nn.Sequential(*blocks,
                                             AvgSpacial(),
                                             nn.Dropout(p=.2),
@@ -153,62 +154,83 @@ class SE3Net(torch.nn.Module):
         return self.sequence(inp)
 
 
-# class CNN(torch.nn.Module):
 
-#     def __init__(self):
-#         super(CNN, self).__init__()
+class CNN(torch.nn.Module):
 
-#         common_params = {
-#             'kernel_size': 5,
-#             'stride': 2,
-#             'padding': 2,
-#             'bias': True,
-#         }
+    def __init__(self, smooth_stride):
+        super().__init__()
 
-#         self.sequence = torch.nn.Sequential(
-#             nn.Conv3d(1, 16, **common_params), nn.BatchNorm3d(16), nn.ReLU(inplace=True),
-#             nn.Conv3d(16, 32, **common_params), nn.BatchNorm3d(32), nn.ReLU(inplace=True),
-#             nn.Conv3d(32, 32, **common_params), nn.BatchNorm3d(32), nn.ReLU(inplace=True),
-#             nn.Conv3d(32, 16, **common_params), nn.BatchNorm3d(16), nn.ReLU(inplace=True),
-#             AvgSpacial(),
-#             torch.nn.Linear(16, 10))
+        features = [
+            1,
+            25,
+            72,
+            80,
+            64,
+        ]
+        common_block_params = {
+            'kernel_size': 5,
+            'padding': 4,
+        }
+        block_params = [
+            { 'stride': 1 },
+            { 'stride': 2 },
+            { 'stride': 2 },
+            { 'stride': 1 },
+        ]
 
-#     def forward(self, inp):  # pylint: disable=W
-#         return self.sequence(inp)
+        if smooth_stride:
+            blocks = [
+                torch.nn.Sequential(
+                    nn.Conv3d(features[i], features[i + 1], **common_block_params),
+                    LowPass(block_params[i]['stride'], block_params[i]['stride']),
+                    nn.BatchNorm3d(features[i + 1]),
+                    nn.ReLU(inplace=True),
+                )
+                for i in range(len(features) - 1)
+            ]
+        else:
+            blocks = [
+                torch.nn.Sequential(
+                    nn.Conv3d(features[i], features[i + 1], **common_block_params, **block_params[i]),
+                    nn.BatchNorm3d(features[i + 1]),
+                    nn.ReLU(inplace=True),
+                )
+                for i in range(len(features) - 1)
+            ]
+
+        self.sequence = torch.nn.Sequential(*blocks,
+                                            AvgSpacial(),
+                                            nn.Dropout(p=.2),
+                                            nn.Linear(64, 10))
+
+    def forward(self, inp):  # pylint: disable=W
+        inp = low_pass_filter(inp, 2)
+        return self.sequence(inp)
 
 
-def main():
-    torch.backends.cudnn.benchmark = True
-
+def experiment(network):
     N_epochs = 250
     N_test = 100
     trainset = get_volumes(rotate=True)  # train with randomly rotated pieces but only once
 
-    network = SE3Net().cuda()
     train(network, trainset, N_epochs=N_epochs)
-    se3_test_accs = []
+    test_accs = []
     for _ in range(N_test):
         testset = get_volumes(rotate=True)
         acc = test(network, testset)
-        se3_test_accs.append(acc)
+        test_accs.append(acc)
 
-    # network = CNN().cuda()
-    # train(network, trainset, N_epochs=N_epochs)
-    # cnn_test_accs = []
-    # for _ in range(N_test):
-    #     testset = get_volumes(rotate90=True)
-    #     acc = test(network, testset)
-    #     cnn_test_accs.append(acc)
+    return np.mean(test_accs)
 
-    print('avg test acc SE3: {}'.format(np.mean(se3_test_accs)))
-    # print('avg test acc CNN: {}'.format(np.mean(cnn_test_accs)))
-    # N_classes = len(testset[1])
-    # print('random guessing accuracy: {}'.format(1 / N_classes))
-    # # c=correct, r0=initial rotation
-    # # assume random rotations p(r0)=1/24
-    # # p(c) = p(c|r0)p(r0) + p(c|!r0)p(!r0)
-    # #      =    1    1/24 +  1/N_cl  23/24
-    # print('theoretically estimated CNN accuracy: {}'.format((1 + 23 / N_classes) / 24))
+def main():
+    torch.backends.cudnn.benchmark = True
+
+    for smooth_stride in [True, False]:
+        for Model in [SE3Net, CNN]:
+            for _rep in range(5):
+                network = Model(smooth_stride).cuda()
+                acc = experiment(network)
+                print("smooth_stride={} model={} acc= {}".format(smooth_stride, Model, acc))
 
 
 main()
