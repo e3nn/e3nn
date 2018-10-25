@@ -1,6 +1,7 @@
 # pylint: disable=C,R,E1101
 from functools import partial
 import torch
+import torch.utils.checkpoint
 from se3cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
 from se3cnn.non_linearities import ScalarActivation
 from se3cnn.dropout import SE3Dropout
@@ -13,7 +14,7 @@ class GatedBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window=kernel.gaussian_window_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
-                 bias=True, smooth_stride=False, dyn_iso=False, verbose=False):
+                 bias=True, smooth_stride=False, dyn_iso=False, checkpoint=True, verbose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -86,14 +87,12 @@ class GatedBlock(torch.nn.Module):
             Rs_out_without_gate = [(mul, 2 * n + 1) for n, mul in enumerate(repr_out)]  # Rs_out without gates
             self.dropout = SE3Dropout(Rs_out_without_gate, capsule_dropout_p)
 
+        self.checkpoint = checkpoint
+
+
     def forward(self, x):  # pylint: disable=W
 
-        # convolution
-        y = self.conv(x)
-
-        if self.scalar_act is None and self.gate_act is None:
-            z = y
-        else:
+        def gate(y):                
             nbatch = y.size(0)
             nx = y.size(2)
             ny = y.size(3)
@@ -148,6 +147,17 @@ class GatedBlock(torch.nn.Module):
                 begin_y += mul * dim
                 del field
 
+            return z
+
+
+        # convolution
+        z = self.conv(x)
+
+        # gate
+        if self.scalar_act is not None or self.gate_act is not None:
+            z = torch.utils.checkpoint.checkpoint(gate, z) if self.checkpoint else gate(z)
+
+        # stride
         if self.stride > 1:
             z = low_pass_filter(z, self.stride, self.stride)
 
