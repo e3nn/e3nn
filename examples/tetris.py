@@ -145,7 +145,7 @@ class SE3Net(torch.nn.Module):
         self.sequence = torch.nn.Sequential(*blocks,
                                             AvgSpacial(),
                                             nn.Dropout(p=.2),
-                                            nn.Linear(features[-1][0], 10))
+                                            nn.Linear(features[-1][0], 8))
 
     def forward(self, inp):  # pylint: disable=W
         inp = low_pass_filter(inp, 2)
@@ -199,7 +199,7 @@ class CNN(torch.nn.Module):
         self.sequence = torch.nn.Sequential(*blocks,
                                             AvgSpacial(),
                                             nn.Dropout(p=.2),
-                                            nn.Linear(features[-1], 10))
+                                            nn.Linear(features[-1], 8))
 
     def forward(self, inp):  # pylint: disable=W
         inp = low_pass_filter(inp, 2)
@@ -225,10 +225,84 @@ def main():
 
     for smooth_stride in [True, False]:
         for Model in [SE3Net, CNN]:
-            for _rep in range(12):
+            for _rep in range(17):
                 network = Model(smooth_stride).cuda()
                 acc = experiment(network)
                 print("smooth_stride={} model={} acc= {}".format(smooth_stride, Model, acc))
 
 
-main()
+if __name__ == "__main__":
+    main()
+
+
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 0.92875
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 0.9975
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 1.0
+# smooth_stride=True model=SE3Net acc= 0.9825
+# smooth_stride=True model=SE3Net acc= 1.0
+
+# smooth_stride=True model=CNN acc= 0.30875
+# smooth_stride=True model=CNN acc= 0.19375
+# smooth_stride=True model=CNN acc= 0.39875
+# smooth_stride=True model=CNN acc= 0.205
+# smooth_stride=True model=CNN acc= 0.22625
+# smooth_stride=True model=CNN acc= 0.23875
+# smooth_stride=True model=CNN acc= 0.2625
+# smooth_stride=True model=CNN acc= 0.20875
+# smooth_stride=True model=CNN acc= 0.26125
+# smooth_stride=True model=CNN acc= 0.195
+# smooth_stride=True model=CNN acc= 0.2675
+# smooth_stride=True model=CNN acc= 0.27375
+# smooth_stride=True model=CNN acc= 0.2325
+# smooth_stride=True model=CNN acc= 0.22125
+# smooth_stride=True model=CNN acc= 0.35125
+# smooth_stride=True model=CNN acc= 0.42375
+# smooth_stride=True model=CNN acc= 0.2775
+
+# smooth_stride=False model=SE3Net acc= 0.46125
+# smooth_stride=False model=SE3Net acc= 0.31125
+# smooth_stride=False model=SE3Net acc= 0.295
+# smooth_stride=False model=SE3Net acc= 0.37125
+# smooth_stride=False model=SE3Net acc= 0.29625
+# smooth_stride=False model=SE3Net acc= 0.47
+# smooth_stride=False model=SE3Net acc= 0.4
+# smooth_stride=False model=SE3Net acc= 0.39375
+# smooth_stride=False model=SE3Net acc= 0.395
+# smooth_stride=False model=SE3Net acc= 0.38625
+# smooth_stride=False model=SE3Net acc= 0.31875
+# smooth_stride=False model=SE3Net acc= 0.4125
+# smooth_stride=False model=SE3Net acc= 0.33125
+# smooth_stride=False model=SE3Net acc= 0.32875
+# smooth_stride=False model=SE3Net acc= 0.275
+# smooth_stride=False model=SE3Net acc= 0.345
+# smooth_stride=False model=SE3Net acc= 0.31
+
+# smooth_stride=False model=CNN acc= 0.1925
+# smooth_stride=False model=CNN acc= 0.23125
+# smooth_stride=False model=CNN acc= 0.2425
+# smooth_stride=False model=CNN acc= 0.32
+# smooth_stride=False model=CNN acc= 0.19375
+# smooth_stride=False model=CNN acc= 0.19125
+# smooth_stride=False model=CNN acc= 0.28625
+# smooth_stride=False model=CNN acc= 0.1975
+# smooth_stride=False model=CNN acc= 0.255
+# smooth_stride=False model=CNN acc= 0.26
+# smooth_stride=False model=CNN acc= 0.27125
+# smooth_stride=False model=CNN acc= 0.18875
+# smooth_stride=False model=CNN acc= 0.32125
+# smooth_stride=False model=CNN acc= 0.24
+# smooth_stride=False model=CNN acc= 0.25875
+# smooth_stride=False model=CNN acc= 0.25875
+# smooth_stride=False model=CNN acc= 0.18875
