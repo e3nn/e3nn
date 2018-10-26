@@ -32,7 +32,7 @@ class Model(torch.nn.Module):
             'size': 5,
             'padding': 4,
             'normalization': 'batch',
-            'smooth_stride': True,
+            'smooth_stride': False,
         }
 
         block_params = [
