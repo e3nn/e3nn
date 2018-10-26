@@ -48,7 +48,7 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers, filename):
     model = mod.Model(55).to(device)
 
     state = torch.load(os.path.join(log_dir, filename))
-    #state = { key.replace('conv.kernel', 'kernel.kernel').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
+    state = { key.replace('conv.kernel_', 'kernel.kernel_').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
     model.load_state_dict(state)
 
     resdir = os.path.join(log_dir, dataset + "_perturbed")
