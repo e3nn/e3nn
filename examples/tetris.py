@@ -23,9 +23,9 @@ class AvgSpacial(nn.Module):
 class LowPass(nn.Module):
     def __init__(self, scale, stride):
         super().__init__()
-        self.scale = scale 
+        self.scale = scale
         self.stride = stride
-        
+
     def forward(self, inp):
         return low_pass_filter(inp, self.scale, self.stride)
 
@@ -83,13 +83,11 @@ def train(network, dataset, N_epochs):
     volumes = torch.tensor(volumes).cuda()
     labels = torch.tensor(labels).cuda()
 
-    # optimizer = torch.optim.Adam(network.parameters(), lr=3e-2, weight_decay=1e-5)
     optimizer = torch.optim.Adam(network.parameters(), lr=1e-3)
     for epoch in range(N_epochs):
         predictions = network(volumes)
 
-        # decay learning rate
-        optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, init_lr=1e-1, epoch_start=100, base_factor=.98, verbose=True)
+        optimizer, _ = lr_schedulers.lr_scheduler_exponential(optimizer, epoch, init_lr=1e-1, epoch_start=100, base_factor=.98, verbose=False)
 
         optimizer.zero_grad()
         F.cross_entropy(predictions, labels).backward()
@@ -97,7 +95,7 @@ def train(network, dataset, N_epochs):
 
         argmax = predictions.argmax(1)
         acc = (argmax.squeeze() == labels).float().mean().item()
-        print('epoch {}: acc={}'.format(epoch, acc))
+        print('epoch {}: acc={:.2f}'.format(epoch, acc), end=" \r")
 
 
 def test(network, dataset):
@@ -111,7 +109,7 @@ def test(network, dataset):
     argmax = predictions.argmax(1)
     acc = (argmax.squeeze() == labels).float().mean().item()
 
-    print('test acc={}'.format(acc))
+    print('test acc={:.2f}'.format(acc), end=" \r")
     return acc
 
 
@@ -122,10 +120,10 @@ class SE3Net(torch.nn.Module):
 
         features = [
             (1,),
-            (2, 2, 2, 1),
-            (8, 8, 8, 0),
-            (16, 8, 8, 0),
-            (64,)
+            (4, 4, 4, 1),
+            (16, 16, 16, 0),
+            (32, 16, 16, 0),
+            (128,)
         ]
         common_block_params = {
             'size': 5,
@@ -141,13 +139,13 @@ class SE3Net(torch.nn.Module):
         ]
 
         blocks = [
-            GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i]) 
+            GatedBlock(features[i], features[i + 1], **common_block_params, **block_params[i])
             for i in range(len(features) - 1)
         ]
         self.sequence = torch.nn.Sequential(*blocks,
                                             AvgSpacial(),
                                             nn.Dropout(p=.2),
-                                            nn.Linear(64, 10))
+                                            nn.Linear(features[-1][0], 10))
 
     def forward(self, inp):  # pylint: disable=W
         inp = low_pass_filter(inp, 2)
@@ -162,10 +160,10 @@ class CNN(torch.nn.Module):
 
         features = [
             1,
-            25,
-            72,
-            80,
-            64,
+            43,
+            144,
+            160,
+            128,
         ]
         common_block_params = {
             'kernel_size': 5,
@@ -201,7 +199,7 @@ class CNN(torch.nn.Module):
         self.sequence = torch.nn.Sequential(*blocks,
                                             AvgSpacial(),
                                             nn.Dropout(p=.2),
-                                            nn.Linear(64, 10))
+                                            nn.Linear(features[-1], 10))
 
     def forward(self, inp):  # pylint: disable=W
         inp = low_pass_filter(inp, 2)
@@ -227,7 +225,7 @@ def main():
 
     for smooth_stride in [True, False]:
         for Model in [SE3Net, CNN]:
-            for _rep in range(5):
+            for _rep in range(12):
                 network = Model(smooth_stride).cuda()
                 acc = experiment(network)
                 print("smooth_stride={} model={} acc= {}".format(smooth_stride, Model, acc))
