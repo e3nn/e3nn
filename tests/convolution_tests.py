@@ -2,7 +2,7 @@
 import unittest, torch
 import torch.nn as nn
 
-from se3cnn import SE3Convolution
+from se3cnn import SE3Convolution, SE3ConvolutionTranspose
 
 class Tests(unittest.TestCase):
     def _test_equivariance(self, f):
@@ -36,15 +36,23 @@ class Tests(unittest.TestCase):
 
         self._test_equivariance(f)
 
+    def test_equivariance_transpose(self):
+        f = torch.nn.Sequential(
+            SE3ConvolutionTranspose([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
+            SE3ConvolutionTranspose([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
+        ).to(torch.float64)
 
-    def test_normalization(self):
+        self._test_equivariance(f)
+
+
+    def _test_normalization(self, f):
         batch = 3
         size = 5
         input_size = 15
         Rs_in = [(2, 0), (1, 1), (3, 4)]
         Rs_out = [(2, 0), (2, 1), (1, 2)]
 
-        conv = SE3Convolution(Rs_in, Rs_out, size)
+        conv = f(Rs_in, Rs_out, size)
 
         n_out = sum([m * (2 * l + 1) for m, l in Rs_out])
         n_in = sum([m * (2 * l + 1) for m, l in Rs_in])
@@ -58,6 +66,12 @@ class Tests(unittest.TestCase):
 
         self.assertLess(abs(y_mean), 0.1)
         self.assertLess(abs(y_std - 1), 0.3)
+
+    def test_normalization_conv(self):
+        self._test_normalization(SE3Convolution)
+
+    def test_normalization_conv_transpose(self):
+        self._test_normalization(SE3ConvolutionTranspose)
 
     def test_combination_gradient(self):
         Rs_in = [(1, 0), (1, 1)]
@@ -99,6 +113,6 @@ class Tests(unittest.TestCase):
         parallel = nn.DataParallel(f).cuda()
 
         self.assertTrue(torch.allclose(f(inp), parallel(inp)))
-        
+
 
 unittest.main()
