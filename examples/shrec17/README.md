@@ -2,7 +2,7 @@
 
 ## training
 ```bash
-python train.py --log_dir myrun --model_path model_deep.py --dataset train --batch_size 32 --learning_rate 0.1 
+python train.py --log_dir myrun --model_path model.py --dataset train --batch_size 32 --learning_rate 0.1 
 ```
 The script will automatically 
 - download the dataset (and fix the .obj files)
