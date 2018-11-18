@@ -14,7 +14,7 @@ class GatedBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window=kernel.gaussian_window_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
-                 bias=True, smooth_stride=False, dyn_iso=False, checkpoint=True, verbose=False):
+                 bias=True, smooth_stride=True, dyn_iso=False, checkpoint=True, verbose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -92,7 +92,7 @@ class GatedBlock(torch.nn.Module):
 
     def forward(self, x):  # pylint: disable=W
 
-        def gate(y):                
+        def gate(y):
             nbatch = y.size(0)
             nx = y.size(2)
             ny = y.size(3)
