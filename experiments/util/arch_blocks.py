@@ -125,6 +125,7 @@ class SE3GatedResBlock(nn.Module):
                            radial_window=radial_window,
                            batch_norm_momentum=batch_norm_momentum,
                            normalization=normalization,
+                           smooth_stride=False,
                            capsule_dropout_p=capsule_dropout_p))
             if downsample_by_pooling and i == 0 and stride > 1:
                 self.layers.append(nn.AvgPool3d(kernel_size=size,
@@ -149,6 +150,7 @@ class SE3GatedResBlock(nn.Module):
                                radial_window=radial_window,
                                batch_norm_momentum=batch_norm_momentum,
                                normalization=normalization,
+                               smooth_stride=False,
                                capsule_dropout_p=capsule_dropout_p))
                 if downsample_by_pooling and stride > 1:
                     self.shortcut.append(nn.AvgPool3d(kernel_size=size,

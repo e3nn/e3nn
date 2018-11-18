@@ -22,7 +22,7 @@ class Model(torch.nn.Module):
 
         features = [
             (n_in, ), # 77
-            (12, 4, 1), 
+            (12, 4, 1),
             (24, 8, 2),
             (24, 8, 2),
             (24, 8, 2),
@@ -34,6 +34,7 @@ class Model(torch.nn.Module):
             'padding': 3,
             'normalization': 'batch_max',
             'smooth_stride': True,
+            'smooth_stride': False,
         }
 
         block_params = [

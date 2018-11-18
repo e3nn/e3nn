@@ -64,7 +64,8 @@ class Model(torch.nn.Module):
             'stride': 2,
             'padding': 4,
             'normalization': None,
-            'capsule_dropout_p': 0.0
+            'capsule_dropout_p': 0.0,
+            'smooth_stride': False,
         }
 
         block_params = [
