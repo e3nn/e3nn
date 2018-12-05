@@ -88,6 +88,17 @@ def _basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: dis
     return Q_J  # [m_out * m_in, m]
 
 
+def spherical_harmonics_xyz(x, y, z, J):
+    if x == y == z == 0:  # angles at origin are nan, special treatment
+        if J == 0:  # Y^0 is angularly independent, choose any angle
+            return spherical_harmonics(0, 123, 321)  # [m]
+        else:  # insert zeros for Y^J with J!=0
+            return 0
+    else:  # not at the origin, sample spherical harmonic
+        alpha, beta = x_to_alpha_beta([x, y, z])
+        return spherical_harmonics(J, alpha, beta)  # [m]
+
+
 @cached_dirpklgz("cache/sh_cube")
 def _sample_sh_cube(size, J, version=3):  # pylint: disable=W0613
     '''
@@ -103,17 +114,36 @@ def _sample_sh_cube(size, J, version=3):  # pylint: disable=W0613
         for idx_x, x in enumerate(rng):
             for idx_y, y in enumerate(rng):
                 for idx_z, z in enumerate(rng):
-                    if x == y == z == 0:  # angles at origin are nan, special treatment
-                        if J == 0:  # Y^0 is angularly independent, choose any angle
-                            Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(0, 123, 321)  # [m]
-                        else:  # insert zeros for Y^J with J!=0
-                            Y_J[:, idx_x, idx_y, idx_z] = 0
-                    else:  # not at the origin, sample spherical harmonic
-                        alpha, beta = x_to_alpha_beta([x, y, z])
-                        Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics(J, alpha, beta)  # [m]
+                    Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics_xyz(x, y, z, J)  # [m]
 
     assert Y_J.dtype == torch.float64
     return Y_J  # [m, x, y, z]
+
+
+def _sample_points(points, order_in, order_out):
+    '''
+    :param points: tensor of shape (N_a, 3)
+    :param order_in: order of the input representation
+    :param order_out: order of the output representation
+    :return: sampled equivariant kernel basis of shape (N_basis, N_a, 2*order_out+1, 2*order_in+1)
+    '''
+
+    N_a = points.size(0)
+    order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
+    solutions = []
+    for J in order_irreps:
+        Y_J = torch.zeros(N_a, 2 * J + 1, dtype=torch.float64)  # [a, m]
+        with torch_default_dtype(torch.float64):
+            for a, (x, y, z) in enumerate(points):
+                Y_J[a] = spherical_harmonics_xyz(x, y, z, J)  # [m]
+
+        # compute basis transformation matrix Q_J
+        Q_J = _basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
+        K_J = torch.einsum('mn,an->am', (Q_J, Y_J))  # [a, m_out * m_in]
+        K_J = K_J.view(N_a, 2 * order_out + 1, 2 * order_in + 1)  # [a, m_out, m_in]
+        solutions.append(K_J)
+
+    return solutions, points, order_irreps
 
 
 def _sample_cube(size, order_in, order_out):
