@@ -6,10 +6,11 @@ import torch.nn.functional as F
 def low_pass_filter(image, scale, stride=1):
     """
     :param tensor image: [..., x, y, z]
-    :param float scale: 
+    :param float scale:
     :param int stride:
     """
     if scale <= 1:
+        assert stride == 1
         return image
 
     sigma = 0.5 * (scale ** 2 - 1) ** 0.5
