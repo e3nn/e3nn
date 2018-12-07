@@ -85,11 +85,21 @@ def spherical_harmonics(order, alpha, beta, dtype=None):
     - compatible with irr_repr and compose
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
-    Y = torch.tensor([sh(order, m, math.pi - beta, alpha) for m in range(-order, order + 1)], dtype=torch.get_default_dtype() if dtype is None else dtype)
-    # if order == 1:
-    #     # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
-    #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
-    #     return A @ Y
+    import numpy as np
+    if not isinstance(order, list):
+        order = [order]
+    if not torch.is_tensor(alpha):
+        alpha = torch.tensor(alpha, dtype=torch.float64)
+    if not torch.is_tensor(beta):
+        beta = torch.tensor(beta, dtype=torch.float64)
+    Js = np.concatenate([J * np.ones(2 * J + 1) for J in order], 0)
+    Ms = np.concatenate([np.arange(-J, J + 1, 1) for J in order], 0)
+    Js = Js.reshape(-1, *[1] * alpha.dim())
+    Ms = Ms.reshape(-1, *[1] * alpha.dim())
+    alpha = alpha.view(1, *alpha.size())
+    beta = beta.view(1, *beta.size())
+    Y = sh(Js, Ms, math.pi - beta.cpu().numpy(), alpha.cpu().numpy())
+    Y = torch.tensor(Y, dtype=torch.get_default_dtype() if dtype is None else dtype)
     return Y
 
 
