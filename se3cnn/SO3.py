@@ -6,20 +6,8 @@ Using ZYZ Euler angles parametrisation
 '''
 import torch
 import math
-
-
-class torch_default_dtype:
-
-    def __init__(self, dtype):
-        self.saved_dtype = None
-        self.dtype = dtype
-
-    def __enter__(self):
-        self.saved_dtype = torch.get_default_dtype()
-        torch.set_default_dtype(self.dtype)
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        torch.set_default_dtype(self.saved_dtype)
+from se3cnn.utils import torch_default_dtype
+from se3cnn.util.cache_file import cached_dirpklgz
 
 
 def rot_z(gamma):
@@ -86,6 +74,11 @@ def irr_repr(order, alpha, beta, gamma, dtype=None):
     return torch.tensor(wigner_D_matrix(order, alpha, beta, gamma), dtype=torch.get_default_dtype() if dtype is None else dtype)
 
 
+# TODO
+# vectorize
+# order can be a list
+# alpha, beta as well
+# broadcasting order=int or [],   alpha, beta = float or [, , ]
 def spherical_harmonics(order, alpha, beta, dtype=None):
     """
     spherical harmonics
@@ -98,6 +91,21 @@ def spherical_harmonics(order, alpha, beta, dtype=None):
     #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
     #     return A @ Y
     return Y
+
+
+# TODO
+# vectorize
+# xyz tensor [,,, 3]
+def spherical_harmonics_xyz(x, y, z, J):
+    with torch_default_dtype(torch.float64):
+        if x == y == z == 0:  # angles at origin are nan, special treatment
+            if J == 0:  # Y^0 is angularly independent, choose any angle
+                return spherical_harmonics(0, 123, 321)  # [m]
+            else:  # insert zeros for Y^J with J!=0
+                return 0
+        else:  # not at the origin, sample spherical harmonic
+            alpha, beta = x_to_alpha_beta([x, y, z])
+            return spherical_harmonics(J, alpha, beta)  # [m]
 
 
 def compose(a1, b1, c1, a2, b2, c2):
@@ -116,6 +124,77 @@ def kron(x, y):
     assert x.ndimension() == 2
     assert y.ndimension() == 2
     return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+
+
+
+################################################################################
+# Solving the constraint coming from the stabilizer of 0 and e
+################################################################################
+
+def get_matrix_kernel(A, eps=1e-10):
+    '''
+    Compute an orthonormal basis of the kernel (x_1, x_2, ...)
+    A x_i = 0
+    scalar_product(x_i, x_j) = delta_ij
+
+    :param A: matrix
+    :return: matrix where each row is a basis vector of the kernel of A
+    '''
+    _u, s, v = torch.svd(A)
+
+    # A = u @ torch.diag(s) @ v.t()
+    kernel = v.t()[s < eps]
+    return kernel
+
+
+def get_matrices_kernel(As, eps=1e-10):
+    '''
+    Computes the commun kernel of all the As matrices
+    '''
+    return get_matrix_kernel(torch.cat(As, dim=0), eps)
+
+
+################################################################################
+# Analytically derived basis
+################################################################################
+
+@cached_dirpklgz("cache/trans_Q")
+def basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disable=W0613
+    """
+    :param J: order of the spherical harmonics
+    :param order_in: order of the input representation
+    :param order_out: order of the output representation
+    :return: one part of the Q^-1 matrix of the article
+    """
+    with torch_default_dtype(torch.float64):
+        def _R_tensor(a, b, c): return kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
+
+        def _sylvester_submatrix(J, a, b, c):
+            ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
+            R_tensor = _R_tensor(a, b, c)  # [m_out * m_in, m_out * m_in]
+            R_irrep_J = irr_repr(J, a, b, c)  # [m, m]
+            return kron(R_tensor, torch.eye(R_irrep_J.size(0))) - \
+                kron(torch.eye(R_tensor.size(0)), R_irrep_J.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
+
+        random_angles = [
+            [4.41301023, 5.56684102, 4.59384642],
+            [4.93325116, 6.12697327, 4.14574096],
+            [0.53878964, 4.09050444, 5.36539036],
+            [2.16017393, 3.48835314, 5.55174441],
+            [2.52385107, 0.2908958, 3.90040975]
+        ]
+        null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
+        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
+        Q_J = null_space[0]  # [(m_out * m_in) * m]
+        Q_J = Q_J.view((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
+        assert all(torch.allclose(
+            _R_tensor(a.item(), b.item(), c.item()) @ Q_J,
+            Q_J @ irr_repr(J, a.item(), b.item(), c.item())) for a, b, c in torch.rand(4, 3)
+        )
+
+    assert Q_J.dtype == torch.float64
+    return Q_J  # [m_out * m_in, m]
+
 
 
 ################################################################################

@@ -14,89 +14,10 @@ Therefore
     K(0, g |x| e) = R_out(g) K(0, |x| e) R_in(g^{-1})  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import torch
-from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, torch_default_dtype
+from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, spherical_harmonics_xyz, basis_transformation_Q_J
+from se3cnn.utils import torch_default_dtype
 from se3cnn.util.cache_file import cached_dirpklgz
 import math
-
-
-################################################################################
-# Solving the constraint coming from the stabilizer of 0 and e
-################################################################################
-
-def get_matrix_kernel(A, eps=1e-10):
-    '''
-    Compute an orthonormal basis of the kernel (x_1, x_2, ...)
-    A x_i = 0
-    scalar_product(x_i, x_j) = delta_ij
-
-    :param A: matrix
-    :return: matrix where each row is a basis vector of the kernel of A
-    '''
-    _u, s, v = torch.svd(A)
-
-    # A = u @ torch.diag(s) @ v.t()
-    kernel = v.t()[s < eps]
-    return kernel
-
-
-def get_matrices_kernel(As, eps=1e-10):
-    '''
-    Computes the commun kernel of all the As matrices
-    '''
-    return get_matrix_kernel(torch.cat(As, dim=0), eps)
-
-
-################################################################################
-# Analytically derived basis
-################################################################################
-
-@cached_dirpklgz("cache/trans_Q")
-def _basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disable=W0613
-    """
-    :param J: order of the spherical harmonics
-    :param order_in: order of the input representation
-    :param order_out: order of the output representation
-    :return: one part of the Q^-1 matrix of the article
-    """
-    with torch_default_dtype(torch.float64):
-        def _R_tensor(a, b, c): return kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
-
-        def _sylvester_submatrix(J, a, b, c):
-            ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
-            R_tensor = _R_tensor(a, b, c)  # [m_out * m_in, m_out * m_in]
-            R_irrep_J = irr_repr(J, a, b, c)  # [m, m]
-            return kron(R_tensor, torch.eye(R_irrep_J.size(0))) - \
-                kron(torch.eye(R_tensor.size(0)), R_irrep_J.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
-
-        random_angles = [
-            [4.41301023, 5.56684102, 4.59384642],
-            [4.93325116, 6.12697327, 4.14574096],
-            [0.53878964, 4.09050444, 5.36539036],
-            [2.16017393, 3.48835314, 5.55174441],
-            [2.52385107, 0.2908958, 3.90040975]
-        ]
-        null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
-        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
-        Q_J = null_space[0]  # [(m_out * m_in) * m]
-        Q_J = Q_J.view((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
-        assert all(torch.allclose(
-            _R_tensor(a.item(), b.item(), c.item()) @ Q_J,
-            Q_J @ irr_repr(J, a.item(), b.item(), c.item())) for a, b, c in torch.rand(4, 3)
-        )
-
-    assert Q_J.dtype == torch.float64
-    return Q_J  # [m_out * m_in, m]
-
-
-def spherical_harmonics_xyz(x, y, z, J):
-    if x == y == z == 0:  # angles at origin are nan, special treatment
-        if J == 0:  # Y^0 is angularly independent, choose any angle
-            return spherical_harmonics(0, 123, 321)  # [m]
-        else:  # insert zeros for Y^J with J!=0
-            return 0
-    else:  # not at the origin, sample spherical harmonic
-        alpha, beta = x_to_alpha_beta([x, y, z])
-        return spherical_harmonics(J, alpha, beta)  # [m]
 
 
 @cached_dirpklgz("cache/sh_cube")
@@ -107,43 +28,16 @@ def _sample_sh_cube(size, J, version=3):  # pylint: disable=W0613
     :param size: side length of the kernel
     :param J: order of the spherical harmonics
     '''
-    with torch_default_dtype(torch.float64):
-        rng = torch.linspace(-((size - 1) / 2), (size - 1) / 2, steps=size)
+    rng = torch.linspace(-((size - 1) / 2), (size - 1) / 2, steps=size, dtype=torch.float64)
 
-        Y_J = torch.zeros(2 * J + 1, size, size, size, dtype=torch.float64)
-        for idx_x, x in enumerate(rng):
-            for idx_y, y in enumerate(rng):
-                for idx_z, z in enumerate(rng):
-                    Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics_xyz(x, y, z, J)  # [m]
+    Y_J = torch.zeros(2 * J + 1, size, size, size, dtype=torch.float64)
+    for idx_x, x in enumerate(rng):
+        for idx_y, y in enumerate(rng):
+            for idx_z, z in enumerate(rng):
+                Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics_xyz(x, y, z, J)  # [m]
 
     assert Y_J.dtype == torch.float64
     return Y_J  # [m, x, y, z]
-
-
-def _sample_points(points, order_in, order_out):
-    '''
-    :param points: tensor of shape (N_a, 3)
-    :param order_in: order of the input representation
-    :param order_out: order of the output representation
-    :return: sampled equivariant kernel basis of shape (N_basis, N_a, 2*order_out+1, 2*order_in+1)
-    '''
-
-    N_a = points.size(0)
-    order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
-    solutions = []
-    for J in order_irreps:
-        Y_J = torch.zeros(N_a, 2 * J + 1, dtype=torch.float64)  # [a, m]
-        with torch_default_dtype(torch.float64):
-            for a, (x, y, z) in enumerate(points):
-                Y_J[a] = spherical_harmonics_xyz(x, y, z, J)  # [m]
-
-        # compute basis transformation matrix Q_J
-        Q_J = _basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
-        K_J = torch.einsum('mn,an->am', (Q_J, Y_J))  # [a, m_out * m_in]
-        K_J = K_J.view(N_a, 2 * order_out + 1, 2 * order_in + 1)  # [a, m_out, m_in]
-        solutions.append(K_J)
-
-    return solutions, points, order_irreps
 
 
 def _sample_cube(size, order_in, order_out):
@@ -162,7 +56,7 @@ def _sample_cube(size, order_in, order_out):
         Y_J = _sample_sh_cube(size, J)  # [m, x, y, z]
 
         # compute basis transformation matrix Q_J
-        Q_J = _basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
+        Q_J = basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
         K_J = torch.einsum('mn,nxyz->mxyz', (Q_J, Y_J))  # [m_out * m_in, x, y, z]
         K_J = K_J.view(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
         solutions.append(K_J)
