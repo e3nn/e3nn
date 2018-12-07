@@ -49,10 +49,10 @@ def x_to_alpha_beta(x):
     '''
     if not torch.is_tensor(x):
         x = torch.tensor(x, dtype=torch.get_default_dtype())
-    x = x / torch.norm(x)
-    beta = torch.acos(x[2])
-    alpha = torch.atan2(x[1], x[0])
-    return (alpha, beta)
+    x = x / torch.norm(x, 2, -1, keepdim=True)
+    beta = torch.acos(x[..., 2])
+    alpha = torch.atan2(x[..., 1], x[..., 0])
+    return (alpha, beta)  
 
 
 # These functions (x_to_alpha_beta and rot) satisfies that
