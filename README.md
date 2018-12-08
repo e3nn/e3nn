@@ -1,6 +1,6 @@
 # SE3CNN
 
-[arxiv.org/abs/1807.02547](https://arxiv.org/abs/1807.02547)
+[3D Steerable CNNs](https://arxiv.org/abs/1807.02547) and [Tensor field networks](https://arxiv.org/abs/1802.08219)
 
 The group SE(3) is the group of 3 dimensional rotations and translations.
 This library aims to create [SE(3) equivariant](https://youtu.be/ENLJACPHSEA) convolutional neural networks.
