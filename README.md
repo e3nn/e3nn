@@ -39,7 +39,7 @@ vector_field = conv(scalar_field)  # [batch, vector component, x, y, z]
 
 ## Dependencies
 
-- [pytorch](https://pytorch.org)
+- [pytorch](https://pytorch.org) (v >= 1)
 - [lie_learn](https://github.com/AMLab-Amsterdam/lie_learn) is required to compute the irreducible representations of SO(3)
 - scipy
 
