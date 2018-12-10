@@ -34,7 +34,7 @@ def _sample_sh_cube(size, J, version=3):  # pylint: disable=W0613
     for idx_x, x in enumerate(rng):
         for idx_y, y in enumerate(rng):
             for idx_z, z in enumerate(rng):
-                Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics_xyz(x, y, z, J)  # [m]
+                Y_J[:, idx_x, idx_y, idx_z] = spherical_harmonics_xyz(J, torch.stack([x, y, z]))  # [m]
 
     assert Y_J.dtype == torch.float64
     return Y_J  # [m, x, y, z]
@@ -346,9 +346,9 @@ def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
     y = torch.einsum(
         "ij,bjkxyz,kl->bilxyz",
         (
-            irr_repr(order_out, alpha, beta, gamma, dtype=y.dtype),
+            irr_repr(order_out, alpha.item(), beta.item(), gamma.item(), dtype=y.dtype),
             y,
-            irr_repr(order_in, -gamma, -beta, -alpha, dtype=y.dtype)
+            irr_repr(order_in, -gamma.item(), -beta.item(), -alpha.item(), dtype=y.dtype)
         )
     )
 
