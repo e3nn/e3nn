@@ -52,7 +52,7 @@ def x_to_alpha_beta(x):
     x = x / torch.norm(x, 2, -1, keepdim=True)
     beta = torch.acos(x[..., 2])
     alpha = torch.atan2(x[..., 1], x[..., 0])
-    return (alpha, beta)  
+    return (alpha, beta)
 
 
 # These functions (x_to_alpha_beta and rot) satisfies that
@@ -74,14 +74,15 @@ def irr_repr(order, alpha, beta, gamma, dtype=None):
     return torch.tensor(wigner_D_matrix(order, alpha, beta, gamma), dtype=torch.get_default_dtype() if dtype is None else dtype)
 
 
-# TODO
-# vectorize
-# order can be a list
-# alpha, beta as well
-# broadcasting order=int or [],   alpha, beta = float or [, , ]
 def spherical_harmonics(order, alpha, beta, dtype=None):
     """
     spherical harmonics
+
+    :param order: int or list
+    :param alpha: float or tensor of shape [A]
+    :param beta: float or tensor of shape [A]
+    :return: tensor of shape [m, A]
+
     - compatible with irr_repr and compose
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
@@ -103,19 +104,25 @@ def spherical_harmonics(order, alpha, beta, dtype=None):
     return Y
 
 
-# TODO
-# vectorize
-# xyz tensor [,,, 3]
-def spherical_harmonics_xyz(x, y, z, J):
+def spherical_harmonics_xyz(order, xyz):
+    """
+    spherical harmonics
+
+    :param order: int or list
+    :param xyz: tensor of shape [A, 3]
+    :return: tensor of shape [m, A]
+    """
+    if not isinstance(order, list):
+        order = [order]
+
     with torch_default_dtype(torch.float64):
-        if x == y == z == 0:  # angles at origin are nan, special treatment
-            if J == 0:  # Y^0 is angularly independent, choose any angle
-                return spherical_harmonics(0, 123, 321)  # [m]
-            else:  # insert zeros for Y^J with J!=0
-                return 0
-        else:  # not at the origin, sample spherical harmonic
-            alpha, beta = x_to_alpha_beta([x, y, z])
-            return spherical_harmonics(J, alpha, beta)  # [m]
+        alpha, beta = x_to_alpha_beta(xyz)  # two tensors of shape [A]
+        out = spherical_harmonics(order, alpha, beta)  # [m, A]
+
+        # fix values when xyz = 0
+        val = torch.cat([spherical_harmonics(0, 123, 321) if J == 0 else torch.zeros(2 * J + 1) for J in order])  # [m]
+        out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
+        return out
 
 
 def compose(a1, b1, c1, a2, b2, c2):
