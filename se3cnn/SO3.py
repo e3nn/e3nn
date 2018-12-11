@@ -120,8 +120,9 @@ def spherical_harmonics_xyz(order, xyz):
         out = spherical_harmonics(order, alpha, beta)  # [m, A]
 
         # fix values when xyz = 0
-        val = torch.cat([spherical_harmonics(0, 123, 321) if J == 0 else torch.zeros(2 * J + 1) for J in order])  # [m]
-        out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
+        if (xyz.norm(2, -1) == 0).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
+            val = torch.cat([spherical_harmonics(0, 123, 321) if J == 0 else torch.zeros(2 * J + 1) for J in order])  # [m]
+            out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
         return out
 
 
