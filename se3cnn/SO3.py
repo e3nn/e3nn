@@ -126,6 +126,64 @@ def spherical_harmonics_xyz(order, xyz):
         return out
 
 
+def legendre(order, z):
+    # TODO accept list for order
+    """
+    associated Legendre polynomials
+
+    :param order: int
+    :param z: tensor of shape [A]
+    :return: tensor of shape [m, A]
+    """
+    fac = math.factorial(order)
+    sqz2 = (1 - z ** 2) ** 0.5
+    hsqz2 = 0.5 * sqz2
+    ihsqz2 = z / hsqz2
+
+    if order == 0:
+        return z.new_ones(1, *z.size())
+    if order == 1:
+        return torch.stack([-0.5 * sqz2, z, sqz2])
+
+    plm = [(1 - 2 * abs(order - 2 * order // 2)) * hsqz2 ** order / fac]
+    plm.append(-plm[0] * order * ihsqz2)
+    for mr in range(1, 2 * order):
+        plm.append((mr - order) * ihsqz2 * plm[mr] - (2 * order - mr + 1) * mr * plm[mr - 1])
+    return torch.stack(plm)
+
+
+def spherical_harmonics_xyz_backwardable(order, xyz):
+    # TODO accept list for order
+    """
+    spherical harmonics
+
+    :param order: int
+    :param xyz: tensor of shape [A, 3]
+    :return: tensor of shape [m, A]
+    """
+    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
+
+    plm = legendre(order, xyz[..., 2])  # [m, A]
+
+    m = torch.arange(-order, order + 1, dtype=xyz.dtype, device=xyz.device)
+    m = m.view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
+    sm = 1 - m % 2 * 2  # [m, 1...]
+
+    phi = torch.atan2(xyz[..., 1], xyz[..., 0]).unsqueeze(0)  # [1, A]
+    exr = torch.cos(m * phi)  # [m, A]
+    exi = torch.sin(-m * phi)  # [-m, A]
+
+    prefactor = torch.cat([
+        2 ** 0.5 * sm[:order] * exi[:order],
+        xyz.new_ones(1, *xyz.size()[:-1]),
+        2 ** 0.5 * exr[-order:],
+    ])
+
+    quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
+    quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
+    return prefactor * quantum * plm  # [m, A]
+
+
 def compose(a1, b1, c1, a2, b2, c2):
     """
     (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
