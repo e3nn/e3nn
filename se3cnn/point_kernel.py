@@ -87,9 +87,9 @@ class SE3PointKernel(torch.nn.Module):
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
                 basis_size = 0
-                for r in self.radii:
+                for _ in self.radii:
                     order_irreps = list(range(abs(l_in - l_out), l_in + l_out + 1))
-                    for idx_J, J in enumerate(order_irreps):
+                    for J in order_irreps:
                         if J <= self.J_filter_max:
                             basis_size += 1
                             set_of_irreps.add(J)

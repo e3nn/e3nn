@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 import sys, os
 import torch
 import se3cnn
@@ -45,9 +46,9 @@ class PointGatedBlock(torch.nn.Module):
             z = y
         else:
             if len(difference_mat.size()) == 4:
-                batch, N, M, _ = difference_mat.size()
+                batch, N, _M, _ = difference_mat.size()
             if len(difference_mat.size()) == 3:
-                N, M, _ = difference_mat.size()
+                N, _M, _ = difference_mat.size()
 
             size_out = sum(mul * (2 * n + 1) for n, mul in enumerate(self.repr_out))
 

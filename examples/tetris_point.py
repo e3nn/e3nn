@@ -1,3 +1,4 @@
+# pylint: disable=C,R,E1101,not-callable
 import sys, os
 import torch
 import se3cnn
@@ -8,7 +9,7 @@ from se3cnn.utils import torch_default_dtype
 import se3cnn.point_utils as point_utils
 from se3cnn.non_linearities import ScalarActivation
 from se3cnn.convolution import SE3PointConvolution
-from se3cnn.blocks.point_gated_block import PointGatedBlock 
+from se3cnn.blocks.point_gated_block import PointGatedBlock
 
 EPSILON = 1e-8
 
@@ -43,7 +44,7 @@ class SE3Net(torch.nn.Module):
         features = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
         self.num_features = len(features)
 
-        kwargs = { 
+        kwargs = {
             'radii': torch.linspace(0, max_radius, steps=num_radial, dtype=torch.float64),
             'activation': (torch.nn.functional.relu, torch.sigmoid) }
 
@@ -59,7 +60,7 @@ class SE3Net(torch.nn.Module):
         for i in range(self.num_features - 1, len(self.layers)):
             layer = self.layers[i]
             output = layer(output)
-        return output 
+        return output
 
 def get_dataset():
     tetris = [[(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)],  # chiral_shape_1
@@ -72,7 +73,7 @@ def get_dataset():
               [(0, 0, 0), (1, 0, 0), (1, 1, 0), (2, 1, 0)]]  # L
     tetris = torch.tensor(tetris, dtype=torch.float64)
     labels = torch.arange(len(tetris))
-        
+
     return tetris, labels
 
 def train(net, diff_M, labels):
@@ -83,7 +84,7 @@ def train(net, diff_M, labels):
     max_epochs = 250
     optimizer = torch.optim.Adam(net.parameters(), lr=3e-2, weight_decay=1e-5)
 
-    batch, N, M, _ = diff_M.size()
+    batch, N, _M, _ = diff_M.size()
 
     for epoch in range(max_epochs):
         input = torch.ones(batch, 1, N, dtype=torch.float64)
@@ -107,17 +108,17 @@ def test(net, tetris):
 
     correct_predictions = 0
     total_predictions = 0
-    for i in range(test_set_size):
+    for _ in range(test_set_size):
         for label, shape in enumerate(tetris):
             rotation = random_rotation_matrix(rng)
             rotated_shape = np.dot(shape, rotation)
             translation = np.expand_dims(np.random.uniform(low=-3., high=3., size=(3)), axis=0)
             translated_shape = torch.from_numpy(rotated_shape + translation).unsqueeze(-3)
             diff_M = point_utils.difference_matrix(translated_shape)
-            batch, N, M, _ = diff_M.size()
+            batch, N, _M, _ = diff_M.size()
             input = torch.ones(batch, 1, N, dtype=torch.float64)
             prediction = net(input, diff_M).argmax(1)
-            
+
             correct_predictions += (prediction == label).item()
             total_predictions += 1
     print('Test Accuracy: {0}'.format(correct_predictions / total_predictions))
@@ -129,8 +130,8 @@ def main(argv):
     net = SE3Net(8)
     train(net, diff_M, labels)
     test_epochs = 10
-    for i in range(test_epochs):
-        test(net, tetris) 
+    for _ in range(test_epochs):
+        test(net, tetris)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
