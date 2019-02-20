@@ -40,8 +40,8 @@ class PointGatedBlock(torch.nn.Module):
         with torch_default_dtype(torch.float64):
             self.conv = SE3PointConvolution(Rs_in, Rs_out_with_gate, radii=radii)
 
-    def forward(self, input, difference_mat):
-        y = self.conv(input, difference_mat)
+    def forward(self, input, difference_mat, relative_mask=None):
+        y = self.conv(input, difference_mat, relative_mask)
         if self.scalar_act is None and self.gate_act is None:
             z = y
         else:
