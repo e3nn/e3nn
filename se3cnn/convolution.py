@@ -2,7 +2,7 @@
 import torch
 from se3cnn import SE3Kernel
 from se3cnn.point_kernel import SE3PointKernel
-from se3cnn import kernel, point_kernel
+from se3cnn import kernel, point_kernel, point_utils
 
 
 class SE3Convolution(torch.nn.Module):
@@ -69,4 +69,36 @@ class SE3PointConvolution(torch.nn.Module):
             output = torch.einsum('nca,dcnba->ndb', (input, kernel))
 
         return output
+        
+
+class SE3PointNeighborConvolution(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, radii, radial_function=point_kernel.gaussian_radial_function, J_filter_max=10, **kwargs):
+        super().__init__()
+
+        self.kernel = SE3PointKernel(Rs_in, Rs_out, radii, radial_function=radial_function, J_filter_max=J_filter_max)
+        self.kwargs = kwargs
+
+    def __repr__(self):
+        return "{name} ({kernel}, kwargs={kwargs})".format(
+            name=self.__class__.__name__,
+            kernel=self.kernel,
+            kwargs=self.kwargs,
+        )
+
+    def forward(self, input, coords, neighbors, relative_mask=None):  # pylint: disable=W
+        difference_matrix =  point_utils.neighbors_difference_matrix(neighbors, coords)  # [N, K, 3]
+        neighbors_input = point_utils.neighbors_feature_matrix(neighbors, input)  # [C, N, K]
+        kernel = self.kernel(difference_matix)
+        if len(input.size()) == 2:
+            # No batch dimension
+            output = torch.einsum('cba,dcba->db', (neighbors_input, kernel))
+        elif len(input.size()) == 3:
+            # Batch dimension
+            # Apply relative_mask to kernel (if examples are not all size N, M)
+            if relative_mask is not None:
+                kernel = torch.einsum('nba,dcnba->dcnba', (relative_mask, kernel))
+            output = torch.einsum('ncba,dcnba->ndb', (neighbors_input, kernel))
+
+        return output
+        
 
