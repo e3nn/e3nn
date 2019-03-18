@@ -20,7 +20,7 @@ class NormSoftplus(torch.nn.Module):
         self.scalar_act = scalar_act
         self.is_scalar = [dim == 1 for dim in dimensionalities]
         nbias = int(np.sum(np.array(dimensionalities) != 1))
-        self.bias = torch.nn.Parameter(torch.FloatTensor(nbias)) if nbias > 0 else None
+        self.bias = torch.nn.Parameter(torch.Tensor(nbias)) if nbias > 0 else None
         self.eps = eps
         self.bias_min = bias_min
         self.bias_max = bias_max
