@@ -53,7 +53,7 @@ def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6, 
 
         for sol, J in zip(solutions, order_irreps):
             if J <= J_max:
-                x = sol * window  # [m_out, m_in, x, y, z]
+                x = sol.to(window.device) * window  # [m_out, m_in, x, y, z]
                 basis.append(x)
 
     return torch.stack(basis, dim=0) if len(basis) > 0 else None
@@ -77,7 +77,7 @@ class SE3PointKernel(torch.nn.Module):
         self.dims_out = [2 * l + 1 for _, l in self.Rs_out]
         self.dims_in = [2 * l + 1 for _, l in self.Rs_in]
         self.radial_function = radial_function
-        self.radii = radii
+        self.register_buffer('radii', radii)
         self.J_filter_max = J_filter_max
         self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i in range(len(self.multiplicities_out))])
         self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in range(len(self.multiplicities_in))])
