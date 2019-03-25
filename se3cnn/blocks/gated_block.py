@@ -2,7 +2,7 @@
 from functools import partial
 import torch
 import torch.utils.checkpoint
-from se3cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution
+from se3cnn import SE3BNConvolution, SE3Convolution, SE3GNConvolution, SE3ConvolutionTranspose
 from se3cnn.non_linearities import ScalarActivation
 from se3cnn.dropout import SE3Dropout
 from se3cnn import kernel
@@ -14,7 +14,7 @@ class GatedBlock(torch.nn.Module):
                  repr_in, repr_out, size, radial_window=kernel.gaussian_window_wrapper,  # kernel params
                  activation=(None, None), stride=1, padding=0, dilation=1, capsule_dropout_p=None,  # conv/nonlinearity/dropout params
                  normalization=None, batch_norm_momentum=0.1,  # batch norm params
-                 bias=True, smooth_stride=True, dyn_iso=False, checkpoint=True, verbose=False):
+                 bias=True, smooth_stride=True, dyn_iso=False, checkpoint=True, verbose=False, transpose=False):
         '''
         :param repr_in: tuple with multiplicities of repr. (1, 3, 5, ..., 15)
         :param repr_out: same but for the output
@@ -67,6 +67,9 @@ class GatedBlock(torch.nn.Module):
             Convolution = partial(SE3GNConvolution, Rs_gn=[(1, 2 * n + 1) for n, mul in enumerate(repr_in) for _ in range(mul)])
         else:
             raise NotImplementedError('normalization mode unknown')
+
+        if transpose == True:
+           Convolution = SE3ConvolutionTranspose
 
         self.conv = Convolution(
             Rs_in=Rs_in,
