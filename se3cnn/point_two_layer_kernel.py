@@ -3,65 +3,14 @@ import torch
 from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, spherical_harmonics_xyz, basis_transformation_Q_J
 from se3cnn.utils import torch_default_dtype
 from se3cnn.util.cache_file import cached_dirpklgz
+from se3cnn.point_kernel import get_Y_for_filter, angular_function, gaussian_radial_function
 import math
-
-def get_Y_for_filter(irrep, filter_irreps, Y):
-    if irrep not in filter_irreps:
-        return None
-    start_index = 0
-    for filter_irrep in filter_irreps:
-        if filter_irrep != irrep:
-            start_index += 2 * filter_irrep + 1
-        else:
-            break
-    end_index = start_index + (2 * irrep + 1)
-    return Y[start_index:end_index]
-
-# TODO: Vectorize
-def angular_function(difference_mat, order_in, order_out, filter_irreps, Ys, eps=1e-8):
-    order_irreps = list(range(abs(order_in - order_out), order_in + order_out + 1))
-    angular_filters = []
-    for J in order_irreps:
-        Y_J = get_Y_for_filter(J, filter_irreps, Ys)
-        if Y_J is not None:
-            # compute basis transformation matrix Q_J
-            Q_J = basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
-            if len(difference_mat.size()) == 4:
-                batch, N, M, _ = difference_mat.size()
-                K_J = torch.einsum('mn,nkab->mkab', (Q_J, Y_J))  # [m_out * m_in, batch, N, M]
-                K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, batch, N, M)  # [m_out, m_in, batch, N, M]
-            else:
-                N, M, _ = difference_mat.size()
-                K_J = torch.einsum('mn,nab->mab', (Q_J, Y_J))  # [m_out * m_in, N, M]
-                K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, N, M)  # [m_out, m_in, N, M]
-            # Normalize wrt incoming?
-            angular_filters.append(K_J)
-
-    return angular_filters, difference_mat.norm(2, -1), order_irreps
-
-# TODO: Reduce duplicate code in this and gaussian_window in kernel.py
-def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6, J_max=10):
-    '''
-    gaussian radial function with  manual handling of shell radii, shell bandlimits and shell width
-    takes as input the output of angular_function
-    :param radii: radii of the shells, sets mean of the radial gaussians
-    :param sigma: width of the shells, corresponds to standard deviation of radial gaussians
-    '''
-    basis = []
-    for r in radii:
-        window = torch.exp(-.5 * ((r_field - r) / sigma)**2) / (math.sqrt(2 * math.pi) * sigma)
-
-        for sol, J in zip(solutions, order_irreps):
-            if J <= J_max:
-                x = sol.to(window.device) * window  # [m_out, m_in, x, y, z]
-                basis.append(x)
-
-    return torch.stack(basis, dim=0) if len(basis) > 0 else None
+import torch.nn.functional as F
 
 
 # TODO: Split into radial and angular kernels
-class SE3PointKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, radii, radial_function=gaussian_radial_function, J_filter_max=10):
+class SE3PointTwoLayerKernel(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, radii, radial_function=gaussian_radial_function, J_filter_max=10, radial_nonlinearity=None, hidden_dim=10):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
@@ -81,8 +30,15 @@ class SE3PointKernel(torch.nn.Module):
         self.J_filter_max = J_filter_max
         self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i in range(len(self.multiplicities_out))])
         self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in range(len(self.multiplicities_in))])
+        self.hidden_dim = hidden_dim
 
-        self.nweights = 0
+        self.radial_nonlinearity = F.relu if radial_nonlinearity is None else radial_nonlinearity
+
+        self.nweights_0 = 0
+        self.nweights_1 = 0
+        self.nbiases_0 = 0
+        self.nbiases_1 = 0
+
         set_of_irreps = set()
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
@@ -93,10 +49,16 @@ class SE3PointKernel(torch.nn.Module):
                         if J <= self.J_filter_max:
                             basis_size += 1
                             set_of_irreps.add(J)
-                self.nweights += m_out * m_in * basis_size  # This depends on radial function
+                self.nweights_0 += self.hidden_dim * basis_size  # This depends on radial function
+                self.nbiases_0 += self.hidden_dim
+                self.nweights_1 += m_out * m_in * self.hidden_dim
+                self.nbiases_1 += m_out * m_in
         self.filter_irreps = sorted(list(set_of_irreps))
 
-        self.weight = torch.nn.Parameter(torch.randn(self.nweights))
+        self.weight_0 = torch.nn.Parameter(torch.randn(self.nweights_0))
+        self.biases_0 = torch.nn.Parameter(torch.zeros(self.nbiases_0))
+        self.weight_1 = torch.nn.Parameter(torch.randn(self.nweights_1))
+        self.biases_1 = torch.nn.Parameter(torch.zeros(self.nbiases_1))
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, radii={radii})".format(
@@ -107,17 +69,20 @@ class SE3PointKernel(torch.nn.Module):
         )
 
 
-    def combination(self, weight, difference_mat):
+    def combination(self, weight_0, weight_1, biases_0, biases_1, difference_mat):
         # Check for batch dimension for difference_mat
         if len(difference_mat.size()) == 4:
             batch, N, M, _ = difference_mat.size()
-            kernel = weight.new_empty(self.n_out, self.n_in, batch, N, M)
+            kernel = weight_0.new_empty(self.n_out, self.n_in, batch, N, M)
         if len(difference_mat.size()) == 3:
             N, M, _ = difference_mat.size()
-            kernel = weight.new_empty(self.n_out, self.n_in, N, M)
+            kernel = weight_0.new_empty(self.n_out, self.n_in, N, M)
 
         begin_i = 0
-        weight_index = 0
+        weight_0_index = 0
+        weight_1_index = 0
+        bias_0_index = 0
+        bias_1_index = 0
 
         # Compute Ys for filters
         Ys = spherical_harmonics_xyz(self.filter_irreps, difference_mat)
@@ -137,13 +102,27 @@ class SE3PointKernel(torch.nn.Module):
                     b_el = kij.size(0)
                     b_size = kij.size()[1:]  # [i, j, N, M] or [i, j, batch, N, M]
 
-                    w = weight[weight_index: weight_index + m_out * m_in * b_el].view(m_out * m_in, b_el)  # [I*J, beta]
-                    weight_index += m_out * m_in * b_el
+                    w0 = weight_0[weight_0_index: weight_0_index + self.hidden_dim * b_el].view(self.hidden_dim, b_el)  # [I*J, beta]
+                    b0 = biases_0[bias_0_index: bias_0_index + self.hidden_dim]  # [I*J]
+                    w1 = weight_1[weight_1_index: weight_1_index + m_out * m_in * self.hidden_dim].view(m_out * m_in, self.hidden_dim)  # [I*J, I*J]
+                    b1 = biases_1[bias_1_index: bias_1_index + m_out * m_in]  # [I*J]
+
+                    # weight_index += m_out * m_in * b_el
+                    weight_0_index += self.hidden_dim * b_el
+                    bias_0_index += self.hidden_dim
+                    weight_1_index += m_out * m_in * self.hidden_dim
+                    bias_1_index += m_out * m_in
 
                     basis_kernels_ij = kij.contiguous().view(b_el, -1)  # [beta, i*j*N*M] or [beta, i*j*batch*N*M]
 
-                    # TODO: Rewrite as einsum
-                    ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*N*M] or [I*J, i*j*batch*N*M]
+                    ker = torch.mm(w0, basis_kernels_ij)  # [hidden_dim, i*j*N*M] or [hidden_dim, i*j*batch*N*M]
+                    # Add bias and nonlinearity
+                    ker += b0.unsqueeze(-1)
+                    ker = self.radial_nonlinearity(ker)
+                    # Add weight and bias
+                    ker = torch.mm(w1, ker)  # [I*J, i*j*N*M] or [I*J, i*j*batch*N*M]
+                    ker += b1.unsqueeze(-1)
+
                     ker = ker.view(m_out, m_in, *b_size)  # [I, J, i, j, N, M] or [I, J, i, j, batch, N, M]
                     ker = ker.transpose(1, 2).contiguous()  # [I, i, J, j, N, M] or [I, i, J, j, batch, N, M]
                     ker = ker.view(m_out * self.dims_out[i], m_in * self.dims_in[j], *b_size[2:])  # [I*i, J*j, N, M] or [I*i, J*j, batch, N, M]
@@ -157,5 +136,5 @@ class SE3PointKernel(torch.nn.Module):
         return kernel
 
     def forward(self, difference_mat):  # pylint: disable=W
-        return self.combination(self.weight, difference_mat)
+        return self.combination(self.weight_0, self.weight_1, self.biases_0, self.biases_1, difference_mat)
 
