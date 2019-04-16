@@ -174,11 +174,14 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     exr = torch.cos(m * phi)  # [m, A]
     exi = torch.sin(-m * phi)  # [-m, A]
 
-    prefactor = torch.cat([
-        2 ** 0.5 * sm[:order] * exi[:order],
-        xyz.new_ones(1, *xyz.size()[:-1]),
-        2 ** 0.5 * exr[-order:],
-    ])
+    if order==0:
+        prefactor = 1.
+    else:
+        prefactor = torch.cat([
+            2 ** 0.5 * sm[:order] * exi[:order],
+            xyz.new_ones(1, *xyz.size()[:-1]),
+            2 ** 0.5 * exr[-order:],
+        ])
 
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
     quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
