@@ -183,6 +183,9 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
             2 ** 0.5 * exr[-order:],
         ])
 
+    if order==1:
+        prefactor *= -1
+
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
     quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
     return prefactor * quantum * plm  # [m, A] 
