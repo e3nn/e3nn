@@ -152,7 +152,7 @@ def legendre(order, z):
     return torch.stack(plm)
 
 
-def spherical_harmonics_xyz_backwardable(order, xyz):
+def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     # TODO accept list for order
     """
     spherical harmonics
@@ -161,7 +161,8 @@ def spherical_harmonics_xyz_backwardable(order, xyz):
     :param xyz: tensor of shape [A, 3]
     :return: tensor of shape [m, A]
     """
-    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
+    norm = torch.norm(xyz, 2, -1, keepdim=True) + eps
+    xyz = xyz / norm
 
     plm = legendre(order, xyz[..., 2])  # [m, A]
 
