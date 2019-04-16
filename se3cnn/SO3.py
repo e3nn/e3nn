@@ -153,7 +153,6 @@ def legendre(order, z):
 
 
 def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
-    # TODO accept list for order
     """
     spherical harmonics
 
@@ -161,8 +160,10 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     :param xyz: tensor of shape [A, 3]
     :return: tensor of shape [m, A]
     """
-    norm = torch.norm(xyz, 2, -1, keepdim=True) + eps
-    xyz = xyz / norm
+    norm = torch.norm(xyz, 2, -1, keepdim=True)
+    # Using this eps and masking out spherical harmonics from radii < eps
+    # are both crucial to stability.
+    xyz = xyz / (norm + eps)
 
     plm = legendre(order, xyz[..., 2])  # [m, A]
 
@@ -188,7 +189,15 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
 
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
     quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
-    return prefactor * quantum * plm  # [m, A] 
+
+    out = prefactor * quantum * plm  # [m, A]
+
+    # fix values when xyz = 0
+    if (norm < eps).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
+        val = spherical_harmonics(0, 123, 321) if order == 0 else xyz.new_zeros(2 * order + 1)
+        out[..., norm.squeeze(-1) < eps] = val.view(-1, 1)
+
+    return out
 
 
 def spherical_harmonics_xyz_backwardable_order_list(order, xyz):
