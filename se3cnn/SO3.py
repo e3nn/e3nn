@@ -190,6 +190,7 @@ def spherical_harmonics_xyz_backwardable_order_list(order, xyz):
         order = [order]
     return torch.cat([spherical_harmonics_xyz_backwardable(J, xyz) for J in order], dim=0)  # [m, A]
 
+
 def compose(a1, b1, c1, a2, b2, c2):
     """
     (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
