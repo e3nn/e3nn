@@ -42,10 +42,15 @@ class SE3ConvolutionTranspose(torch.nn.Module):
 
 
 class SE3PointConvolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, radii, radial_function=point_kernel.gaussian_radial_function, J_filter_max=10, kernel=SE3PointKernel, **kwargs):
+    def __init__(self, Rs_in, Rs_out, radii,
+                 radial_function=point_kernel.gaussian_radial_function,
+                 J_filter_max=10, kernel=SE3PointKernel, sh_backwardable=False, **kwargs):
         super().__init__()
 
-        self.kernel = kernel(Rs_in, Rs_out, radii, radial_function=radial_function, J_filter_max=J_filter_max)
+        self.kernel = kernel(Rs_in, Rs_out, radii,
+                             radial_function=radial_function,
+                             J_filter_max=J_filter_max,
+                             sh_backwardable=sh_backwardable)
         self.kwargs = kwargs
 
     def __repr__(self):
