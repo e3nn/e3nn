@@ -7,11 +7,12 @@ import scipy
 
 from se3cnn.utils import torch_default_dtype
 import se3cnn.point_utils as point_utils
-from se3cnn.non_linearities import ScalarActivation
 from se3cnn.convolution import SE3PointConvolution
-from se3cnn.blocks.point_gated_block import PointGatedBlock
+
+torch.set_default_dtype(torch.float64)
 
 EPSILON = 1e-8
+
 
 def random_rotation_matrix(numpy_random_state):
     """
@@ -31,26 +32,38 @@ def random_rotation_matrix(numpy_random_state):
 def rotation_matrix(axis, theta):
     return scipy.linalg.expm(np.cross(np.eye(3), axis * theta))
 
+
 class AvgSpacial(torch.nn.Module):
     def forward(self, inp):
         return inp.view(inp.size(0), inp.size(1), -1).mean(-1)
 
+
 size = 3  # To match image case
+
 
 class SE3Net(torch.nn.Module):
     def __init__(self, num_classes, num_radial=size // 2 + 1, max_radius=size // 2):
         super(SE3Net, self).__init__()
 
-        # features = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
-        features = [(1,), (2, 2), (4, 4), (6, 6), (64,)]
+        features = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
+        #features = [(1,), (2, 2), (4, 4), (6, 4), (64,)]
         self.num_features = len(features)
 
         kwargs = {
-            'radii': torch.linspace(0, max_radius, steps=num_radial, dtype=torch.float64),
-            'activation': (torch.nn.functional.relu, torch.sigmoid),
-            'sh_backwardable': True}
+            'radii': torch.linspace(0, max_radius, steps=num_radial,
+                                    dtype=torch.float64),
+            'sh_backwardable': True,
+        }
 
-        self.layers = torch.nn.ModuleList([PointGatedBlock(features[i], features[i+1], **kwargs) for i in range(len(features) - 1)])
+        self.layers = torch.nn.ModuleList([])
+        for i in range(len(features) - 1):
+            Rs_in = list(zip(features[i],
+                             range(len(features[i]))))
+            Rs_out = list(zip(features[i + 1],
+                              range(len(features[i + 1]))))
+            self.layers.append(
+                SE3PointConvolution(Rs_in, Rs_out, **kwargs)
+            )
         with torch_default_dtype(torch.float64):
             self.layers.extend([AvgSpacial(), torch.nn.Dropout(p=0.2), torch.nn.Linear(64, num_classes)])
 
