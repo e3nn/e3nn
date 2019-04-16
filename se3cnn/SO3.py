@@ -181,8 +181,13 @@ def spherical_harmonics_xyz_backwardable(order, xyz):
 
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
     quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
-    return prefactor * quantum * plm  # [m, A]
+    return prefactor * quantum * plm  # [m, A] 
 
+
+def spherical_harmonics_xyz_backwardable_order_list(order, xyz):
+    if not isinstance(order, list):
+        order = [order]
+    return torch.cat([spherical_harmonics_xyz_backwardable(J, xyz) for J in order], dim=0)  # [m, A]
 
 def compose(a1, b1, c1, a2, b2, c2):
     """
