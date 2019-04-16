@@ -12,7 +12,8 @@ from se3cnn.non_linearities import ScalarActivation
 # TODO: Refactor so we don't need separate functions for point and image
 # TODO: Broaden scope of function, add radial function, J_filter_max
 class PointGatedBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, radii, activation=(None, None)):
+    def __init__(self, repr_in, repr_out, radii, activation=(None, None),
+                 sh_backwardable=False):
         super().__init__()
 
         if type(activation) is tuple:
@@ -38,7 +39,10 @@ class PointGatedBlock(torch.nn.Module):
             self.gate_act = None
 
         with torch_default_dtype(torch.float64):
-            self.conv = SE3PointConvolution(Rs_in, Rs_out_with_gate, radii=radii)
+            self.conv = SE3PointConvolution(Rs_in, Rs_out_with_gate,
+                                            radii=radii,
+                                            sh_backwardable=sh_backwardable
+                                           )
 
     def forward(self, input, difference_mat):
         y = self.conv(input, difference_mat)
