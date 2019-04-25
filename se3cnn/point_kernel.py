@@ -104,6 +104,7 @@ class SE3PointKernel(torch.nn.Module):
 
         self.nweights = 0
         set_of_irreps = set()
+        weight_variances = list()
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
                 basis_size = 0
@@ -116,9 +117,12 @@ class SE3PointKernel(torch.nn.Module):
                             set_of_irreps.add(J)
                 # This depends on radial function
                 self.nweights += m_out * m_in * basis_size
+                weight_variances += [2 / (
+                    (m_out + m_in) * basis_size)] * (m_out * m_in * basis_size)
         self.filter_irreps = sorted(list(set_of_irreps))
 
-        self.weight = torch.nn.Parameter(torch.randn(self.nweights))
+        self.weight = torch.nn.Parameter(torch.randn(self.nweights) *
+                                         torch.tensor(weight_variances))
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, radii={radii})".format(
