@@ -152,8 +152,7 @@ def legendre(order, z):
     return torch.stack(plm)
 
 
-def spherical_harmonics_xyz_backwardable(order, xyz):
-    # TODO accept list for order
+def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     """
     spherical harmonics
 
@@ -161,7 +160,10 @@ def spherical_harmonics_xyz_backwardable(order, xyz):
     :param xyz: tensor of shape [A, 3]
     :return: tensor of shape [m, A]
     """
-    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
+    norm = torch.norm(xyz, 2, -1, keepdim=True)
+    # Using this eps and masking out spherical harmonics from radii < eps
+    # are both crucial to stability.
+    xyz = xyz / (norm + eps)
 
     plm = legendre(order, xyz[..., 2])  # [m, A]
 
@@ -173,15 +175,34 @@ def spherical_harmonics_xyz_backwardable(order, xyz):
     exr = torch.cos(m * phi)  # [m, A]
     exi = torch.sin(-m * phi)  # [-m, A]
 
-    prefactor = torch.cat([
-        2 ** 0.5 * sm[:order] * exi[:order],
-        xyz.new_ones(1, *xyz.size()[:-1]),
-        2 ** 0.5 * exr[-order:],
-    ])
+    if order==0:
+        prefactor = 1.
+    else:
+        prefactor = torch.cat([
+            2 ** 0.5 * sm[:order] * exi[:order],
+            xyz.new_ones(1, *xyz.size()[:-1]),
+            2 ** 0.5 * exr[-order:],
+        ])
+
+    if order==1:
+        prefactor *= -1
 
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
     quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
-    return prefactor * quantum * plm  # [m, A]
+
+    out = prefactor * quantum * plm  # [m, A]
+
+    # fix values when xyz = 0
+    if (norm < eps).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
+        out[..., norm.squeeze(-1) < eps] = spherical_harmonics(0, 123, 321) if order == 0 else 0.
+
+    return out
+
+
+def spherical_harmonics_xyz_backwardable_order_list(order, xyz):
+    if not isinstance(order, list):
+        order = [order]
+    return torch.cat([spherical_harmonics_xyz_backwardable(J, xyz) for J in order], dim=0)  # [m, A]
 
 
 def compose(a1, b1, c1, a2, b2, c2):
