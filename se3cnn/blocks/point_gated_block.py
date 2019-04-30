@@ -44,8 +44,8 @@ class PointGatedBlock(torch.nn.Module):
                                             sh_backwardable=sh_backwardable
                                            )
 
-    def forward(self, input, difference_mat):
-        y = self.conv(input, difference_mat)
+    def forward(self, input, difference_mat, relative_mask=None):
+        y = self.conv(input, difference_mat, relative_mask)
         if self.scalar_act is None and self.gate_act is None:
             z = y
         else:
