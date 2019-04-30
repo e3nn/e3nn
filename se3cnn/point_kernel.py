@@ -63,7 +63,7 @@ def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6,
     basis = []
     for r in radii:
         window = torch.exp(-.5 * ((r_field - r) / sigma)**2)
-        window /= (math.sqrt(2 * math.pi) * sigma)
+        window = window / (math.sqrt(2 * math.pi) * sigma)
 
         for sol, J in zip(solutions, order_irreps):
             if J <= J_max:

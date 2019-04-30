@@ -194,8 +194,7 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
 
     # fix values when xyz = 0
     if (norm < eps).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
-        val = spherical_harmonics(0, 123, 321) if order == 0 else xyz.new_zeros(2 * order + 1)
-        out[..., norm.squeeze(-1) < eps] = val.view(-1, 1)
+        out[..., norm.squeeze(-1) < eps] = spherical_harmonics(0, 123, 321) if order == 0 else 0.
 
     return out
 
