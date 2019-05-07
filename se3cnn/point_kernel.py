@@ -2,6 +2,7 @@
 import torch
 import se3cnn.SO3 as SO3
 import math
+import numpy as np
 
 
 def get_Y_for_filter(irrep, filter_irreps, Y):
@@ -104,7 +105,8 @@ class SE3PointKernel(torch.nn.Module):
 
         self.nweights = 0
         set_of_irreps = set()
-        weight_variances = list()
+        filter_variances = list()
+        num_paths = 0
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
                 basis_size = 0
@@ -116,13 +118,21 @@ class SE3PointKernel(torch.nn.Module):
                             basis_size += 1
                             set_of_irreps.add(J)
                 # This depends on radial function
+                if basis_size > 0:
+                    num_paths += 1
                 self.nweights += m_out * m_in * basis_size
-                weight_variances += [2 / (
-                    (m_out + m_in) * basis_size)] * (m_out * m_in * basis_size)
+                variance_factor = (2 * l_out + 1) / (m_in * basis_size)
+                filter_variances += [np.sqrt(variance_factor)] * (m_out *
+                                                                  m_in *
+                                                                  basis_size)
         self.filter_irreps = sorted(list(set_of_irreps))
 
-        self.weight = torch.nn.Parameter(torch.randn(self.nweights) *
-                                         torch.tensor(weight_variances))
+        self.weight = torch.nn.Parameter(torch.randn(self.nweights))
+        # Change variance of filter
+        # We've assumed each radial function and spherical harmonic
+        # is normalized to 1.
+        self.register_buffer('fvar', (torch.tensor(filter_variances) *
+                                      np.sqrt(1 / num_paths)))
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, radii={radii})".format(
@@ -189,5 +199,5 @@ class SE3PointKernel(torch.nn.Module):
         return kernel
 
     def forward(self, difference_mat):  # pylint: disable=W
-        return self.combination(self.weight, difference_mat)
+        return self.combination(self.weight * self.fvar, difference_mat)
 
