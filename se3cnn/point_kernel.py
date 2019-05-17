@@ -3,6 +3,7 @@ import torch
 import se3cnn.SO3 as SO3
 import math
 import numpy as np
+import scipy.special
 
 
 def get_Y_for_filter(irrep, filter_irreps, Y):
@@ -64,6 +65,29 @@ def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6,
     basis = []
     for r in radii:
         window = torch.exp(-.5 * ((r_field - r) / sigma)**2)
+        window = window / (math.sqrt(2 * math.pi) * sigma)
+
+        for sol, J in zip(solutions, order_irreps):
+            if J <= J_max:
+                x = sol.to(window.device) * window  # [m_out, m_in, x, y, z]
+                basis.append(x)
+
+    return torch.stack(basis, dim=0) if len(basis) > 0 else None
+
+
+def gaussian_radial_function_normed(solutions, r_field, order_irreps, radii,
+                                    sigma=.6, J_max=10):
+    '''
+    gaussian radial function with  manual handling of shell radii, shell
+    bandlimits and shell width takes as input the output of angular_function
+    :param radii: radii of the shells, sets mean of the radial gaussians
+    :param sigma: width of the shells, corresponds to standard deviation of
+        radial gaussians
+    '''
+    basis = []
+    for r in radii:
+        window = torch.exp(-.5 * ((r_field - r) / sigma)**2)
+        window /= (2 * r ** 2 + 1)
         window = window / (math.sqrt(2 * math.pi) * sigma)
 
         for sol, J in zip(solutions, order_irreps):
