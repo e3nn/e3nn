@@ -100,6 +100,8 @@ def one_layer_radial_function(solutions, radial_basis, order_irreps, J_max=10):
     solutions = [sol for sol, J in zip(solutions, order_irreps) if J <= J_max]
     # [num_irreps, m_out, m_in]
     solutions = torch.stack(solutions, dim=0) if len(solutions) > 0 else None
+    if solutions is None:
+        return None
     if len(radial_basis.shape) > 3:
         # Batch dimension
         basis = torch.einsum('rkab,jmnkab->rjmnkab', (radial_basis, solutions))
@@ -177,11 +179,11 @@ class SE3PointKernel(torch.nn.Module):
                 # This depends on radial function
                 if basis_size > 0:
                     num_paths += 1
-                self.nweights += m_out * m_in * basis_size
-                variance_factor = (2 * l_out + 1) / (m_in * basis_size)
-                filter_variances += [np.sqrt(variance_factor)] * (m_out *
-                                                                  m_in *
-                                                                  basis_size)
+                    self.nweights += m_out * m_in * basis_size
+                    variance_factor = (2 * l_out + 1) / (m_in * basis_size)
+                    filter_variances += [np.sqrt(variance_factor)] * (m_out *
+                                                                      m_in *
+                                                                      basis_size)
         self.filter_irreps = sorted(list(set_of_irreps))
 
         self.weight = torch.nn.Parameter(torch.randn(self.nweights))
