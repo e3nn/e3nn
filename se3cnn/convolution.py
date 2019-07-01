@@ -92,9 +92,11 @@ class SE3PointNeighborConvolution(torch.nn.Module):
             kwargs=self.kwargs,
         )
 
-    def forward(self, input, coords, neighbors, relative_mask=None):  # pylint: disable=W
-        difference_matrix =  point_utils.neighbors_difference_matrix(neighbors, coords)  # [N, K, 3]
-        neighbors_input = point_utils.neighbors_feature_matrix(neighbors, input)  # [C, N, K]
+    def forward(self, input, coords=None, neighbors=None, relative_mask=None):  # pylint: disable=W
+        if coords is None or neighbors is None:
+            raise ValueError()
+        difference_matrix =  point_utils.neighbor_difference_matrix(neighbors, coords)  # [N, K, 3]
+        neighbors_input = point_utils.neighbor_feature_matrix(neighbors, input)  # [C, N, K]
         kernel = self.kernel(difference_matrix)
         if len(input.size()) == 2:
             # No batch dimension
