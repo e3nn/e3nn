@@ -2,6 +2,8 @@
 import torch
 import se3cnn.SO3 as SO3
 import math
+import numpy as np
+import scipy.special
 
 
 def get_Y_for_filter(irrep, filter_irreps, Y):
@@ -73,6 +75,29 @@ def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6,
     return torch.stack(basis, dim=0) if len(basis) > 0 else None
 
 
+def gaussian_radial_function_normed(solutions, r_field, order_irreps, radii,
+                                    sigma=.6, J_max=10):
+    '''
+    gaussian radial function with  manual handling of shell radii, shell
+    bandlimits and shell width takes as input the output of angular_function
+    :param radii: radii of the shells, sets mean of the radial gaussians
+    :param sigma: width of the shells, corresponds to standard deviation of
+        radial gaussians
+    '''
+    basis = []
+    for r in radii:
+        window = torch.exp(-.5 * ((r_field - r) / sigma)**2)
+        window /= (2 * r ** 2 + 1)
+        window = window / (math.sqrt(2 * math.pi) * sigma)
+
+        for sol, J in zip(solutions, order_irreps):
+            if J <= J_max:
+                x = sol.to(window.device) * window  # [m_out, m_in, x, y, z]
+                basis.append(x)
+
+    return torch.stack(basis, dim=0) if len(basis) > 0 else None
+
+
 # TODO: Split into radial and angular kernels
 class SE3PointKernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, radii,
@@ -104,6 +129,8 @@ class SE3PointKernel(torch.nn.Module):
 
         self.nweights = 0
         set_of_irreps = set()
+        filter_variances = list()
+        num_paths = 0
         for i, (m_out, l_out) in enumerate(self.Rs_out):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
                 basis_size = 0
@@ -115,10 +142,21 @@ class SE3PointKernel(torch.nn.Module):
                             basis_size += 1
                             set_of_irreps.add(J)
                 # This depends on radial function
+                if basis_size > 0:
+                    num_paths += 1
                 self.nweights += m_out * m_in * basis_size
+                variance_factor = (2 * l_out + 1) / (m_in * basis_size)
+                filter_variances += [np.sqrt(variance_factor)] * (m_out *
+                                                                  m_in *
+                                                                  basis_size)
         self.filter_irreps = sorted(list(set_of_irreps))
 
         self.weight = torch.nn.Parameter(torch.randn(self.nweights))
+        # Change variance of filter
+        # We've assumed each radial function and spherical harmonic
+        # is normalized to 1.
+        self.register_buffer('fvar', (torch.tensor(filter_variances) *
+                                      np.sqrt(1 / num_paths)))
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, radii={radii})".format(
@@ -185,5 +223,5 @@ class SE3PointKernel(torch.nn.Module):
         return kernel
 
     def forward(self, difference_mat):  # pylint: disable=W
-        return self.combination(self.weight, difference_mat)
+        return self.combination(self.weight * self.fvar, difference_mat)
 
