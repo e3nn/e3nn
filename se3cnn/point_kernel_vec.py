@@ -21,7 +21,7 @@ def get_Y_for_filter(irrep, filter_irreps, Y):
 
 #  TODO: Vectorize
 def angular_function(difference_mat, order_in, order_out, filter_irreps, Ys,
-                     eps=1e-8):
+                     Qs, eps=1e-8):
     order_irreps = list(range(abs(order_in - order_out),
                               order_in + order_out + 1))
     angular_filters = []
@@ -29,20 +29,18 @@ def angular_function(difference_mat, order_in, order_out, filter_irreps, Ys,
         Y_J = get_Y_for_filter(J, filter_irreps, Ys)
         if Y_J is not None:
             # compute basis transformation matrix Q_J
-            Q_J = SO3.basis_transformation_Q_J(J,
-                                               order_in,
-                                               order_out)  # [m_out * m_in, m]
+            Q_J = Qs[J]
             if len(difference_mat.size()) == 4:
                 batch, N, M, _ = difference_mat.size()
-                K_J = torch.einsum('mn,nkab->mkab',
-                                   (Q_J, Y_J))  # [m_out * m_in, batch, N, M]
+                K_J = torch.einsum('nkab,mn->mkab',
+                                   (Y_J, Q_J))  # [m_out * m_in, batch, N, M]
                 K_J = K_J.reshape(2 * order_out + 1,
                                   2 * order_in + 1,
                                   batch, N, M)  # [m_out, m_in, batch, N, M]
             else:
                 N, M, _ = difference_mat.size()
-                K_J = torch.einsum('mn,nab->mab',
-                                   (Q_J, Y_J))  # [m_out * m_in, N, M]
+                K_J = torch.einsum('nab,mn->mab',
+                                   (Y_J, Q_J))  # [m_out * m_in, N, M]
                 K_J = K_J.reshape(2 * order_out + 1,
                                   2 * order_in + 1,
                                   N, M)  # [m_out, m_in, N, M]
@@ -92,16 +90,47 @@ def gaussian_radial_function_normed(solutions, r_field, order_irreps, radii,
 
         for sol, J in zip(solutions, order_irreps):
             if J <= J_max:
-                x = sol.to(window.device) * window  # [m_out, m_in, x, y, z]
+                x = sol.to(window.device) * window  # [m_out, m_in, batch, N, M]
                 basis.append(x)
 
     return torch.stack(basis, dim=0) if len(basis) > 0 else None
 
 
+def one_layer_radial_function(solutions, radial_basis, order_irreps, J_max=10):
+    solutions = [sol for sol, J in zip(solutions, order_irreps) if J <= J_max]
+    # [num_irreps, m_out, m_in]
+    solutions = torch.stack(solutions, dim=0) if len(solutions) > 0 else None
+    if solutions is None:
+        return None
+    if len(radial_basis.shape) > 3:
+        # Batch dimension
+        basis = torch.einsum('rkab,jmnkab->rjmnkab', (radial_basis, solutions))
+    else:
+        basis = torch.einsum('rab,jmnab->rjmnab', (radial_basis, solutions))
+    basis = basis.reshape([-1] + list(basis.shape[2:])) # [b_el, m_out, m_in, batch, N, M]
+    return basis
+
+
+def gaussian_rbf(r_field, radii, sigma=.6):
+    '''
+    gaussian radial function with  manual handling of shell radii, shell
+    bandlimits and shell width takes as input the output of angular_function
+    :param radii: radii of the shells, sets mean of the radial gaussians
+    :param sigma: width of the shells, corresponds to standard deviation of
+        radial gaussians
+    '''
+    radii = radii.reshape([-1] + [1] * len(r_field.shape))
+    r_field = r_field.unsqueeze(0)  # Add basis dimension
+    basis = torch.exp(-.5 * ((r_field - radii) / sigma)**2)  # [R, batch, N, M]
+    basis = basis / (2 * radii ** 2 + 1)
+    basis = basis / (math.sqrt(2 * math.pi) * sigma)
+    return basis
+
+
 # TODO: Split into radial and angular kernels
 class SE3PointKernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, radii,
-                 radial_function=gaussian_radial_function, J_filter_max=10,
+                 radial_function=gaussian_rbf, J_filter_max=10,
                  sh_backwardable=False):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
@@ -141,14 +170,20 @@ class SE3PointKernel(torch.nn.Module):
                         if J <= self.J_filter_max:
                             basis_size += 1
                             set_of_irreps.add(J)
+                            self.register_buffer("Q_{}_{}_{}".format(J,
+                                                                     l_in,
+                                                                     l_out),
+                                                 SO3.basis_transformation_Q_J(J,
+                                                                              l_in,
+                                                                              l_out))
                 # This depends on radial function
                 if basis_size > 0:
                     num_paths += 1
-                self.nweights += m_out * m_in * basis_size
-                variance_factor = (2 * l_out + 1) / (m_in * basis_size)
-                filter_variances += [np.sqrt(variance_factor)] * (m_out *
-                                                                  m_in *
-                                                                  basis_size)
+                    self.nweights += m_out * m_in * basis_size
+                    variance_factor = (2 * l_out + 1) / (m_in * basis_size)
+                    filter_variances += [np.sqrt(variance_factor)] * (m_out *
+                                                                      m_in *
+                                                                      basis_size)
         self.filter_irreps = sorted(list(set_of_irreps))
 
         self.weight = torch.nn.Parameter(torch.randn(self.nweights))
@@ -191,10 +226,21 @@ class SE3PointKernel(torch.nn.Module):
             for j, (m_in, l_in) in enumerate(self.Rs_in):
                 si = slice(begin_i, begin_i + m_out * self.dims_out[i])
                 sj = slice(begin_j, begin_j + m_in * self.dims_in[j])
+                Qs = {}
+                for J in self.filter_irreps:
+                    try:
+                        Qs[J] = getattr(self, "Q_{}_{}_{}".format(J,
+                                                                  l_in,
+                                                                  l_out))
+                    except:
+                        Qs[J] = None
                 angular = angular_function(difference_mat, l_in, l_out,
-                                           self.filter_irreps, Ys)
-                basis = self.radial_function(*angular, self.radii,
-                                             J_max=self.J_filter_max)
+                                           self.filter_irreps, Ys, Qs)
+                solutions, r_field, order_irreps = angular
+                radial = self.radial_function(difference_mat.norm(2, -1), self.radii)
+                basis = one_layer_radial_function(solutions, radial,
+                                                  order_irreps,
+                                                  J_max=self.J_filter_max)
                 if basis is not None:
                     assert basis.size()[1:3] == ((2 * l_out + 1), (2 * l_in + 1)), "wrong basis shape"
                     assert basis.size()[-2:] == (N, M), "wrong basis shape"
