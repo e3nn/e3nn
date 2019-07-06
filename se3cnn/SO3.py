@@ -152,7 +152,7 @@ def legendre(order, z):
     return torch.stack(plm)
 
 
-def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
+def _spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     """
     spherical harmonics
 
@@ -175,7 +175,7 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     exr = torch.cos(m * phi)  # [m, A]
     exi = torch.sin(-m * phi)  # [-m, A]
 
-    if order==0:
+    if order == 0:
         prefactor = 1.
     else:
         prefactor = torch.cat([
@@ -184,7 +184,7 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
             2 ** 0.5 * exr[-order:],
         ])
 
-    if order==1:
+    if order == 1:
         prefactor *= -1
 
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
@@ -199,10 +199,10 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     return out
 
 
-def spherical_harmonics_xyz_backwardable_order_list(order, xyz):
+def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     if not isinstance(order, list):
         order = [order]
-    return torch.cat([spherical_harmonics_xyz_backwardable(J, xyz) for J in order], dim=0)  # [m, A]
+    return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
 def compose(a1, b1, c1, a2, b2, c2):
@@ -221,6 +221,19 @@ def kron(x, y):
     assert x.ndimension() == 2
     assert y.ndimension() == 2
     return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+
+
+def direct_sum(*matrices):
+    m = sum(x.size(0) for x in matrices)
+    n = sum(x.size(1) for x in matrices)
+    out = matrices[0].new_zeros(m, n)
+    i, j = 0, 0
+    for x in matrices:
+        m, n = x.size()
+        out[i: i + m, j: j + n] = x
+        i += m
+        j += n
+    return out
 
 
 

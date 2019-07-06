@@ -2,8 +2,6 @@
 import torch
 import se3cnn.SO3 as SO3
 import math
-import numpy as np
-import scipy.special
 
 
 def get_Y_for_filter(irrep, filter_irreps, Y):
@@ -20,41 +18,32 @@ def get_Y_for_filter(irrep, filter_irreps, Y):
 
 
 #  TODO: Vectorize
-def angular_function(difference_mat, order_in, order_out, filter_irreps, Ys,
-                     eps=1e-8):
-    order_irreps = list(range(abs(order_in - order_out),
-                              order_in + order_out + 1))
+def angular_function(difference_mat, l_in, l_out, filter_irreps, Ys):
+    order_irreps = list(range(abs(l_in - l_out), l_in + l_out + 1))
     angular_filters = []
     for J in order_irreps:
         Y_J = get_Y_for_filter(J, filter_irreps, Ys)
         if Y_J is not None:
             # compute basis transformation matrix Q_J
-            Q_J = SO3.basis_transformation_Q_J(J,
-                                               order_in,
-                                               order_out)  # [m_out * m_in, m]
-            if len(difference_mat.size()) == 4:
-                batch, N, M, _ = difference_mat.size()
-                K_J = torch.einsum('mn,nkab->mkab',
-                                   (Q_J, Y_J))  # [m_out * m_in, batch, N, M]
-                K_J = K_J.reshape(2 * order_out + 1,
-                                  2 * order_in + 1,
-                                  batch, N, M)  # [m_out, m_in, batch, N, M]
+            Q_J = SO3.basis_transformation_Q_J(J, l_in, l_out)  # [m_out * m_in, m]
+            if difference_mat.dim() == 4:
+                B, N, M, _ = difference_mat.size()
+                K_J = torch.einsum('mn,nkab->mkab', (Q_J, Y_J))  # [m_out * m_in, batch, N, M]
+                K_J = K_J.view(2 * l_out + 1, 2 * l_in + 1, B, N, M)  # [m_out, m_in, batch, N, M]
             else:
                 N, M, _ = difference_mat.size()
-                K_J = torch.einsum('mn,nab->mab',
-                                   (Q_J, Y_J))  # [m_out * m_in, N, M]
-                K_J = K_J.reshape(2 * order_out + 1,
-                                  2 * order_in + 1,
-                                  N, M)  # [m_out, m_in, N, M]
+                K_J = torch.einsum('mn,nab->mab', (Q_J, Y_J))  # [m_out * m_in, N, M]
+                K_J = K_J.view(2 * l_out + 1, 2 * l_in + 1, N, M)  # [m_out, m_in, N, M]
             # Normalize wrt incoming?
+            K_J = K_J.type(difference_mat.dtype)
+            K_J = K_J.to(difference_mat.device)
             angular_filters.append(K_J)
 
     return angular_filters, difference_mat.norm(2, -1), order_irreps
 
 
 # TODO: Reduce duplicate code in this and gaussian_window in kernel.py
-def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6,
-                             J_max=10):
+def gaussian_radial_function(solutions, r_field, order_irreps, radii, sigma=.6, J_max=10):
     '''
     gaussian radial function with  manual handling of shell radii, shell
     bandlimits and shell width takes as input the output of angular_function
@@ -121,42 +110,36 @@ class SE3PointKernel(torch.nn.Module):
         self.radial_function = radial_function
         self.register_buffer('radii', radii)
         self.J_filter_max = J_filter_max
-        self.n_out = sum([self.multiplicities_out[i] * self.dims_out[i] for i
-                          in range(len(self.multiplicities_out))])
-        self.n_in = sum([self.multiplicities_in[j] * self.dims_in[j] for j in
-                         range(len(self.multiplicities_in))])
+        self.n_out = sum(m * d for m, d in zip(self.multiplicities_out, self.dims_out))
+        self.n_in = sum(m * d for m, d in zip(self.multiplicities_in, self.dims_in))
         self.sh_backwardable = sh_backwardable
 
         self.nweights = 0
         set_of_irreps = set()
         filter_variances = list()
         num_paths = 0
-        for i, (m_out, l_out) in enumerate(self.Rs_out):
-            for j, (m_in, l_in) in enumerate(self.Rs_in):
+        for m_out, l_out in self.Rs_out:
+            for m_in, l_in in self.Rs_in:
                 basis_size = 0
-                for _ in self.radii:
-                    order_irreps = list(range(abs(l_in - l_out),
-                                              l_in + l_out + 1))
-                    for J in order_irreps:
-                        if J <= self.J_filter_max:
-                            basis_size += 1
-                            set_of_irreps.add(J)
+                order_irreps = list(range(abs(l_in - l_out), l_in + l_out + 1))
+                for J in order_irreps:
+                    if J <= self.J_filter_max:
+                        basis_size += 1
+                        set_of_irreps.add(J)
                 # This depends on radial function
+                basis_size *= len(self.radii)
                 if basis_size > 0:
                     num_paths += 1
                 self.nweights += m_out * m_in * basis_size
                 variance_factor = (2 * l_out + 1) / (m_in * basis_size)
-                filter_variances += [np.sqrt(variance_factor)] * (m_out *
-                                                                  m_in *
-                                                                  basis_size)
-        self.filter_irreps = sorted(list(set_of_irreps))
+                filter_variances += [variance_factor ** 0.5] * (m_out * m_in * basis_size)
+        self.filter_irreps = sorted(set_of_irreps)
 
         self.weight = torch.nn.Parameter(torch.randn(self.nweights))
         # Change variance of filter
         # We've assumed each radial function and spherical harmonic
         # is normalized to 1.
-        self.register_buffer('fvar', (torch.tensor(filter_variances) *
-                                      np.sqrt(1 / num_paths)))
+        self.register_buffer('fvar', torch.tensor(filter_variances) / num_paths ** 0.5)
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out}, radii={radii})".format(
@@ -168,58 +151,58 @@ class SE3PointKernel(torch.nn.Module):
 
     def combination(self, weight, difference_mat):
         # Check for batch dimension for difference_mat
-        if len(difference_mat.size()) == 4:
+        if difference_mat.dim() == 4:
             batch, N, M, _ = difference_mat.size()
             kernel = weight.new_empty(self.n_out, self.n_in, batch, N, M)
-        if len(difference_mat.size()) == 3:
+        if difference_mat.dim() == 3:
             N, M, _ = difference_mat.size()
             kernel = weight.new_empty(self.n_out, self.n_in, N, M)
+
+        # Compute Ys for filters
+        if self.sh_backwardable:
+            Ys = SO3.spherical_harmonics_xyz_backwardable(self.filter_irreps, difference_mat)
+        else:
+            Ys = SO3.spherical_harmonics_xyz(self.filter_irreps, difference_mat)
 
         begin_i = 0
         weight_index = 0
 
-        # Compute Ys for filters
-        if self.sh_backwardable:
-            Ys = SO3.spherical_harmonics_xyz_backwardable_order_list(
-                self.filter_irreps, difference_mat)
-        else:
-            Ys = SO3.spherical_harmonics_xyz(
-                self.filter_irreps, difference_mat)
-
-        for i, (m_out, l_out) in enumerate(self.Rs_out):
+        for mul_out, l_out in self.Rs_out:
             begin_j = 0
-            for j, (m_in, l_in) in enumerate(self.Rs_in):
-                si = slice(begin_i, begin_i + m_out * self.dims_out[i])
-                sj = slice(begin_j, begin_j + m_in * self.dims_in[j])
-                angular = angular_function(difference_mat, l_in, l_out,
-                                           self.filter_irreps, Ys)
-                basis = self.radial_function(*angular, self.radii,
-                                             J_max=self.J_filter_max)
+            for mul_in, l_in in self.Rs_in:
+                si = slice(begin_i, begin_i + mul_out * (2 * l_out + 1))
+                sj = slice(begin_j, begin_j + mul_in * (2 * l_in + 1))
+                angular = angular_function(difference_mat, l_in, l_out, self.filter_irreps, Ys)  # list of [m_out, m_in, [batch], N, M]
+                basis = self.radial_function(*angular, self.radii, J_max=self.J_filter_max)  # [radii * J, m_out, m_in, [batch], N, M]
                 if basis is not None:
-                    assert basis.size()[1:3] == ((2 * l_out + 1), (2 * l_in + 1)), "wrong basis shape"
+                    assert basis.size()[1:3] == (2 * l_out + 1, 2 * l_in + 1), "wrong basis shape"
                     assert basis.size()[-2:] == (N, M), "wrong basis shape"
-                    kij = basis
 
-                    b_el = kij.size(0)
-                    b_size = kij.size()[1:]  # [i, j, N, M] or [i, j, batch, N, M]
+                    b_el = basis.size(0)
+                    b_size = basis.size()[1:]  # [m_out, m_in, [batch], N, M]
 
-                    w = weight[weight_index: weight_index + m_out * m_in * b_el].view(m_out * m_in, b_el)  # [I*J, beta]
-                    weight_index += m_out * m_in * b_el
+                    w = weight[weight_index: weight_index + mul_out * mul_in * b_el].view(mul_out, mul_in, b_el)  # [mul_out, mul_in, radii * J]
+                    weight_index += mul_out * mul_in * b_el
 
-                    basis_kernels_ij = kij.contiguous().view(b_el, -1)  # [beta, i*j*N*M] or [beta, i*j*batch*N*M]
+                    if basis.dim() == 5:
+                        # uv = mul_out, mul_in
+                        # r = radii * J
+                        # ij = m_out m_in
+                        # nm = N M
+                        ker = torch.einsum("uvr,rijnm->uivjnm", (w, basis))  # [mul_out, m_out, mul_in, m_in, N, M]
+                    else:
+                        # k = batch
+                        ker = torch.einsum("uvr,rijknm->uivjknm", (w, basis))  # [mul_out, m_out, mul_in, m_in, batch, N, M]
 
-                    # TODO: Rewrite as einsum
-                    ker = torch.mm(w, basis_kernels_ij)  # [I*J, i*j*N*M] or [I*J, i*j*batch*N*M]
-                    ker = ker.view(m_out, m_in, *b_size)  # [I, J, i, j, N, M] or [I, J, i, j, batch, N, M]
-                    ker = ker.transpose(1, 2).contiguous()  # [I, i, J, j, N, M] or [I, i, J, j, batch, N, M]
-                    ker = ker.view(m_out * self.dims_out[i], m_in * self.dims_in[j], *b_size[2:])  # [I*i, J*j, N, M] or [I*i, J*j, batch, N, M]
+                    ker = ker.contiguous().view(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1), *b_size[2:])
+
                     kernel[si, sj] = ker
 
                 else:
                     kernel[si, sj] = 0
 
-                begin_j += m_in * self.dims_in[j]
-            begin_i += m_out * self.dims_out[i]
+                begin_j += mul_in * (2 * l_in + 1)
+            begin_i += mul_out * (2 * l_out + 1)
         return kernel
 
     def forward(self, difference_mat):  # pylint: disable=W
