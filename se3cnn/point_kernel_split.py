@@ -49,16 +49,24 @@ class SE3PointKernel(torch.nn.Module):
 
         for i, (mul_out, l_out) in enumerate(self.Rs_out):
             for j, (mul_in, l_in) in enumerate(self.Rs_in):
-                Js = list(range(abs(l_in - l_out), l_in + l_out + 1))
-                Js = [J for J in Js if J <= self.J_filter_max]
+                Js = self.get_Js(l_in, l_out)
+
+                # compute the number of degrees of freedom
                 n += mul_out * mul_in * len(Js)
+
+                # create the set of all spherical harmonics orders needed
                 set_of_Js = set_of_Js.union(Js)
+
+                # precompute the change of basis Q
                 Q = [SO3.basis_transformation_Q_J(J, l_in, l_out) for J in Js]
                 Q = torch.cat(Q, dim=1).view(2 * l_out + 1, 2 * l_in + 1, -1)  # [m_out, m_in, J * m]
                 self.register_buffer("Q_{}_{}".format(i, j), Q.type(torch.get_default_dtype()))
 
+        # create the radial model: R+ -> R^n
+        # it contains the learned parameters
         self.f = RadialModel(n)
-        self.Js = sorted(set_of_Js)
+
+        self.set_of_Js = sorted(set_of_Js)
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
@@ -67,23 +75,31 @@ class SE3PointKernel(torch.nn.Module):
             Rs_out=self.Rs_out,
         )
 
-    def forward(self, difference_mat):
+    def get_Js(self, l_in, l_out):
+        Js = list(range(abs(l_in - l_out), l_in + l_out + 1))
+        Js = [J for J in Js if J <= self.J_filter_max]
+        return Js
+
+    def forward(self, difference_matrix):
         """
-        :param difference_mat: tensor [[batch,] N, M, 3]
+        :param difference_matrix: tensor [[batch,] N, M, 3]
         :return: tensor [l_out * mul_out * m_out, l_in * mul_in * m_in, [batch,] N, M]
         """
-        has_batch = difference_mat.dim() == 4
+        has_batch = difference_matrix.dim() == 4
         if not has_batch:
-            difference_mat = difference_mat.unsqueeze(0)
+            difference_matrix = difference_matrix.unsqueeze(0)
 
-        batch, N, M, _ = difference_mat.size()
+        batch, N, M, _ = difference_matrix.size()
 
+        kernel = difference_matrix.new_zeros(self.n_out, self.n_in, batch, N, M)
+
+        # precompute all needed spherical harmonics
         sh = SO3.spherical_harmonics_xyz_backwardable if self.sh_backwardable else SO3.spherical_harmonics_xyz
-        Ys = sh(self.Js, difference_mat)  # [J * m, batch, N, M]
+        Ys = sh(self.set_of_Js, difference_matrix)  # [J * m, batch, N, M]
 
-        kernel = difference_mat.new_zeros(self.n_out, self.n_in, batch, N, M)
-
-        weights = self.f(difference_mat.norm(2, dim=-1).view(-1)).view(batch, N, M, -1)  # [batch, N, M, l_out * l_in * mul_out * mul_in * J]
+        # use the radial model to fix all the degrees of freedom
+        radii = difference_matrix.norm(2, dim=-1).view(-1)  # [batch * N * M]
+        weights = self.f(radii).view(batch, N, M, -1)  # [batch, N, M, l_out * l_in * mul_out * mul_in * J]
         begin_w = 0
 
         begin_out = 0
@@ -94,23 +110,25 @@ class SE3PointKernel(torch.nn.Module):
             for j, (mul_in, l_in) in enumerate(self.Rs_in):
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
 
-                Js = list(range(abs(l_in - l_out), l_in + l_out + 1))
-                Js = [J for J in Js if J <= self.J_filter_max]
-                n = mul_out * mul_in * len(Js)
+                Js = self.get_Js(l_in, l_out)
 
+                # extract the subset of the `weights` that corresponds to the couple (l_out, l_in)
+                n = mul_out * mul_in * len(Js)
                 w = weights[:, :, :, begin_w: begin_w + n].contiguous().view(batch, N, M, mul_out, mul_in, -1)  # [batch, N, M, mul_out, mul_in, J]
                 begin_w += n
 
                 Qs = getattr(self, "Q_{}_{}".format(i, j))  # [m_out, m_in, J * m]
 
+                # note: I don't know if we can vectorize this for loop because [J * m] cannot be put into [J, m]
                 K = 0
                 for k, J in enumerate(Js):
-                    tmp = sum(2 * l + 1 for l in self.Js if l < J)
+                    tmp = sum(2 * l + 1 for l in self.set_of_Js if l < J)
                     Y = Ys[tmp: tmp + 2 * J + 1]  # [m, batch, N, M]
 
                     tmp = sum(2 * l + 1 for l in Js if l < J)
                     Q = Qs[:, :, tmp: tmp + 2 * J + 1]  # [m_out, m_in, m]
 
+                    # note: The multiplication with `w` could also be done outside of the for loop
                     K += torch.einsum("ijr,rknm,knmuv->uivjknm", (Q, Y, w[..., k]))  # [mul_out, m_out, mul_in, m_in, batch, N, M]
 
                 if K is not 0:
