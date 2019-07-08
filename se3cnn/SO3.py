@@ -126,8 +126,7 @@ def spherical_harmonics_xyz(order, xyz):
         return out
 
 
-def legendre(order, z):
-    # TODO accept list for order
+def _legendre(order, z):
     """
     associated Legendre polynomials
 
@@ -150,6 +149,19 @@ def legendre(order, z):
     for mr in range(1, 2 * order):
         plm.append((mr - order) * ihsqz2 * plm[mr] - (2 * order - mr + 1) * mr * plm[mr - 1])
     return torch.stack(plm)
+
+
+def legendre(order, z):
+    """
+    associated Legendre polynomials
+
+    :param order: int
+    :param z: tensor of shape [A]
+    :return: tensor of shape [l * m, A]
+    """
+    if not isinstance(order, list):
+        order = [order]
+    return torch.cat([_legendre(J, z) for J in order], dim=0)  # [l * m, A]
 
 
 def _spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
@@ -200,6 +212,13 @@ def _spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
 
 
 def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
+    """
+    spherical harmonics
+
+    :param order: int
+    :param xyz: tensor of shape [A, 3]
+    :return: tensor of shape [l * m, A]
+    """
     if not isinstance(order, list):
         order = [order]
     return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]

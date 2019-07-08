@@ -103,15 +103,11 @@ class SE3PointKernel(torch.nn.Module):
 
         self.Rs_out = [(m, l) for m, l in Rs_out if m >= 1]
         self.Rs_in = [(m, l) for m, l in Rs_in if m >= 1]
-        self.multiplicities_out = [m for m, _ in self.Rs_out]
-        self.multiplicities_in = [m for m, _ in self.Rs_in]
-        self.dims_out = [2 * l + 1 for _, l in self.Rs_out]
-        self.dims_in = [2 * l + 1 for _, l in self.Rs_in]
         self.radial_function = radial_function
         self.register_buffer('radii', radii)
         self.J_filter_max = J_filter_max
-        self.n_out = sum(m * d for m, d in zip(self.multiplicities_out, self.dims_out))
-        self.n_in = sum(m * d for m, d in zip(self.multiplicities_in, self.dims_in))
+        self.n_out = sum(m * (2 * l + 1) for m, l in self.Rs_out)
+        self.n_in = sum(m * (2 * l + 1) for m, l in self.Rs_in)
         self.sh_backwardable = sh_backwardable
 
         self.nweights = 0
@@ -179,7 +175,6 @@ class SE3PointKernel(torch.nn.Module):
                     assert basis.size()[-2:] == (N, M), "wrong basis shape"
 
                     b_el = basis.size(0)
-                    b_size = basis.size()[1:]  # [m_out, m_in, [batch], N, M]
 
                     w = weight[weight_index: weight_index + mul_out * mul_in * b_el].view(mul_out, mul_in, b_el)  # [mul_out, mul_in, radii * J]
                     weight_index += mul_out * mul_in * b_el
@@ -194,7 +189,7 @@ class SE3PointKernel(torch.nn.Module):
                         # k = batch
                         ker = torch.einsum("uvr,rijknm->uivjknm", (w, basis))  # [mul_out, m_out, mul_in, m_in, batch, N, M]
 
-                    ker = ker.contiguous().view(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1), *b_size[2:])
+                    ker = ker.contiguous().view(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1), *basis.size()[3:])
 
                     kernel[si, sj] = ker
 
