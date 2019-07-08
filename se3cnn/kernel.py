@@ -14,7 +14,7 @@ Therefore
     K(0, g |x| e) = R_out(g) K(0, |x| e) R_in(g^{-1})  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import torch
-from se3cnn.SO3 import irr_repr, spherical_harmonics_xyz, basis_transformation_Q_J
+from se3cnn.SO3 import irr_repr, spherical_harmonics_xyz, basis_transformation_Q
 from se3cnn.utils import torch_default_dtype
 from se3cnn.util.cache_file import cached_dirpklgz
 import math
@@ -56,7 +56,7 @@ def _sample_cube(size, order_in, order_out):
         Y_J = _sample_sh_cube(size, J)  # [m, x, y, z]
 
         # compute basis transformation matrix Q_J
-        Q_J = basis_transformation_Q_J(J, order_in, order_out)  # [m_out * m_in, m]
+        Q_J = basis_transformation_Q(J, order_in, order_out)  # [m_out * m_in, m]
         K_J = torch.einsum('mn,nxyz->mxyz', (Q_J, Y_J))  # [m_out * m_in, x, y, z]
         K_J = K_J.view(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
         solutions.append(K_J)

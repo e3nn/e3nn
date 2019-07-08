@@ -1,6 +1,6 @@
 # pylint: disable=C,R,E1101,E1102
 import torch
-from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, spherical_harmonics_xyz, basis_transformation_Q_J
+from se3cnn.SO3 import x_to_alpha_beta, irr_repr, spherical_harmonics, kron, spherical_harmonics_xyz, basis_transformation_Q
 import se3cnn.SO3 as SO3
 from se3cnn.point_kernel import get_Y_for_filter, angular_function, gaussian_radial_function
 import math

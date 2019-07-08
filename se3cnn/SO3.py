@@ -295,7 +295,7 @@ def direct_sum(*matrices):
 ################################################################################
 
 @cached_dirpklgz("cache/trans_Q")
-def basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disable=unused-argument
+def basis_transformation_Q(J, order_in, order_out, version=3):  # pylint: disable=unused-argument
     """
     :param J: order of the spherical harmonics
     :param order_in: order of the input representation
