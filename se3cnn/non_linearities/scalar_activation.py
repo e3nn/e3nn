@@ -1,4 +1,4 @@
-# pylint: disable=C,R,E1101
+# pylint: disable=C, R, no-member, arguments-differ, redefined-builtin
 import torch
 
 
@@ -8,7 +8,7 @@ class ScalarActivation(torch.nn.Module):
         Can be used only with scalar fields
 
         :param enable: list of tuple (dimension, activation function or None)
-        :param bool bias: add a bias before the applying the activation
+        :param bool bias: add a bias before applying the activation
         '''
         super().__init__()
 
@@ -29,24 +29,26 @@ class ScalarActivation(torch.nn.Module):
         else:
             self.bias = None
 
-    def forward(self, input):  # pylint: disable=W
+    def forward(self, input):
         '''
-        :param input: [batch, feature, x, y, z]
+        :param input: [batch, feature, ...]
         '''
+        flatten_input = input.flatten(2)
+
         begin1 = 0
         begin2 = 0
 
         if self.inplace:
-            output = input
+            output = flatten_input
         else:
-            output = torch.empty_like(input)
+            output = torch.empty_like(flatten_input)
 
         for d, act in self.enable:
-            x = input[:, begin1:begin1 + d]
+            x = flatten_input[:, begin1:begin1 + d]
 
             if act is not None:
                 if self.bias is not None:
-                    x = x + self.bias[begin2:begin2 + d].view(1, -1, 1, 1, 1)
+                    x = x + self.bias[begin2:begin2 + d].view(1, -1, 1)
                     begin2 += d
 
                 x = act(x)
@@ -58,5 +60,7 @@ class ScalarActivation(torch.nn.Module):
 
         assert begin1 == input.size(1)
         assert self.bias is None or begin2 == self.bias.size(0)
+
+        output = output.view_as(input)
 
         return output
