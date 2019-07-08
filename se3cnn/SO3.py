@@ -36,6 +36,11 @@ def rot_y(beta):
     ])
 
 
+# The following two functions (rot and x_to_alpha_beta) satisfies that
+# rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
+# is proportional to
+# [x, y, z]
+
 def rot(alpha, beta, gamma):
     '''
     ZYZ Eurler angles rotation
@@ -55,10 +60,16 @@ def x_to_alpha_beta(x):
     return (alpha, beta)
 
 
-# These functions (x_to_alpha_beta and rot) satisfies that
-# rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
-# is proportional to
-# [x, y, z]
+def compose(a1, b1, c1, a2, b2, c2):
+    """
+    (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
+    """
+    comp = rot(a1, b1, c1) @ rot(a2, b2, c2)
+    xyz = comp @ torch.tensor([0, 0, 1.])
+    a, b = x_to_alpha_beta(xyz)
+    rotz = rot(0, -b, -a) @ comp
+    c = torch.atan2(rotz[1, 0], rotz[0, 0])
+    return a, b, c
 
 
 def irr_repr(order, alpha, beta, gamma, dtype=None):
@@ -67,12 +78,19 @@ def irr_repr(order, alpha, beta, gamma, dtype=None):
     - compatible with compose and spherical_harmonics
     """
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    # if order == 1:
-    #     # change of basis to have vector_field[x, y, z] = [vx, vy, vz]
-    #     A = np.array([[0, 0, 1], [1, 0, 0], [0, 1, 0]])
-    #     return A @ wigner_D_matrix(1, alpha, beta, gamma) @ A.T
+    if torch.is_tensor(alpha):
+        alpha = alpha.item()
+    if torch.is_tensor(beta):
+        beta = beta.item()
+    if torch.is_tensor(gamma):
+        gamma = gamma.item()
     return torch.tensor(wigner_D_matrix(order, alpha, beta, gamma), dtype=torch.get_default_dtype() if dtype is None else dtype)
 
+
+
+################################################################################
+# Spherical harmonics
+################################################################################
 
 def spherical_harmonics(order, alpha, beta, dtype=None):
     """
@@ -224,40 +242,9 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
-def compose(a1, b1, c1, a2, b2, c2):
-    """
-    (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
-    """
-    comp = rot(a1, b1, c1) @ rot(a2, b2, c2)
-    xyz = comp @ torch.tensor([0, 0, 1.])
-    a, b = x_to_alpha_beta(xyz)
-    rotz = rot(0, -b, -a) @ comp
-    c = torch.atan2(rotz[1, 0], rotz[0, 0])
-    return a, b, c
-
-
-def kron(x, y):
-    assert x.ndimension() == 2
-    assert y.ndimension() == 2
-    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
-
-
-def direct_sum(*matrices):
-    m = sum(x.size(0) for x in matrices)
-    n = sum(x.size(1) for x in matrices)
-    out = matrices[0].new_zeros(m, n)
-    i, j = 0, 0
-    for x in matrices:
-        m, n = x.size()
-        out[i: i + m, j: j + n] = x
-        i += m
-        j += n
-    return out
-
-
 
 ################################################################################
-# Solving the constraint coming from the stabilizer of 0 and e
+# Linear algebra
 ################################################################################
 
 def get_matrix_kernel(A, eps=1e-10):
@@ -283,12 +270,32 @@ def get_matrices_kernel(As, eps=1e-10):
     return get_matrix_kernel(torch.cat(As, dim=0), eps)
 
 
+def kron(x, y):
+    assert x.ndimension() == 2
+    assert y.ndimension() == 2
+    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+
+
+def direct_sum(*matrices):
+    m = sum(x.size(0) for x in matrices)
+    n = sum(x.size(1) for x in matrices)
+    out = matrices[0].new_zeros(m, n)
+    i, j = 0, 0
+    for x in matrices:
+        m, n = x.size()
+        out[i: i + m, j: j + n] = x
+        i += m
+        j += n
+    return out
+
+
+
 ################################################################################
 # Analytically derived basis
 ################################################################################
 
 @cached_dirpklgz("cache/trans_Q")
-def basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disable=W0613
+def basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disable=unused-argument
     """
     :param J: order of the spherical harmonics
     :param order_in: order of the input representation
@@ -310,7 +317,7 @@ def basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disa
             [4.93325116, 6.12697327, 4.14574096],
             [0.53878964, 4.09050444, 5.36539036],
             [2.16017393, 3.48835314, 5.55174441],
-            [2.52385107, 0.2908958, 3.90040975]
+            [2.52385107, 0.29089583, 3.90040975],
         ]
         null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
@@ -329,7 +336,6 @@ def basis_transformation_Q_J(J, order_in, order_out, version=3):  # pylint: disa
 ################################################################################
 # Change of basis
 ################################################################################
-
 
 def xyz_vector_basis_to_spherical_basis():
     """
@@ -383,12 +389,12 @@ def tensor3x3_repr_basis_to_spherical_basis():
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
+
 ################################################################################
 # Tests
 ################################################################################
 
-
-def test_is_representation(rep):
+def _test_is_representation(rep):
     """
     rep(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = rep(Z(a1) Y(b1) Z(c1)) rep(Z(a2) Y(b2) Z(c2))
     """
@@ -435,8 +441,6 @@ def _test_spherical_harmonics(order):
 
 
 def _test_change_basis_wigner_to_rot():
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-
     with torch_default_dtype(torch.float64):
         A = torch.tensor([
             [0, 1, 0],
@@ -446,7 +450,7 @@ def _test_change_basis_wigner_to_rot():
 
         a, b, c = torch.rand(3)
 
-        r1 = A.t() @ torch.tensor(wigner_D_matrix(1, a, b, c), dtype=torch.float64) @ A
+        r1 = A.t() @ irr_repr(1, a, b, c) @ A
         r2 = rot(a, b, c)
 
         d = (r1 - r2).abs().max()
@@ -459,7 +463,7 @@ if __name__ == "__main__":
 
     print("Change of basis")
     xyz_vector_basis_to_spherical_basis()
-    test_is_representation(tensor3x3_repr)
+    _test_is_representation(tensor3x3_repr)
     tensor3x3_repr_basis_to_spherical_basis()
 
     print("Change of basis Wigner <-> rot")
@@ -473,4 +477,4 @@ if __name__ == "__main__":
 
     print("Irreducible repr are indeed representations")
     for l in range(7):
-        test_is_representation(partial(irr_repr, l))
+        _test_is_representation(partial(irr_repr, l))
