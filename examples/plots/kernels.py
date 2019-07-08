@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
 from se3cnn.SO3 import irr_repr, spherical_harmonics
-from se3cnn.kernel import _basis_transformation_Q_J
+from se3cnn.kernel import _basis_transformation_Q
 from se3cnn.util.cache_file import cached_dirpklgz
 from se3cnn.SO3 import compose
 
@@ -37,7 +37,7 @@ def _sample_sh_sphere(n, order_in, order_out, alpha, beta, gamma):
         Y_J = _sample_Y(n, J, alpha, beta, gamma)
 
         # compute basis transformation matrix Q_J
-        Q_J = _basis_transformation_Q_J(J, order_in, order_out)
+        Q_J = _basis_transformation_Q(J, order_in, order_out)
         K_J = np.einsum('mn,n...->m...', Q_J, Y_J)
         K_J = K_J.reshape(2 * order_out + 1, 2 * order_in + 1, n, 2 * n)
         sh_spheres.append(K_J)

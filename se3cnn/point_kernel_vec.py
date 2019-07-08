@@ -173,9 +173,9 @@ class SE3PointKernel(torch.nn.Module):
                             self.register_buffer("Q_{}_{}_{}".format(J,
                                                                      l_in,
                                                                      l_out),
-                                                 SO3.basis_transformation_Q_J(J,
-                                                                              l_in,
-                                                                              l_out))
+                                                 SO3.basis_transformation_Q(J,
+                                                                            l_in,
+                                                                            l_out))
                 # This depends on radial function
                 if basis_size > 0:
                     num_paths += 1

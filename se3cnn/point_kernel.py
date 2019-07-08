@@ -25,7 +25,7 @@ def angular_function(difference_mat, l_in, l_out, filter_irreps, Ys):
         Y_J = get_Y_for_filter(J, filter_irreps, Ys)
         if Y_J is not None:
             # compute basis transformation matrix Q_J
-            Q_J = SO3.basis_transformation_Q_J(J, l_in, l_out)  # [m_out * m_in, m]
+            Q_J = SO3.basis_transformation_Q(J, l_in, l_out)  # [m_out * m_in, m]
             if difference_mat.dim() == 4:
                 B, N, M, _ = difference_mat.size()
                 K_J = torch.einsum('mn,nkab->mkab', (Q_J, Y_J))  # [m_out * m_in, batch, N, M]
