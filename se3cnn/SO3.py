@@ -48,6 +48,12 @@ def rot(alpha, beta, gamma):
     return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)
 
 
+def rand_rot():
+    alpha, gamma = 2 * math.pi * torch.rand(2)
+    beta = torch.rand(()).mul(2).sub(1).acos()
+    return rot(alpha, beta, gamma)
+
+
 def x_to_alpha_beta(x):
     '''
     Convert point (x, y, z) on the sphere into (alpha, beta)
