@@ -47,12 +47,15 @@ class SE3PointKernel(torch.nn.Module):
         n = 0
         set_of_Js = set()
 
-        for mul_out, l_out in self.Rs_out:
-            for mul_in, l_in in self.Rs_in:
+        for i, (mul_out, l_out) in enumerate(self.Rs_out):
+            for j, (mul_in, l_in) in enumerate(self.Rs_in):
                 Js = list(range(abs(l_in - l_out), l_in + l_out + 1))
                 Js = [J for J in Js if J <= self.J_filter_max]
                 n += mul_out * mul_in * len(Js)
                 set_of_Js = set_of_Js.union(Js)
+                Q = [SO3.basis_transformation_Q_J(J, l_in, l_out) for J in Js]
+                Q = torch.cat(Q, dim=1).view(2 * l_out + 1, 2 * l_in + 1, -1)  # [m_out, m_in, J * m]
+                self.register_buffer("Q_{}_{}".format(i, j), Q.type(torch.get_default_dtype()))
 
         self.f = RadialModel(n)
         self.Js = sorted(set_of_Js)
@@ -78,17 +81,17 @@ class SE3PointKernel(torch.nn.Module):
         sh = SO3.spherical_harmonics_xyz_backwardable if self.sh_backwardable else SO3.spherical_harmonics_xyz
         Ys = sh(self.Js, difference_mat)  # [J * m, batch, N, M]
 
-        kernel = difference_mat.new_empty(self.n_out, self.n_in, batch, N, M)
+        kernel = difference_mat.new_zeros(self.n_out, self.n_in, batch, N, M)
 
         weights = self.f(difference_mat.norm(2, dim=-1).view(-1)).view(batch, N, M, -1)  # [batch, N, M, l_out * l_in * mul_out * mul_in * J]
         begin_w = 0
 
         begin_out = 0
-        for mul_out, l_out in self.Rs_out:
+        for i, (mul_out, l_out) in enumerate(self.Rs_out):
             s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
 
             begin_in = 0
-            for mul_in, l_in in self.Rs_in:
+            for j, (mul_in, l_in) in enumerate(self.Rs_in):
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
 
                 Js = list(range(abs(l_in - l_out), l_in + l_out + 1))
@@ -98,17 +101,20 @@ class SE3PointKernel(torch.nn.Module):
                 w = weights[:, :, :, begin_w: begin_w + n].contiguous().view(batch, N, M, mul_out, mul_in, -1)  # [batch, N, M, mul_out, mul_in, J]
                 begin_w += n
 
-                Ks = []
-                for J in Js:
-                    i = sum(2 * l + 1 for l in self.Js if l < J)
-                    Y = Ys[i: i + 2 * J + 1]  # [m, batch, N, M]
-                    Q = SO3.basis_transformation_Q_J(J, l_in, l_out).view(2 * l_out + 1, 2 * l_in + 1, 2 * J + 1)  # [m_out, m_in, m]
-                    K = torch.einsum("ijr,rknm->ijknm", (Q, Y))  # [m_out, m_in, batch, N, M]
-                    Ks.append(K)
-                K = torch.stack(Ks)  # [J, m_out, m_in, batch, N, M]
-                A = torch.einsum("knmuvr,rijknm->uivjknm", (w, K))  # [mul_out, m_out, mul_in, m_in, batch, N, M]
+                Qs = getattr(self, "Q_{}_{}".format(i, j))  # [m_out, m_in, J * m]
 
-                kernel[s_out, s_in] = A.view(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1), batch, N, M)
+                K = 0
+                for k, J in enumerate(Js):
+                    tmp = sum(2 * l + 1 for l in self.Js if l < J)
+                    Y = Ys[tmp: tmp + 2 * J + 1]  # [m, batch, N, M]
+
+                    tmp = sum(2 * l + 1 for l in Js if l < J)
+                    Q = Qs[:, :, tmp: tmp + 2 * J + 1]  # [m_out, m_in, m]
+
+                    K += torch.einsum("ijr,rknm,knmuv->uivjknm", (Q, Y, w[..., k]))  # [mul_out, m_out, mul_in, m_in, batch, N, M]
+
+                if K is not 0:
+                    kernel[s_out, s_in] = K.contiguous().view_as(kernel[s_out, s_in])
 
                 begin_in += mul_in * (2 * l_in + 1)
             begin_out += mul_out * (2 * l_out + 1)
