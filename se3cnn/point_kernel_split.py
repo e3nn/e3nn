@@ -3,30 +3,6 @@ import torch
 import se3cnn.SO3 as SO3
 
 
-class FiniteElementModel(torch.nn.Module):
-    def __init__(self, position, basis, Model, out_dim):
-        '''
-        :param position: tensor [i, ...]
-        :param basis: scalar function: tensor [a, ...] -> [a]
-        :param Model: Class(d1, d2), trainable model: R^d1 -> R^d2
-        :param out_dim: output dimension
-        '''
-        super().__init__()
-        self.position = position
-        self.basis = basis
-        self.f = Model(len(position), out_dim)
-
-    def forward(self, x):
-        """
-        :param x: tensor [batch, ...]
-        :return: tensor [batch, dim]
-        """
-        diff = x.unsqueeze(1) - self.position.unsqueeze(0)  # [batch, i, ...]
-        batch, n, *rest = diff.size()
-        x = self.basis(diff.view(-1, *rest)).view(batch, n)  # [batch, i]
-        return self.f(x)
-
-
 class SE3PointKernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel, l_filter_max=10, sh_backwardable=False):
         '''
