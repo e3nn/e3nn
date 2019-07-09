@@ -31,6 +31,7 @@ class PointGatedBlock(torch.nn.Module):
             Rs_out_with_gate = Rs_out + [(num_non_scalar, 0)]
             self.gate_act = ScalarActivation([(num_non_scalar, gate_activation)], bias=False)
         else:
+            Rs_out_with_gate = Rs_out
             self.gate_act = None
 
         self.conv = SE3PointConvolution(Kernel(Rs_in, Rs_out_with_gate))
