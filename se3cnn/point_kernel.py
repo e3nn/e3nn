@@ -58,24 +58,24 @@ class SE3PointKernel(torch.nn.Module):
 
     def forward(self, difference_matrix):
         """
-        :param difference_matrix: tensor [[batch,] N, M, 3]
-        :return: tensor [l_out * mul_out * m_out, l_in * mul_in * m_in, [batch,] N, M]
+        :param difference_matrix: tensor [[batch,] N_out, N_in, 3]
+        :return: tensor [l_out * mul_out * m_out, l_in * mul_in * m_in, [batch,] N_out, N_in]
         """
         has_batch = difference_matrix.dim() == 4
         if not has_batch:
             difference_matrix = difference_matrix.unsqueeze(0)
 
-        batch, N, M, _ = difference_matrix.size()
+        batch, N_out, N_in, _ = difference_matrix.size()
 
-        kernel = difference_matrix.new_zeros(self.n_out, self.n_in, batch, N, M)
+        kernel = difference_matrix.new_zeros(self.n_out, self.n_in, batch, N_out, N_in)
 
         # precompute all needed spherical harmonics
         sh = SO3.spherical_harmonics_xyz_backwardable if self.sh_backwardable else SO3.spherical_harmonics_xyz
-        Ys = sh(self.set_of_l_filters, difference_matrix)  # [l_filter * m_filter, batch, N, M]
+        Ys = sh(self.set_of_l_filters, difference_matrix)  # [l_filter * m_filter, batch, N_out, N_in]
 
         # use the radial model to fix all the degrees of freedom
-        radii = difference_matrix.norm(2, dim=-1).view(-1)  # [batch * N * M]
-        weights = self.R(radii).view(batch, N, M, -1)  # [batch, N, M, l_out * l_in * mul_out * mul_in * l_filter]
+        radii = difference_matrix.norm(2, dim=-1).view(-1)  # [batch * N_out * N_in]
+        weights = self.R(radii).view(batch, N_out, N_in, -1)  # [batch, N_out, N_in, l_out * l_in * mul_out * mul_in * l_filter]
         begin_w = 0
 
         begin_out = 0
@@ -90,7 +90,7 @@ class SE3PointKernel(torch.nn.Module):
 
                 # extract the subset of the `weights` that corresponds to the couple (l_out, l_in)
                 n = mul_out * mul_in * len(l_filters)
-                w = weights[:, :, :, begin_w: begin_w + n].contiguous().view(batch, N, M, mul_out, mul_in, -1)  # [batch, N, M, mul_out, mul_in, l_filter]
+                w = weights[:, :, :, begin_w: begin_w + n].contiguous().view(batch, N_out, N_in, mul_out, mul_in, -1)  # [batch, N_out, N_in, mul_out, mul_in, l_filter]
                 begin_w += n
 
                 Qs = getattr(self, "Q_{}_{}".format(i, j))  # [m_out, m_in, l_filter * m_filter]
@@ -99,13 +99,13 @@ class SE3PointKernel(torch.nn.Module):
                 K = 0
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
-                    Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch, N, M]
+                    Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch, N_out, N_in]
 
                     tmp = sum(2 * l + 1 for l in l_filters if l < l_filter)
                     Q = Qs[:, :, tmp: tmp + 2 * l_filter + 1]  # [m_out, m_in, m]
 
                     # note: The multiplication with `w` could also be done outside of the for loop
-                    K += torch.einsum("ijr,rknm,knmuv->uivjknm", (Q, Y, w[..., k]))  # [mul_out, m_out, mul_in, m_in, batch, N, M]
+                    K += torch.einsum("ijr,rknm,knmuv->uivjknm", (Q, Y, w[..., k]))  # [mul_out, m_out, mul_in, m_in, batch, N_out, N_in]
 
                 if K is not 0:
                     kernel[s_out, s_in] = K.contiguous().view_as(kernel[s_out, s_in])
