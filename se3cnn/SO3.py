@@ -78,19 +78,23 @@ def compose(a1, b1, c1, a2, b2, c2):
     return a, b, c
 
 
-def irr_repr(order, alpha, beta, gamma, dtype=None):
+def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     """
     irreducible representation of SO3
     - compatible with compose and spherical_harmonics
     """
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
-    if torch.is_tensor(alpha):
-        alpha = alpha.item()
-    if torch.is_tensor(beta):
-        beta = beta.item()
-    if torch.is_tensor(gamma):
-        gamma = gamma.item()
-    return torch.tensor(wigner_D_matrix(order, alpha, beta, gamma), dtype=torch.get_default_dtype() if dtype is None else dtype)
+    abc = [alpha, beta, gamma]
+    for i, x in enumerate(abc):
+        if torch.is_tensor(x):
+            abc[i] = x.item()
+            if dtype is None:
+                dtype = x.dtype
+            if device is None:
+                device = x.device
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+    return torch.tensor(wigner_D_matrix(order, *abc), dtype=dtype, device=device)
 
 
 
@@ -98,7 +102,7 @@ def irr_repr(order, alpha, beta, gamma, dtype=None):
 # Spherical harmonics
 ################################################################################
 
-def spherical_harmonics(order, alpha, beta, dtype=None):
+def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     """
     spherical harmonics
 
@@ -111,12 +115,27 @@ def spherical_harmonics(order, alpha, beta, dtype=None):
     """
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
     import numpy as np
+
     if not isinstance(order, list):
         order = [order]
+
+    if dtype is None and torch.is_tensor(alpha):
+        dtype = alpha.dtype
+    if dtype is None and torch.is_tensor(beta):
+        dtype = beta.dtype
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+
+    if device is None and torch.is_tensor(alpha):
+        device = alpha.device
+    if device is None and torch.is_tensor(beta):
+        device = beta.device
+
     if not torch.is_tensor(alpha):
         alpha = torch.tensor(alpha, dtype=torch.float64)
     if not torch.is_tensor(beta):
         beta = torch.tensor(beta, dtype=torch.float64)
+
     Js = np.concatenate([J * np.ones(2 * J + 1) for J in order], 0)
     Ms = np.concatenate([np.arange(-J, J + 1, 1) for J in order], 0)
     Js = Js.reshape(-1, *[1] * alpha.dim())
@@ -124,8 +143,7 @@ def spherical_harmonics(order, alpha, beta, dtype=None):
     alpha = alpha.view(1, *alpha.size())
     beta = beta.view(1, *beta.size())
     Y = sh(Js, Ms, math.pi - beta.cpu().numpy(), alpha.cpu().numpy())
-    Y = torch.tensor(Y, dtype=torch.get_default_dtype() if dtype is None else dtype)
-    return Y
+    return torch.tensor(Y, dtype=dtype, device=device)
 
 
 def spherical_harmonics_xyz(order, xyz):
@@ -145,7 +163,7 @@ def spherical_harmonics_xyz(order, xyz):
 
         # fix values when xyz = 0
         if (xyz.view(-1, 3).norm(2, -1) == 0).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
-            val = torch.cat([spherical_harmonics(0, 123, 321) if J == 0 else torch.zeros(2 * J + 1) for J in order])  # [m]
+            val = torch.cat([spherical_harmonics(0, xyz.flatten()[0], 321) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
             out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
         return out
 
@@ -188,7 +206,7 @@ def legendre(order, z):
     return torch.cat([_legendre(J, z) for J in order], dim=0)  # [l * m, A]
 
 
-def _spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
+def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
     """
     spherical harmonics
 
