@@ -2,6 +2,46 @@
 import torch
 
 
+def convolve(kernel, features, geometry, neighbors=None, rel_mask=None):
+    """
+    :param kernel: kernel model
+    :param features: tensor ([batch,] channel, point)
+    :param geometry: tensor ([batch,] point, xyz)
+    :param neighbors: index tensor ([batch,] point, neighbor)
+    :param rel_mask: tensor ([batch,] point_out, point_in)
+    :return: tensor ([batch,] channel, point)
+    """
+
+    has_batch = features.dim() == 3
+
+    if not has_batch:
+        features = features.unsqueeze(0)
+        geometry = geometry.unsqueeze(0)
+        neighbors = neighbors.unsqueeze(0)
+        rel_mask = rel_mask.unsqueeze(0)
+
+    if neighbors is None:
+        diff_matrix = difference_matrix(geometry)  # [batch, point_out, point_in, 3]
+    else:
+        diff_matrix = neighbor_difference_matrix(neighbors, geometry)  # [batch, point_out, point_in, 3]
+        features = neighbor_feature_matrix(neighbors, features)  # [batch, channel, point_out, point_in]
+
+    kernel = kernel(diff_matrix)  # [channel_out, channel_in, batch, point_out, point_in]
+
+    if rel_mask is not None:
+        kernel = torch.einsum('nba,dcnba->dcnba', (rel_mask, kernel))
+
+    if neighbors is None:
+        output = torch.einsum('nca,dcnba->ndb', (features, kernel))  # [batch, channel, point]
+    else:
+        output = torch.einsum('ncba,dcnba->ndb', (features, kernel))  # [batch, channel, point]
+
+    if not has_batch:
+        output = output.squeeze(0)
+
+    return output
+
+
 def difference_matrix(geometry):
     ri = geometry.unsqueeze(-3)  # [1, N, 3]
     rj = geometry.unsqueeze(-2)  # [N, 1, 3]
