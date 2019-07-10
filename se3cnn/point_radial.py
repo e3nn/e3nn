@@ -56,11 +56,12 @@ class FC(torch.nn.Module):
             h = x.size(1)
 
             if i == 0:
+                # note: normalization assumes that the sum of the inputs is 1
                 x = self.act(x @ W.t())
             elif i < L:
                 x = self.act(x @ (W.t() / h ** 0.5))
             else:
-                x = x @ (W.t() / h)
+                x = x @ (W.t() / h ** 0.5)
 
         return x
 

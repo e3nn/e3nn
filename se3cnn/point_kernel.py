@@ -1,5 +1,8 @@
 # pylint: disable=C, R, arguments-differ, no-member
+import math
+
 import torch
+
 import se3cnn.SO3 as SO3
 
 
@@ -75,12 +78,21 @@ class SE3PointKernel(torch.nn.Module):
 
         # use the radial model to fix all the degrees of freedom
         radii = difference_matrix.norm(2, dim=-1).view(-1)  # [batch * N_out * N_in]
+        # note: for the normalization we assume that the variance of weights[i] is one
         weights = self.R(radii).view(batch, N_out, N_in, -1)  # [batch, N_out, N_in, l_out * l_in * mul_out * mul_in * l_filter]
         begin_w = 0
 
         begin_out = 0
         for i, (mul_out, l_out) in enumerate(self.Rs_out):
             s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+
+            # consider that we sum a bunch of [lambda_(m_out)] vectors
+            # we need to count how many of them we sum in order to normalize the network
+            num_summed_elements = 0
+            for mul_in, l_in in self.Rs_in:
+                l_filters = self.get_l_filters(l_in, l_out)
+                num_summed_elements += mul_in * len(l_filters)
+            num_summed_elements *= N_in  # note: idealy the number of neighbours
 
             begin_in = 0
             for j, (mul_in, l_in) in enumerate(self.Rs_in):
@@ -107,6 +119,14 @@ class SE3PointKernel(torch.nn.Module):
                     # note: The multiplication with `w` could also be done outside of the for loop
                     K += torch.einsum("ijr,rknm,knmuv->uivjknm", (Q, Y, w[..., k]))  # [mul_out, m_out, mul_in, m_in, batch, N_out, N_in]
 
+                # put 2l_in+1 to keep the norm of the m vector constant
+                # put 2l_ou+1 to keep the variance of each m componant constant
+                # sum_m Y_m^2 = (2l+1)/(4pi)  and  norm(Q) = 1  implies that norm(QY) = sqrt(1/4pi)
+                K *= math.sqrt(2 * l_in + 1) * math.sqrt(4 * math.pi)
+
+                # normalization assuming that each terms are of order 1 and uncorrelated
+                K /= num_summed_elements ** 0.5
+
                 if K is not 0:
                     kernel[s_out, s_in] = K.contiguous().view_as(kernel[s_out, s_in])
 
@@ -117,4 +137,3 @@ class SE3PointKernel(torch.nn.Module):
             kernel = kernel.squeeze(2)
 
         return kernel
-

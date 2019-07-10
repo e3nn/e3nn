@@ -40,12 +40,14 @@ class SE3Net(torch.nn.Module):
         features = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
         self.num_features = len(features)
 
-        RadialModel = partial(CosineBasisModel, 3.0, 3, 6, 100)
+        RadialModel = partial(CosineBasisModel, 3.0, 3, 10, 100)
         Kernel = partial(SE3PointKernel, RadialModel=RadialModel)
         Convolution = partial(SE3PointConvolution, Kernel)
 
+        # note: torch.randn(100000).sigmoid().mul(1.85).pow(2).mean() == 1
+        # note: torch.randn(100000).tanh().mul(1.6).pow(2).mean() == 1
         self.layers = torch.nn.ModuleList([
-            GatedBlock(features[i], features[i+1], torch.tanh, torch.sigmoid, Convolution)
+            GatedBlock(features[i], features[i+1], lambda x: x.tanh().mul(1.6), lambda x: x.sigmoid().mul(1.85), Convolution)
             for i in range(len(features) - 1)
         ])
         self.layers += [AvgSpacial(), torch.nn.Linear(64, num_classes)]
@@ -74,7 +76,7 @@ def main():
 
     feature = tetris.new_ones(tetris.size(0), 1, tetris.size(1))
 
-    for step in range(150):
+    for step in range(50):
         out = f(feature, tetris)
         loss = torch.nn.functional.cross_entropy(out, labels)
         optimizer.zero_grad()
