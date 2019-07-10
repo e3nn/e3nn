@@ -3,6 +3,68 @@ import torch
 import numpy as np
 
 
+class NormActivation(torch.nn.Module):
+    def __init__(self, dimensionalities, tensor_act=None, scalar_act=None, eps=1e-6, bias_min=.5, bias_max=2):
+        '''
+        :param dimensionalities: list of dimensionalities of the capsules
+        :param scalar_act: activation function applied to scalar capsules - in last layer often set to None
+        :param eps: regularazier added to norm to prevent division by zero
+        :param bias_min: lower cutoff of uniform bias initialization
+        :param bias_max: upper cutoff of uniform bias initialization
+
+        scalar capsules are acted on by a ReLU nonlinearity, higher order capsules with a nonlinearity acting on their norm
+        '''
+        super().__init__()
+
+        self.dimensionalities = dimensionalities
+        self.tensor_act = torch.nn.Softplus(beta=1, threshold=20) if not tensor_act else tensor_act
+        self.scalar_act = scalar_act
+        self.is_scalar = [dim == 1 for dim in dimensionalities]
+        nbias = int(np.sum(np.array(dimensionalities) != 1))
+        self.bias = torch.nn.Parameter(torch.Tensor(nbias)) if nbias > 0 else None
+        self.eps = eps
+        self.bias_min = bias_min
+        self.bias_max = bias_max
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        if self.bias is not None:
+            self.bias.data.uniform_(self.bias_min, self.bias_max)
+
+    def forward(self, input):  # pylint: disable=W
+        '''
+        :param input: [batch, feature, x, y, z]
+        '''
+        capsule_activations = []
+        idx_capsule_begin = 0
+        idx_bias = 0
+
+        for dim, scalar_bool in zip(self.dimensionalities, self.is_scalar):
+            # take capsule out of input
+            capsule = input[:, idx_capsule_begin:idx_capsule_begin+dim]
+            # act on scalar capsules with scalar activation
+            if scalar_bool:
+                if self.scalar_act == None:
+                    capsule_activ = capsule
+                else:
+                    capsule_activ = self.scalar_act(capsule)
+            # act on norms of higher order capsules
+            else:
+                norm = torch.norm(capsule, p=2, dim=1, keepdim=True) + self.eps  # [batch, 1, x, y, z]
+                b = self.bias[idx_bias].expand_as(norm)  # [batch, 1, x, y, z]
+                activ_factor = self.tensor_act(norm - b)  # [batch, 1, x, y, z]
+                # activ_factor = 1 + torch.nn.ELU(norm - b.expand_as(norm)) # add 1 to make scaling factor positive
+                capsule_activ = activ_factor * (capsule/norm)
+                idx_bias += 1
+            # append to list of nonlinearly transformed capsules
+            capsule_activations.append(capsule_activ)
+            idx_capsule_begin += dim
+        assert idx_capsule_begin == input.size(1)
+        if self.bias is not None:
+            assert idx_bias == self.bias.size(0)
+        return torch.cat(capsule_activations, dim=1)
+
+
 class NormSoftplus(torch.nn.Module):
     def __init__(self, dimensionalities, scalar_act, eps=1e-6, bias_min=.5, bias_max=2):
         '''
