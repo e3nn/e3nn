@@ -6,12 +6,12 @@ import torch
 
 
 class FiniteElementModel(torch.nn.Module):
-    def __init__(self, position, basis, Model, out_dim):
+    def __init__(self, out_dim, position, basis, Model):
         '''
+        :param out_dim: output dimension
         :param position: tensor [i, ...]
         :param basis: scalar function: tensor [a, ...] -> [a]
         :param Model: Class(d1, d2), trainable model: R^d1 -> R^d2
-        :param out_dim: output dimension
         '''
         super().__init__()
         self.register_buffer('position', position)
@@ -66,17 +66,13 @@ class FC(torch.nn.Module):
         return x
 
 
-def GaussianBasisModel(max_radius, number_of_basis, number_of_hidden_layers, number_of_hidden_neurons, out_dim):
-    radii = torch.linspace(0, max_radius, steps=number_of_basis)
-    sigma = 0.45 * (radii[1] - radii[0])
-    basis = lambda x: x.pow(2).div(2 * sigma ** 2).neg().exp()
-    Model = partial(FC, h=number_of_hidden_neurons, L=number_of_hidden_layers, act=lambda x: x.relu().mul(2 ** 0.5))
-    return FiniteElementModel(radii, basis, Model, out_dim)
+def FiniteElementFCModel(out_dim, position, basis, h, L, act):
+    Model = partial(FC, h=h, L=L, act=act)
+    return FiniteElementModel(out_dim, position, basis, Model)
 
 
-def CosineBasisModel(max_radius, number_of_basis, number_of_hidden_layers, number_of_hidden_neurons, out_dim):
+def CosineBasisModel(out_dim, max_radius, number_of_basis, h, L, act):
     radii = torch.linspace(0, max_radius, steps=number_of_basis)
     step = radii[1] - radii[0]
     basis = lambda x: x.div(step).add(1).relu().sub(2).neg().relu().add(1).mul(math.pi / 2).cos().pow(2)
-    Model = partial(FC, h=number_of_hidden_neurons, L=number_of_hidden_layers, act=lambda x: x.relu().mul(2 ** 0.5))
-    return FiniteElementModel(radii, basis, Model, out_dim)
+    return FiniteElementFCModel(out_dim, radii, basis, h, L, act)
