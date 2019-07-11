@@ -1,4 +1,84 @@
 import torch
+from collections import defaultdict
+
+class ConcatenateSphericalSignals(torch.nn.Module):
+    def __init__(self, Rs_in1, Rs_in2):
+        super(ConcatenateSphericalSignals, self).__init__()
+        features1 = sum([m * (2 * l + 1) for m, l in Rs_in1])
+        features2 = sum([m * (2 * l + 1) for m, l in Rs_in2])
+        
+        self.Rs_in1 = Rs_in1
+        self.Rs_in2 = Rs_in2
+        
+        
+        features_out = defaultdict(int)
+        for m, l in Rs_in1:
+            features_out[l] += m
+        for m, l in Rs_in2:
+            features_out[l] += m
+            
+        L, M = zip(*features_out.items())
+        self.Rs_out = list(zip(M, L))
+        
+        
+        self.register_buffer('mixing_matrix', 
+                             torch.zeros(features1 + features2, 
+                                         features1 + features2))
+        
+        index1, index2 = 0, 0
+        dim_index1, dim_index2, dim_index3 = 0, 0, 0
+        
+        while dim_index1 < features1 or dim_index2 < features2:
+            if index1 < len(Rs_in1):
+                m1, l1 = Rs_in1[index1]
+            if index2 < len(Rs_in2):
+                m2, l2 = Rs_in2[index2]
+            if dim_index1 == features1:  # add features from signal2
+                increment = m2 * (2 * l2 + 1)
+                slice1 = slice(dim_index3, dim_index3 + increment)
+                slice2 = slice(features1 + dim_index2,
+                               features1 + dim_index2 + increment)
+                self.mixing_matrix[slice1, slice2] = torch.eye(increment)
+                dim_index3 += increment
+                dim_index2 += increment
+                index2 += 1
+                
+            elif dim_index2 == features2:  # add features from signal1
+                increment = m1 * (2 * l1 + 1)
+                slice1 = slice(dim_index3, 
+                               dim_index3 + increment)
+                slice2 = slice(dim_index1,
+                               dim_index1 + increment)
+                self.mixing_matrix[slice1, slice2] = torch.eye(increment)
+                dim_index3 += increment
+                dim_index1 += increment
+                index1 += 1
+                
+            elif l1 > l2:  # add features from signal2
+                increment = m2 * (2 * l2 + 1)
+                slice1 = slice(dim_index3, 
+                               dim_index3 + increment)
+                slice2 = slice(features1 + dim_index2,
+                               features1 + dim_index2 + increment)
+                self.mixing_matrix[slice1, slice2] = torch.eye(increment)
+                dim_index3 += increment
+                dim_index2 += increment
+                index2 += 1
+            
+            else:  # add features from signal1
+                increment = m1 * (2 * l1 + 1)
+                slice1 = slice(dim_index3, 
+                               dim_index3 + increment)
+                slice2 = slice(dim_index1,
+                               dim_index1 + increment)
+                self.mixing_matrix[slice1, slice2] = torch.eye(increment)
+                dim_index3 += increment
+                dim_index1 += increment
+                index1 += 1
+                
+    def forward(self, signal1, signal2):
+        combined = torch.cat((signal1, signal2), dim=-3)
+        return torch.einsum('dc,ncba->ndba', (self.mixing_matrix, combined))
 
 
 class SelfInteraction(torch.nn.Module):
@@ -41,10 +121,9 @@ class SelfInteraction(torch.nn.Module):
             # We use einsum to do transpose and tensordots at the same time
             kernel[si, sj] = torch.einsum(
                 'dc,ij->dicj', (w,
-                                torch.ones(self.dims_out[i],
-                                           self.dims_in[i]))).view(
-                                               m_out * self.dims_out[i],
-                                               m_in * self.dims_in[i])
+                                torch.eye(self.dims_out[i]))).view(
+                                    m_out * self.dims_out[i],
+                                    m_in * self.dims_in[i])
             begin_j += m_in * self.dims_in[i]
             begin_i += m_out * self.dims_out[i]
             weight_index += m_out * m_in
@@ -59,4 +138,7 @@ class SelfInteraction(torch.nn.Module):
         elif len(input.size()) == 3:
             # Batch dimension
             output = torch.einsum('nca,dc->nda', (input, kernel))
+        elif len(input.size()) == 4:
+            # Multiple atom indices
+            output = torch.einsum('ncba,dc->ndba', (input, kernel))
         return output
