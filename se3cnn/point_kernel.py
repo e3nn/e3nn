@@ -38,7 +38,7 @@ class SE3PointKernel(torch.nn.Module):
 
                 # precompute the change of basis Q
                 Q = [SO3.basis_transformation_Q(l, l_in, l_out) for l in l_filters]
-                Q = torch.cat(Q, dim=1).view(2 * l_out + 1, 2 * l_in + 1, -1)  # [m_out, m_in, l_filter * m_filter]
+                Q = torch.cat(Q, dim=2)  # [m_out, m_in, l_filter * m_filter]
                 self.register_buffer("Q_{}_{}".format(i, j), Q.type(torch.get_default_dtype()))
 
         # create the radial model: R+ -> R^n_path
