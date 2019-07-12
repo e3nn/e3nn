@@ -1,19 +1,21 @@
-# pylint: disable=C,E1101,E1102
-'''
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long
+"""
 Some functions related to SO3 and his usual representations
 
 Using ZYZ Euler angles parametrisation
-'''
-import torch
+"""
 import math
-from se3cnn.utils import torch_default_dtype
+
+import torch
+
 from se3cnn.util.cache_file import cached_dirpklgz
+from se3cnn.utils import torch_default_dtype
 
 
 def rot_z(gamma):
-    '''
+    """
     Rotation around Z axis
-    '''
+    """
     if not torch.is_tensor(gamma):
         gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
     return gamma.new_tensor([
@@ -24,9 +26,9 @@ def rot_z(gamma):
 
 
 def rot_y(beta):
-    '''
+    """
     Rotation around Y axis
-    '''
+    """
     if not torch.is_tensor(beta):
         beta = torch.tensor(beta, dtype=torch.get_default_dtype())
     return beta.new_tensor([
@@ -42,22 +44,25 @@ def rot_y(beta):
 # [x, y, z]
 
 def rot(alpha, beta, gamma):
-    '''
-    ZYZ Eurler angles rotation
-    '''
+    """
+    ZYZ Euler angles rotation
+    """
     return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)
 
 
 def rand_rot():
+    """
+    random rotation matrix
+    """
     alpha, gamma = 2 * math.pi * torch.rand(2)
     beta = torch.rand(()).mul(2).sub(1).acos()
     return rot(alpha, beta, gamma)
 
 
 def x_to_alpha_beta(x):
-    '''
+    """
     Convert point (x, y, z) on the sphere into (alpha, beta)
-    '''
+    """
     if not torch.is_tensor(x):
         x = torch.tensor(x, dtype=torch.get_default_dtype())
     x = x / torch.norm(x, 2, -1, keepdim=True)
@@ -272,14 +277,14 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
 ################################################################################
 
 def get_matrix_kernel(A, eps=1e-10):
-    '''
+    """
     Compute an orthonormal basis of the kernel (x_1, x_2, ...)
     A x_i = 0
     scalar_product(x_i, x_j) = delta_ij
 
     :param A: matrix
     :return: matrix where each row is a basis vector of the kernel of A
-    '''
+    """
     _u, s, v = torch.svd(A)
 
     # A = u @ torch.diag(s) @ v.t()
@@ -288,19 +293,25 @@ def get_matrix_kernel(A, eps=1e-10):
 
 
 def get_matrices_kernel(As, eps=1e-10):
-    '''
+    """
     Computes the commun kernel of all the As matrices
-    '''
+    """
     return get_matrix_kernel(torch.cat(As, dim=0), eps)
 
 
 def kron(x, y):
-    assert x.ndimension() == 2
-    assert y.ndimension() == 2
+    """
+    Kroneker product between two matrices
+    """
+    assert x.dim() == 2
+    assert y.dim() == 2
     return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
 
 def direct_sum(*matrices):
+    """
+    Direct sum of matrices, put them in the diagonal
+    """
     m = sum(x.size(0) for x in matrices)
     n = sum(x.size(1) for x in matrices)
     out = matrices[0].new_zeros(m, n)
@@ -319,22 +330,27 @@ def direct_sum(*matrices):
 ################################################################################
 
 @cached_dirpklgz("cache/trans_Q")
-def basis_transformation_Q(J, order_in, order_out, version=3):  # pylint: disable=unused-argument
+def basis_transformation_Q(l_filter, l_in, l_out, version=4):  # pylint: disable=unused-argument
     """
-    :param J: order of the spherical harmonics
-    :param order_in: order of the input representation
-    :param order_out: order of the output representation
+    Computes the Clebsch–Gordan coefficients
+
+    D(l_out)_ij D(l_in)_kl Q_jlm == Q_ikn D(l_filter)_nm
+
+    :param l_filter: order of the spherical harmonics
+    :param l_in: order of the input representation
+    :param l_out: order of the output representation
     :return: one part of the Q^-1 matrix of the article
     """
     with torch_default_dtype(torch.float64):
-        def _R_tensor(a, b, c): return kron(irr_repr(order_out, a, b, c), irr_repr(order_in, a, b, c))
+        def _DxD(a, b, c):
+            return kron(irr_repr(l_out, a, b, c), irr_repr(l_in, a, b, c))
 
-        def _sylvester_submatrix(J, a, b, c):
-            ''' generate Kronecker product matrix for solving the Sylvester equation in subspace J '''
-            R_tensor = _R_tensor(a, b, c)  # [m_out * m_in, m_out * m_in]
-            R_irrep_J = irr_repr(J, a, b, c)  # [m, m]
-            return kron(R_tensor, torch.eye(R_irrep_J.size(0))) - \
-                kron(torch.eye(R_tensor.size(0)), R_irrep_J.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
+        def _sylvester_submatrix(l_filter, a, b, c):
+            DxD = _DxD(a, b, c)  # [m_out * m_in, m_out * m_in]
+            D = irr_repr(l_filter, a, b, c)  # [m, m]
+            I1 = torch.eye(D.size(0))
+            I2 = torch.eye(DxD.size(0))
+            return kron(DxD, I1) - kron(I2, D.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
 
         random_angles = [
             [4.41301023, 5.56684102, 4.59384642],
@@ -343,17 +359,19 @@ def basis_transformation_Q(J, order_in, order_out, version=3):  # pylint: disabl
             [2.16017393, 3.48835314, 5.55174441],
             [2.52385107, 0.29089583, 3.90040975],
         ]
-        null_space = get_matrices_kernel([_sylvester_submatrix(J, a, b, c) for a, b, c in random_angles])
-        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
-        Q_J = null_space[0]  # [(m_out * m_in) * m]
-        Q_J = Q_J.view((2 * order_out + 1) * (2 * order_in + 1), 2 * J + 1)  # [m_out * m_in, m]
-        assert all(torch.allclose(
-            _R_tensor(a.item(), b.item(), c.item()) @ Q_J,
-            Q_J @ irr_repr(J, a.item(), b.item(), c.item())) for a, b, c in torch.rand(4, 3)
-        )
+        null_space = get_matrices_kernel([_sylvester_submatrix(l_filter, a, b, c) for a, b, c in random_angles])
 
-    assert Q_J.dtype == torch.float64
-    return Q_J  # [m_out * m_in, m]
+        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
+        Q = null_space[0]  # [(m_out * m_in) * m]
+        Q = Q.view((2 * l_out + 1), (2 * l_in + 1), 2 * l_filter + 1)  # [m_out, m_in, m]
+
+        abc = torch.rand(3)
+        A = torch.einsum("ij,kl,jlm", (irr_repr(l_out, *abc), irr_repr(l_in, *abc), Q))
+        B = torch.einsum("ikn,nm", (Q, irr_repr(l_filter, *abc)))
+        assert torch.allclose(A, B)
+
+    assert Q.dtype == torch.float64
+    return Q  # [m_out * m_in, m]
 
 
 

@@ -56,7 +56,7 @@ def _sample_cube(size, order_in, order_out):
         Y_J = _sample_sh_cube(size, J)  # [m, x, y, z]
 
         # compute basis transformation matrix Q_J
-        Q_J = basis_transformation_Q(J, order_in, order_out)  # [m_out * m_in, m]
+        Q_J = basis_transformation_Q(J, order_in, order_out).view(-1, 2 * J + 1)  # [m_out * m_in, m]
         K_J = torch.einsum('mn,nxyz->mxyz', (Q_J, Y_J))  # [m_out * m_in, x, y, z]
         K_J = K_J.view(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
         solutions.append(K_J)
