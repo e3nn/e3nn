@@ -37,7 +37,7 @@ class SE3PointKernel(torch.nn.Module):
                 set_of_l_filters = set_of_l_filters.union(l_filters)
 
                 # precompute the change of basis Q
-                Q = [SO3.basis_transformation_Q(l, l_in, l_out) for l in l_filters]
+                Q = [SO3.clebsch_gordan(l_out, l_in, l) for l in l_filters]
                 Q = torch.cat(Q, dim=2)  # [m_out, m_in, l_filter * m_filter]
                 self.register_buffer("Q_{}_{}".format(i, j), Q.type(torch.get_default_dtype()))
 

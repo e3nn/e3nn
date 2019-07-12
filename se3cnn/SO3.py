@@ -329,28 +329,53 @@ def direct_sum(*matrices):
 # Analytically derived basis
 ################################################################################
 
-@cached_dirpklgz("cache/trans_Q")
-def basis_transformation_Q(l_filter, l_in, l_out, version=4):  # pylint: disable=unused-argument
+def clebsch_gordan(l1, l2, l3):
     """
     Computes the Clebsch–Gordan coefficients
 
-    D(l_out)_ij D(l_in)_kl Q_jlm == Q_ikn D(l_filter)_nm
-
-    :param l_filter: order of the spherical harmonics
-    :param l_in: order of the input representation
-    :param l_out: order of the output representation
-    :return: one part of the Q^-1 matrix of the article
+    D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
     """
-    with torch_default_dtype(torch.float64):
-        def _DxD(a, b, c):
-            return kron(irr_repr(l_out, a, b, c), irr_repr(l_in, a, b, c))
+    if torch.is_tensor(l1):
+        l1 = l1.item()
+    if torch.is_tensor(l2):
+        l2 = l2.item()
+    if torch.is_tensor(l3):
+        l3 = l3.item()
 
-        def _sylvester_submatrix(l_filter, a, b, c):
-            DxD = _DxD(a, b, c)  # [m_out * m_in, m_out * m_in]
-            D = irr_repr(l_filter, a, b, c)  # [m, m]
-            I1 = torch.eye(D.size(0))
-            I2 = torch.eye(DxD.size(0))
-            return kron(DxD, I1) - kron(I2, D.t())  # [(m_out * m_in) * m, (m_out * m_in) * m]
+    if l1 <= l2 <= l3:
+        return _clebsch_gordan(l1, l2, l3)
+    if l1 <= l3 <= l2:
+        return _clebsch_gordan(l1, l3, l2).transpose(1, 2).contiguous()
+    if l2 <= l1 <= l3:
+        return _clebsch_gordan(l2, l1, l3).transpose(0, 1).contiguous()
+    if l3 <= l2 <= l1:
+        return _clebsch_gordan(l3, l2, l1).transpose(0, 2).contiguous()
+    if l2 <= l3 <= l1:
+        return _clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2).contiguous()
+    if l3 <= l1 <= l2:
+        return _clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
+
+
+@cached_dirpklgz("cache/clebsch_gordan")
+def _clebsch_gordan(l1, l2, l3):
+    """
+    Computes the Clebsch–Gordan coefficients
+
+    D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
+    """
+    # these three propositions are equivalent
+    assert abs(l2 - l3) <= l1 <= l2 + l3
+    assert abs(l3 - l1) <= l2 <= l3 + l1
+    assert abs(l1 - l2) <= l3 <= l1 + l2
+
+    with torch_default_dtype(torch.float64):
+        n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
+
+        def _DxDxD(a, b, c):
+            D1 = irr_repr(l1, a, b, c)
+            D2 = irr_repr(l2, a, b, c)
+            D3 = irr_repr(l3, a, b, c)
+            return torch.einsum('il,jm,kn->ijklmn', (D1, D2, D3)).view(n, n)
 
         random_angles = [
             [4.41301023, 5.56684102, 4.59384642],
@@ -359,19 +384,18 @@ def basis_transformation_Q(l_filter, l_in, l_out, version=4):  # pylint: disable
             [2.16017393, 3.48835314, 5.55174441],
             [2.52385107, 0.29089583, 3.90040975],
         ]
-        null_space = get_matrices_kernel([_sylvester_submatrix(l_filter, a, b, c) for a, b, c in random_angles])
+        null_space = get_matrices_kernel([_DxDxD(*abc) - torch.eye(n) for abc in random_angles])
 
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
-        Q = null_space[0]  # [(m_out * m_in) * m]
-        Q = Q.view((2 * l_out + 1), (2 * l_in + 1), 2 * l_filter + 1)  # [m_out, m_in, m]
+        Q = null_space[0]
+        Q = Q.view((2 * l1 + 1), (2 * l2 + 1), 2 * l3 + 1)
 
         abc = torch.rand(3)
-        A = torch.einsum("ij,kl,jlm", (irr_repr(l_out, *abc), irr_repr(l_in, *abc), Q))
-        B = torch.einsum("ikn,nm", (Q, irr_repr(l_filter, *abc)))
-        assert torch.allclose(A, B)
+        _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
+        assert torch.allclose(Q, _Q)
 
     assert Q.dtype == torch.float64
-    return Q  # [m_out * m_in, m]
+    return Q  # [m1, m2, m3]
 
 
 
