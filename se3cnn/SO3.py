@@ -388,7 +388,7 @@ def _clebsch_gordan(l1, l2, l3):
 
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
         Q = null_space[0]
-        Q = Q.view((2 * l1 + 1), (2 * l2 + 1), 2 * l3 + 1)
+        Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
 
         abc = torch.rand(3)
         _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))

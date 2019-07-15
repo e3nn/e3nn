@@ -7,7 +7,7 @@ import se3cnn.SO3 as SO3
 
 
 class SE3PointKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, l_filter_max=10, sh_backwardable=False):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters, sh_backwardable=False):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
@@ -20,7 +20,7 @@ class SE3PointKernel(torch.nn.Module):
         self.n_out = sum(mul * (2 * l + 1) for mul, l in self.Rs_out)
         self.n_in = sum(mul * (2 * l + 1) for mul, l in self.Rs_in)
 
-        self.l_filter_max = l_filter_max
+        self.get_l_filters = get_l_filters
         self.sh_backwardable = sh_backwardable
 
         n_path = 0
@@ -29,6 +29,7 @@ class SE3PointKernel(torch.nn.Module):
         for i, (mul_out, l_out) in enumerate(self.Rs_out):
             for j, (mul_in, l_in) in enumerate(self.Rs_in):
                 l_filters = self.get_l_filters(l_in, l_out)
+                assert l_filters == sorted(set(l_filters)), "get_l_filters must return a sorted list of unique values"
 
                 # compute the number of degrees of freedom
                 n_path += mul_out * mul_in * len(l_filters)
@@ -53,11 +54,6 @@ class SE3PointKernel(torch.nn.Module):
             Rs_in=self.Rs_in,
             Rs_out=self.Rs_out,
         )
-
-    def get_l_filters(self, l_in, l_out):
-        ls = list(range(abs(l_in - l_out), l_in + l_out + 1))
-        ls = [l for l in ls if l <= self.l_filter_max]
-        return ls
 
     def forward(self, difference_matrix):
         """
