@@ -7,11 +7,13 @@ import se3cnn.SO3 as SO3
 
 
 class SE3PointKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters, sh_backwardable=False):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=None, sh=None):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
         :param RadialModel: Class(d), trainable model: R -> R^d
+        :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
+        :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         '''
         super().__init__()
 
@@ -20,8 +22,13 @@ class SE3PointKernel(torch.nn.Module):
         self.n_out = sum(mul * (2 * l + 1) for mul, l in self.Rs_out)
         self.n_in = sum(mul * (2 * l + 1) for mul, l in self.Rs_in)
 
+        if get_l_filters is None:
+            get_l_filters = lambda l_in, l_out: list(range(abs(l_in - l_out), l_in + l_out + 1))
         self.get_l_filters = get_l_filters
-        self.sh_backwardable = sh_backwardable
+
+        if sh is None:
+            sh = SO3.spherical_harmonics_xyz
+        self.sh = sh
 
         n_path = 0
         set_of_l_filters = set()
@@ -69,8 +76,7 @@ class SE3PointKernel(torch.nn.Module):
         kernel = difference_matrix.new_zeros(self.n_out, self.n_in, batch, N_out, N_in)
 
         # precompute all needed spherical harmonics
-        sh = SO3.spherical_harmonics_xyz_backwardable if self.sh_backwardable else SO3.spherical_harmonics_xyz
-        Ys = sh(self.set_of_l_filters, difference_matrix)  # [l_filter * m_filter, batch, N_out, N_in]
+        Ys = self.sh(self.set_of_l_filters, difference_matrix)  # [l_filter * m_filter, batch, N_out, N_in]
 
         # use the radial model to fix all the degrees of freedom
         radii = difference_matrix.norm(2, dim=-1).view(-1)  # [batch * N_out * N_in]

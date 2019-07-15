@@ -44,10 +44,8 @@ class SE3Net(torch.nn.Module):
         sp = rescaled_act.Softplus(beta=5)
 
         RadialModel = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=sp)
-        def get_l_filters(l_in, l_out):
-            return list(range(abs(l_in - l_out), l_in + l_out + 1))
 
-        Kernel = partial(SE3PointKernel, RadialModel=RadialModel, get_l_filters=get_l_filters)
+        Kernel = partial(SE3PointKernel, RadialModel=RadialModel)
         Convolution = partial(SE3PointConvolution, Kernel)
 
         self.layers = torch.nn.ModuleList([
