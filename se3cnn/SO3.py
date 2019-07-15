@@ -112,9 +112,9 @@ def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     spherical harmonics
 
     :param order: int or list
-    :param alpha: float or tensor of shape [A]
-    :param beta: float or tensor of shape [A]
-    :return: tensor of shape [m, A]
+    :param alpha: float or tensor of shape [...]
+    :param beta: float or tensor of shape [...]
+    :return: tensor of shape [m, ...]
 
     - compatible with irr_repr and compose
     """
@@ -145,8 +145,8 @@ def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     Ms = np.concatenate([np.arange(-J, J + 1, 1) for J in order], 0)
     Js = Js.reshape(-1, *[1] * alpha.dim())
     Ms = Ms.reshape(-1, *[1] * alpha.dim())
-    alpha = alpha.view(1, *alpha.size())
-    beta = beta.view(1, *beta.size())
+    alpha = alpha.unsqueeze(0)
+    beta = beta.unsqueeze(0)
     Y = sh(Js, Ms, math.pi - beta.cpu().numpy(), alpha.cpu().numpy())
     return torch.tensor(Y, dtype=dtype, device=device)
 
@@ -156,15 +156,15 @@ def spherical_harmonics_xyz(order, xyz):
     spherical harmonics
 
     :param order: int or list
-    :param xyz: tensor of shape [A, 3]
-    :return: tensor of shape [m, A]
+    :param xyz: tensor of shape [..., 3]
+    :return: tensor of shape [m, ...]
     """
     if not isinstance(order, list):
         order = [order]
 
     with torch_default_dtype(torch.float64):
-        alpha, beta = x_to_alpha_beta(xyz)  # two tensors of shape [A]
-        out = spherical_harmonics(order, alpha, beta)  # [m, A]
+        alpha, beta = x_to_alpha_beta(xyz)  # two tensors of shape [...]
+        out = spherical_harmonics(order, alpha, beta)  # [m, ...]
 
         # fix values when xyz = 0
         if (xyz.view(-1, 3).norm(2, -1) == 0).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
