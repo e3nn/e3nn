@@ -1,15 +1,16 @@
 # pylint: disable=C,E1101,E1102
 import torch
+from functools import partial
 
 
-def convolve(kernel, features, geometry, neighbors=None, rel_mask=None):
+def _apply(equation, equation_neighbors, kernel, features, geometry, neighbors=None, rel_mask=None):
     """
     :param kernel: kernel model
     :param features: tensor ([batch,] channel, point)
     :param geometry: tensor ([batch,] point, xyz)
     :param neighbors: index tensor ([batch,] point, neighbor)
     :param rel_mask: tensor ([batch,] point_out, point_in)
-    :return: tensor ([batch,] channel, point)
+    :return: tensor ([batch,] ...)
     """
 
     has_batch = features.dim() == 3
@@ -32,14 +33,18 @@ def convolve(kernel, features, geometry, neighbors=None, rel_mask=None):
         kernel = torch.einsum('nba,dcnba->dcnba', (rel_mask, kernel))
 
     if neighbors is None:
-        output = torch.einsum('nca,dcnba->ndb', (features, kernel))  # [batch, channel, point]
+        output = torch.einsum(equation, (features, kernel))  # [batch, ...]
     else:
-        output = torch.einsum('ncba,dcnba->ndb', (features, kernel))  # [batch, channel, point]
+        output = torch.einsum(equation_neighbors, (features, kernel))  # [batch, ...]
 
     if not has_batch:
         output = output.squeeze(0)
 
     return output
+
+
+convolve = partial(_apply, 'ncb,dcnab->nda', 'ncab,dcnab->nda')
+apply_kernel = partial(_apply, 'ncb,dcnab->ndab', 'ncab,dcnab->ndab')
 
 
 def difference_matrix(geometry):
