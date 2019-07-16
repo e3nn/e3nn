@@ -455,6 +455,45 @@ def tensor3x3_repr_basis_to_spherical_basis():
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
+def reduce_tensor_product(Rs_i, Rs_j):
+    """
+    Reduce the tensor preduct of Rs_i and Rs_j
+    """
+    with torch_default_dtype(torch.float64):
+        n_i = sum(mul * (2 * l + 1) for mul, l in Rs_i)
+        n_j = sum(mul * (2 * l + 1) for mul, l in Rs_j)
+        out = torch.zeros(n_i, n_j, n_i * n_j, dtype=torch.float64)
+
+        Rs_reduced = []
+        beg = 0
+
+        beg_i = 0
+        for mul_i, l_i in Rs_i:
+            n_i = mul_i * (2 * l_i + 1)
+
+            beg_j = 0
+            for mul_j, l_j in Rs_j:
+                n_j = mul_j * (2 * l_j + 1)
+
+                for l in range(abs(l_i - l_j), l_i + l_j + 1):
+                    Rs_reduced.append((mul_i * mul_j, l))
+                    n = mul_i * mul_j * (2 * l + 1)
+
+                    # put sqrt(2l+1) to get an orthonormal output
+                    Q = math.sqrt(2 * l + 1) * clebsch_gordan(l_i, l_j, l)  # [m_i, m_j, m]
+                    I = torch.eye(mul_i * mul_j).view(mul_i, mul_j, mul_i * mul_j)  # [mul_i, mul_j, mul_i * mul_j]
+
+                    Q = torch.einsum("ijk,mno->imjnko", (I, Q))
+
+                    view = out[beg_i: beg_i + n_i, beg_j: beg_j + n_j, beg: beg + n]
+                    view.add_(Q.view_as(view))
+
+                    beg += n
+                beg_j += n_j
+            beg_i += n_i
+        return Rs_reduced, out
+
+
 
 ################################################################################
 # Tests
@@ -524,6 +563,33 @@ def _test_change_basis_wigner_to_rot():
         assert d < 1e-10
 
 
+def _test_reduce_tensor_product(Rs_i, Rs_j):
+    Rs, Q = reduce_tensor_product(Rs_i, Rs_j)
+
+    abc = torch.rand(3, dtype=torch.float64)
+
+    D_i = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_i for _ in range(mul)])
+    D_j = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_j for _ in range(mul)])
+    D = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs for _ in range(mul)])
+
+    Q1 = torch.einsum("ijk,kl->ijl", (Q, D))
+    Q2 = torch.einsum("li,mj,ijk->lmk", (D_i, D_j, Q))
+
+    d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
+    print(d.item())
+    assert d < 1e-10
+
+    n = Q.size(2)
+    M = Q.view(n, n)
+    I = torch.eye(n, dtype=M.dtype)
+
+    d = ((M @ M.t()) - I).pow(2).mean().sqrt()
+    assert d < 1e-10
+
+    d = ((M.t() @ M) - I).pow(2).mean().sqrt()
+    assert d < 1e-10
+
+
 if __name__ == "__main__":
     from functools import partial
 
@@ -538,9 +604,13 @@ if __name__ == "__main__":
     _test_change_basis_wigner_to_rot()
 
     print("Spherical harmonics are solution of Y(rx) = D(r) Y(x)")
-    for l in range(7):
-        _test_spherical_harmonics(l)
+    for l__ in range(7):
+        _test_spherical_harmonics(l__)
 
     print("Irreducible repr are indeed representations")
-    for l in range(7):
-        _test_is_representation(partial(irr_repr, l))
+    for l__ in range(7):
+        _test_is_representation(partial(irr_repr, l__))
+
+    print("Reduce tensor product")
+    _test_reduce_tensor_product([(1, 0)], [(2, 0)])
+    _test_reduce_tensor_product([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])
