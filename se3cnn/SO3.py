@@ -457,7 +457,11 @@ def tensor3x3_repr_basis_to_spherical_basis():
 
 def reduce_tensor_product(Rs_i, Rs_j):
     """
-    Reduce the tensor preduct of Rs_i and Rs_j
+    Compute the orthonormal change of basis Q
+    from Rs_reduced to Rs_i tensor product with Rs_j
+    where Rs_reduced is a direct sum of irreducible representations
+
+    :return: Rs_reduced, Q
     """
     with torch_default_dtype(torch.float64):
         n_i = sum(mul * (2 * l + 1) for mul, l in Rs_i)
