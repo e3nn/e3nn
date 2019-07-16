@@ -17,8 +17,8 @@ def convolve(kernel, features, geometry, neighbors=None, rel_mask=None):
     if not has_batch:
         features = features.unsqueeze(0)
         geometry = geometry.unsqueeze(0)
-        neighbors = neighbors.unsqueeze(0)
-        rel_mask = rel_mask.unsqueeze(0)
+        neighbors = neighbors.unsqueeze(0) if neighbors is not None else None
+        rel_mask = rel_mask.unsqueeze(0) if rel_mask is not None else None
 
     if neighbors is None:
         diff_matrix = difference_matrix(geometry)  # [batch, point_out, point_in, 3]
