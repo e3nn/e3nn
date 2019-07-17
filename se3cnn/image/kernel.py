@@ -15,7 +15,7 @@ Therefore
 '''
 import torch
 from se3cnn.SO3 import irr_repr, spherical_harmonics_xyz, clebsch_gordan
-from se3cnn.utils import torch_default_dtype
+from se3cnn.util.default_dtype import torch_default_dtype
 from se3cnn.util.cache_file import cached_dirpklgz
 import math
 
@@ -353,19 +353,3 @@ def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
     )
 
     return torch.tensor([(basis[i] * y[i]).sum() for i in range(n)])
-
-
-################################################################################
-# Testing
-################################################################################
-
-def _test_basis_equivariance():
-    from functools import partial
-    with torch_default_dtype(torch.float64):
-        basis = cube_basis_kernels(4 * 5, 2, 2, partial(gaussian_window, radii=[5], J_max_list=[999], sigma=2))
-        overlaps = check_basis_equivariance(basis, 2, 2, *torch.rand(3))
-        assert overlaps.gt(0.98).all(), overlaps
-
-
-if __name__ == '__main__':
-    _test_basis_equivariance()

@@ -1,8 +1,12 @@
 # pylint: disable=C,E1101,E1102
-import unittest, torch
+import unittest
+
+import torch
 import torch.nn as nn
 
-from se3cnn import SE3BNConvolution, SE3BatchNorm, SE3Convolution
+from se3cnn.image.batchnorm import SE3BatchNorm, SE3BNConvolution
+from se3cnn.image.convolution import SE3Convolution
+
 
 class JointConvolution(nn.Module):
     ''' Compose SE3BN with SE3Conv to emulate SE3BNConv '''

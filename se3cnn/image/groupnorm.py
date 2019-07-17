@@ -77,8 +77,7 @@ def test_groupnorm():
     return y
 
 
-from se3cnn import SE3Convolution
-from se3cnn import kernel
+from se3cnn.image.convolution import SE3Convolution
 
 
 class SE3GNConvolution(torch.nn.Module):

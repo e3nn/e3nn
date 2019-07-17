@@ -131,8 +131,8 @@ class SE3BatchNorm(nn.Module):
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
 
-from se3cnn import SE3Kernel
-from se3cnn import kernel
+from se3cnn.image.kernel import SE3Kernel
+from se3cnn.image import kernel
 
 
 class SE3BNConvolution(torch.nn.Module):
@@ -157,7 +157,7 @@ class SE3BNConvolution(torch.nn.Module):
 
         self.register_buffer('running_mean', torch.zeros(num_scalar))
         self.register_buffer('running_var', torch.ones(num_features))
-        
+
         self.reduce = reduce
 
     def __repr__(self):
@@ -175,7 +175,7 @@ class SE3BNConvolution(torch.nn.Module):
     def forward(self, input):  # pylint: disable=W
         field_means = []
         field_norms = []
-        
+
         if self.training:
             new_means = []
             new_vars = []

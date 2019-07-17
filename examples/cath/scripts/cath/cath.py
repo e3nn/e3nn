@@ -1,4 +1,4 @@
-# pylint: disable=C,R,E1101,W0221,W0511,W0601
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long
 '''
 Architecture to predict the structural categories of proteins according to the CATH
 classification (www.cathdb.info).

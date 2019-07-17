@@ -1,4 +1,4 @@
-# pylint: disable=C,R,E1101,E1102
+# pylint: disable=no-member, not-callable, missing-docstring, line-too-long, invalid-name
 '''
 Minimalist example of usage of SE(3) CNN
 
@@ -8,15 +8,14 @@ An octahedron : |x| + |y| + |z| < radius
 
 The input data is generated on the fly, the radius is random and noise is added
 '''
-import torch
 import numpy as np
-
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 # The class GatedBlock inherit from the class torch.nn.Module.
 # It contains one convolution, some ReLU and multiplications
-from se3cnn.blocks import GatedBlock
+from se3cnn.image.gated_block import GatedBlock
 
 
 class AvgSpacial(nn.Module):

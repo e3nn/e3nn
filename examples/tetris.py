@@ -1,18 +1,16 @@
-# pylint: disable=C,R,E1101,E1102
+# pylint: disable=not-callable, no-member, arguments-differ, missing-docstring, invalid-name, line-too-long
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
-
-import numpy as np
 from scipy.ndimage import zoom
 
 from experiments.util import lr_schedulers
-
-from se3cnn.blocks import GatedBlock
-from se3cnn.SE3 import rotate_scalar
+from se3cnn.image.filter import low_pass_filter
+from se3cnn.image.gated_block import GatedBlock
+from se3cnn.image.utils import rotate_scalar
 from se3cnn.SO3 import rot
-from se3cnn.filter import low_pass_filter
 
 
 class AvgSpacial(nn.Module):
@@ -132,10 +130,10 @@ class SE3Net(torch.nn.Module):
             'smooth_stride': smooth_stride,
         }
         block_params = [
-            { 'stride': 1 },
-            { 'stride': 2 },
-            { 'stride': 2 },
-            { 'stride': 1 },
+            {'stride': 1},
+            {'stride': 2},
+            {'stride': 2},
+            {'stride': 1},
         ]
 
         blocks = [
@@ -170,10 +168,10 @@ class CNN(torch.nn.Module):
             'padding': 4,
         }
         block_params = [
-            { 'stride': 1 },
-            { 'stride': 2 },
-            { 'stride': 2 },
-            { 'stride': 1 },
+            {'stride': 1},
+            {'stride': 2},
+            {'stride': 2},
+            {'stride': 1},
         ]
 
         if smooth_stride:
