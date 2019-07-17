@@ -1,13 +1,13 @@
-# pylint: disable=C,R,E1101
-import numpy as np
+# pylint: disable=no-member, not-callable, missing-docstring, line-too-long, invalid-name
 import argparse
+
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import numpy as np
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=W
-from se3cnn.SO3 import irr_repr, spherical_harmonics
-from se3cnn.kernel import clebsch_gordan
+
+from se3cnn.SO3 import clebsch_gordan, compose, irr_repr, spherical_harmonics
 from se3cnn.util.cache_file import cached_dirpklgz
-from se3cnn.SO3 import compose
 
 
 def beta_alpha(n):

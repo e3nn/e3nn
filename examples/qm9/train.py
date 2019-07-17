@@ -1,18 +1,18 @@
-# pylint: disable=E1101,E1102,R,C,W1202
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
+# pylint: disable=no-member, not-callable, missing-docstring, line-too-long, invalid-name, logging-format-interpolation
+import copy
+import importlib.machinery
+import logging
 import os
 import shutil
 import time
-import logging
-import copy
 import types
-import importlib.machinery
-import numpy as np
 
-from se3cnn.util.dataset.molecules import QM9, center_positions, random_rotate_translate, VoxelizeBlobs
+import torch
+import torch.nn as nn
+
+from se3cnn.util.dataset.molecules import (QM9, VoxelizeBlobs,
+                                           center_positions,
+                                           random_rotate_translate)
 
 
 def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps):
@@ -45,7 +45,7 @@ def main(log_dir, model_path, dataset, batch_size, learning_rate, num_workers, r
     perceptron = nn.Linear(5, 1).to(device)
     with torch.no_grad():
         # perceptron for QM9
-        perceptron.weight.copy_(perceptron.weight.new_tensor([[-38.0770,  -0.6040, -75.2287, -54.7525, -99.8718]])) 
+        perceptron.weight.copy_(perceptron.weight.new_tensor([[-38.0770, -0.6040, -75.2287, -54.7525, -99.8718]]))
         perceptron.bias.copy_(perceptron.bias.new_tensor([0.0292]))
 
     if restore_dir is not None:
@@ -165,4 +165,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(**args.__dict__)
-

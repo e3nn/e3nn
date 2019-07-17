@@ -1,9 +1,9 @@
-# pylint: disable=E1101,R,C,W1202
+# pylint: disable=no-member, not-callable, missing-docstring, line-too-long, invalid-name
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from se3cnn.blocks import GatedBlock
+from se3cnn.image.gated_block import GatedBlock
 
 
 class AvgSpacial(torch.nn.Module):
@@ -34,7 +34,6 @@ class Model(torch.nn.Module):
             'padding': 3,
             'normalization': 'batch_max',
             'smooth_stride': True,
-            'smooth_stride': False,
         }
 
         block_params = [

@@ -3,11 +3,11 @@ from functools import partial
 
 import torch
 
-from se3cnn.blocks import GatedBlock
-from se3cnn.convolution import SE3PointConvolution
+from se3cnn.non_linearities import GatedBlock
+from se3cnn.point.convolution import SE3PointConvolution
 from se3cnn.non_linearities import rescaled_act
-from se3cnn.point_kernel import SE3PointKernel
-from se3cnn.point_radial import CosineBasisModel
+from se3cnn.point.kernel import SE3PointKernel
+from se3cnn.point.radial import CosineBasisModel
 from se3cnn.SO3 import rand_rot
 
 

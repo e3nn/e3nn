@@ -20,5 +20,4 @@ tf_logs
 checkpoints
 **/*.log
 **/*.ckpt
-modelnet10
 *.pkl
