@@ -1,4 +1,4 @@
-# pylint: disable=C,R,E1101
+# pylint: disable=no-member, arguments-differ, missing-docstring, invalid-name
 import torch
 
 
@@ -13,13 +13,16 @@ class SE3Dropout(torch.nn.Module):
             self.__class__.__name__,
             self.p)
 
-    def forward(self, x):  # pylint: disable=W
+    def forward(self, x):
+        """
+        :param x: tensor [batch, channel, ...]
+        """
         if not self.training:
             return x
 
         noises = []
         for mul, dim in self.Rs:
-            noise = x.new_empty(x.size(0), mul, 1, 1, 1)  # independent of spatial position
+            noise = x.new_empty(x.size(0), mul)  # independent of spatial position
 
             if self.p == 1:
                 noise.fill_(0)
@@ -28,7 +31,7 @@ class SE3Dropout(torch.nn.Module):
             else:
                 noise.bernoulli_(1 - self.p).div_(1 - self.p)
 
-            noise = noise.unsqueeze(2).expand(-1, -1, dim, -1, -1, -1).contiguous().view(x.size(0), mul * dim, 1, 1, 1)
+            noise = noise.unsqueeze(2).expand(-1, -1, dim).contiguous().view(x.size(0), mul * dim)
             noises.append(noise)
         noise = torch.cat(noises, dim=1)
-        return x * noise
+        return x * noise.view(*noise.size(), *(1,) * (x.dim() - 2))
