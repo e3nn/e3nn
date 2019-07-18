@@ -1,8 +1,18 @@
-# pylint: disable=C, R, arguments-differ, no-member
+# pylint: disable=arguments-differ, no-member, missing-docstring, invalid-name, line-too-long
 import math
 from functools import partial
 
 import torch
+
+
+class ConstantRadialModel(torch.nn.Module):
+    def __init__(self, d):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.randn(d))
+
+    def forward(self, _radii):
+        batch = _radii.size(0)
+        return self.weight.view(1, -1).expand(batch, -1)
 
 
 class FiniteElementModel(torch.nn.Module):
