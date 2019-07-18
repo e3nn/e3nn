@@ -78,7 +78,7 @@ def cached_dirpklgz(dirname, maxsize=128):
 
             mutexfile = os.path.join(dirname, "mutex")
 
-            key = (args, frozenset(kwargs), func.__defaults__)
+            key = (args, frozenset(kwargs.items()), func.__defaults__)
 
             with FileSystemMutex(mutexfile):
                 for file in glob.glob(os.path.join(dirname, "*.cache")):
