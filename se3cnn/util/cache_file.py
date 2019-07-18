@@ -1,12 +1,14 @@
 '''
 Cache in files
 '''
-from functools import wraps, lru_cache
-import pickle
+import fcntl
+import glob
 import gzip
 import os
+import pickle
 import sys
-import fcntl
+from functools import lru_cache, wraps
+from itertools import count
 
 
 class FileSystemMutex:
@@ -68,42 +70,43 @@ def cached_dirpklgz(dirname, maxsize=128):
                 os.makedirs(dirname)
             except FileExistsError:
                 pass
+            except PermissionError:
+                return func(*args, **kwargs)
 
-            indexfile = os.path.join(dirname, "index.pkl")
+            if not os.access(dirname, os.W_OK):
+                return func(*args, **kwargs)
+
             mutexfile = os.path.join(dirname, "mutex")
 
+            key = (args, frozenset(kwargs), func.__defaults__)
+
             with FileSystemMutex(mutexfile):
+                for file in glob.glob(os.path.join(dirname, "*.cache")):
+                    with gzip.open(file, "rb") as file:
+                        loadedkey = pickle.load(file)
+                        if key == loadedkey:
+                            return pickle.load(file)
+
+            print("compute... ", end="")
+            sys.stdout.flush()
+            result = func(*args, **kwargs)
+            print("save... ", end="")
+            sys.stdout.flush()
+
+            with FileSystemMutex(mutexfile):
+                for i in count():
+                    file = os.path.join(dirname, "{}.cache".format(i))
+                    if not os.path.isfile(file):
+                        break
+
                 try:
-                    with open(indexfile, "rb") as file:
-                        index = pickle.load(file)
-                except FileNotFoundError:
-                    index = {}
-
-                key = (args, frozenset(kwargs), func.__defaults__)
-
-                try:
-                    filename = index[key]
-                except KeyError:
-                    index[key] = filename = "{}.pkl.gz".format(len(index))
-                    with open(indexfile, "wb") as file:
-                        pickle.dump(index, file)
-
-            filepath = os.path.join(dirname, filename)
-
-            try:
-                with FileSystemMutex(mutexfile):
-                    with gzip.open(filepath, "rb") as file:
-                        result = pickle.load(file)
-            except FileNotFoundError:
-                print("compute {}... ".format(filename), end="")
-                sys.stdout.flush()
-                result = func(*args, **kwargs)
-                print("save {}... ".format(filename), end="")
-                sys.stdout.flush()
-                with FileSystemMutex(mutexfile):
-                    with gzip.open(filepath, "wb") as file:
+                    with gzip.open(file, "wb") as file:
+                        pickle.dump(key, file)
                         pickle.dump(result, file)
-                print("done")
+                    print("done")
+                except PermissionError:
+                    pass
+
             return result
 
         return wrapper
