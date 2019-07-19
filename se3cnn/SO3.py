@@ -71,6 +71,17 @@ def x_to_alpha_beta(x):
     return (alpha, beta)
 
 
+def rot_to_abc(R):
+    """
+    Convert rotation matrix into (alpha, beta, gamma)
+    """
+    x = R @ R.new_tensor([0, 0, 1])
+    a, b = x_to_alpha_beta(x)
+    R = rot(a, b, 0).t() @ R
+    c = torch.atan2(R[1, 0], R[0, 0])
+    return a, b, c
+
+
 def compose(a1, b1, c1, a2, b2, c2):
     """
     (a, b, c) = (a1, b1, c1) composed with (a2, b2, c2)
