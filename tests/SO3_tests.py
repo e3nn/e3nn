@@ -8,6 +8,15 @@ from se3cnn.SO3 import *
 
 class Tests(unittest.TestCase):
 
+    def test_rot_to_abc(self):
+        with torch_default_dtype(torch.float64):
+            R = rand_rot()
+            abc = rot_to_abc(R)
+            R2 = rot(*abc)
+            d = (R - R2).norm() / R.norm()
+            self.assertTrue(d < 1e-10, d)
+
+
     def _test_is_representation(self, rep):
         """
         rep(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = rep(Z(a1) Y(b1) Z(c1)) rep(Z(a2) Y(b2) Z(c2))

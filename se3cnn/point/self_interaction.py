@@ -19,8 +19,7 @@ class SortSphericalSignals(torch.nn.Module):
             ljds.append((l, j, d))
             j += d
 
-        n = sum(mul * (2 * l + 1) for mul, l in Rs)
-        mixing_matrix = torch.zeros(n, n)
+        mixing_matrix = torch.zeros(j, j)
 
         i = 0
         for _l, j, d in sorted(ljds):
