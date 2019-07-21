@@ -7,13 +7,14 @@ import se3cnn.SO3 as SO3
 
 
 class SE3PointKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=None, sh=None):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=None, sh=None, normalization='norm'):
         '''
         :param Rs_in: list of couple (multiplicity, representation order)
         :param Rs_out: list of couple (multiplicity, representation order)
         :param RadialModel: Class(d), trainable model: R -> R^d
         :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
+        :param normalization: either 'norm' or 'component'
         '''
         super().__init__()
 
@@ -29,6 +30,9 @@ class SE3PointKernel(torch.nn.Module):
         if sh is None:
             sh = SO3.spherical_harmonics_xyz
         self.sh = sh
+
+        assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+        self.normalization = normalization
 
         n_path = 0
         set_of_l_filters = set()
@@ -124,7 +128,10 @@ class SE3PointKernel(torch.nn.Module):
                 # put 2l_in+1 to keep the norm of the m vector constant
                 # put 2l_ou+1 to keep the variance of each m componant constant
                 # sum_m Y_m^2 = (2l+1)/(4pi)  and  norm(Q) = 1  implies that norm(QY) = sqrt(1/4pi)
-                K *= math.sqrt(2 * l_in + 1) * math.sqrt(4 * math.pi)
+                if self.normalization == 'norm':
+                    K *= math.sqrt(2 * l_in + 1) * math.sqrt(4 * math.pi)
+                if self.normalization == 'component':
+                    K *= math.sqrt(2 * l_out + 1) * math.sqrt(4 * math.pi)
 
                 # normalization assuming that each terms are of order 1 and uncorrelated
                 K /= num_summed_elements ** 0.5
