@@ -17,8 +17,8 @@ class GatedBlock(torch.nn.Module):
 
         self.repr_out = repr_out
 
-        Rs_in = [(m, l) for l, m in enumerate(repr_in)]
-        Rs_out = [(m, l) for l, m in enumerate(repr_out)]
+        Rs_in = [(mul, l) for l, mul in enumerate(repr_in)]
+        Rs_out = [(mul, l) for l, mul in enumerate(repr_out)]
 
         if scalar_activation is not None and repr_out[0] > 0:
             self.scalar_act = ScalarActivation([(repr_out[0], scalar_activation)], bias=False)
