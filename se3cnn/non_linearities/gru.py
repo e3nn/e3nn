@@ -50,7 +50,7 @@ class GRU(torch.nn.Module):
             i += d
             j += mul
 
-            out = (1 - z_) * h_ + z * h_tilde_
+            out = (1 - z_) * h_ + z_ * h_tilde_
             outs.append(out.view(batch, -1, *size))
 
         return torch.cat(outs, dim=1)
