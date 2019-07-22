@@ -2,7 +2,7 @@
 import torch
 
 from se3cnn.non_linearities import GatedBlock, ScalarActivation
-from se3cnn.non_linearities.rescaled_act import sigmoid, tanh
+from se3cnn.non_linearities.rescaled_act import tanh
 
 
 class GRU(torch.nn.Module):
@@ -22,7 +22,7 @@ class GRU(torch.nn.Module):
         self.repr = repr
 
         self.z_conv = Convolution([(mul, l) for l, mul in enumerate(repr)], [(sum(repr), 0)])
-        self.z_act = ScalarActivation([(sum(repr), sigmoid)], bias=False)
+        self.z_act = ScalarActivation([(sum(repr), torch.sigmoid)], bias=False)
 
         self.h_tilde = GatedBlock(repr, repr, tanh, tanh, Convolution)
 
