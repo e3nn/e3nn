@@ -75,11 +75,11 @@ plt.gca().view_init(azim=0, elev=45)
   - `se3cnn/non_linearities` non linearities working for both point and voxel code
 - `examples` simple scripts and experiments
 
-## Dependencies
+## Installation
 
-- [pytorch](https://pytorch.org) (v >= 1)
-- [lie_learn](https://github.com/AMLab-Amsterdam/lie_learn) is required to compute the irreducible representations of SO(3)
-- scipy
+1. install [pytorch](https://pytorch.org)
+2. `pip install git+https://github.com/AMLab-Amsterdam/lie_learn`
+3. `pip install git+https://github.com/mariogeiger/se3cnn`
 
 ## Usage
 
