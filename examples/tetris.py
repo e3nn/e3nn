@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.utils.data
 from scipy.ndimage import zoom
 
-from experiments.util import lr_schedulers
+from cath.util import lr_schedulers
 from se3cnn.image.filter import low_pass_filter
 from se3cnn.image.gated_block import GatedBlock
 from se3cnn.image.utils import rotate_scalar
