@@ -7,7 +7,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'scipy',
-        'pytorch',
+        'torch',
         'lie_learn',
     ],
     dependency_links=['https://github.com/AMLab-Amsterdam/lie_learn'],
