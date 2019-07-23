@@ -87,3 +87,23 @@ Install with
 ```
 python setup.py install
 ```
+
+## Citing
+[![DOI](https://zenodo.org/badge/116704656.svg)](https://zenodo.org/badge/latestdoi/116704656)
+
+```
+@misc{mario_geiger_2019_3348277,
+  author       = {Mario Geiger and
+                  Tess Smidt and
+                  Wouter Boomsma and
+                  Maurice Weiler and
+                  Michał Tyszkiewicz and
+                  Jes Frellsen and
+                  Ben},
+  title        = {mariogeiger/se3cnn: Point cloud support},
+  month        = jul,
+  year         = 2019,
+  doi          = {10.5281/zenodo.3348277},
+  url          = {https://doi.org/10.5281/zenodo.3348277}
+}
+```
