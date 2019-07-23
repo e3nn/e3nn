@@ -8,8 +8,9 @@ setup(
     install_requires=[
         'scipy',
         'pytorch',
-        'git+https://github.com/AMLab-Amsterdam/lie_learn',
+        'lie_learn',
     ],
+    dependency_links=['https://github.com/AMLab-Amsterdam/lie_learn'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
