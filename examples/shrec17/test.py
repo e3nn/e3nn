@@ -1,16 +1,17 @@
-# pylint: disable=E1101,R,C
+# pylint: disable=no-member, missing-docstring, invalid-name, line-too-long
+import importlib.machinery
 import os
-import numpy as np
 import shutil
-import requests
+import types
 import zipfile
 from subprocess import check_output
-import torch
-import types
-import importlib.machinery
 
-from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel
-from se3cnn.filter import low_pass_filter
+import numpy as np
+import requests
+import torch
+
+from se3cnn.image.filter import low_pass_filter
+from se3cnn.util.dataset.shapes import CacheNPY, Obj2Voxel, Shrec17
 
 
 class KeepName:
@@ -48,7 +49,7 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers, filename):
     model = mod.Model(55).to(device)
 
     state = torch.load(os.path.join(log_dir, filename))
-    state = { key.replace('conv.kernel_', 'kernel.kernel_').replace('conv.weight', 'kernel.weight') : value for key, value in state.items() }
+    state = {key.replace('conv.kernel_', 'kernel.kernel_').replace('conv.weight', 'kernel.weight') : value for key, value in state.items()}
     model.load_state_dict(state)
 
     resdir = os.path.join(log_dir, dataset + "_perturbed")
@@ -87,12 +88,12 @@ def main(log_dir, augmentation, dataset, batch_size, num_workers, filename):
     predictions_class = np.argmax(predictions, axis=1)
 
     print("write files...")
-    for i in range(len(ids)):
+    for i, id_i in enumerate(ids):
         if i % 100 == 0:
             print("{}/{}    ".format(i, len(ids)), end="\r")
-        idfile = os.path.join(resdir, ids[i])
+        idfile = os.path.join(resdir, id_i)
 
-        retrieved = [(predictions[j, predictions_class[j]], ids[j]) for j in range(len(ids)) if predictions_class[j] == predictions_class[i]]
+        retrieved = [(predictions[j, predictions_class[j]], id_j) for j, id_j in enumerate(ids) if predictions_class[j] == predictions_class[i]]
         retrieved = sorted(retrieved, reverse=True)
         retrieved = [i for _, i in retrieved]
 

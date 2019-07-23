@@ -1,9 +1,9 @@
-# pylint: disable=E1101,R,C,W1202
-import torch
-
+# pylint: disable=no-member, missing-docstring, invalid-name
+import importlib.machinery
 import time
 import types
-import importlib.machinery
+
+import torch
 
 
 def main(model_path, batch_size):

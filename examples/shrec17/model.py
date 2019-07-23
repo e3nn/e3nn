@@ -1,9 +1,9 @@
-# pylint: disable=E1101,R,C,W1202
+# pylint: disable=no-member, missing-docstring
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from se3cnn.blocks import GatedBlock
+from se3cnn.image.gated_block import GatedBlock
 
 
 class AvgSpacial(torch.nn.Module):
