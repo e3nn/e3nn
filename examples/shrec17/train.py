@@ -1,19 +1,19 @@
-# pylint: disable=E1101,R,C,W1202
-import torch
-import torch.nn.functional as F
-
+# pylint: disable=no-member, missing-docstring, invalid-name, line-too-long, logging-format-interpolation
+import copy
+import importlib.machinery
+import logging
 import os
 import shutil
 import time
-import logging
-import copy
 import types
-import importlib.machinery
-import numpy as np
-
-from se3cnn.util.dataset.shapes import Shrec17, CacheNPY, Obj2Voxel, EqSampler
-from se3cnn.filter import low_pass_filter
 from test import main as evaluate
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+from se3cnn.image.filter import low_pass_filter
+from se3cnn.util.dataset.shapes import CacheNPY, EqSampler, Obj2Voxel, Shrec17
 
 
 def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps):
