@@ -37,8 +37,8 @@ class Kernel(torch.nn.Module):
         n_path = 0
         set_of_l_filters = set()
 
-        for i, (mul_out, l_out) in enumerate(self.Rs_out):
-            for j, (mul_in, l_in) in enumerate(self.Rs_in):
+        for mul_out, l_out in self.Rs_out:
+            for mul_in, l_in in self.Rs_in:
                 l_filters = self.get_l_filters(l_in, l_out)
                 assert l_filters == sorted(set(l_filters)), "get_l_filters must return a sorted list of unique values"
 
@@ -48,10 +48,10 @@ class Kernel(torch.nn.Module):
                 # create the set of all spherical harmonics orders needed
                 set_of_l_filters = set_of_l_filters.union(l_filters)
 
-                # precompute the change of basis Q
-                Q = [SO3.clebsch_gordan(l_out, l_in, l) for l in l_filters]
-                Q = torch.cat(Q, dim=2)  # [m_out, m_in, l_filter * m_filter]
-                self.register_buffer("Q_{}_{}".format(i, j), Q.type(torch.get_default_dtype()))
+                for l in l_filters:
+                    # precompute the change of basis Q
+                    Q = SO3.clebsch_gordan(l_out, l_in, l).type(torch.get_default_dtype())
+                    self.register_buffer("Q_{}_{}_{}".format(l_out, l_in, l), Q)
 
         # create the radial model: R+ -> R^n_path
         # it contains the learned parameters
@@ -86,7 +86,7 @@ class Kernel(torch.nn.Module):
         begin_c = 0
 
         begin_out = 0
-        for i, (mul_out, l_out) in enumerate(self.Rs_out):
+        for mul_out, l_out in self.Rs_out:
             s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
 
             # consider that we sum a bunch of [lambda_(m_out)] vectors
@@ -97,7 +97,7 @@ class Kernel(torch.nn.Module):
                 num_summed_elements += mul_in * len(l_filters)
 
             begin_in = 0
-            for j, (mul_in, l_in) in enumerate(self.Rs_in):
+            for mul_in, l_in in self.Rs_in:
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
 
                 l_filters = self.get_l_filters(l_in, l_out)
@@ -107,16 +107,13 @@ class Kernel(torch.nn.Module):
                 c = coefficients[:, begin_c: begin_c + n].contiguous().view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
                 begin_c += n
 
-                Qs = getattr(self, "Q_{}_{}".format(i, j))  # [m_out, m_in, l_filter * m_filter]
-
                 # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
                 K = 0
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
                     Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
 
-                    tmp = sum(2 * l + 1 for l in l_filters if l < l_filter)
-                    Q = Qs[:, :, tmp: tmp + 2 * l_filter + 1]  # [m_out, m_in, m]
+                    Q = getattr(self, "Q_{}_{}_{}".format(l_out, l_in, l_filter))  # [m_out, m_in, m]
 
                     # note: The multiplication with `c` could also be done outside of the for loop
                     K += torch.einsum("ijk,kz,zuv->zuivj", (Q, Y, c[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
