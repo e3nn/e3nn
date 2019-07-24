@@ -3,7 +3,7 @@ from functools import reduce
 
 import torch
 
-from se3cnn.point.kernel import SE3PointKernel
+from se3cnn.point.kernel import Kernel
 from se3cnn.point.radial import ConstantRadialModel
 from se3cnn.point.utils import convolve
 
@@ -50,7 +50,7 @@ class ConcatenateSphericalSignals(torch.nn.Module):
 class SelfInteraction(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out):
         super().__init__()
-        self.kernel = SE3PointKernel(Rs_in, Rs_out, ConstantRadialModel)
+        self.kernel = Kernel(Rs_in, Rs_out, ConstantRadialModel)
 
     def forward(self, features):
         if features.dim() == 2:

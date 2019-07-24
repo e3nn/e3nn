@@ -6,7 +6,7 @@ This library aims to create [SE(3) equivariant](https://youtu.be/ENLJACPHSEA) co
 
 ## Image and Point
 The code is separated in two parts:
-- `image` for volumetric data [[1]](https://arxiv.org/abs/1807.02547) 
+- `image` for volumetric data [[1]](https://arxiv.org/abs/1807.02547)
 - `point` for point cloud data [[2]](https://arxiv.org/abs/1802.08219)
 
 ## Example
@@ -33,8 +33,8 @@ vector_field = conv(scalar_field)  # [batch, vector component, x, y, z]
 from functools import partial
 import torch
 from se3cnn.point.radial import CosineBasisModel
-from se3cnn.point.kernel import SE3PointKernel
-from se3cnn.point.convolution import SE3PointConvolution
+from se3cnn.point.kernel import Kernel
+from se3cnn.point.operations import Convolution
 from se3cnn.util.plot import plot_sh_signal
 import matplotlib.pyplot as plt
 
@@ -42,17 +42,17 @@ import matplotlib.pyplot as plt
 # Projection on cos^2 basis functions followed by a fully connected network
 RadialModel = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=1, act=torch.relu)
 
-# kernel: composed on a radial part that contains the learned parameters 
+# kernel: composed on a radial part that contains the learned parameters
 #  and an angular part given by the spherical hamonics and the Clebsch-Gordan coefficients
-Kernel = partial(SE3PointKernel, RadialModel=RadialModel)
+K = partial(Kernel, RadialModel=RadialModel)
 
 # Use the kernel to define a convolution operation
-Convolution = partial(SE3PointConvolution, Kernel)
+C = partial(Convolution, K)
 
 
 Rs_in = [(1, 0)]  # one scalar
 Rs_out = [(1, l) for l in range(10)]
-conv = Convolution(Rs_in, Rs_out)
+conv = C(Rs_in, Rs_out)
 
 n = 3  # number of points
 features = torch.ones(1, n)

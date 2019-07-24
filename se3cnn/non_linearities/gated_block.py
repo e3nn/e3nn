@@ -38,7 +38,7 @@ class GatedBlock(torch.nn.Module):
 
     def forward(self, *args, **kwargs):
         """
-        :return: tensor (batch, channel, ...)
+        :return: tensor [batch, channel, ...]
         """
         y = self.conv(*args, **kwargs)  # [batch, channel, ...]
 
