@@ -6,11 +6,11 @@ from functools import partial
 def _apply(equation, equation_neighbors, kernel, features, geometry, neighbors=None, rel_mask=None):
     """
     :param kernel: kernel model
-    :param features: tensor ([batch,] channel, point)
-    :param geometry: tensor ([batch,] point, xyz)
-    :param neighbors: index tensor ([batch,] point, neighbor)
-    :param rel_mask: tensor ([batch,] point_out, point_in)
-    :return: tensor ([batch,] ...)
+    :param features: tensor [[batch,] channel, point]
+    :param geometry: tensor [[batch,] point, xyz]
+    :param neighbors: index tensor [[batch,] point, neighbor]
+    :param rel_mask: tensor [[batch,] point_out, point_in]
+    :return: tensor [[batch,] ...]
     """
 
     has_batch = features.dim() == 3
@@ -27,10 +27,11 @@ def _apply(equation, equation_neighbors, kernel, features, geometry, neighbors=N
         diff_matrix = neighbor_difference_matrix(neighbors, geometry)  # [batch, point_out, point_in, 3]
         features = neighbor_feature_matrix(neighbors, features)  # [batch, channel, point_out, point_in]
 
-    kernel = kernel(diff_matrix)  # [channel_out, channel_in, batch, point_out, point_in]
+    kernel = kernel(diff_matrix.view(-1, 3))  # [batch * point_out * point_in, channel_out, channel_in]
+    kernel = kernel.view(*diff_matrix.size()[:-1], *kernel.size()[1:])  # [batch, point_out, point_in, channel_out, channel_in]
 
     if rel_mask is not None:
-        kernel = torch.einsum('nba,dcnba->dcnba', (rel_mask, kernel))
+        kernel = torch.einsum('zab,zabij->zabij', (rel_mask, kernel))
 
     if neighbors is None:
         output = torch.einsum(equation, (features, kernel))  # [batch, ...]
@@ -43,15 +44,15 @@ def _apply(equation, equation_neighbors, kernel, features, geometry, neighbors=N
     return output
 
 
-convolve = partial(_apply, 'ncb,dcnab->nda', 'ncab,dcnab->nda')
-apply_kernel = partial(_apply, 'ncb,dcnab->ndab', 'ncab,dcnab->ndab')
+convolve = partial(_apply, 'zjb,zabij->zia', 'zjab,zabij->zia')
+apply_kernel = partial(_apply, 'zjb,zabij->ziab', 'zjab,zabij->ziab')
 
 
 def difference_matrix(geometry):
-    ri = geometry.unsqueeze(-3)  # [1, N, 3]
-    rj = geometry.unsqueeze(-2)  # [N, 1, 3]
-    rij = ri - rj  # [N, N, 3]
-    return rij
+    rb = geometry.unsqueeze(-3)  # [1, N, 3]
+    ra = geometry.unsqueeze(-2)  # [N, 1, 3]
+    rab = rb - ra  # [N, N, 3]
+    return rab
 
 
 def relative_mask(mask):
@@ -65,14 +66,14 @@ def neighbor_difference_matrix(neighbors, geometry):
     """
     if neighbors.dim() == 2:
         N, _K = neighbors.size()
-        ri = geometry[neighbors, :]  # [N, K, 3]
-        rj = geometry.unsqueeze(-2)  # [N, 1, 3]
+        rb = geometry[neighbors, :]  # [N, K, 3]
+        ra = geometry.unsqueeze(-2)  # [N, 1, 3]
     elif neighbors.dim() == 3:
         B, N, _K = neighbors.size()
-        ri = geometry[torch.arange(B).view(-1, 1, 1), neighbors, :]  # [B, N, K, 3]
-        rj = geometry[torch.arange(B).view(-1, 1), torch.arange(N).view(1, -1), :].unsqueeze(-2)  # [B, N, 1, 3]
-    rij = ri - rj  # [N, K, 3] or [B, N, K, 3]
-    return rij
+        rb = geometry[torch.arange(B).view(-1, 1, 1), neighbors, :]  # [B, N, K, 3]
+        ra = geometry[torch.arange(B).view(-1, 1), torch.arange(N).view(1, -1), :].unsqueeze(-2)  # [B, N, 1, 3]
+    rab = rb - ra  # [N, K, 3] or [B, N, K, 3]
+    return rab
 
 
 def neighbor_feature_matrix(neighbors, features):

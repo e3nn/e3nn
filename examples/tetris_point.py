@@ -4,9 +4,9 @@ from functools import partial
 import torch
 
 from se3cnn.non_linearities import GatedBlock
-from se3cnn.point.convolution import SE3PointConvolution
+from se3cnn.point.operations import Convolution
 from se3cnn.non_linearities import rescaled_act
-from se3cnn.point.kernel import SE3PointKernel
+from se3cnn.point.kernel import Kernel
 from se3cnn.point.radial import CosineBasisModel
 from se3cnn.SO3 import rand_rot
 
@@ -45,11 +45,11 @@ class SE3Net(torch.nn.Module):
 
         RadialModel = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=sp)
 
-        Kernel = partial(SE3PointKernel, RadialModel=RadialModel)
-        Convolution = partial(SE3PointConvolution, Kernel)
+        K = partial(Kernel, RadialModel=RadialModel)
+        C = partial(Convolution, K)
 
         self.layers = torch.nn.ModuleList([
-            GatedBlock(features[i], features[i+1], sp, rescaled_act.sigmoid, Convolution)
+            GatedBlock(features[i], features[i+1], sp, rescaled_act.sigmoid, C)
             for i in range(len(features) - 1)
         ])
         self.layers += [AvgSpacial(), torch.nn.Linear(64, num_classes)]
