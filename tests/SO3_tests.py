@@ -8,6 +8,37 @@ from se3cnn.SO3 import *
 
 class Tests(unittest.TestCase):
 
+    def test_sh_norm(self):
+        with torch_default_dtype(torch.float64):
+            l_filter = list(range(15))
+            Ys = [spherical_harmonics_xyz(l, torch.randn(10, 3)) for l in l_filter]
+            s = torch.stack([Y.pow(2).mean(0).mean() for Y in Ys])
+            d = s - 1 / (4 * math.pi)
+            assert d.pow(2).mean().sqrt() < 1e-10
+
+
+    def test_clebsch_gordan_orthogonal(self):
+        with torch_default_dtype(torch.float64):
+            for l_out in range(6):
+                for l_in in range(6):
+                    for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
+                        Q = clebsch_gordan(l_f, l_in, l_out).view(2 * l_f + 1, -1)
+                        e = (2 * l_f + 1) * Q @ Q.t()
+                        d = e - torch.eye(2 * l_f + 1)
+                        assert d.pow(2).mean().sqrt() < 1e-10
+
+
+    def test_clebsch_gordan_sh_norm(self):
+        with torch_default_dtype(torch.float64):
+            for l_out in range(6):
+                for l_in in range(6):
+                    for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
+                        Q = clebsch_gordan(l_out, l_in, l_f)
+                        Y = spherical_harmonics_xyz(l_f, torch.randn(1, 3)).view(2 * l_f + 1)
+                        QY = math.sqrt(4 * math.pi) * Q @ Y
+                        assert abs(QY.norm() - 1) < 1e-10
+
+
     def test_rot_to_abc(self):
         with torch_default_dtype(torch.float64):
             R = rand_rot()
