@@ -126,17 +126,18 @@ class Tests(unittest.TestCase):
 
         d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
         print(d.item())
-        self.assertTrue(d < 1e-10)
+        self.assertLess(d, 1e-10)
 
         n = Q.size(2)
         M = Q.view(n, n)
         I = torch.eye(n, dtype=M.dtype)
 
         d = ((M @ M.t()) - I).pow(2).mean().sqrt()
-        self.assertTrue(d < 1e-10)
+        self.assertLess(d, 1e-10)
 
         d = ((M.t() @ M) - I).pow(2).mean().sqrt()
-        self.assertTrue(d < 1e-10)
+        self.assertLess(d, 1e-10)
+
 
     def test(self):
         from functools import partial
