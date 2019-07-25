@@ -27,8 +27,7 @@ def _apply(equation, equation_neighbors, kernel, features, geometry, neighbors=N
         diff_matrix = neighbor_difference_matrix(neighbors, geometry)  # [batch, point_out, point_in, 3]
         features = neighbor_feature_matrix(neighbors, features)  # [batch, channel, point_out, point_in]
 
-    kernel = kernel(diff_matrix.view(-1, 3))  # [batch * point_out * point_in, channel_out, channel_in]
-    kernel = kernel.view(*diff_matrix.size()[:-1], *kernel.size()[1:])  # [batch, point_out, point_in, channel_out, channel_in]
+    kernel = kernel(diff_matrix)  # [batch, point_out, point_in, channel_out, channel_in]
 
     if rel_mask is not None:
         kernel = torch.einsum('zab,zabij->zabij', (rel_mask, kernel))
