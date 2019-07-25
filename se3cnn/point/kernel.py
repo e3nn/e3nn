@@ -68,11 +68,13 @@ class Kernel(torch.nn.Module):
 
     def forward(self, r):
         """
-        :param r: tensor [batch, 3]
-        :return: tensor [batch, l_out * mul_out * m_out, l_in * mul_in * m_in]
+        :param r: tensor [..., 3]
+        :return: tensor [..., l_out * mul_out * m_out, l_in * mul_in * m_in]
         """
-        batch, xyz = r.size()
+        *size, xyz = r.size()
         assert xyz == 3
+        r = r.flatten(1)
+        batch = r.size(0)
 
         kernel = r.new_zeros(batch, self.n_out, self.n_in)
 
@@ -138,4 +140,4 @@ class Kernel(torch.nn.Module):
                 begin_in += mul_in * (2 * l_in + 1)
             begin_out += mul_out * (2 * l_out + 1)
 
-        return kernel
+        return kernel.view(*size, self.n_out, self.n_in)
