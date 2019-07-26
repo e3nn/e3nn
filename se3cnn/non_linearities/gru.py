@@ -12,19 +12,19 @@ class GRU(torch.nn.Module):
     - there is no input x
     - there is no gate r (remember gate)
     """
-    def __init__(self, repr, Convolution):
+    def __init__(self, repr, Operation):
         """
         :param repr: multiplicities
-        :param Convolution: class of signature (Rs_in, Rs_out)
+        :param Operation: class of signature (Rs_in, Rs_out)
         """
         super().__init__()
 
         self.repr = repr
 
-        self.z_conv = Convolution([(mul, l) for l, mul in enumerate(repr)], [(sum(repr), 0)])
+        self.z_conv = Operation([(mul, l) for l, mul in enumerate(repr)], [(sum(repr), 0)])
         self.z_act = ScalarActivation([(sum(repr), torch.sigmoid)], bias=False)
 
-        self.h_tilde = GatedBlock(repr, repr, tanh, tanh, Convolution)
+        self.h_tilde = GatedBlock(repr, repr, tanh, tanh, Operation)
 
 
     def forward(self, h, *args, **kwargs):

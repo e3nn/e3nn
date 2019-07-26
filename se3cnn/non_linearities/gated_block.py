@@ -5,13 +5,13 @@ from se3cnn.non_linearities import ScalarActivation
 
 
 class GatedBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, scalar_activation, gate_activation, Convolution):
+    def __init__(self, repr_in, repr_out, scalar_activation, gate_activation, Operation):
         """
         :param repr_in: input multiplicities
         :param repr_out: output multiplicities
         :param scalar_activation: nonlinear function applied on l=0 channels
         :param gate_activation: nonlinear function applied on the gates
-        :param Convolution: class of signature (Rs_in, Rs_out)
+        :param Operation: class of signature (Rs_in, Rs_out)
         """
         super().__init__()
 
@@ -33,14 +33,14 @@ class GatedBlock(torch.nn.Module):
             Rs_out_with_gate = Rs_out
             self.gate_act = None
 
-        self.conv = Convolution(Rs_in, Rs_out_with_gate)
+        self.op = Operation(Rs_in, Rs_out_with_gate)
 
 
     def forward(self, *args, **kwargs):
         """
         :return: tensor [batch, channel, ...]
         """
-        y = self.conv(*args, **kwargs)  # [batch, channel, ...]
+        y = self.op(*args, **kwargs)  # [batch, channel, ...]
 
         if self.scalar_act is None and self.gate_act is None:
             return y
