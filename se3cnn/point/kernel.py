@@ -73,7 +73,7 @@ class Kernel(torch.nn.Module):
         """
         *size, xyz = r.size()
         assert xyz == 3
-        r = r.flatten(1)
+        r = r.view(-1, 3)
         batch = r.size(0)
 
         kernel = r.new_zeros(batch, self.n_out, self.n_in)
