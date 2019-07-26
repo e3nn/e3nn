@@ -131,7 +131,6 @@ class Kernel(torch.nn.Module):
                 # normalization assuming that each terms are of order 1 and uncorrelated
                 x /= num_summed_elements ** 0.5
 
-                # TODO create tests for these normalizations
                 K.mul_(x)
 
                 if K is not 0:
