@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import
 from se3cnn.SO3 import spherical_harmonics
 
 
-def spherical_surface(n, fun):
+def spherical_surface(n):
     beta = torch.linspace(1e-16, math.pi - 1e-16, 2 * n)
     alpha = torch.linspace(0, 2 * math.pi, 2 * n)
     beta_, alpha_ = torch.meshgrid(beta, alpha)
@@ -19,8 +19,7 @@ def spherical_surface(n, fun):
     beta = 0.5 * (beta[1:] + beta[:-1])
     alpha = 0.5 * (alpha[1:] + alpha[:-1])
     beta, alpha = torch.meshgrid(beta, alpha)
-    f = fun(alpha, beta)
-    return x, y, z, f
+    return x, y, z, alpha, beta
 
 
 def spherical_harmonic_signal(coeff, alpha, beta):
@@ -42,8 +41,17 @@ def plot_sh_signal(coeff, n=20):
     from functools import partial
 
     fun = partial(spherical_harmonic_signal, coeff)
-    x, y, z, f = spherical_surface(n, fun)
+    plot_sphere(fun, n)
 
+
+def plot_sphere(fun, n=20):
+    """
+    :param fun: function of (alpha, beta)
+    :param n: precision
+    """
+    x, y, z, a, b = spherical_surface(n)
+
+    f = fun(a, b)
     f = 0.5 + 0.5 * f.div(f.abs().max())  # get a signal in the interval [0, 1]
     fc = plt.get_cmap("bwr")(f.detach().cpu().numpy())
 
@@ -55,3 +63,5 @@ def plot_sh_signal(coeff, n=20):
     ax.set_xlim3d(-a, a)
     ax.set_ylim3d(-a, a)
     ax.set_zlim3d(-a, a)
+
+    ax.view_init(90, 0)
