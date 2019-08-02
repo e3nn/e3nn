@@ -65,3 +65,37 @@ def plot_sphere(fun, n=20):
     ax.set_zlim3d(-a, a)
 
     ax.view_init(90, 0)
+
+
+def plotly_sphere(fun, n=240, radius=False):
+    import plotly.graph_objs as go
+    import numpy as np
+
+    a = torch.linspace(0, 2 * np.pi, n, dtype=torch.float64)
+    b = torch.linspace(0, np.pi, n, dtype=torch.float64)
+    a, b = torch.meshgrid(a, b)
+
+    f = fun(a, b)
+    r = f.abs() if radius else 1
+    x = r * a.cos() * b.sin()
+    y = r * a.sin() * b.sin()
+    z = r * b.cos()
+
+    surface = go.Surface(x=x.numpy(), y=y.numpy(), z=z.numpy(), surfacecolor=f.numpy())
+    data = [surface]
+
+    axis = dict(
+        showbackground=False,
+        showticklabels=False,
+        title='',
+    )
+    layout = dict(
+        scene=dict(
+            xaxis=axis,
+            yaxis=axis,
+            zaxis=axis,
+        ),
+    )
+
+    fig = go.Figure(data=data, layout=layout)
+    fig.show()
