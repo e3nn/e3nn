@@ -68,11 +68,15 @@ def plot_sphere(fun, n=20):
 
 
 def plotly_sphere(fun, n=240, radius=False):
+    """
+    surface = plotly_sphere(partial(spherical_harmonic_signal, x))
+    fig = go.Figure(data=[surface])
+    fig.show()
+    """
     import plotly.graph_objs as go
-    import numpy as np
 
-    a = torch.linspace(0, 2 * np.pi, n, dtype=torch.float64)
-    b = torch.linspace(0, np.pi, n, dtype=torch.float64)
+    a = torch.linspace(0, 2 * math.pi, n, dtype=torch.float64)
+    b = torch.linspace(0, math.pi, n, dtype=torch.float64)
     a, b = torch.meshgrid(a, b)
 
     f = fun(a, b)
@@ -81,21 +85,4 @@ def plotly_sphere(fun, n=240, radius=False):
     y = r * a.sin() * b.sin()
     z = r * b.cos()
 
-    surface = go.Surface(x=x.numpy(), y=y.numpy(), z=z.numpy(), surfacecolor=f.numpy())
-    data = [surface]
-
-    axis = dict(
-        showbackground=False,
-        showticklabels=False,
-        title='',
-    )
-    layout = dict(
-        scene=dict(
-            xaxis=axis,
-            yaxis=axis,
-            zaxis=axis,
-        ),
-    )
-
-    fig = go.Figure(data=data, layout=layout)
-    fig.show()
+    return go.Surface(x=x.numpy(), y=y.numpy(), z=z.numpy(), surfacecolor=f.numpy())
