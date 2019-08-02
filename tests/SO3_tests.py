@@ -12,9 +12,28 @@ class Tests(unittest.TestCase):
         with torch_default_dtype(torch.float64):
             l_filter = list(range(15))
             Ys = [spherical_harmonics_xyz(l, torch.randn(10, 3)) for l in l_filter]
-            s = torch.stack([Y.pow(2).mean(0).mean() for Y in Ys])
+            s = torch.stack([Y.pow(2).mean(0) for Y in Ys])
             d = s - 1 / (4 * math.pi)
-            assert d.pow(2).mean().sqrt() < 1e-10
+            self.assertLess(d.pow(2).mean().sqrt(), 1e-10)
+
+
+    def test_sh_closure(self):
+        """
+        integral of Ylm * Yjn = delta_lj delta_mn
+        integral of 1 over the unit sphere = 4 pi
+        """
+        with torch_default_dtype(torch.float64):
+            for l1 in range(0, 3 + 1):
+                for l2 in range(l1, 3 + 1):
+                    x = torch.randn(200000, 3)
+                    Y1 = spherical_harmonics_xyz(l1, x)
+                    Y2 = spherical_harmonics_xyz(l2, x)
+                    x = (Y1.view(2 * l1 + 1, 1, -1) * Y2.view(1, 2 * l2 + 1, -1)).mean(-1) * (4 * math.pi)
+                    if l1 == l2:
+                        i = torch.eye(2 * l1 + 1)
+                        self.assertLess((x - i).pow(2).max(), 1e-4)
+                    else:
+                        self.assertLess(x.pow(2).max(), 1e-4)
 
 
     def test_clebsch_gordan_orthogonal(self):
@@ -25,7 +44,7 @@ class Tests(unittest.TestCase):
                         Q = clebsch_gordan(l_f, l_in, l_out).view(2 * l_f + 1, -1)
                         e = (2 * l_f + 1) * Q @ Q.t()
                         d = e - torch.eye(2 * l_f + 1)
-                        assert d.pow(2).mean().sqrt() < 1e-10
+                        self.assertLess(d.pow(2).mean().sqrt(), 1e-10)
 
 
     def test_clebsch_gordan_sh_norm(self):
@@ -36,7 +55,7 @@ class Tests(unittest.TestCase):
                         Q = clebsch_gordan(l_out, l_in, l_f)
                         Y = spherical_harmonics_xyz(l_f, torch.randn(1, 3)).view(2 * l_f + 1)
                         QY = math.sqrt(4 * math.pi) * Q @ Y
-                        assert abs(QY.norm() - 1) < 1e-10
+                        self.assertLess(abs(QY.norm() - 1), 1e-10)
 
 
     def test_rot_to_abc(self):
