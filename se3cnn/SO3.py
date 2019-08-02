@@ -38,8 +38,8 @@ def rot_y(beta):
     ])
 
 
-# The following two functions (rot and x_to_alpha_beta) satisfies that
-# rot(*x_to_alpha_beta([x, y, z]), 0) @ np.array([[0], [0], [1]])
+# The following two functions (rot and xyz_to_angles) satisfies that
+# rot(*xyz_to_angles([x, y, z]), 0) @ np.array([[0], [0], [1]])
 # is proportional to
 # [x, y, z]
 
@@ -59,7 +59,17 @@ def rand_rot():
     return rot(alpha, beta, gamma)
 
 
-def x_to_alpha_beta(x):
+def angles_to_xyz(alpha, beta):
+    """
+    Convert (alpha, beta) into point (x, y, z) on the sphere
+    """
+    x = torch.sin(beta) * torch.cos(alpha)
+    y = torch.sin(beta) * torch.sin(alpha)
+    z = torch.cos(beta)
+    return x, y, z
+
+
+def xyz_to_angles(x):
     """
     Convert point (x, y, z) on the sphere into (alpha, beta)
     """
@@ -68,7 +78,7 @@ def x_to_alpha_beta(x):
     x = x / torch.norm(x, 2, -1, keepdim=True)
     beta = torch.acos(x[..., 2])
     alpha = torch.atan2(x[..., 1], x[..., 0])
-    return (alpha, beta)
+    return alpha, beta
 
 
 def rot_to_abc(R):
@@ -76,7 +86,7 @@ def rot_to_abc(R):
     Convert rotation matrix into (alpha, beta, gamma)
     """
     x = R @ R.new_tensor([0, 0, 1])
-    a, b = x_to_alpha_beta(x)
+    a, b = xyz_to_angles(x)
     R = rot(a, b, 0).t() @ R
     c = torch.atan2(R[1, 0], R[0, 0])
     return a, b, c
@@ -88,7 +98,7 @@ def compose(a1, b1, c1, a2, b2, c2):
     """
     comp = rot(a1, b1, c1) @ rot(a2, b2, c2)
     xyz = comp @ torch.tensor([0, 0, 1.])
-    a, b = x_to_alpha_beta(xyz)
+    a, b = xyz_to_angles(xyz)
     rotz = rot(0, -b, -a) @ comp
     c = torch.atan2(rotz[1, 0], rotz[0, 0])
     return a, b, c
@@ -174,7 +184,7 @@ def spherical_harmonics_xyz(order, xyz):
         order = [order]
 
     with torch_default_dtype(torch.float64):
-        alpha, beta = x_to_alpha_beta(xyz)  # two tensors of shape [...]
+        alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
         out = spherical_harmonics(order, alpha, beta)  # [m, ...]
 
         # fix values when xyz = 0
