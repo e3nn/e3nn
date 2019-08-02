@@ -10,7 +10,7 @@ import torch
 from se3cnn.SO3 import irr_repr, xyz_vector_basis_to_spherical_basis
 import torch.nn.functional as F
 
-from se3cnn.blocks import GatedBlock
+from se3cnn.image.gated_block import GatedBlock
 
 
 class Obj2OrientedVoxel:
@@ -96,12 +96,12 @@ class Model(torch.nn.Module):
 
 
 def rotation_from_orientations(t1, f1, t2, f2):
-    from se3cnn.SO3 import x_to_alpha_beta, rot
+    from se3cnn.SO3 import xyz_to_angles, rot
 
     zero = t1.new_tensor(0)
 
-    r_e_t1 = rot(*x_to_alpha_beta(t1), zero)
-    r_e_t2 = rot(*x_to_alpha_beta(t2), zero)
+    r_e_t1 = rot(*xyz_to_angles(t1), zero)
+    r_e_t2 = rot(*xyz_to_angles(t2), zero)
 
     f1_e = r_e_t1.t() @ f1
     f2_e = r_e_t2.t() @ f2
