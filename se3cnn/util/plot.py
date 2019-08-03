@@ -5,16 +5,14 @@ import matplotlib.pyplot as plt
 import torch
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import
 
-from se3cnn.SO3 import spherical_harmonics
+from se3cnn.SO3 import spherical_harmonics, angles_to_xyz
 
 
 def spherical_surface(n):
     beta = torch.linspace(1e-16, math.pi - 1e-16, 2 * n)
     alpha = torch.linspace(0, 2 * math.pi, 2 * n)
     beta_, alpha_ = torch.meshgrid(beta, alpha)
-    x = torch.sin(beta_) * torch.cos(alpha_)
-    y = torch.sin(beta_) * torch.sin(alpha_)
-    z = torch.cos(beta_)
+    x, y, z = angles_to_xyz(beta_, alpha_)
 
     beta = 0.5 * (beta[1:] + beta[:-1])
     alpha = 0.5 * (alpha[1:] + alpha[:-1])
