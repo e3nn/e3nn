@@ -69,12 +69,20 @@ def angles_to_xyz(alpha, beta):
     return x, y, z
 
 
-def xyz_to_angles(x):
+def xyz_to_angles(x, y=None, z=None):
     """
     Convert point (x, y, z) on the sphere into (alpha, beta)
     """
     if not torch.is_tensor(x):
         x = torch.tensor(x, dtype=torch.get_default_dtype())
+
+    if y is not None and z is not None:
+        if not torch.is_tensor(y):
+            y = torch.tensor(y, dtype=torch.get_default_dtype())
+        if not torch.is_tensor(z):
+            z = torch.tensor(z, dtype=torch.get_default_dtype())
+        x = torch.stack([x, y, z], dim=-1)
+
     x = x / torch.norm(x, 2, -1, keepdim=True)
     beta = torch.acos(x[..., 2])
     alpha = torch.atan2(x[..., 1], x[..., 0])
