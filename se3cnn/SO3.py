@@ -292,6 +292,33 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
+def spherical_harmonics_onehot(lmax, alpha, beta):
+    """
+    approximation of a signal that is 0 everywhere except in (alpha, beta) it is one
+    the higher is lmax the better is the approximation
+    """
+    a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
+    return torch.cat([spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)]) / a
+
+
+def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
+    """
+    Evaluate the signal on the sphere
+    """
+    from itertools import count
+    s = 0
+    i = 0
+    for l in count():
+        d = 2 * l + 1
+        if len(coeff) < i + d:
+            break
+        c = coeff[i: i + d]
+        i += d
+
+        s += torch.einsum("i,i...->...", (c, spherical_harmonics(l, alpha, beta)))
+    return s
+
+
 
 ################################################################################
 # Linear algebra
@@ -347,7 +374,7 @@ def direct_sum(*matrices):
 
 
 ################################################################################
-# Analytically derived basis
+# Clebsch Gordan
 ################################################################################
 
 def clebsch_gordan(l1, l2, l3):

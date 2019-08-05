@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import
 
-from se3cnn.SO3 import spherical_harmonics, angles_to_xyz
+from se3cnn.SO3 import angles_to_xyz, spherical_harmonics_coeff_to_sphere
 
 
 def spherical_surface(n):
@@ -20,25 +20,10 @@ def spherical_surface(n):
     return x, y, z, alpha, beta
 
 
-def spherical_harmonic_signal(coeff, alpha, beta):
-    from itertools import count
-    s = 0
-    i = 0
-    for l in count():
-        d = 2 * l + 1
-        if len(coeff) < i + d:
-            break
-        c = coeff[i: i + d]
-        i += d
-
-        s += torch.einsum("i,i...->...", (c, spherical_harmonics(l, alpha, beta)))
-    return s
-
-
 def plot_sh_signal(coeff, n=20):
     from functools import partial
 
-    fun = partial(spherical_harmonic_signal, coeff)
+    fun = partial(spherical_harmonics_coeff_to_sphere, coeff)
     plot_sphere(fun, n)
 
 
