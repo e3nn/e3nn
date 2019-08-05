@@ -8,6 +8,14 @@ from se3cnn.SO3 import *
 
 class Tests(unittest.TestCase):
 
+    def test_sh_onehot(self):
+        with torch_default_dtype(torch.float64):
+            for l in range(5):
+                a = spherical_harmonics_onehot(l, 1.2, 2.1)
+                a = spherical_harmonics_coeff_to_sphere(a, 1.2, 2.1)
+                self.assertAlmostEqual(a.item(), 1)
+
+
     def test_sh_norm(self):
         with torch_default_dtype(torch.float64):
             l_filter = list(range(15))
