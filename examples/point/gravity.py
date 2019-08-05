@@ -10,7 +10,7 @@ from se3cnn.non_linearities import rescaled_act
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.operations import Convolution
 from se3cnn.point.radial import CosineBasisModel
-from se3cnn.SO3 import spherical_harmonics_xyz_backwardable
+from se3cnn.SO3 import spherical_harmonics_xyz_backwardable, spherical_basis_vector_to_xyz_basis
 
 torch.set_default_dtype(torch.float64)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -107,8 +107,7 @@ def train(net):
         output = torch.transpose(output, 0, 1)
 
         # spherical harmonics are given in y,z,x order
-        permute = torch.LongTensor([2, 0, 1])
-        output = output[:, permute]
+        output = output @ spherical_basis_vector_to_xyz_basis().t()
         loss = torch.mean((output - accels)**2)
         optimizer.zero_grad()
         loss.backward()
@@ -127,8 +126,8 @@ def train(net):
                 output = net(val_masses, val_points)
                 output = torch.transpose(output, 0, 1)
 
-                permute = torch.LongTensor([2, 0, 1])
-                output = output[:, permute]
+                # spherical harmonics are given in y,z,x order
+                output = output @ spherical_basis_vector_to_xyz_basis().t()
 
                 loss = torch.mean((output - val_accels)**2)
             print('Step {0}: validation loss = {1}'.format(step, loss.item()))

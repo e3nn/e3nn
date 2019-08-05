@@ -471,6 +471,20 @@ def xyz_vector_basis_to_spherical_basis():
     return A.type(torch.get_default_dtype())
 
 
+def spherical_basis_vector_to_xyz_basis():
+    """
+    to convert a vector transforming with irr_repr(1, a, b, c)
+    into a vector [x, y, z] transforming with rot(a, b, c)
+    see assert for usage
+
+    Inverse of xyz_vector_basis_to_spherical_basis
+    """
+    with torch_default_dtype(torch.float64):
+        Ainv = torch.tensor([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=torch.float64)
+        assert all(torch.allclose(Ainv @ irr_repr(1, a, b, c), rot(a, b, c) @ Ainv) for a, b, c in torch.rand(10, 3))
+    return Ainv.type(torch.get_default_dtype())
+
+
 def tensor3x3_repr(a, b, c):
     """
     representation of 3x3 tensors
