@@ -1,34 +1,30 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long
 import torch
 
-from se3cnn.non_linearities import ScalarActivation
-
 
 class GatedBlock(torch.nn.Module):
-    def __init__(self, repr_in, repr_out, scalar_activation, gate_activation, Operation):
+    def __init__(self, Rs_in, Rs_out, scalar_activation, gate_activation, Operation):
         """
-        :param repr_in: input multiplicities
-        :param repr_out: output multiplicities
+        :param Rs_in: input list of (multiplicities, orders)
+        :param Rs_out: output list of (multiplicities, orders)
         :param scalar_activation: nonlinear function applied on l=0 channels
         :param gate_activation: nonlinear function applied on the gates
         :param Operation: class of signature (Rs_in, Rs_out)
         """
         super().__init__()
 
-        self.repr_out = repr_out
+        self.Rs_out = Rs_out
 
-        Rs_in = [(mul, l) for l, mul in enumerate(repr_in)]
-        Rs_out = [(mul, l) for l, mul in enumerate(repr_out)]
-
-        if scalar_activation is not None and repr_out[0] > 0:
-            self.scalar_act = ScalarActivation([(repr_out[0], scalar_activation)], bias=False)
+        num_scalar = sum(mul for mul, l in Rs_out if l == 0)
+        if scalar_activation is not None and num_scalar > 0:
+            self.scalar_act = scalar_activation
         else:
             self.scalar_act = None
 
-        num_non_scalar = sum(repr_out[1:])
+        num_non_scalar = sum(mul for mul, l in Rs_out if l != 0)
         if gate_activation is not None and num_non_scalar > 0:
             Rs_out_with_gate = Rs_out + [(num_non_scalar, 0)]
-            self.gate_act = ScalarActivation([(num_non_scalar, gate_activation)], bias=False)
+            self.gate_act = gate_activation
         else:
             Rs_out_with_gate = Rs_out
             self.gate_act = None
@@ -48,18 +44,16 @@ class GatedBlock(torch.nn.Module):
         batch = y.size(0)
         size = y.size()[2:]
 
-        size_out = sum(mul * (2 * l + 1) for l, mul in enumerate(self.repr_out))
+        size_out = sum(mul * (2 * l + 1) for mul, l in self.Rs_out)
 
         if self.gate_act is not None:
-            g = y[:, size_out:]
-            assert g.size(1) == sum(self.repr_out[1:])
-            g = self.gate_act(g)
+            g = self.gate_act(y[:, size_out:])
             begin_g = 0  # index of first scalar gate capsule
 
         z = y.new_empty(batch, size_out, *size)
         begin_y = 0  # index of first capsule
 
-        for l, mul in enumerate(self.repr_out):
+        for mul, l in self.Rs_out:
             if mul == 0:
                 continue
             dim = 2 * l + 1

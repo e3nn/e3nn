@@ -49,7 +49,10 @@ class SE3Net(torch.nn.Module):
         C = partial(Convolution, K)
 
         self.layers = torch.nn.ModuleList([
-            GatedBlock(features[i], features[i+1], sp, rescaled_act.sigmoid, C)
+            GatedBlock(
+                [(m, l) for l, m in enumerate(features[i])],
+                [(m, l) for l, m in enumerate(features[i+1])],
+                sp, rescaled_act.sigmoid, C)
             for i in range(len(features) - 1)
         ])
         self.layers += [AvgSpacial(), torch.nn.Linear(64, num_classes)]
