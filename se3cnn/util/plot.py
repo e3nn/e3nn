@@ -78,9 +78,12 @@ def plotly_sphere(fun, n=240, radius=False):
     a, b = torch.meshgrid(a, b)
 
     f = fun(a, b)
-    r = f.abs() if radius else 1
-    x = r * a.cos() * b.sin()
-    y = r * a.sin() * b.sin()
-    z = r * b.cos()
+    x, y, z = angles_to_xyz(a, b)
+
+    if radius:
+        r = f.abs()
+        x *= r
+        y *= r
+        z *= r
 
     return go.Surface(x=x.numpy(), y=y.numpy(), z=z.numpy(), surfacecolor=f.numpy())
