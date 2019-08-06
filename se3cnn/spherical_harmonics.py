@@ -56,7 +56,7 @@ class SphericalHarmonicsFindPeaks(torch.nn.Module):
         peaks = list(set(beta_pass).intersection(set(alpha_pass)))
 
         radius = torch.stack([f[i, j] for i, j in peaks]) if peaks else torch.empty(0)
-        peaks = torch.stack([xyz[i, j] for i, j in peaks]) if peaks else torch.empty(0)
+        peaks = torch.stack([xyz[i, j] for i, j in peaks]) if peaks else torch.empty(0, 3)
         return peaks, radius
 
     def forward(self, signal):
