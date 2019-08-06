@@ -459,7 +459,7 @@ def _clebsch_gordan(l1, l2, l3):
 # Change of basis
 ################################################################################
 
-def xyz_vector_basis_to_spherical_basis():
+def xyz_vector_basis_to_spherical_basis(check=True):
     """
     to convert a vector [x, y, z] transforming with rot(a, b, c)
     into a vector transforming with irr_repr(1, a, b, c)
@@ -467,7 +467,23 @@ def xyz_vector_basis_to_spherical_basis():
     """
     with torch_default_dtype(torch.float64):
         A = torch.tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0]], dtype=torch.float64)
-        assert all(torch.allclose(irr_repr(1, a, b, c) @ A, A @ rot(a, b, c)) for a, b, c in torch.rand(10, 3))
+        if check:
+            assert all(torch.allclose(irr_repr(1, a, b, c) @ A, A @ rot(a, b, c)) for a, b, c in torch.rand(10, 3))
+    return A.type(torch.get_default_dtype())
+
+
+def spherical_basis_vector_to_xyz_basis(check=True):
+    """
+    to convert a vector transforming with irr_repr(1, a, b, c)
+    into a vector [x, y, z] transforming with rot(a, b, c)
+    see assert for usage
+
+    Inverse of xyz_vector_basis_to_spherical_basis
+    """
+    with torch_default_dtype(torch.float64):
+        A = torch.tensor([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=torch.float64)
+        if check:
+            assert all(torch.allclose(A @ irr_repr(1, a, b, c), rot(a, b, c) @ A) for a, b, c in torch.rand(10, 3))
     return A.type(torch.get_default_dtype())
 
 
