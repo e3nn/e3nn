@@ -15,8 +15,9 @@ class Softplus:
 class ShiftedSoftplus:
     def __init__(self, beta):
         x = torch.randn(100000, dtype=torch.float64)
-        self.factor = torch.nn.functional.softplus(x, beta).pow(2).mean().rsqrt().item()
         self.shift = torch.nn.functional.softplus(torch.zeros(()), beta).item()
+        y = torch.nn.functional.softplus(x, beta).sub(self.shift)
+        self.factor = y.pow(2).mean().rsqrt().item()
         self.beta = beta
 
     def __call__(self, x):
