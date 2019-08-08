@@ -5,7 +5,6 @@ import torch
 
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.radial import ConstantRadialModel
-from se3cnn.point.utils import convolve
 
 
 class SortSphericalSignals(torch.nn.Module):
@@ -53,24 +52,14 @@ class SelfInteraction(torch.nn.Module):
         self.kernel = Kernel(Rs_in, Rs_out, ConstantRadialModel)
 
     def forward(self, features):
-        if features.dim() == 2:
-            # No batch dimension
-            _, N = features.size()
-            batch = 1
-        if features.dim() == 3:
-            # Batch dimension
-            batch, _, N = features.size()
-        if features.dim() == 4:
-            # Multiple atom indices
-            batch, _, Na, Nb = features.size()
-            N = Na * Nb
+        """
+        :param features: tensor [..., channel]
+        :return:         tensro [..., channel]
+        """
+        *size, n = features.size()
+        features = features.view(-1, n)
 
-        neighbors = torch.arange(N, device=features.device).view(1, N, 1).expand(batch, N, 1)
-        output = convolve(self.kernel, features.view(batch, -1, N), features.new_zeros(batch, N, 3), neighbors)
-
-        if features.dim() == 2:
-            return output.view(-1, N)
-        if features.dim() == 3:
-            return output
-        if features.dim() == 4:
-            return output.view(batch, -1, Na, Nb)
+        k = self.kernel(features.new_zeros(features.size(0), 3))
+        features = torch.einsum("zij,zj->zi", (k, features))
+        features = features.view(*size, -1)
+        return features

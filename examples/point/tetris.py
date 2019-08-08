@@ -31,15 +31,15 @@ def get_dataset():
 
 class AvgSpacial(torch.nn.Module):
     def forward(self, features):
-        return features.flatten(2).mean(-1)
+        return features.mean(1)
 
 
 class SE3Net(torch.nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        features = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
-        self.num_features = len(features)
+        representations = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
+        representations = [[(mul, l) for l, mul in enumerate(rs)] for rs in representations]
 
         sp = rescaled_act.Softplus(beta=5)
 
@@ -48,38 +48,32 @@ class SE3Net(torch.nn.Module):
         K = partial(Kernel, RadialModel=RadialModel)
         C = partial(Convolution, K)
 
-        self.layers = torch.nn.ModuleList([
-            GatedBlock(
-                [(m, l) for l, m in enumerate(features[i])],
-                [(m, l) for l, m in enumerate(features[i+1])],
-                sp, rescaled_act.sigmoid, C)
-            for i in range(len(features) - 1)
+        self.firstlayers = torch.nn.ModuleList([
+            GatedBlock(Rs_in, Rs_out, sp, rescaled_act.sigmoid, C)
+            for Rs_in, Rs_out in zip(representations, representations[1:])
         ])
-        self.layers += [AvgSpacial(), torch.nn.Linear(64, num_classes)]
+        self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
 
     def forward(self, features, geometry):
-        output = features
-        for i in range(self.num_features - 1):
-            output = self.layers[i](output, geometry)
+        for m in self.firstlayers:
+            features = m(features.div(4 ** 0.5), geometry)
 
-        for i in range(self.num_features - 1, len(self.layers)):
-            output = self.layers[i](output)
-
-        return output
+        return self.lastlayers(features)
 
 
 def main():
     torch.set_default_dtype(torch.float64)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     tetris, labels = get_dataset()
-    tetris = tetris.cuda()
-    labels = labels.cuda()
+    tetris = tetris.to(device)
+    labels = labels.to(device)
     f = SE3Net(len(tetris))
-    f = f.cuda()
+    f = f.to(device)
 
     optimizer = torch.optim.Adam(f.parameters())
 
-    feature = tetris.new_ones(tetris.size(0), 1, tetris.size(1))
+    feature = tetris.new_ones(tetris.size(0), tetris.size(1), 1)
 
     for step in range(50):
         out = f(feature, tetris)
@@ -94,7 +88,7 @@ def main():
     out = f(feature, tetris)
 
     r_tetris, _ = get_dataset()
-    r_tetris = r_tetris.cuda()
+    r_tetris = r_tetris.to(device)
     r_out = f(feature, r_tetris)
 
     print('equivariance error={}'.format((out - r_out).pow(2).mean().sqrt().item()))

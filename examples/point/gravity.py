@@ -27,7 +27,9 @@ class GravityNet(torch.nn.Module):
         self.conv = Convolution(K, [(1, 0)], [(1, 1)])
 
     def forward(self, features, geometry):
-        return self.conv(features, geometry)
+        features = self.conv(features, geometry)
+        features = torch.einsum("ij,zaj->zai", (spherical_basis_vector_to_xyz_basis(), features))
+        return features
 
 
 EPSILON = 1e-8
@@ -93,35 +95,32 @@ def train(net):
 
     max_steps = 301
     validation_size = 10
-    print_freq = 50
+    print_freq = 25
 
     for step in range(max_steps):
         points, masses = random_points_and_masses(10)
         accels = accelerations(points, masses)
 
-        points = torch.from_numpy(points)
-        masses = torch.from_numpy(masses).unsqueeze(0)
-        accels = torch.from_numpy(accels)
+        points = torch.from_numpy(points).view(1, -1, 3)
+        masses = torch.from_numpy(masses).view(1, -1, 1)
+        accels = torch.from_numpy(accels).view(1, -1, 3)
         output = net(masses, points) # [3, N]
 
-        output = torch.transpose(output, 0, 1)
-
         # spherical harmonics are given in y,z,x order
-        output = output @ spherical_basis_vector_to_xyz_basis().t()
         loss = torch.mean((output - accels)**2)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         step_loss = loss.item()
 
-        if step > 0 and step % print_freq == 0:
+        if step % print_freq == 0:
             for _ in range(validation_size):
                 val_points, val_masses = random_points_and_masses(50)
                 val_accels = accelerations(val_points, val_masses)
 
-                val_points = torch.from_numpy(val_points)
-                val_masses = torch.from_numpy(val_masses).unsqueeze(0)
-                val_accels = torch.from_numpy(val_accels)
+                val_points = torch.from_numpy(val_points).view(1, -1, 3)
+                val_masses = torch.from_numpy(val_masses).view(1, -1, 1)
+                val_accels = torch.from_numpy(val_accels).view(1, -1, 3)
 
                 output = net(val_masses, val_points)
                 output = torch.transpose(output, 0, 1)
@@ -138,7 +137,7 @@ def train(net):
             plt.plot(x, y)
             start = 25
             plt.plot(x[start:], -1/ (x[start:]**2))
-            plt.savefig('validation_result_{0}.png'.format(step / print_freq))
+            plt.savefig('validation_result_{0}.png'.format(step))
 
         if step % 500 == 0:
             print('Step {0}, Loss {1}'.format(step, step_loss))
