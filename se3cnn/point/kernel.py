@@ -9,23 +9,34 @@ import se3cnn.SO3 as SO3
 class Kernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=None, sh=None, normalization='norm'):
         '''
-        :param Rs_in: list of couple (multiplicity, representation order)
-        :param Rs_out: list of couple (multiplicity, representation order)
+        :param Rs_in: list of couple (multiplicity, representation order, parity)
+        :param Rs_out: list of couple (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
         :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         :param normalization: either 'norm' or 'component'
+
+        representation order = nonnegative integer
+        parity = 0 (no parity), 1 (even), -1 (odd)
         '''
         super().__init__()
 
-        self.Rs_out = [(mul, l) for mul, l in Rs_out if mul >= 1]
-        self.Rs_in = [(mul, l) for mul, l in Rs_in if mul >= 1]
-        self.n_out = sum(mul * (2 * l + 1) for mul, l in self.Rs_out)
-        self.n_in = sum(mul * (2 * l + 1) for mul, l in self.Rs_in)
+        self.Rs_out = [(mul, l[0], 0 if len(l) == 1 else l[1]) for mul, *l in Rs_out if mul >= 1]
+        self.Rs_in = [(mul, l[0], 0 if len(l) == 1 else l[1]) for mul, *l in Rs_in if mul >= 1]
+        self.n_out = sum(mul * (2 * l + 1) for mul, l, p in self.Rs_out)
+        self.n_in = sum(mul * (2 * l + 1) for mul, l, p in self.Rs_in)
 
         if get_l_filters is None:
             get_l_filters = lambda l_in, l_out: list(range(abs(l_in - l_out), l_in + l_out + 1))
-        self.get_l_filters = get_l_filters
+
+        def filters(l_in, p_in, l_out, p_out):
+            ls = []
+            for l in get_l_filters(l_in, l_out):
+                if p_out == 0 or p_in * (-1) ** l == p_out:
+                    ls.append(l)
+            return ls
+
+        self.get_l_filters = filters
 
         if sh is None:
             sh = SO3.spherical_harmonics_xyz
@@ -37,9 +48,9 @@ class Kernel(torch.nn.Module):
         n_path = 0
         set_of_l_filters = set()
 
-        for mul_out, l_out in self.Rs_out:
-            for mul_in, l_in in self.Rs_in:
-                l_filters = self.get_l_filters(l_in, l_out)
+        for mul_out, l_out, p_out in self.Rs_out:
+            for mul_in, l_in, p_in in self.Rs_in:
+                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
                 assert l_filters == sorted(set(l_filters)), "get_l_filters must return a sorted list of unique values"
 
                 # compute the number of degrees of freedom
@@ -88,21 +99,25 @@ class Kernel(torch.nn.Module):
         begin_c = 0
 
         begin_out = 0
-        for mul_out, l_out in self.Rs_out:
+        for mul_out, l_out, p_out in self.Rs_out:
             s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+            begin_out += mul_out * (2 * l_out + 1)
 
             # consider that we sum a bunch of [lambda_(m_out)] vectors
             # we need to count how many of them we sum in order to normalize the network
             num_summed_elements = 0
-            for mul_in, l_in in self.Rs_in:
-                l_filters = self.get_l_filters(l_in, l_out)
+            for mul_in, l_in, p_in in self.Rs_in:
+                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
                 num_summed_elements += mul_in * len(l_filters)
 
             begin_in = 0
-            for mul_in, l_in in self.Rs_in:
+            for mul_in, l_in, p_in in self.Rs_in:
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
+                begin_in += mul_in * (2 * l_in + 1)
 
-                l_filters = self.get_l_filters(l_in, l_out)
+                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
+                if not l_filters:
+                    continue
 
                 # extract the subset of the `coefficients` that corresponds to the couple (l_out, l_in)
                 n = mul_out * mul_in * len(l_filters)
@@ -136,7 +151,5 @@ class Kernel(torch.nn.Module):
                 if K is not 0:
                     kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
 
-                begin_in += mul_in * (2 * l_in + 1)
-            begin_out += mul_out * (2 * l_out + 1)
 
         return kernel.view(*size, self.n_out, self.n_in)
