@@ -40,16 +40,32 @@ class Tests(unittest.TestCase):
             Rs_out = [(2, 0), (2, 1), (2, 2)]
 
             k = Kernel(Rs_in, Rs_out, ConstantRadialModel)
-            r = torch.randn(100, 3)
+            r = torch.randn(3)
 
             abc = torch.randn(3)
             D_in = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
             D_out = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
 
 
-            W1 = k(r)  # [batch, i, j]
-            W2 = k(r @ rot(*abc).t())  # [batch, i, j]
-            W2 = torch.einsum("ij,zjk,kl->zil", (D_out.t(), W2, D_in))
+            W1 = D_out @ k(r)  # [i, j]
+            W2 = k(rot(*abc) @ r) @ D_in  # [i, j]
+            self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
+
+
+    def test3(self):
+        with torch_default_dtype(torch.float64):
+            Rs_in = [(2, 0, 1), (2, 1, 1), (2, 2, -1)]
+            Rs_out = [(2, 0, -1), (2, 1, 1), (2, 2, 1)]
+
+            k = Kernel(Rs_in, Rs_out, ConstantRadialModel)
+            r = torch.randn(3)
+
+            D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
+            D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
+
+
+            W1 = D_out @ k(r)  # [i, j]
+            W2 = k(-r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
 
 unittest.main()
