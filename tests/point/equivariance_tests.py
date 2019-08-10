@@ -76,21 +76,19 @@ class Tests(unittest.TestCase):
 
     def test4(self):
         with torch_default_dtype(torch.float64):
-            Rs_in = [(2, 0, 1), (2, 1, 1), (2, 2, -1)]
-            Rs_out = [(2, 0, -1), (2, 1, 1), (2, 2, 1)]
+            Rs = [(2, l, p) for l in range(6) for p in [-1, 1]]
 
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
-            f = GatedBlock(Rs_in, Rs_out, rescaled_act.tanh, rescaled_act.tanh, C)
+            f = GatedBlock(Rs, Rs, rescaled_act.tanh, rescaled_act.tanh, C)
 
-            D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
+            D = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs for _ in range(mul)])
 
-            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
+            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs))
             geo = torch.randn(1, 4, 3)
 
-            x1 = torch.einsum("ij,zaj->zai", (D_out, f(fea, geo)))
-            x2 = f(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo)
+            x1 = torch.einsum("ij,zaj->zai", (D, f(fea, geo)))
+            x2 = f(torch.einsum("ij,zaj->zai", (D, fea)), -geo)
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 unittest.main()

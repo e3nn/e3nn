@@ -1,6 +1,7 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long
 import torch
 
+from se3cnn.non_linearities.rescaled_act import tanh
 from se3cnn.SO3 import normalizeRs
 
 
@@ -18,41 +19,33 @@ class GatedBlock(torch.nn.Module):
         Rs_out = normalizeRs(Rs_out)
         Rs_in = normalizeRs(Rs_in)
 
-        self.Rs_out = Rs_out
+        self.scalar_act = scalar_activation
+        self.gate_act = gate_activation
 
-        num_scalar = sum(mul for mul, l, p in Rs_out if l == 0)
-        if scalar_activation is not None and num_scalar > 0:
-            self.scalar_act = scalar_activation
-            if any(p == -1 for mul, l, p in Rs_out if l == 0):
-                x = torch.linspace(0, 2, 10)
-                assert (scalar_activation(-x) + scalar_activation(x)).abs().max() < 1e-5, "need odd function for odd scalars"
-        else:
-            self.scalar_act = None
-
-        num_non_scalar = sum(mul for mul, l, p in Rs_out if l != 0)
-        if gate_activation is not None and num_non_scalar > 0:
-            Rs_out_parity = []
-            Rs_out_gates = []
-            for mul, l, p in Rs_out:
+        Rs_parity = []
+        Rs_gates = []
+        Rs_info = []
+        for mul, l, p in Rs_out:
+            if l == 0:
+                Rs_parity.append((mul, 0, p))
+                Rs_info.append((mul, l, p, 0))
+            else:
                 if p == 0:
-                    Rs_out_parity.append((mul, l, 0))
-                    Rs_out_gates.append((mul, 0, 0))
+                    Rs_parity.append((mul, l, 0))
+                    Rs_gates.append((mul, 0, 0))
+                    Rs_info.append((mul, l, 0, 0))
                 else:
-                    Rs_out_parity.append((mul, l, p))
-                    Rs_out_gates.append((mul, 0, 1))
-                    # Rs_out_parity.append((mul, l, -p))
-                    # Rs_out_gates.append((mul, 0, -1))
+                    mul2 = mul // 2
+                    Rs_parity.append((mul - mul2, l, p))
+                    Rs_gates.append((mul - mul2, 0, 1))
+                    Rs_info.append((mul - mul2, l, p, 1))
 
-                    # x = torch.linspace(0, 2, 10)
-                    # assert (gate_activation(-x) + gate_activation(x)).abs().max() < 1e-5, "need odd function for odd scalars"
+                    Rs_parity.append((mul2, l, -p))
+                    Rs_gates.append((mul2, 0, -1))
+                    Rs_info.append((mul2, l, -p, -1))
 
-            Rs_out_with_gate = Rs_out_parity + normalizeRs(Rs_out_gates)
-            self.gate_act = gate_activation
-        else:
-            Rs_out_with_gate = Rs_out
-            self.gate_act = None
-
-        self.op = Operation(Rs_in, Rs_out_with_gate)
+        self.Rs_info = Rs_info
+        self.op = Operation(Rs_in, normalizeRs(Rs_parity + Rs_gates))
         self.dim = dim
 
 
@@ -62,59 +55,43 @@ class GatedBlock(torch.nn.Module):
         """
         features = self.op(*args, **kwargs)  # [..., channel, ...]
 
-        if self.scalar_act is None and self.gate_act is None:
-            return features
-
         dim = (features.dim() + self.dim) % features.dim()
         size_bef = features.size()[:dim]
         size = features.size(dim)
         size_aft = features.size()[dim + 1:]
 
-        size_out = sum(mul * (2 * l + 1) for mul, l, p in self.Rs_out)
+        size_out = sum(mul * (2 * l + 1) for mul, l, p, p_gate in self.Rs_info)
 
-        if self.gate_act is not None:
-            gates = self.gate_act(features.narrow(dim, size_out, size - size_out))
-            begin_g = 0  # index of first scalar gate capsule
+        gates = features.narrow(dim, size_out, size - size_out)
+        begin_g = 0  # index of first scalar gate capsule
 
         out = features.new_empty(*size_bef, size_out, *size_aft)
         begin_out = 0  # index of first capsule
-        begin_in = 0
 
-        for mul, l, _p in self.Rs_out:
-            if mul == 0:
-                continue
-
+        for mul, l, p, p_gate in self.Rs_info:
             # crop out capsules of order l
-            field_y = features.narrow(dim, begin_in, mul * (2 * l + 1))  # [..., feature * repr, ...]
-            begin_in += mul * (2 * l + 1)
+            sub = features.narrow(dim, begin_out, mul * (2 * l + 1))  # [..., feature * repr, ...]
 
             if l == 0:
                 # Scalar activation
-                if self.scalar_act is not None:
-                    field = self.scalar_act(field_y)
-                else:
-                    field = field_y
+                sub = tanh(sub) if p == -1 else self.scalar_act(sub)
             else:
-                if self.gate_act is not None:
-                    # reshape channels in capsules and capsule entries
-                    field_y = field_y.reshape(*size_bef, mul, 2 * l + 1, *size_aft)  # [..., feature, repr, ...]
+                sub = sub.reshape(*size_bef, mul, 2 * l + 1, *size_aft)  # [..., feature, repr, ...]
 
-                    # crop out corresponding scalar gates
-                    field_g = gates.narrow(dim, begin_g, mul)  # [..., feature, ...]
-                    begin_g += mul
+                gate = gates.narrow(dim, begin_g, mul)  # [..., feature, ...]
+                begin_g += mul
 
-                    # reshape channels for broadcasting
-                    field_g = field_g.contiguous().unsqueeze(dim + 1)  # [..., feature, 1, ...]
+                gate = tanh(gate) if p_gate == -1 else self.gate_act(gate)
+                gate = gate.contiguous().unsqueeze(dim + 1)  # [..., feature, 1, ...]
 
-                    # scale non-scalar capsules by gate values
-                    field = (field_y * field_g).view(*size_bef, mul * (2 * l + 1), *size_aft)  # [..., feature * repr, ...]
-                    del field_g
-                else:
-                    field = field_y
-            del field_y
+                sub = (sub * gate).view(*size_bef, mul * (2 * l + 1), *size_aft)  # [..., feature * repr, ...]
+                del gate
 
-            out.narrow(dim, begin_out, mul * (2 * l + 1)).copy_(field)
+            out.narrow(dim, begin_out, mul * (2 * l + 1)).copy_(sub)
             begin_out += mul * (2 * l + 1)
-            del field
+            del sub
+
+        assert begin_g == size - size_out
+        assert begin_out == size_out
 
         return out
