@@ -1,11 +1,16 @@
-# pylint: disable=invalid-name, missing-docstring, no-member
+# pylint: disable=invalid-name, missing-docstring, no-member, line-too-long
 import unittest
+from functools import partial
 
 import torch
 
+from se3cnn.non_linearities import rescaled_act
+from se3cnn.non_linearities.gated_block import GatedBlock
 from se3cnn.point.kernel import Kernel
+from se3cnn.point.operations import Convolution
 from se3cnn.point.radial import ConstantRadialModel
-from se3cnn.SO3 import direct_sum, irr_repr, clebsch_gordan, spherical_harmonics_xyz, rot
+from se3cnn.SO3 import (clebsch_gordan, direct_sum, irr_repr, rot,
+                        spherical_harmonics_xyz)
 from se3cnn.util.default_dtype import torch_default_dtype
 
 
@@ -67,5 +72,25 @@ class Tests(unittest.TestCase):
             W1 = D_out @ k(r)  # [i, j]
             W2 = k(-r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
+
+
+    def test4(self):
+        with torch_default_dtype(torch.float64):
+            Rs_in = [(2, 0, 1), (2, 1, 1), (2, 2, -1)]
+            Rs_out = [(2, 0, -1), (2, 1, 1), (2, 2, 1)]
+
+            K = partial(Kernel, RadialModel=ConstantRadialModel)
+            C = partial(Convolution, K)
+            f = GatedBlock(Rs_in, Rs_out, rescaled_act.tanh, rescaled_act.tanh, C)
+
+            D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
+            D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
+
+            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
+            geo = torch.randn(1, 4, 3)
+
+            x1 = torch.einsum("ij,zaj->zai", (D_out, f(fea, geo)))
+            x2 = f(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo)
+            self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 unittest.main()

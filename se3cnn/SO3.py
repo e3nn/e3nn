@@ -133,6 +133,52 @@ def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
 
 
 ################################################################################
+# Rs lists
+################################################################################
+
+def normalizeRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: simplified version of the same list with the parity
+    """
+    out = []
+    for r in Rs:
+        if len(r) == 2:
+            mul, l = r
+            p = 0
+        if len(r) == 3:
+            mul, l, p = r
+            if p > 0:
+                p = 1
+            if p < 0:
+                p = -1
+
+        if mul == 0:
+            continue
+
+        if out and out[-1][1:] == (l, p):
+            out[-1] = (out[-1][0] + mul, l, p)
+        else:
+            out.append((mul, l, p))
+
+    return out
+
+
+def formatRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: simplified version of the same list with the parity
+    """
+    d = {
+        0: "",
+        1: "+",
+        -1: "-",
+    }
+    return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
+
+
+
+################################################################################
 # Spherical harmonics
 ################################################################################
 

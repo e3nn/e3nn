@@ -9,8 +9,8 @@ import se3cnn.SO3 as SO3
 class Kernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=None, sh=None, normalization='norm'):
         '''
-        :param Rs_in: list of couple (multiplicity, representation order, parity)
-        :param Rs_out: list of couple (multiplicity, representation order, parity)
+        :param Rs_in: list of triplet (multiplicity, representation order, parity)
+        :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
         :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
@@ -21,10 +21,10 @@ class Kernel(torch.nn.Module):
         '''
         super().__init__()
 
-        self.Rs_out = [(mul, l[0], 0 if len(l) == 1 else l[1]) for mul, *l in Rs_out if mul >= 1]
-        self.Rs_in = [(mul, l[0], 0 if len(l) == 1 else l[1]) for mul, *l in Rs_in if mul >= 1]
-        self.n_out = sum(mul * (2 * l + 1) for mul, l, p in self.Rs_out)
+        self.Rs_in = SO3.normalizeRs(Rs_in)
+        self.Rs_out = SO3.normalizeRs(Rs_out)
         self.n_in = sum(mul * (2 * l + 1) for mul, l, p in self.Rs_in)
+        self.n_out = sum(mul * (2 * l + 1) for mul, l, p in self.Rs_out)
 
         if get_l_filters is None:
             get_l_filters = lambda l_in, l_out: list(range(abs(l_in - l_out), l_in + l_out + 1))
@@ -73,8 +73,8 @@ class Kernel(torch.nn.Module):
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
             name=self.__class__.__name__,
-            Rs_in=self.Rs_in,
-            Rs_out=self.Rs_out,
+            Rs_in=SO3.formatRs(self.Rs_in),
+            Rs_out=SO3.formatRs(self.Rs_out),
         )
 
     def forward(self, r):
