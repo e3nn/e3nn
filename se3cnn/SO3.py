@@ -582,23 +582,26 @@ def reduce_tensor_product(Rs_i, Rs_j):
     :return: Rs_reduced, Q
     """
     with torch_default_dtype(torch.float64):
-        n_i = sum(mul * (2 * l + 1) for mul, l in Rs_i)
-        n_j = sum(mul * (2 * l + 1) for mul, l in Rs_j)
+        Rs_i = normalizeRs(Rs_i)
+        Rs_j = normalizeRs(Rs_j)
+
+        n_i = sum(mul * (2 * l + 1) for mul, l, p in Rs_i)
+        n_j = sum(mul * (2 * l + 1) for mul, l, p in Rs_j)
         out = torch.zeros(n_i, n_j, n_i * n_j, dtype=torch.float64)
 
         Rs_reduced = []
         beg = 0
 
         beg_i = 0
-        for mul_i, l_i in Rs_i:
+        for mul_i, l_i, p_i in Rs_i:
             n_i = mul_i * (2 * l_i + 1)
 
             beg_j = 0
-            for mul_j, l_j in Rs_j:
+            for mul_j, l_j, p_j in Rs_j:
                 n_j = mul_j * (2 * l_j + 1)
 
                 for l in range(abs(l_i - l_j), l_i + l_j + 1):
-                    Rs_reduced.append((mul_i * mul_j, l))
+                    Rs_reduced.append((mul_i * mul_j, l, p_i * p_j))
                     n = mul_i * mul_j * (2 * l + 1)
 
                     # put sqrt(2l+1) to get an orthonormal output
