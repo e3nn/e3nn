@@ -76,7 +76,7 @@ class Tests(unittest.TestCase):
 
     def test4(self):
         with torch_default_dtype(torch.float64):
-            Rs = [(2, l, p) for l in range(6) for p in [-1, 1]]
+            Rs = [(4, l, p) for l in range(6) for p in [-1, 1]]
 
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
