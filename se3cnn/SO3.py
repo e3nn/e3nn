@@ -632,3 +632,41 @@ def reduce_tensor_product(Rs_i, Rs_j):
                 beg_j += n_j
             beg_i += n_i
         return Rs_reduced, out
+
+
+
+################################################################################
+# Check equivariance of an arbitrary function
+################################################################################
+
+def check_network_equivariance(network, Rs_in, Rs_out, b=2, n=6):
+    # Make sure that all parameters are on the same device. Set that to calculation device.
+    devices = [i.device for i in network.parameters()]
+    device = devices[0]
+    assert all([device == i for i in devices])
+
+    Rs_in = normalizeRs(Rs_in)
+    Rs_out = normalizeRs(Rs_out)
+
+    abc = torch.randn(3, device=device)  # Rotation seed of euler angles
+
+    D_in = direct_sum(*[irr_repr(l, *abc) for mul, l, _ in Rs_in for _ in range(mul)])
+    D_out = direct_sum(*[irr_repr(l, *abc) for mul, l, _ in Rs_out for _ in range(mul)])
+    rotmat = rot(*abc)
+
+    c = sum([mul * (2 * l + 1) for mul, l, _ in Rs_in])
+
+    feat = torch.randn(b, n, c, device=device)  # Transforms with wigner D matrix
+    geo = torch.randn(b, n, 3, device=device)  # Transforms with rotation matrix.
+
+    F = network(feat, geo)
+    RF = torch.einsum("ij,zkj->zki", D_out, F)
+    FR = network(feat @ D_in.t(), geo @ rotmat.t())  # [batch, feat, N]
+
+    # TODO parity check
+    # if p ==0:
+    #     pass
+    # else:
+    #     D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)]).to(device)
+
+    assert (RF - FR).norm() < 10e-5 * RF.norm()
