@@ -1,8 +1,24 @@
-# pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long
+# pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long, unbalanced-tuple-unpacking
 import torch
 
 from se3cnn.non_linearities.rescaled_act import tanh
-from se3cnn.SO3 import normalizeRs
+from se3cnn.SO3 import normalizeRs, haslinearpathRs
+
+
+def split(n, *ons):
+    k = sum(ons)
+    i = 0
+    out = []
+    for on in ons:
+        if on:
+            if i < n % k:
+                out.append(n // k + 1)
+            else:
+                out.append(n // k)
+            i += 1
+        else:
+            out.append(0)
+    return out
 
 
 class GatedBlock(torch.nn.Module):
@@ -22,6 +38,9 @@ class GatedBlock(torch.nn.Module):
         self.scalar_act = scalar_activation
         self.gate_act = gate_activation
 
+        has_gate_plus = haslinearpathRs(Rs_in, 0, +1)
+        has_gate_minus = haslinearpathRs(Rs_in, 0, -1)
+
         Rs_parity = []
         Rs_gates = []
         Rs_info = []
@@ -31,14 +50,16 @@ class GatedBlock(torch.nn.Module):
                     Rs_parity.append((mul, 0, 0))
                     Rs_info.append((mul, l, 0, 0, 0))
                 elif p == 1:
-                    mul1, mul2 = mul // 2, mul - mul // 2
+                    mul1, mul2 = split(mul, has_gate_plus, has_gate_minus)
+                    assert mul == mul1 + mul2
 
-                    Rs_parity.append((mul1, 0, -1))
-                    Rs_info.append((mul1, l, -1, 0, 1))
+                    Rs_parity.append((mul1, 0, 1))
+                    Rs_info.append((mul1, l, 1, 0, 1))
 
-                    Rs_parity.append((mul2, 0, 1))
-                    Rs_info.append((mul2, l, 1, 0, 1))
+                    Rs_parity.append((mul2, 0, -1))
+                    Rs_info.append((mul2, l, -1, 0, 1))
                 else:
+                    assert has_gate_minus
                     Rs_parity.append((mul, 0, -1))
                     Rs_info.append((mul, l, -1, 0, -1))
             else:
@@ -47,19 +68,23 @@ class GatedBlock(torch.nn.Module):
                     Rs_gates.append((mul, 0, 0))
                     Rs_info.append((mul, l, 0, 0, 0))
                 else:
-                    mul1, mul2, mul3 = mul - mul // 2 - mul // 4, mul // 4, mul // 2
+                    has_same = haslinearpathRs(Rs_in, l, p)
+                    has_opposit = haslinearpathRs(Rs_in, l, -p)
+
+                    mul1, mul2, mul3 = split(mul, has_same and has_gate_plus, has_opposit and has_gate_minus, has_same and has_gate_minus)
+                    assert mul == mul1 + mul2 + mul3
 
                     Rs_parity.append((mul1, l, p))
                     Rs_gates.append((mul1, 0, 1))
                     Rs_info.append((mul1, l, p, 1, p))
 
-                    Rs_parity.append((mul2, l, p))
+                    Rs_parity.append((mul2, l, -p))
                     Rs_gates.append((mul2, 0, -1))
-                    Rs_info.append((mul2, l, p, -1, p))
+                    Rs_info.append((mul2, l, -p, -1, p))
 
-                    Rs_parity.append((mul3, l, -p))
+                    Rs_parity.append((mul3, l, p))
                     Rs_gates.append((mul3, 0, -1))
-                    Rs_info.append((mul3, l, -p, -1, p))
+                    Rs_info.append((mul3, l, p, -1, p))
 
         self.Rs_info = Rs_info
         self.op = Operation(Rs_in, normalizeRs(Rs_parity + Rs_gates))
