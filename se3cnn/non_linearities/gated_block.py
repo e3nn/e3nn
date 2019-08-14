@@ -51,7 +51,7 @@ class GatedBlock(torch.nn.Module):
                     Rs_info.append((mul, l, 0, 0, 0))
                 elif p == 1:
                     mul1, mul2 = split(mul, has_gate_plus, has_gate_minus)
-                    assert mul == mul1 + mul2
+                    assert mul == mul1 + mul2, "unable to output l={} p={}".format(l, p)
 
                     Rs_parity.append((mul1, 0, 1))
                     Rs_info.append((mul1, l, 1, 0, 1))
@@ -59,7 +59,7 @@ class GatedBlock(torch.nn.Module):
                     Rs_parity.append((mul2, 0, -1))
                     Rs_info.append((mul2, l, -1, 0, 1))
                 else:
-                    assert has_gate_minus
+                    assert has_gate_minus, "unable to output l={} p={}".format(l, p)
                     Rs_parity.append((mul, 0, -1))
                     Rs_info.append((mul, l, -1, 0, -1))
             else:
@@ -72,7 +72,7 @@ class GatedBlock(torch.nn.Module):
                     has_opposit = haslinearpathRs(Rs_in, l, -p)
 
                     mul1, mul2, mul3 = split(mul, has_same and has_gate_plus, has_opposit and has_gate_minus, has_same and has_gate_minus)
-                    assert mul == mul1 + mul2 + mul3
+                    assert mul == mul1 + mul2 + mul3, "unable to output l={} p={}".format(l, p)
 
                     Rs_parity.append((mul1, l, p))
                     Rs_gates.append((mul1, 0, 1))
