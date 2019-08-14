@@ -136,6 +136,21 @@ def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
 # Rs lists
 ################################################################################
 
+def haslinearpathRs(Rs_in, l_out, p_out):
+    """
+    :param Rs_in: list of triplet (multiplicity, representation order, parity)
+    :return: if there is a linear operation between them
+    """
+    for mul_in, l_in, p_in in Rs_in:
+        if mul_in == 0:
+            continue
+
+        for l in range(abs(l_in - l_out), l_in + l_out + 1):
+            if p_out == 0 or p_in * (-1) ** l == p_out:
+                return True
+    return False
+
+
 def normalizeRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
