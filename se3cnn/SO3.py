@@ -639,7 +639,18 @@ def reduce_tensor_product(Rs_i, Rs_j):
 # Check equivariance of an arbitrary function
 ################################################################################
 
-def check_network_equivariance(network, Rs_in, Rs_out, b=2, n=6):
+def check_network_equivariance(network, Rs_in, Rs_out,
+                               vector_output: bool = False, b: int = 2, n: int = 6, ):
+    """Checks rotation equivariance for a function. Network output transforms with the wigner d matrices.
+
+    :param network: Often the forward pass of an object inheriting from torch.nn.Module
+    :param Rs_in: Rs for the input of the network.
+    :param Rs_out: Rs for the output of the network.
+    :param vector_output: When True, the network outputs vectors which have already been converted to xyz basis.
+    :param b: Batch size of test case.
+    :param n: Number of atoms of test case.
+    :return: None
+    """
     # Make sure that all parameters are on the same device. Set that to calculation device.
     devices = [i.device for i in network.parameters()]
     device = devices[0]
@@ -660,7 +671,10 @@ def check_network_equivariance(network, Rs_in, Rs_out, b=2, n=6):
     geo = torch.randn(b, n, 3, device=device)  # Transforms with rotation matrix.
 
     F = network(feat, geo)
-    RF = torch.einsum("ij,zkj->zki", D_out, F)
+    if vector_output:
+        RF = torch.einsum("ij,zkj->zki", rotmat, F)
+    else:
+        RF = torch.einsum("ij,zkj->zki", D_out, F)
     FR = network(feat @ D_in.t(), geo @ rotmat.t())  # [batch, feat, N]
 
     # TODO parity check
@@ -670,3 +684,4 @@ def check_network_equivariance(network, Rs_in, Rs_out, b=2, n=6):
     #     D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)]).to(device)
 
     assert (RF - FR).norm() < 10e-5 * RF.norm()
+    return None
