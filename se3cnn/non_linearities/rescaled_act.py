@@ -34,3 +34,7 @@ def tanh(x):
 
 def relu(x):
     return x.relu().mul(2 ** 0.5)
+
+
+def absolute(x):
+    return x.abs()
