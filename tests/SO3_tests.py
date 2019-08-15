@@ -157,7 +157,7 @@ class Tests(unittest.TestCase):
 
                 D_i = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_i for _ in range(mul)])
                 D_j = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_j for _ in range(mul)])
-                D = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs for _ in range(mul)])
+                D = direct_sum(*[irr_repr(l, *abc) for mul, l, _ in Rs for _ in range(mul)])
 
                 Q1 = torch.einsum("ijk,kl->ijl", (Q, D))
                 Q2 = torch.einsum("li,mj,ijk->lmk", (D_i, D_j, Q))

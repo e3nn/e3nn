@@ -474,7 +474,7 @@ def clebsch_gordan(l1, l2, l3):
 
 
 @cached_dirpklgz("cache/clebsch_gordan")
-def _clebsch_gordan(l1, l2, l3):
+def _clebsch_gordan(l1, l2, l3, _version=2):
     """
     Computes the Clebsch–Gordan coefficients
 
@@ -506,6 +506,9 @@ def _clebsch_gordan(l1, l2, l3):
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
         Q = null_space[0]
         Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+
+        if Q.sum() < 0:
+            Q.neg_()
 
         abc = torch.rand(3)
         _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
