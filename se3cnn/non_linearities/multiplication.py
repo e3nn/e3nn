@@ -35,7 +35,7 @@ class Multiplication(torch.nn.Module):
             for l in range(abs(l_1 - l_2), l_1 + l_2 + 1):
                 Rs_out.append((mul, l, p_1 * p_2))
 
-                C = SO3.clebsch_gordan(l, l_1, l_2) * (2 * l + 1) ** 0.5
+                C = SO3.clebsch_gordan(l, l_1, l_2).type(torch.get_default_dtype()) * (2 * l + 1) ** 0.5
                 if l_1 == 0 or l_2 == 0:
                     m = C.view(2 * l + 1, 2 * l + 1)
                     assert (m - torch.eye(2 * l + 1, dtype=C.dtype)).abs().max() < 1e-10, m.numpy().round(3)

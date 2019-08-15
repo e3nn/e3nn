@@ -1,5 +1,4 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long
-# TODO find a better way to do, now it computes diff_matrix and so on at every convolution
 import torch
 
 
