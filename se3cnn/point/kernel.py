@@ -62,8 +62,8 @@ class Kernel(torch.nn.Module):
 
                 for l in l_filters:
                     # precompute the change of basis Q
-                    Q = SO3.clebsch_gordan(l_out, l_in, l).type(torch.get_default_dtype())
-                    self.register_buffer("Q_{}_{}_{}".format(l_out, l_in, l), Q)
+                    C = SO3.clebsch_gordan(l_out, l_in, l).type(torch.get_default_dtype())
+                    self.register_buffer("cg_{}_{}_{}".format(l_out, l_in, l), C)
 
         # create the radial model: R+ -> R^n_path
         # it contains the learned parameters
@@ -153,10 +153,10 @@ class Kernel(torch.nn.Module):
                     tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
                     Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
 
-                    Q = getattr(self, "Q_{}_{}_{}".format(l_out, l_in, l_filter))  # [m_out, m_in, m]
+                    C = getattr(self, "cg_{}_{}_{}".format(l_out, l_in, l_filter))  # [m_out, m_in, m]
 
                     # note: The multiplication with `c` could also be done outside of the for loop
-                    K += torch.einsum("ijk,kz,zuv->zuivj", (Q, Y, c[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
+                    K += torch.einsum("ijk,kz,zuv->zuivj", (C, Y, c[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
 
                 # put 2l_in+1 to keep the norm of the m vector constant
                 # put 2l_ou+1 to keep the variance of each m componant constant
