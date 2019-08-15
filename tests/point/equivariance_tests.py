@@ -5,7 +5,7 @@ from functools import partial
 import torch
 
 from se3cnn.non_linearities.gated_block_parity import GatedBlockParity
-from se3cnn.non_linearities.rescaled_act import relu, sigmoid, tanh
+from se3cnn.non_linearities.rescaled_act import relu, sigmoid, tanh, absolute
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.operations import Convolution
 from se3cnn.point.radial import ConstantRadialModel
@@ -82,7 +82,7 @@ class Tests(unittest.TestCase):
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
 
-            scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)]
+            scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, absolute)]
             rs_nonscalars = [(mul, 1, +1), (mul, 1, -1), (mul, 2, +1), (mul, 2, -1), (mul, 3, +1), (mul, 3, -1)]
             n = 3 * mul
             gates = [(n, 0, +1), (n, 0, -1)], [(n, sigmoid), (n, tanh)]
