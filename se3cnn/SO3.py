@@ -257,9 +257,8 @@ def spherical_harmonics_xyz(order, xyz):
         out = spherical_harmonics(order, alpha, beta)  # [m, ...]
 
         # fix values when xyz = 0
-        if (xyz.view(-1, 3).norm(2, -1) == 0).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
-            val = torch.cat([spherical_harmonics(0, xyz.flatten()[0], 321) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
-            out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
+        val = torch.cat([xyz.new_tensor([1 / math.sqrt(4 * math.pi)]) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
+        out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
         return out
 
 
@@ -342,8 +341,7 @@ def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
     out = prefactor * quantum * plm  # [m, A]
 
     # fix values when xyz = 0
-    if (norm < eps).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
-        out[..., norm.squeeze(-1) < eps] = spherical_harmonics(0, 123, 321) if order == 0 else 0.
+    out[:, norm.squeeze(-1) < eps] = 1 / math.sqrt(4 * math.pi) if order == 0 else 0.
 
     return out
 
