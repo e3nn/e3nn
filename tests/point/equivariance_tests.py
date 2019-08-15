@@ -82,10 +82,10 @@ class Tests(unittest.TestCase):
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
 
-            scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu, 0), (mul, tanh, -1)]
+            scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)]
             rs_nonscalars = [(mul, 1, +1), (mul, 1, -1), (mul, 2, +1), (mul, 2, -1), (mul, 3, +1), (mul, 3, -1)]
             n = 3 * mul
-            gates = [(n, 0, +1), (n, 0, -1)], [(n, sigmoid, 0), (n, tanh, -1)]
+            gates = [(n, 0, +1), (n, 0, -1)], [(n, sigmoid), (n, tanh)]
 
             f = GatedBlockParity(C, Rs_in, *scalars, *gates, rs_nonscalars)
 
