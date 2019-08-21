@@ -86,3 +86,39 @@ class NeighborsConvolution(torch.nn.Module):
         output = torch.einsum('zab,zabij,zabj->zai', (rel_mask, kernel, neighbor_features))  # [batch, a, i]
 
         return output
+
+
+class PeriodicConvolution(torch.nn.Module):
+    def __init__(self, Kernel, Rs_in, Rs_out):
+        super().__init__()
+        self.kernel = Kernel(Rs_in, Rs_out)
+
+    def forward(self, features, geometry, lattice, max_radius):
+        """
+        :param features:   tensor [batch, point, channel]
+        :param geometry:   tensor [batch, point, xyz]
+        :param lattice:    pymatgen.Lattice
+        :param max_radius: float
+        :return:           tensor [batch, point, channel]
+        """
+        import pymatgen
+        assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
+
+        k_z = []
+        for geo in geometry:
+            structure = pymatgen.Structure(lattice, ["H"] * len(geo), geo.cpu().numpy(), coords_are_cartesian=True)
+
+            k_a = []
+            for site_a in structure:
+                k = None
+                k_b = [0] * len(structure)
+                for site_b, _r, b, _ in structure.get_sites_in_sphere(site_a.coords, max_radius, include_index=True, include_image=True):
+                    rba = geometry.new_tensor(site_b.coords - site_a.coords)
+                    k = self.kernel(rba)  # [i, j]
+                    k_b[b] += k
+                k_b = torch.stack([torch.zeros_like(k) if x is 0 else x for x in k_b])  # [b, i, j]
+                k_a.append(k_b)
+            k_z.append(torch.stack(k_a))  # [a, b, i, j]
+        k = torch.stack(k_z)  # [z, a, b, i, j]
+
+        return torch.einsum("zabij,zbj->zai", (k, features))  # [point, channel]
