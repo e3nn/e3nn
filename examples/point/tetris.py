@@ -5,7 +5,7 @@ import torch
 
 from se3cnn.non_linearities import GatedBlock
 from se3cnn.point.operations import Convolution
-from se3cnn.non_linearities import rescaled_act
+from se3cnn.non_linearities.rescaled_act import relu, sigmoid
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.radial import CosineBasisModel
 from se3cnn.SO3 import rand_rot
@@ -41,15 +41,12 @@ class SE3Net(torch.nn.Module):
         representations = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
         representations = [[(mul, l) for l, mul in enumerate(rs)] for rs in representations]
 
-        sp = rescaled_act.Softplus(beta=5)
-
-        RadialModel = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=sp)
-
-        K = partial(Kernel, RadialModel=RadialModel)
+        R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=relu)
+        K = partial(Kernel, RadialModel=R)
         C = partial(Convolution, K)
 
         self.firstlayers = torch.nn.ModuleList([
-            GatedBlock(Rs_in, Rs_out, sp, rescaled_act.sigmoid, C)
+            GatedBlock(Rs_in, Rs_out, relu, sigmoid, C)
             for Rs_in, Rs_out in zip(representations, representations[1:])
         ])
         self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
