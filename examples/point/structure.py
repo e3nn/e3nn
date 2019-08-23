@@ -17,7 +17,7 @@ def get_dataset(filename):
         dataset = json.load(f)
 
     structures = [pymatgen.Structure.from_dict(s) for s, l in dataset]
-    classes = sorted({l for s, l in dataset})
+    classes = ['diamond', 'fcc', 'bcc', 'hcp', 'rutile', 'perovskite', 'spinel', 'corundum']
     labels = [classes.index(l) for s, l in dataset]
 
     return structures, labels
@@ -62,16 +62,16 @@ def main():
     torch.set_default_dtype(torch.float64)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    structures, labels = get_dataset('structure-trainset.json')
+    structures, labels = get_dataset('structure-1atomstype-trainset.json')
     labels = torch.tensor(labels, device=device)
 
-    f = Network(4)
+    f = Network(8)
     f = f.to(device)
 
     optimizer = torch.optim.Adam(f.parameters())
     success = []
 
-    for step in range(500):
+    for step in range(800):
         i = random.randint(0, len(structures) - 1)
         struct = structures[i]
         target = labels[i]
@@ -87,11 +87,14 @@ def main():
 
             print("step={} loss={:.2e} {}".format(step, loss.item(), success[-10:]))
 
-    structures, labels = get_dataset('structure-trainset.json')
-    print(100 * sum([f(struct).argmax().item() == target for struct, target in zip(structures, labels)]) / len(structures))
+    def test(filename):
+        structures, labels = get_dataset(filename)
+        pred = [f(s).argmax().item() for s in structures]
+        from sklearn.metrics import confusion_matrix
+        print(confusion_matrix(labels, pred))
 
-    structures, labels = get_dataset('structure-testset.json')
-    print(100 * sum([f(struct).argmax().item() == target for struct, target in zip(structures, labels)]) / len(structures))
+    test('structure-1atomstype-trainset.json')
+    test('structure-1atomstype-testset.json')
 
 
 if __name__ == '__main__':
