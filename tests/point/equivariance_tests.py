@@ -4,8 +4,8 @@ from functools import partial
 
 import torch
 
-from se3cnn.non_linearities import rescaled_act
-from se3cnn.non_linearities.gated_block import GatedBlock
+from se3cnn.non_linearities.gated_block_parity import GatedBlockParity
+from se3cnn.non_linearities.rescaled_act import relu, sigmoid, tanh, absolute
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.operations import Convolution
 from se3cnn.point.radial import ConstantRadialModel
@@ -76,19 +76,27 @@ class Tests(unittest.TestCase):
 
     def test4(self):
         with torch_default_dtype(torch.float64):
-            Rs = [(4, l, p) for l in range(6) for p in [-1, 1]]
+            mul = 2
+            Rs_in = [(mul, l, p) for l in range(6) for p in [-1, 1]]
 
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
-            f = GatedBlock(Rs, Rs, rescaled_act.tanh, rescaled_act.tanh, C)
 
-            D = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs for _ in range(mul)])
+            scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, absolute)]
+            rs_nonscalars = [(mul, 1, +1), (mul, 1, -1), (mul, 2, +1), (mul, 2, -1), (mul, 3, +1), (mul, 3, -1)]
+            n = 3 * mul
+            gates = [(n, 0, +1), (n, 0, -1)], [(n, sigmoid), (n, tanh)]
 
-            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs))
+            f = GatedBlockParity(C, Rs_in, *scalars, *gates, rs_nonscalars)
+
+            D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
+            D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in f.Rs_out for _ in range(mul)])
+
+            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
             geo = torch.randn(1, 4, 3)
 
-            x1 = torch.einsum("ij,zaj->zai", (D, f(fea, geo)))
-            x2 = f(torch.einsum("ij,zaj->zai", (D, fea)), -geo)
+            x1 = torch.einsum("ij,zaj->zai", (D_out, f(fea, geo)))
+            x2 = f(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo)
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 unittest.main()
