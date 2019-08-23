@@ -257,9 +257,8 @@ def spherical_harmonics_xyz(order, xyz):
         out = spherical_harmonics(order, alpha, beta)  # [m, ...]
 
         # fix values when xyz = 0
-        if (xyz.view(-1, 3).norm(2, -1) == 0).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
-            val = torch.cat([spherical_harmonics(0, xyz.flatten()[0], 321) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
-            out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
+        val = torch.cat([xyz.new_tensor([1 / math.sqrt(4 * math.pi)]) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
+        out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
         return out
 
 
@@ -342,8 +341,7 @@ def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
     out = prefactor * quantum * plm  # [m, A]
 
     # fix values when xyz = 0
-    if (norm < eps).nonzero().numel() > 0:  # this `if` is not needed with version 1.0 of pytorch
-        out[..., norm.squeeze(-1) < eps] = spherical_harmonics(0, 123, 321) if order == 0 else 0.
+    out[:, norm.squeeze(-1) < eps] = 1 / math.sqrt(4 * math.pi) if order == 0 else 0.
 
     return out
 
@@ -474,7 +472,7 @@ def clebsch_gordan(l1, l2, l3):
 
 
 @cached_dirpklgz("cache/clebsch_gordan")
-def _clebsch_gordan(l1, l2, l3):
+def _clebsch_gordan(l1, l2, l3, _version=2):
     """
     Computes the Clebsch–Gordan coefficients
 
@@ -506,6 +504,9 @@ def _clebsch_gordan(l1, l2, l3):
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
         Q = null_space[0]
         Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+
+        if Q.sum() < 0:
+            Q.neg_()
 
         abc = torch.rand(3)
         _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))

@@ -1,5 +1,4 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long
-# TODO find a better way to do, now it computes diff_matrix and so on at every convolution
 import torch
 
 
@@ -87,3 +86,53 @@ class NeighborsConvolution(torch.nn.Module):
         output = torch.einsum('zab,zabij,zabj->zai', (rel_mask, kernel, neighbor_features))  # [batch, a, i]
 
         return output
+
+
+class PeriodicConvolution(torch.nn.Module):
+    def __init__(self, Kernel, Rs_in, Rs_out):
+        super().__init__()
+        self.kernel = Kernel(Rs_in, Rs_out)
+
+    def forward(self, features, geometry, lattice, max_radius):
+        """
+        :param features:   tensor [batch, point, channel]
+        :param geometry:   tensor [batch, point, xyz]
+        :param lattice:    pymatgen.Lattice
+        :param max_radius: float
+        :return:           tensor [batch, point, channel]
+        """
+        import pymatgen
+        assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
+
+        radius = []
+        bs = []
+        ns = []
+        for geo in geometry:
+            structure = pymatgen.Structure(lattice, ["H"] * len(geo), geo.cpu().numpy(), coords_are_cartesian=True)
+
+            for site_a in structure:
+                nei = structure.get_sites_in_sphere(site_a.coords, max_radius, include_index=True, include_image=True)
+                ns.append(len(nei))
+                for site_b, _, b, _ in nei:
+                    radius.append(geometry.new_tensor(site_b.coords - site_a.coords))
+                    bs.append(b)
+
+        kernels = self.kernel(torch.stack(radius))  # [r, i, j]
+
+        ns = iter(ns)
+        bs = iter(bs)
+        ks = iter(kernels)
+
+        k_z = []
+        for _ in range(geometry.size(0)):
+            k_a = []
+            for _ in range(geometry.size(1)):
+                k_b = [torch.zeros_like(kernels[0]) for _ in range(geometry.size(1))]
+                for _ in range(next(ns)):
+                    k_b[next(bs)] += next(ks)  # [i, j]
+                k_b = torch.stack(k_b)  # [b, i, j]
+                k_a.append(k_b)
+            k_z.append(torch.stack(k_a))  # [a, b, i, j]
+        k = torch.stack(k_z)  # [z, a, b, i, j]
+
+        return torch.einsum("zabij,zbj->zai", (k, features))  # [point, channel]
