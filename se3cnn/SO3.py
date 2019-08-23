@@ -131,6 +131,35 @@ def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return torch.tensor(wigner_D_matrix(order, *abc), dtype=dtype, device=device)
 
 
+def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
+    """
+    derivative of irreducible representation of SO3
+    """
+    import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
+    abc = [alpha, beta, gamma]
+    for i, x in enumerate(abc):
+        if torch.is_tensor(x):
+            abc[i] = x.item()
+            if dtype is None:
+                dtype = x.dtype
+            if device is None:
+                device = x.device
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+    return torch.tensor(ph.derivative_rot_mat(*abc, l=order, J=ph.Jd[order]), dtype=dtype, device=device)
+
+
+def rep(Rs, alpha, beta, gamma, parity=None):
+    """
+    Representation of O(3). Parity applied (-1)**parity times.
+    """
+    abc = [alpha, beta, gamma]
+    if parity is None:
+        return direct_sum(*[irr_repr(l, *abc) for mul, l, _ in normalizeRs(Rs) for _ in range(mul)])
+    else:
+        assert all(parity != 0 for _, _, parity in normalizeRs(Rs))
+        return direct_sum(*[(p ** parity) * irr_repr(l, *abc) for mul, l, p in normalizeRs(Rs) for _ in range(mul)])
+
 
 ################################################################################
 # Rs lists
@@ -640,18 +669,24 @@ def reduce_tensor_product(Rs_i, Rs_j):
 # Check equivariance of an arbitrary function
 ################################################################################
 
-def check_network_equivariance(network, Rs_in, Rs_out,
-                               vector_output: bool = False, b: int = 2, n: int = 6, ):
+def check_network_equivariance(network, Rs_in, Rs_out, vector_output: bool = False, batch: int = 2,
+                               n_atoms: int = 6) -> bool:
     """Checks rotation equivariance for a function. Network output transforms with the wigner d matrices.
 
     :param network: Often the forward pass of an object inheriting from torch.nn.Module
     :param Rs_in: Rs for the input of the network.
     :param Rs_out: Rs for the output of the network.
     :param vector_output: When True, the network outputs vectors which have already been converted to xyz basis.
-    :param b: Batch size of test case.
-    :param n: Number of atoms of test case.
+    :param batch: Batch size of test case.
+    :param n_atoms: Number of atoms of test case.
     :return: None
     """
+    def check_parity(Rs):
+        if any(p != 0 for _, _, p in normalizeRs(Rs)):
+            return True
+        else:
+            return False
+
     # Make sure that all parameters are on the same device. Set that to calculation device.
     devices = [i.device for i in network.parameters()]
     device = devices[0]
@@ -659,30 +694,21 @@ def check_network_equivariance(network, Rs_in, Rs_out,
 
     Rs_in = normalizeRs(Rs_in)
     Rs_out = normalizeRs(Rs_out)
+    parity = check_parity(Rs_in) or check_parity(Rs_out)
 
-    abc = torch.randn(3, device=device)  # Rotation seed of euler angles
-
-    D_in = direct_sum(*[irr_repr(l, *abc) for mul, l, _ in Rs_in for _ in range(mul)])
-    D_out = direct_sum(*[irr_repr(l, *abc) for mul, l, _ in Rs_out for _ in range(mul)])
-    rotmat = rot(*abc)
+    abc = torch.randn(3, device=device)  # Rotation seed of euler angles.
+    D_in = rep(Rs_in, *abc)
+    geo_rotation_matrix = -rot(*abc) if parity else rot(*abc)  # Geometry is odd parity.
+    D_out = rep(Rs_out, *abc)
 
     c = sum([mul * (2 * l + 1) for mul, l, _ in Rs_in])
-
-    feat = torch.randn(b, n, c, device=device)  # Transforms with wigner D matrix
-    geo = torch.randn(b, n, 3, device=device)  # Transforms with rotation matrix.
+    feat = torch.randn(batch, n_atoms, c, device=device)  # Transforms with wigner D matrix
+    geo = torch.randn(batch, n_atoms, 3, device=device)  # Transforms with rotation matrix.
 
     F = network(feat, geo)
     if vector_output:
-        RF = torch.einsum("ij,zkj->zki", rotmat, F)
+        RF = torch.einsum("ij,zkj->zki", geo_rotation_matrix, F)
     else:
         RF = torch.einsum("ij,zkj->zki", D_out, F)
-    FR = network(feat @ D_in.t(), geo @ rotmat.t())  # [batch, feat, N]
-
-    # TODO parity check
-    # if p ==0:
-    #     pass
-    # else:
-    #     D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)]).to(device)
-
-    assert (RF - FR).norm() < 10e-5 * RF.norm()
-    return None
+    FR = network(feat @ D_in.t(), geo @ geo_rotation_matrix.t())  # [batch, feat, N]
+    return (RF - FR).norm() < 10e-5 * RF.norm()

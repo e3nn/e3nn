@@ -99,4 +99,17 @@ class Tests(unittest.TestCase):
             x2 = f(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo)
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
+
+    def check_network_equivariance_parity(self):
+        with torch_default_dtype(torch.float64):
+            K = partial(Kernel, RadialModel=ConstantRadialModel)
+            C = partial(Convolution, K)
+
+            Rs_in = [(1, 0, +1)]
+            m = GatedBlockParity(C,
+                                 Rs_in,
+                                 [(4, 0, 1)], [(-1, relu)],
+                                 [(8, 0, 1)], [(-1, sigmoid)],
+                                 [(4, 1, -1), (4, 2, 1)])
+            # Rs_in and m.Rs_out
 unittest.main()
