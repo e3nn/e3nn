@@ -12,8 +12,8 @@ from se3cnn.point.operations import PeriodicConvolution
 from se3cnn.point.radial import CosineBasisModel
 
 
-def get_dataset():
-    with open('structure-dataset.json', 'r') as f:
+def get_dataset(filename):
+    with open(filename, 'r') as f:
         dataset = json.load(f)
 
     structures = [pymatgen.Structure.from_dict(s) for s, l in dataset]
@@ -45,18 +45,24 @@ class Network(torch.nn.Module):
         ])
         self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
 
-    def forward(self, features, geometry, lattice):
-        for m in self.firstlayers:
-            features = m(features.div(4 ** 0.5), geometry, lattice, 3.8)
+    def forward(self, structure):
+        p = next(self.parameters())
+        geometry = torch.stack([p.new_tensor(s.coords) for s in structure.sites])
+        features = p.new_ones(1, len(geometry), 1)
+        geometry = geometry.unsqueeze(0)
 
-        return self.lastlayers(features)
+        for i, m in enumerate(self.firstlayers):
+            assert torch.isfinite(features).all(), i
+            features = m(features.div(4 ** 0.5), geometry, structure.lattice, 3.8)
+
+        return self.lastlayers(features).squeeze(0)
 
 
 def main():
     torch.set_default_dtype(torch.float64)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    structures, labels = get_dataset()
+    structures, labels = get_dataset('structure-trainset.json')
     labels = torch.tensor(labels, device=device)
 
     f = Network(4)
@@ -70,12 +76,9 @@ def main():
         struct = structures[i]
         target = labels[i]
 
-        geo = torch.stack([torch.tensor(s.coords) for s in struct.sites])
-        feature = geo.new_ones(len(geo), 1)
-
-        out = f(feature.unsqueeze(0), geo.unsqueeze(0), struct.lattice)
-        success.append(1 if out.argmax(1)[0].item() == target else 0)
-        loss = torch.nn.functional.cross_entropy(out, target.unsqueeze(0))
+        out = f(struct)
+        success.append(1 if out.argmax().item() == target else 0)
+        loss = torch.nn.functional.cross_entropy(out.unsqueeze(0), target.unsqueeze(0))
         loss.backward()
 
         if step % 2 == 0:
@@ -83,6 +86,12 @@ def main():
             optimizer.zero_grad()
 
             print("step={} loss={:.2e} {}".format(step, loss.item(), success[-10:]))
+
+    structures, labels = get_dataset('structure-trainset.json')
+    print(100 * sum([f(struct).argmax().item() == target for struct, target in zip(structures, labels)]) / len(structures))
+
+    structures, labels = get_dataset('structure-testset.json')
+    print(100 * sum([f(struct).argmax().item() == target for struct, target in zip(structures, labels)]) / len(structures))
 
 
 if __name__ == '__main__':

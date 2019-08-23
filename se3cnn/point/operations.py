@@ -117,7 +117,9 @@ class PeriodicConvolution(torch.nn.Module):
                     radius.append(geometry.new_tensor(site_b.coords - site_a.coords))
                     bs.append(b)
 
-        kernels = self.kernel(torch.stack(radius))  # [r, i, j]
+        radius = torch.stack(radius)
+        radius[radius.norm(2, -1) < 1e-10] = 0
+        kernels = self.kernel(radius)  # [r, i, j]
 
         ns = iter(ns)
         bs = iter(bs)
