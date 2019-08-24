@@ -7,7 +7,7 @@ class Convolution(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry):
+    def forward(self, features, geometry, n_norm=1):
         """
         :param features: tensor [batch, point, channel]
         :param geometry: tensor [batch, point, xyz]
@@ -17,6 +17,7 @@ class Convolution(torch.nn.Module):
         rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
         ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, i, j]
+        k.div_(n_norm ** 0.5)
         return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]
 
 
@@ -25,7 +26,7 @@ class PairConvolution(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out * 6)
 
-    def forward(self, features, geometry):
+    def forward(self, features, geometry, n_norm=1):
         """
         :param features: tensor [batch, c, d, channel]
         :param geometry: tensor [batch, a, xyz]
@@ -35,6 +36,7 @@ class PairConvolution(torch.nn.Module):
         rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
         ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, 6 * i, j]
+        k.div_((6 * n_norm ** 2) ** 0.5)
         k1, k2, k3, k4, k5, k6 = k.split(k.size(3) // 6, 3)
         out = torch.einsum("zabij,zcdj->zabi", (k1, features))  # [batch, a, b, channel]
         out += torch.einsum("zacij,zcdj->zai", (k2, features)).unsqueeze(2)  # [batch, a, b, channel]
@@ -50,7 +52,7 @@ class ApplyKernel(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry):
+    def forward(self, features, geometry, n_norm=1):
         """
         :param features: tensor [batch, point, channel]
         :param geometry: tensor [batch, point, xyz]
@@ -60,6 +62,7 @@ class ApplyKernel(torch.nn.Module):
         rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
         ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, i, j]
+        # k.div_((n_norm ** 0) ** 0.5)
         return torch.einsum("zabij,zbj->zabi", (k, features))  # [batch, point, point, channel]
 
 
@@ -70,7 +73,7 @@ class NeighborsConvolution(torch.nn.Module):
         self.kernel = Kernel(Rs_in, Rs_out)
         self.radius = radius
 
-    def forward(self, features, geometry):
+    def forward(self, features, geometry, n_norm=1):
         """
         :param features: tensor [batch, point, channel]
         :param geometry: tensor [batch, point, xyz]
@@ -107,8 +110,9 @@ class NeighborsConvolution(torch.nn.Module):
 
         neighbor_features = features[torch.arange(batch).view(-1, 1, 1), neighbors, :]  # [batch, a, b, j]
 
-        kernel = self.kernel(diff)  # [batch, a, b, i, j]
-        output = torch.einsum('zab,zabij,zabj->zai', (rel_mask, kernel, neighbor_features))  # [batch, a, i]
+        k = self.kernel(diff)  # [batch, a, b, i, j]
+        k.div_(n_norm ** 0.5)
+        output = torch.einsum('zab,zabij,zabj->zai', (rel_mask, k, neighbor_features))  # [batch, a, i]
 
         return output
 
@@ -118,7 +122,7 @@ class PeriodicConvolution(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry, lattice, max_radius):
+    def forward(self, features, geometry, lattice, max_radius, n_norm=1):
         """
         :param features:   tensor [batch, point, channel]
         :param geometry:   tensor [batch, point, xyz]
@@ -161,5 +165,6 @@ class PeriodicConvolution(torch.nn.Module):
                 k_a.append(k_b)
             k_z.append(torch.stack(k_a))  # [a, b, i, j]
         k = torch.stack(k_z)  # [z, a, b, i, j]
+        k.div_(n_norm ** 0.5)
 
         return torch.einsum("zabij,zbj->zai", (k, features))  # [point, channel]
