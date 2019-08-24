@@ -52,7 +52,7 @@ class ApplyKernel(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry, n_norm=1):
+    def forward(self, features, geometry, _n_norm=1):
         """
         :param features: tensor [batch, point, channel]
         :param geometry: tensor [batch, point, xyz]
@@ -62,7 +62,6 @@ class ApplyKernel(torch.nn.Module):
         rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
         ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, i, j]
-        # k.div_((n_norm ** 0) ** 0.5)
         return torch.einsum("zabij,zbj->zabi", (k, features))  # [batch, point, point, channel]
 
 
