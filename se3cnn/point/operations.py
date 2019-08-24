@@ -20,6 +20,25 @@ class Convolution(torch.nn.Module):
         return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]
 
 
+class PairConvolution(torch.nn.Module):
+    def __init__(self, Kernel, Rs_in, Rs_out):
+        super().__init__()
+        self.kernel = Kernel(Rs_in, Rs_out * 6)
+
+    def forward(self, features, geometry):
+        """
+        :param features: tensor [batch, c, d, channel]
+        :param geometry: tensor [batch, a, xyz]
+        :return:         tensor [batch, a, b, channel]
+        """
+        assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
+        rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
+        ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
+        k = self.kernel(rb - ra)  # [batch, a, b, 6 * i, j]
+        return torch.einsum("zabij,zacij,zadij,zbcij,zbdij,zcdij,zcdj->zabi",
+                            (*k.split(k.size(3) // 6, 3), features))  # [batch, a, b, channel]
+
+
 class ApplyKernel(torch.nn.Module):
     def __init__(self, Kernel, Rs_in, Rs_out):
         super().__init__()
