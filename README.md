@@ -2,7 +2,7 @@
 The group SE(3) is the group of 3 dimensional rotations and translations.
 This library aims to create [SE(3) equivariant](https://youtu.be/ENLJACPHSEA) convolutional neural networks.
 
-![](https://github.com/antigol/se3net/raw/master/examples/plots/kernels.png)
+![](https://user-images.githubusercontent.com/333780/63736480-135b8700-c838-11e9-873f-2d65c67b98df.gif)
 
 ## Image and Point
 The code is separated in two parts:
