@@ -38,7 +38,10 @@ class GatedBlockParity(torch.nn.Module):
         features = self.op(*args, **kwargs)
         scalars, gates, nonscalars = split_features(features, self.Rs_scalars, self.Rs_gates, self.Rs_nonscalars)
         scalars = self.act_scalars(scalars)
-        gates = self.act_gates(gates)
-        nonscalars = self.mul(nonscalars, gates)
-        features = torch.cat([scalars, nonscalars], dim=dim)
+        if gates.size(dim):
+            gates = self.act_gates(gates)
+            nonscalars = self.mul(nonscalars, gates)
+            features = torch.cat([scalars, nonscalars], dim=dim)
+        else:
+            features = scalars
         return features
