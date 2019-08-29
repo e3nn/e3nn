@@ -38,13 +38,35 @@ class PairConvolution(torch.nn.Module):
         k = self.kernel(rb - ra)  # [batch, a, b, 6 * i, j]
         k.div_((6 * n_norm ** 2) ** 0.5)
         k1, k2, k3, k4, k5, k6 = k.split(k.size(3) // 6, 3)
-        out = torch.einsum("zabij,zcdj->zabi", (k1, features))  # [batch, a, b, channel]
+        out = 0
+        out += torch.einsum("zabij,zcdj->zabi", (k1, features))  # [batch, a, b, channel]
         out += torch.einsum("zacij,zcdj->zai", (k2, features)).unsqueeze(2)  # [batch, a, b, channel]
         out += torch.einsum("zadij,zcdj->zai", (k3, features)).unsqueeze(2)  # [batch, a, b, channel]
         out += torch.einsum("zbcij,zcdj->zbi", (k4, features)).unsqueeze(1)  # [batch, a, b, channel]
         out += torch.einsum("zbdij,zcdj->zbi", (k5, features)).unsqueeze(1)  # [batch, a, b, channel]
         out += torch.einsum("zcdij,zcdj->zi", (k6, features)).unsqueeze(1).unsqueeze(2)  # [batch, a, b, channel]
         return out
+
+
+class PairConvolution2(torch.nn.Module):
+    def __init__(self, Kernel, Rs_in, Rs_out):
+        super().__init__()
+        self.kernel1 = Kernel(Rs_in, Rs_out)
+        self.kernel2 = Kernel(Rs_out, Rs_out)
+
+    def forward(self, features, geometry, n_norm=1):
+        """
+        :param features: tensor [batch, c, d, channel]
+        :param geometry: tensor [batch, a, xyz]
+        :return:         tensor [batch, a, b, channel]
+        """
+        assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
+        rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
+        ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
+        k1 = self.kernel1(rb - ra)  # [batch, a, b, i, j]
+        k2 = self.kernel2(rb - ra)  # [batch, a, b, i, j]
+        k1.div_(n_norm)
+        return torch.einsum("zacij,zbdjk,zcdk->zabi", (k2, k1, features))  # [batch, a, b, channel]
 
 
 class ApplyKernel(torch.nn.Module):
