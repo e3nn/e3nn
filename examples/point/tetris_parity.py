@@ -3,12 +3,12 @@ from functools import partial
 
 import torch
 
-from se3cnn.non_linearities import GatedBlock
+from se3cnn.non_linearities.gated_block_parity import GatedBlockParity
 from se3cnn.point.operations import Convolution
-from se3cnn.non_linearities.rescaled_act import relu, sigmoid
+from se3cnn.non_linearities.rescaled_act import relu, sigmoid, tanh
 from se3cnn.point.kernel import Kernel
 from se3cnn.point.radial import CosineBasisModel
-from se3cnn.SO3 import rand_rot
+from se3cnn.SO3 import rand_rot, formatRs
 
 
 def get_dataset():
@@ -34,26 +34,50 @@ class AvgSpacial(torch.nn.Module):
         return features.mean(1)
 
 
-class SE3Net(torch.nn.Module):
+def haspath(Rs_in, l_out, p_out):
+    for _, l_in, p_in in Rs_in:
+        for l in range(abs(l_in - l_out), l_in + l_out + 1):
+            if p_out == 0 or p_in * (-1) ** l == p_out:
+                return True
+    return False
+
+
+class Network(torch.nn.Module):
     def __init__(self, num_classes):
         super().__init__()
 
-        representations = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
-        representations = [[(mul, l) for l, mul in enumerate(rs)] for rs in representations]
-
-        R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=relu)
+        R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=3, act=relu)
         K = partial(Kernel, RadialModel=R)
         C = partial(Convolution, K)
 
-        self.firstlayers = torch.nn.ModuleList([
-            GatedBlock(Rs_in, Rs_out, relu, sigmoid, C)
-            for Rs_in, Rs_out in zip(representations, representations[1:])
-        ])
-        self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
+        mul = 7
+        layers = []
+
+        rs = [(1, 0, +1)]
+        for i in range(3):
+            scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1), (mul, 0, -1)] if haspath(rs, l, p)]
+            act_scalars = [(mul, relu if p == 1 else tanh) for mul, l, p in scalars]
+
+            nonscalars = [(mul, l, p) for mul, l, p in [(mul, 1, +1), (mul, 1, -1)] if haspath(rs, l, p)]
+            gates = [(sum(mul for mul, l, p in nonscalars), 0, +1)]
+            act_gates = [(-1, sigmoid)]
+
+            print("layer {}: from {} to {}".format(i, formatRs(rs), formatRs(scalars + nonscalars)))
+
+            block = GatedBlockParity(C, rs, scalars, act_scalars, gates, act_gates, nonscalars)
+            rs = block.Rs_out
+            layers.append(block)
+
+        layers.append(GatedBlockParity(C, rs, [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)], [], [], []))
+
+        self.firstlayers = torch.nn.ModuleList(layers)
+
+        # the last layer is not equivariant, it is allowed to mix even and odds scalars
+        self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(mul + mul, num_classes))
 
     def forward(self, features, geometry):
         for m in self.firstlayers:
-            features = m(features.div(4 ** 0.5), geometry)
+            features = m(features, geometry, 4)
 
         return self.lastlayers(features)
 
@@ -65,22 +89,23 @@ def main():
     tetris, labels = get_dataset()
     tetris = tetris.to(device)
     labels = labels.to(device)
-    f = SE3Net(len(tetris))
+    f = Network(len(tetris))
     f = f.to(device)
 
     optimizer = torch.optim.Adam(f.parameters())
 
     feature = tetris.new_ones(tetris.size(0), tetris.size(1), 1)
 
-    for step in range(50):
+    for step in range(200):
         out = f(feature, tetris)
         loss = torch.nn.functional.cross_entropy(out, labels)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        acc = out.argmax(1).eq(labels).double().mean().item()
-        print("step={} loss={} accuracy={}".format(step, loss.item(), acc))
+        if step % 10 == 0:
+            acc = out.argmax(1).eq(labels).double().mean().item()
+            print("step={:03d} loss={:.3f} accuracy={:.0f}%".format(step, loss.item(), 100 * acc))
 
     out = f(feature, tetris)
 
