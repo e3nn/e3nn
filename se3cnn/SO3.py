@@ -133,7 +133,8 @@ def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
 
 def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     """
-    derivative of irreducible representation of SO3
+    derivative of irreducible representation of SO3.
+    returns (dDda, dDdb, dDdc)
     """
     import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
     abc = [alpha, beta, gamma]
@@ -146,7 +147,9 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
                 device = x.device
     if dtype is None:
         dtype = torch.get_default_dtype()
-    return torch.tensor(ph.derivative_rot_mat(*abc, l=order, J=ph.Jd[order]), dtype=dtype, device=device)
+    dDdabc = ph.derivative_rot_mat(*abc, l=order, J=ph.Jd[order])
+    dDda, dDdb, dDdc = [torch.tensor(i, dtype=dtype, device=device) for i in dDdabc]
+    return dDda, dDdb, dDdc
 
 
 def rep(Rs, alpha, beta, gamma, parity=None):
