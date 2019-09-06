@@ -243,7 +243,9 @@ def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
     import numpy as np
 
-    if not isinstance(order, list):
+    try:
+        order = list(order)
+    except TypeError:
         order = [order]
 
     if dtype is None and torch.is_tensor(alpha):
@@ -281,17 +283,31 @@ def spherical_harmonics_xyz(order, xyz, dtype=None, device=None):
     :param xyz: tensor of shape [..., 3]
     :return: tensor of shape [m, ...]
     """
-    if not isinstance(order, list):
+    try:
+        order = list(order)
+    except TypeError:
         order = [order]
+
+    if dtype is None and torch.is_tensor(xyz):
+        dtype = xyz.dtype
+    if dtype is None:
+        dtype = torch.get_default_dtype()
+
+    if device is None and torch.is_tensor(xyz):
+        device = xyz.device
+
+    if not torch.is_tensor(xyz):
+        xyz = torch.tensor(xyz, dtype=torch.float64)
 
     with torch_default_dtype(torch.float64):
         alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
-        out = spherical_harmonics(order, alpha, beta, dtype=dtype, device=device)  # [m, ...]
+        out = spherical_harmonics(order, alpha, beta)  # [m, ...]
 
         # fix values when xyz = 0
-        val = torch.cat([xyz.new_tensor([1 / math.sqrt(4 * math.pi)]) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
+        val = xyz.new_tensor([1 / math.sqrt(4 * math.pi)])
+        val = torch.cat([val if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
         out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
-        return out
+        return out.to(dtype=dtype, device=device)
 
 
 def _legendre(order, z):
