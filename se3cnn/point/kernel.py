@@ -113,7 +113,7 @@ class Kernel(torch.nn.Module):
         kernel = r.new_zeros(batch, self.n_out, self.n_in)
 
         # precompute all needed spherical harmonics
-        Ys = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
+        Ys = self.sh(self.set_of_l_filters, r.cpu().detach())  # [l_filter * m_filter, batch]
 
         # use the radial model to fix all the degrees of freedom
         radii = r.norm(2, dim=1)  # [batch]
