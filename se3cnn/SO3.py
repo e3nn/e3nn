@@ -273,7 +273,7 @@ def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     return torch.tensor(Y, dtype=dtype, device=device)
 
 
-def spherical_harmonics_xyz(order, xyz):
+def spherical_harmonics_xyz(order, xyz, dtype=None, device=None):
     """
     spherical harmonics
 
@@ -286,7 +286,7 @@ def spherical_harmonics_xyz(order, xyz):
 
     with torch_default_dtype(torch.float64):
         alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
-        out = spherical_harmonics(order, alpha, beta)  # [m, ...]
+        out = spherical_harmonics(order, alpha, beta, dtype=dtype, device=device)  # [m, ...]
 
         # fix values when xyz = 0
         val = torch.cat([xyz.new_tensor([1 / math.sqrt(4 * math.pi)]) if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
