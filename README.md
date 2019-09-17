@@ -99,7 +99,7 @@ python setup.py install
                   Maurice Weiler and
                   Michał Tyszkiewicz and
                   Jes Frellsen and
-                  Ben},
+                  Benjamin K. Miller},
   title        = {mariogeiger/se3cnn: Point cloud support},
   month        = jul,
   year         = 2019,
