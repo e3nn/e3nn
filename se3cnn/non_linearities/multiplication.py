@@ -38,7 +38,10 @@ class Multiplication(torch.nn.Module):
                 C = SO3.clebsch_gordan(l, l_1, l_2).type(torch.get_default_dtype()) * (2 * l + 1) ** 0.5
                 if l_1 == 0 or l_2 == 0:
                     m = C.view(2 * l + 1, 2 * l + 1)
-                    assert (m - torch.eye(2 * l + 1, dtype=C.dtype)).abs().max() < 1e-10, m.numpy().round(3)
+                    if C.dtype == torch.float:
+                        assert (m - torch.eye(2 * l + 1, dtype=C.dtype)).abs().max() < 1e-7, m.numpy().round(3)
+                    else:
+                        assert (m - torch.eye(2 * l + 1, dtype=C.dtype)).abs().max() < 1e-10, m.numpy().round(3)
                 else:
                     self.register_buffer("cg_{}_{}_{}".format(l, l_1, l_2), C)
 
