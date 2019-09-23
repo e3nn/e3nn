@@ -151,41 +151,36 @@ class PeriodicConvolution(torch.nn.Module):
         :param max_radius: float
         :return:           tensor [batch, point, channel]
         """
+        assert features.size()[:2] == geometry.size()[:2], "features ({}) and geometry ({}) sizes of the first two dimensions should match".format(features.size(), geometry.size())
         import pymatgen
-        assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
+        import numpy as np
 
-        radius = []
-        bs = []
-        ns = []
-        for geo in geometry:
-            structure = pymatgen.Structure(lattice, ["H"] * len(geo), geo.cpu().numpy(), coords_are_cartesian=True)
+        batch_size, points_num = features.size(0), features.size(1)
+        in_channels, out_channels = self.kernel.n_in, self.kernel.n_out
 
-            for site_a in structure:
+        geometry = geometry.cpu().numpy()
+        features = features.view(batch_size, points_num * in_channels)                                               # [z, b*j]
+        out = features.new_zeros(batch_size, points_num, out_channels)                                               # [z, a, i]
+
+        for z, geo in enumerate(geometry):
+            structure = pymatgen.Structure(lattice, ["H"] * points_num, geo, coords_are_cartesian=True)
+            for a, site_a in enumerate(structure):
                 nei = structure.get_sites_in_sphere(site_a.coords, max_radius, include_index=True, include_image=True)
-                ns.append(len(nei))
-                for site_b, _, b, _ in nei:
-                    radius.append(geometry.new_tensor(site_b.coords - site_a.coords))
-                    bs.append(b)
+                if nei:
+                    bs = torch.tensor([entry[2] for entry in nei], dtype=torch.long, device=features.device)         # [r]
+                    site_b_coords = np.array([entry[0].coords for entry in nei])                                     # [r, 3]
+                    site_a_coords = np.array(site_a.coords).reshape(1, 3)                                            # [1, 3]
+                    radius = site_b_coords - site_a_coords                                                           # [r, 3]       # implicit broadcasting of site_a_coords
+                    radius[np.linalg.norm(radius, ord=2, axis=-1) < 1e-10] = 0.                                      # [r, 3]
 
-        radius = torch.stack(radius)
-        radius[radius.norm(2, -1) < 1e-10] = 0
-        kernels = self.kernel(radius)  # [r, i, j]
+                    radius = features.new_tensor(radius)
+                    kernels = self.kernel(radius)                                                                    # [r, i, j]
 
-        ns = iter(ns)
-        bs = iter(bs)
-        ks = iter(kernels)
+                    k_b = features.new_zeros(points_num, out_channels, in_channels)                                  # [b, i, j]
+                    k_b.index_add_(dim=0, index=bs, source=kernels)                                                  # [b, i, j]
+                    k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)              # [i, b*j]
 
-        k_z = []
-        for _ in range(geometry.size(0)):
-            k_a = []
-            for _ in range(geometry.size(1)):
-                k_b = [torch.zeros_like(kernels[0]) for _ in range(geometry.size(1))]
-                for _ in range(next(ns)):
-                    k_b[next(bs)] += next(ks)  # [i, j]
-                k_b = torch.stack(k_b)  # [b, i, j]
-                k_a.append(k_b)
-            k_z.append(torch.stack(k_a))  # [a, b, i, j]
-        k = torch.stack(k_z)  # [z, a, b, i, j]
-        k.div_(n_norm ** 0.5)
+                    out[z, a] = torch.mv(k_b, features[z])                                                           # [i, b*j] @ [b*j] -> [i]
 
-        return torch.einsum("zabij,zbj->zai", (k, features))  # [point, channel]
+        out.div_(n_norm ** 0.5)
+        return out                                                                                                   # [batch, point, channel]
