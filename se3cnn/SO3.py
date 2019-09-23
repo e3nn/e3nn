@@ -83,7 +83,10 @@ def xyz_to_angles(x, y=None, z=None):
             z = torch.tensor(z, dtype=torch.get_default_dtype())
         x = torch.stack([x, y, z], dim=-1)
 
-    x = x / torch.norm(x, 2, -1, keepdim=True)
+    x = torch.nn.functional.normalize(x, p=2, dim=-1)  # forward 0's instead of nan for zero-radius
+    x.masked_fill_(x < -1., -1.)                       # mitigate numerical inaccuracies from normalization
+    x.masked_fill_(x > 1., 1.)
+
     beta = torch.acos(x[..., 2])
     alpha = torch.atan2(x[..., 1], x[..., 0])
     return alpha, beta
