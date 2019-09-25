@@ -60,6 +60,7 @@ class Network(torch.nn.Module):
 
 def main():
     import time
+    torch.manual_seed(42)
     random.seed(42)
     torch.set_default_dtype(torch.float64)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -90,7 +91,7 @@ def main():
             # print("step={} loss={:.2e} {}".format(step, loss.item(), success[-10:]))
     
     t2 = time.time()
-    print(t2-t1)
+    print(f"Training time: {t2-t1:.2f} seconds")
 
     def test(filename):
         structures, labels = get_dataset(filename)
