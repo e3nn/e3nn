@@ -143,12 +143,13 @@ class PeriodicConvolution(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry, lattice, max_radius, n_norm=1):
+    def forward(self, features, geometry, lattice, max_radius, n_norm=None):
         """
         :param features:   tensor [batch, point, channel]
         :param geometry:   tensor [batch, point, xyz]
         :param lattice:    pymatgen.Lattice
         :param max_radius: float
+        :param n_norm:     float
         :return:           tensor [batch, point, channel]
         """
         assert features.size()[:2] == geometry.size()[:2], "features ({}) and geometry ({}) sizes of the first two dimensions should match".format(features.size(), geometry.size())
@@ -164,23 +165,35 @@ class PeriodicConvolution(torch.nn.Module):
 
         for z, geo in enumerate(geometry):
             structure = pymatgen.Structure(lattice, ["H"] * points_num, geo, coords_are_cartesian=True)
+            bs_list = []
+            radius_list = []
+
             for a, site_a in enumerate(structure):
                 nei = structure.get_sites_in_sphere(site_a.coords, max_radius, include_index=True, include_image=True)
                 if nei:
-                    bs = torch.tensor([entry[2] for entry in nei], dtype=torch.long, device=features.device)         # [r]
-                    site_b_coords = np.array([entry[0].coords for entry in nei])                                     # [r, 3]
+                    bs_entry = torch.tensor([entry[2] for entry in nei], dtype=torch.long, device=features.device)   # [r_part_a]
+                    bs_list.append(bs_entry)
+
+                    site_b_coords = np.array([entry[0].coords for entry in nei])                                     # [r_part_a, 3]
                     site_a_coords = np.array(site_a.coords).reshape(1, 3)                                            # [1, 3]
-                    radius = site_b_coords - site_a_coords                                                           # [r, 3]       # implicit broadcasting of site_a_coords
-                    radius[np.linalg.norm(radius, ord=2, axis=-1) < 1e-10] = 0.                                      # [r, 3]
+                    radius_list.append(site_b_coords - site_a_coords)                                                # implicit broadcasting of site_a_coords
 
-                    radius = features.new_tensor(radius)
-                    kernels = self.kernel(radius)                                                                    # [r, i, j]
+            radius = np.concatenate(radius_list)                                                                     # [r, 3]
+            radius[np.linalg.norm(radius, ord=2, axis=-1) < 1e-10] = 0.
 
-                    k_b = features.new_zeros(points_num, out_channels, in_channels)                                  # [b, i, j]
-                    k_b.index_add_(dim=0, index=bs, source=kernels)                                                  # [b, i, j]
-                    k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)              # [i, b*j]
+            radius = torch.from_numpy(radius).to(features.device)                                                    # [r, 3]
+            kernels = self.kernel(radius)                                                                            # [r, i, j]
 
-                    out[z, a] = torch.mv(k_b, features[z])                                                           # [i, b*j] @ [b*j] -> [i]
+            ks_start = 0                                                                                             # kernels stacked flat - indicate where block of interest begins
+            for a, bs in enumerate(bs_list):
+                k_b = features.new_zeros(points_num, out_channels, in_channels)                                      # [b, i, j]
+                k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start+bs.size(0)])
+                ks_start += bs.size(0)
+                k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)                  # [i, b*j]
 
-        out.div_(n_norm ** 0.5)
+                out[z, a] = torch.mv(k_b, features[z])                                                               # [i, b*j] @ [b*j] -> [i]
+
+        if n_norm:
+            out.div_(n_norm ** 0.5)
+
         return out                                                                                                   # [batch, point, channel]
