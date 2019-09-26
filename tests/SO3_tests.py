@@ -21,10 +21,10 @@ class Tests(unittest.TestCase):
                 self.assertLess((Y1 - Y2).abs().max(), 1e-10 * Y1.abs().max())
 
 
-    def test_sh_onehot(self):
+    def test_sh_dirac(self):
         with torch_default_dtype(torch.float64):
             for l in range(5):
-                a = spherical_harmonics_onehot(l, 1.2, 2.1)
+                a = spherical_harmonics_dirac(l, 1.2, 2.1)
                 a = spherical_harmonics_coeff_to_sphere(a, 1.2, 2.1)
                 self.assertAlmostEqual(a.item(), 1)
 

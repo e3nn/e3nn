@@ -426,9 +426,9 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
-def spherical_harmonics_onehot(lmax, alpha, beta, sph_last=False, dtype=None, device=None):
+def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, device=None):
     """
-    approximation of a signal that is 0 everywhere except in (alpha, beta) it is one
+    approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
     the higher is lmax the better is the approximation
     """
     a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
