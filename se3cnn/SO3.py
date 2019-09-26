@@ -232,14 +232,17 @@ def formatRs(Rs):
 # Spherical harmonics
 ################################################################################
 
-def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
+def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=None):
     """
     spherical harmonics
 
     :param order: int or list
     :param alpha: float or tensor of shape [...]
     :param beta: float or tensor of shape [...]
-    :return: tensor of shape [m, ...]
+    :param sph_last: return the spherical harmonics in the last channel
+    :param dtype:
+    :param device:
+    :return: tensor of shape [m, ...] (or [..., m] if sph_last)
 
     - compatible with irr_repr and compose
     """
@@ -275,16 +278,25 @@ def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     alpha = alpha.unsqueeze(0)
     beta = beta.unsqueeze(0)
     Y = sh(Js, Ms, math.pi - beta.cpu().numpy(), alpha.cpu().numpy())
-    return torch.tensor(Y, dtype=dtype, device=device)
+    if sph_last:
+        rank = len(Y.shape)
+        return torch.tensor(Y, dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
+    else:
+        return torch.tensor(Y, dtype=dtype, device=device)
 
 
-def spherical_harmonics_xyz(order, xyz, dtype=None, device=None):
+
+def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None):
     """
+
     spherical harmonics
 
     :param order: int or list
     :param xyz: tensor of shape [..., 3]
-    :return: tensor of shape [m, ...]
+    :param sph_last: return the spherical harmonics in the last channel
+    :param dtype:
+    :param device:
+    :return: tensor of shape [m, ...] (or [..., m] if sph_last)
     """
     try:
         order = list(order)
@@ -310,7 +322,11 @@ def spherical_harmonics_xyz(order, xyz, dtype=None, device=None):
         val = xyz.new_tensor([1 / math.sqrt(4 * math.pi)])
         val = torch.cat([val if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
         out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
-        return out.to(dtype=dtype, device=device)
+        if sph_last:
+            rank = len(out.shape)
+            return out.to(dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
+        else:
+            return out.to(dtype=dtype, device=device)
 
 
 def _legendre(order, z):
@@ -410,13 +426,20 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
-def spherical_harmonics_onehot(lmax, alpha, beta):
+def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, device=None):
     """
-    approximation of a signal that is 0 everywhere except in (alpha, beta) it is one
+    approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
     the higher is lmax the better is the approximation
     """
     a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
-    return torch.cat([spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)]) / a
+
+    if sph_last:
+        onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
+        rank = len(onehot.shape)
+        return onehot.permute(*range(1, rank), 0).contiguous()
+    else:
+        return torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
+
 
 
 def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
