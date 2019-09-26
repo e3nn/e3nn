@@ -329,7 +329,6 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             return out.to(dtype=dtype, device=device)
 
 
-
 def _legendre(order, z):
     """
     associated Legendre polynomials
@@ -427,13 +426,20 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
-def spherical_harmonics_onehot(lmax, alpha, beta):
+def spherical_harmonics_onehot(lmax, alpha, beta, sph_last=False, dtype=None, device=None):
     """
     approximation of a signal that is 0 everywhere except in (alpha, beta) it is one
     the higher is lmax the better is the approximation
     """
     a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
-    return torch.cat([spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)]) / a
+
+    if sph_last:
+        onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
+        rank = len(onehot.shape)
+        return onehot.permute(*range(1, rank), 0).contiguous()
+    else:
+        return torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
+
 
 
 def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
