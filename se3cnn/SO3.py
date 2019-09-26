@@ -229,14 +229,17 @@ def formatRs(Rs):
 # Spherical harmonics
 ################################################################################
 
-def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
+def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=None):
     """
     spherical harmonics
 
     :param order: int or list
     :param alpha: float or tensor of shape [...]
     :param beta: float or tensor of shape [...]
-    :return: tensor of shape [m, ...]
+    :param sph_last: return the spherical harmonics in the last channel
+    :param dtype:
+    :param device:
+    :return: tensor of shape [m, ...] (or [..., m] if sph_last)
 
     - compatible with irr_repr and compose
     """
@@ -272,16 +275,25 @@ def spherical_harmonics(order, alpha, beta, dtype=None, device=None):
     alpha = alpha.unsqueeze(0)
     beta = beta.unsqueeze(0)
     Y = sh(Js, Ms, math.pi - beta.cpu().numpy(), alpha.cpu().numpy())
-    return torch.tensor(Y, dtype=dtype, device=device)
+    if sph_last:
+        rank = len(Y.shape)
+        return torch.tensor(Y, dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
+    else:
+        return torch.tensor(Y, dtype=dtype, device=device)
 
 
-def spherical_harmonics_xyz(order, xyz, dtype=None, device=None):
+
+def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None):
     """
+
     spherical harmonics
 
     :param order: int or list
     :param xyz: tensor of shape [..., 3]
-    :return: tensor of shape [m, ...]
+    :param sph_last: return the spherical harmonics in the last channel
+    :param dtype:
+    :param device:
+    :return: tensor of shape [m, ...] (or [..., m] if sph_last)
     """
     try:
         order = list(order)
@@ -307,7 +319,12 @@ def spherical_harmonics_xyz(order, xyz, dtype=None, device=None):
         val = xyz.new_tensor([1 / math.sqrt(4 * math.pi)])
         val = torch.cat([val if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
         out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
-        return out.to(dtype=dtype, device=device)
+        if sph_last:
+            rank = len(out.shape)
+            return out.to(dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
+        else:
+            return out.to(dtype=dtype, device=device)
+
 
 
 def _legendre(order, z):
