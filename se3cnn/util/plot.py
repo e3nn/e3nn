@@ -50,7 +50,7 @@ def plot_sphere(fun, n=20):
     ax.view_init(90, 0)
 
 
-def plotly_sphere(fun, n=240, radius=False):
+def plotly_sphere(fun, n=240, radius=False, center=None):
     """
     surface = plotly_sphere(partial(spherical_harmonic_signal, x))
     fig = go.Figure(data=[surface])
@@ -70,5 +70,10 @@ def plotly_sphere(fun, n=240, radius=False):
         x *= r
         y *= r
         z *= r
+
+    if center:
+        x += center[0]
+        y += center[1]
+        z += center[2]
 
     return go.Surface(x=x.numpy(), y=y.numpy(), z=z.numpy(), surfacecolor=f.numpy())
