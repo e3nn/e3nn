@@ -50,7 +50,7 @@ def plot_sphere(fun, n=20):
     ax.view_init(90, 0)
 
 
-def plotly_sphere(fun, n=240, radius=False, center=None):
+def plotly_sphere(fun, n=240, radius=False, center=None, relu=False):
     """
     surface = plotly_sphere(partial(spherical_harmonic_signal, x))
     fig = go.Figure(data=[surface])
@@ -63,6 +63,8 @@ def plotly_sphere(fun, n=240, radius=False, center=None):
     a, b = torch.meshgrid(a, b)
 
     f = fun(a, b)
+    f = f.relu() if relu else f
+
     x, y, z = angles_to_xyz(a, b)
 
     if radius:
