@@ -71,7 +71,7 @@ def plotly_sphere(fun, n=240, radius=False, center=None):
         y *= r
         z *= r
 
-    if center:
+    if center is not None:
         x += center[0]
         y += center[1]
         z += center[2]
