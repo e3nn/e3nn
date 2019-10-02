@@ -139,16 +139,16 @@ class NeighborsConvolution(torch.nn.Module):
 
 
 class PeriodicConvolution(torch.nn.Module):
-    def __init__(self, Kernel, Rs_in, Rs_out):
+    def __init__(self, Rs_in, Rs_out, Kernel, max_radius):
         super().__init__()
+        self.max_radius = max_radius
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry, lattice, max_radius, n_norm=None):
+    def forward(self, features, geometry, lattice, n_norm=None):
         """
         :param features:   tensor [batch, point, channel]
         :param geometry:   tensor [batch, point, xyz]
         :param lattice:    pymatgen.Lattice
-        :param max_radius: float
         :param n_norm:     float
         :return:           tensor [batch, point, channel]
         """
@@ -169,7 +169,7 @@ class PeriodicConvolution(torch.nn.Module):
             radius_list = []
 
             for a, site_a in enumerate(structure):
-                nei = structure.get_sites_in_sphere(site_a.coords, max_radius, include_index=True, include_image=True)
+                nei = structure.get_sites_in_sphere(site_a.coords, self.max_radius, include_index=True, include_image=True)
                 if nei:
                     bs_entry = torch.tensor([entry[2] for entry in nei], dtype=torch.long, device=features.device)   # [r_part_a]
                     bs_list.append(bs_entry)
