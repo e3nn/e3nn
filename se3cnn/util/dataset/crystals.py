@@ -31,11 +31,12 @@ class CrystalCIF(Dataset):
                     |_____bs.pth
                     |_____partitions.pth
     """
-    def __init__(self, root, max_radius, material_properties=None):
+    def __init__(self, root, max_radius, material_properties=None, bs_pad=64):
         """
-        :param root: string path to the root directory of dataset
-        :param max_radius: float radius of sphere (?)
+        :param root: string, path to the root directory of dataset
+        :param max_radius: float, radius of sphere (?)
         :param material_properties: (optional) list of file paths containing additional properties, one type of property per file
+        :param bs_pad: integer, length of fixed size vector in which we embed bs (single list)
         """
         preprocessed_dir = join(root, 'preprocessed')
         preprocessed_radius_dir = join(preprocessed_dir, f'max_radius_{max_radius}')
@@ -47,9 +48,9 @@ class CrystalCIF(Dataset):
                      or not isfile(join(preprocessed_radius_dir, 'partitions.pth')))
         ):
             rmtree(preprocessed_radius_dir)
-            CrystalCIF.preprocess(root, max_radius)
+            CrystalCIF.preprocess(root, max_radius, bs_pad)
         elif not isdir(preprocessed_radius_dir):
-            CrystalCIF.preprocess(root, max_radius)
+            CrystalCIF.preprocess(root, max_radius, bs_pad)
         else:
             pass
 
@@ -60,7 +61,7 @@ class CrystalCIF(Dataset):
         self.lattice_params = torch.load(join(preprocessed_dir, 'lattice_params.pth'))
 
         self.radii = torch.load(join(preprocessed_radius_dir, 'radii.pth'))
-        self.bs = torch.load(join(preprocessed_radius_dir, 'bs.pth'))                   # TODO: due to inner lists, inflates from compressed size almost 10 times - fix memory layout
+        self.bs = torch.load(join(preprocessed_radius_dir, 'bs.pth'))
         self.partitions = torch.load(join(preprocessed_radius_dir, 'partitions.pth'))
 
         if material_properties:
@@ -69,15 +70,16 @@ class CrystalCIF(Dataset):
             self.properties = None
 
     def __getitem__(self, item_id):
-        start, end = self.partitions[item_id]
-        properties = None if self.properties is None else self.properties[item_id]      # TODO: update retrieval of bs for new layout
-        return self.radii[start:end], self.bs[item_id], self.geometries[item_id], self.atomic_charges[item_id], self.lattice_params[item_id], properties
+        properties = None if self.properties is None else self.properties[item_id]
+        radii_start, radii_end, bs_start, bs_end = self.partitions[item_id]
+        bs = [b[1:1+b[0]].long() for b in self.bs[bs_start:bs_end]]                                 # retrieve actual bs from slice
+        return self.radii[radii_start:radii_end], bs, self.geometries[item_id], self.atomic_charges[item_id], self.lattice_params[item_id], properties
 
     def __len__(self):
         return self.size
 
     @staticmethod
-    def preprocess(root, max_radius=None):
+    def preprocess(root, max_radius=None, bs_pad=64):
         # region 0. Set up
         preprocessed_dir = join(root, 'preprocessed')
         if not isdir(preprocessed_dir):
@@ -92,6 +94,8 @@ class CrystalCIF(Dataset):
         # region 1. Init
         index = np.load(join(root, 'index.npy'))
 
+        # TODO: preallocate memory for tensors and write into it, instead of using lists.
+
         site_a_coords_list = []
         atomic_charges_list = []
         lattice_params_list = []
@@ -103,6 +107,8 @@ class CrystalCIF(Dataset):
         # endregion
 
         # region 2. Process
+        radii_partition_start = 0
+        bs_partition_start = 0
         for file_rel_path in tqdm(index):
             structure = pymatgen.Structure.from_file((join(root, 'cif', file_rel_path)))
 
@@ -116,29 +122,33 @@ class CrystalCIF(Dataset):
             if max_radius:
                 radii_proxy_list = []
                 bs_proxy_list = []
-                partition_start = 0
                 for site_a_coords in site_a_coords_entry:
                     nei = structure.get_sites_in_sphere(site_a_coords.numpy(), max_radius, include_index=True)
-                    if nei:
-                        # - array of bitsets 8 64-bit words each would be nice, but Python does not have real bitsets
-                        # - pickle heavily inflates memory on dump and fails
-                        # - hickle is (very) slow on dump and inflates stored size
-                        # TODO: complete layout of bs to single the tensor, fill mis-alignments with "non-values", there is no nan for int type, but -1 will do
-                        bs_entry = torch.tensor([entry[2] for entry in nei], dtype=torch.short)     # [r_part_a]                              - store as a 16-bit integer, convert to 64-bit index/address on rolling basis
-                        bs_proxy_list.append(bs_entry)
+                    assert nei, f"Encountered empty nei for {file_rel_path}: {site_a_coords}"
 
-                        site_b_coords = np.array([entry[0].coords for entry in nei])                # [r_part_a, 3]
-                        site_a_coords = np.array(site_a_coords).reshape(1, 3)                       # [1, 3]
-                        radii_proxy_list.append(site_b_coords - site_a_coords)                      # implicit broadcasting of site_a_coords
-                    else:
-                        print(f"Encountered empty nei for {file_rel_path}: {site_a_coords}")
+                    bs_entry = np.zeros(bs_pad, dtype=np.short)
+                    bs_entry_data = [entry[2] for entry in nei]
+                    bs_entry_data_len = len(bs_entry_data)
+                    assert bs_entry_data_len < bs_pad, f"Encountered bs vector ({bs_entry_data_len}) longer than provided bs_pad ({bs_pad})"
+
+                    bs_entry[0] = bs_entry_data_len                                                 # store number of meaningful entries as a first element
+                    bs_entry[1:1+bs_entry_data_len] = bs_entry_data                                 # store said meaningful entries in consecutive cells
+                    bs_proxy_list.append(bs_entry)
+
+                    site_b_coords = np.array([entry[0].coords for entry in nei])                    # [r_part_a, 3]
+                    site_a_coords = np.array(site_a_coords).reshape(1, 3)                           # [1, 3]
+                    radii_proxy_list.append(site_b_coords - site_a_coords)                          # implicit broadcasting of site_a_coords
 
                 radii_proxy = np.concatenate(radii_proxy_list)                                      # [r, 3]
                 radii_proxy[np.linalg.norm(radii_proxy, ord=2, axis=-1) < 1e-10] = 0.
                 radii_list.append(radii_proxy)
+
                 bs_list.append(bs_proxy_list)
-                partitions_list.append((partition_start, partition_start + radii_proxy.shape[0]))
-                partition_start += radii_proxy.shape[0]
+
+                partitions_list.append((radii_partition_start, radii_partition_start + radii_proxy.shape[0],
+                                        bs_partition_start, bs_partition_start + len(bs_proxy_list)))
+                radii_partition_start += radii_proxy.shape[0]
+                bs_partition_start += len(bs_proxy_list)
         # endregion
 
         # region 3. Post-process
@@ -146,9 +156,14 @@ class CrystalCIF(Dataset):
         del lattice_params_list
 
         if max_radius:
+            bs = torch.from_numpy(np.concatenate(bs_list))
+            del bs_list
+
             radii = torch.from_numpy(np.concatenate(radii_list))
+            del radii_list
+
             partitions = torch.tensor(partitions_list, dtype=torch.long)
-            del radii_list, partitions_list
+            del partitions_list
         # endregion
 
         # region 4. Store
@@ -158,8 +173,8 @@ class CrystalCIF(Dataset):
         del site_a_coords_list, atomic_charges_list, lattice_params
 
         if max_radius:
-            torch.save(bs_list, join(max_radius_dir, 'bs.pth'))                                     # list of z lists with integer values [r_i]
-            del bs_list
+            torch.save(bs, join(max_radius_dir, 'bs.pth'))                                          # tensor [sum(a_i), bs_pad]
+            del bs
 
             torch.save(radii, join(max_radius_dir, 'radii.pth'))                                    # tensor [sum(r_i), 3]                  - xyz
             del radii
