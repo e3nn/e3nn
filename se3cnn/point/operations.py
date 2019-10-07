@@ -197,3 +197,79 @@ class PeriodicConvolution(torch.nn.Module):
             out.div_(n_norm ** 0.5)
 
         return out                                                                                                   # [batch, point, channel]
+
+
+class PeriodicConvolutionPrep(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, Kernel):
+        super().__init__()
+        self.kernel = Kernel(Rs_in, Rs_out)
+
+    def forward(self, features, radii, bs_slice):
+        """
+        :param features: [point, channel_in]
+        :param radii: [r, xyz]
+        :param bs_slice:
+        :return: out: [point, channel_out]
+        """
+        kernels = self.kernel(radii)                                                                # [r, i, j]
+        out = PeriodicConvolutionFunc.apply(kernels, bs_slice, features)
+        return out
+
+
+class PeriodicConvolutionFunc(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, kernels, bs_slice, features):
+        ctx.save_for_backward(kernels, bs_slice, features)                                          # save input for backward pass
+
+        points_num = features.size(0)
+        in_channels, out_channels = kernels.size(2), kernels.size(1)
+
+        features = features.view(points_num * in_channels)                                          # [b*j]
+        bs_slice = bs_slice.long()
+
+        out = features.new_zeros(points_num, out_channels)                                          # [a, i]
+        ks_start = 0                                                                                # kernels stacked flat - indicate where block of interest begins
+        for a, bs in enumerate(bs_slice):
+            bs = bs[1:1+bs[0]]
+            k_b = features.new_zeros(points_num, out_channels, in_channels)                         # [b, i, j]
+            k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
+            ks_start += bs.size(0)
+            k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)     # [i, b*j]
+
+            out[a] = torch.mv(k_b, features)                                                        # [i, b*j] @ [b*j] -> [i]
+
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        kernels, bs_slice, features = ctx.saved_tensors                                             # restore input from context
+        del ctx                                                                                     # pros: allows to decrease peak memory usage (del kernels); cons: backward cannot be called more than once!
+
+        points_num, out_channels = grad_output.size(0), grad_output.size(1)
+        in_channels = features.size(1)
+
+        bs_slice = bs_slice.long()
+
+        # region features_grad[b, j] = sum_(a, i){ k_b[a, b, i, j] * grad_output[a, i] }
+        features_grad = torch.zeros_like(features).view(points_num * in_channels)
+        ks_start = 0
+        for a, bs in enumerate(bs_slice):
+            bs = bs[1:1+bs[0]]
+            k_b = features.new_zeros(points_num, out_channels, in_channels)
+            k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
+            ks_start += bs.size(0)
+            k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)
+
+            features_grad += (k_b * grad_output[a].unsqueeze(1).expand_as(k_b)).sum(dim=0)
+
+        features_grad = features_grad.view(points_num, in_channels)
+        # endregion
+
+        del kernels
+
+        # region kernels_grad[r, i, j] = features[fb(r), j] * grad_output[fa(r), i].  Each r correspond to unique pair (a, b)
+        fa, fb = torch.tensor([(a, b.item()) for a, bs in enumerate(bs_slice) for b in bs[1:1+bs[0]]], dtype=torch.long, device=features.device).t()
+        kernels_grad = features[fb].unsqueeze(1) * grad_output[fa].unsqueeze(2)                     # implicit broadcasting: [r, 1, j] and [r, i, 1] -> [r, i ,j]
+        # endregion
+
+        return kernels_grad, None, features_grad                                                    # No gradients for bs_slice
