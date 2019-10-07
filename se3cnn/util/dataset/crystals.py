@@ -72,8 +72,7 @@ class CrystalCIF(Dataset):
     def __getitem__(self, item_id):
         properties = None if self.properties is None else self.properties[item_id]
         radii_start, radii_end, bs_start, bs_end = self.partitions[item_id]
-        bs = [b[1:1+b[0]].long() for b in self.bs[bs_start:bs_end]]                                 # retrieve actual bs from slice
-        return self.radii[radii_start:radii_end], bs, self.geometries[item_id], self.atomic_charges[item_id], self.lattice_params[item_id], properties
+        return self.names[item_id], self.radii[radii_start:radii_end], self.bs[bs_start:bs_end], self.geometries[item_id], self.atomic_charges[item_id], self.lattice_params[item_id], properties
 
     def __len__(self):
         return self.size
