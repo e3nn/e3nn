@@ -34,7 +34,7 @@ class CrystalCIF(Dataset):
     def __init__(self, root, max_radius, material_properties=None, bs_pad=64):
         """
         :param root: string, path to the root directory of dataset
-        :param max_radius: float, radius of sphere (?)
+        :param max_radius: float, radius of sphere
         :param material_properties: (optional) list of file paths containing additional properties, one type of property per file
         :param bs_pad: integer, length of fixed size vector in which we embed bs (single list)
         """
@@ -79,6 +79,22 @@ class CrystalCIF(Dataset):
 
     @staticmethod
     def preprocess(root, max_radius=None, bs_pad=64):
+        """
+        Allows calls without class instance: CrystalCIF.preprocess(...).
+        :param root: string, path to the root directory of dataset
+        :param max_radius: float, (optional) radius of sphere
+        :param bs_pad: integer, (unused for max_radius=None) length of fixed size vector in which we embed bs (single list)
+
+        Notes:
+            Let there be bs_lists [17, 18, 19, 24, 25] and [1, 2, 5, 6], then with bs_pad = 8 they will be stacked in tensor as follows:
+            [[5, 17, 18, 19, 24, 25, 0, 0],
+             [4,  1,  2,  5,  6,  0, 0, 0]]
+            where first element in each row is a number n of relevant elements in it, next n elements are those copied from the lists,
+            and rest padded with zeros for length to match bs_pad.
+
+            Pros (over list of lists): has smaller overhead from structure meta-data, occupies contingent memory area.
+            Cons (over list of lists): additionally stores lengths and pad elements.
+        """
         # region 0. Set up
         preprocessed_dir = join(root, 'preprocessed')
         if not isdir(preprocessed_dir):
@@ -94,6 +110,7 @@ class CrystalCIF(Dataset):
         index = np.load(join(root, 'index.npy'))
 
         # TODO: preallocate memory for tensors and write into it, instead of using lists.
+        #  Can save ~30% on peak memory, but requires proper reallocation on the go for radii as shape isn't known beforehand.  
 
         site_a_coords_list = []
         atomic_charges_list = []
@@ -125,7 +142,7 @@ class CrystalCIF(Dataset):
                     nei = structure.get_sites_in_sphere(site_a_coords.numpy(), max_radius, include_index=True)
                     assert nei, f"Encountered empty nei for {file_rel_path}: {site_a_coords}"
 
-                    bs_entry = np.zeros(bs_pad, dtype=np.short)
+                    bs_entry = np.zeros(bs_pad, dtype=np.short)                                     # save storage/RAM, transfer of small parts to the long "register" (for indexing) on the fly is comp. cheap
                     bs_entry_data = [entry[2] for entry in nei]
                     bs_entry_data_len = len(bs_entry_data)
                     assert bs_entry_data_len < bs_pad, f"Encountered bs vector ({bs_entry_data_len}) longer than provided bs_pad ({bs_pad})"
@@ -178,6 +195,6 @@ class CrystalCIF(Dataset):
             torch.save(radii, join(max_radius_dir, 'radii.pth'))                                    # tensor [sum(r_i), 3]                  - xyz
             del radii
 
-            torch.save(partitions, join(max_radius_dir, 'partitions.pth'))                          # tensor [z, 2]                         - start/end of radii slice corresponding to z
+            torch.save(partitions, join(max_radius_dir, 'partitions.pth'))                          # tensor [z, 4]                         - start/end of radii slice and bs slice corresponding to z
             del partitions
         # endregion
