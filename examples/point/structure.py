@@ -37,7 +37,7 @@ class Network(torch.nn.Module):
 
         R = partial(CosineBasisModel, max_radius=3.8, number_of_basis=10, h=100, L=2, act=relu)
         K = partial(Kernel, RadialModel=R)
-        C = partial(PeriodicConvolution, K)
+        C = partial(PeriodicConvolution, Kernel=K, max_radius=3.8)
 
         self.firstlayers = torch.nn.ModuleList([
             GatedBlock(Rs_in, Rs_out, relu, sigmoid, C)
@@ -53,7 +53,7 @@ class Network(torch.nn.Module):
 
         for i, m in enumerate(self.firstlayers):
             assert torch.isfinite(features).all(), i
-            features = m(features.div(4 ** 0.5), geometry, structure.lattice, 3.8)
+            features = m(features.div(4 ** 0.5), geometry, structure.lattice)
 
         return self.lastlayers(features).squeeze(0)
 
