@@ -208,7 +208,7 @@ class PeriodicConvolutionPrep(torch.nn.Module):
         """
         :param features: [point, channel_in]
         :param radii: [r, xyz]
-        :param bs_slice:
+        :param bs_slice: [point, bs_pad]
         :return: out: [point, channel_out]
         """
         kernels = self.kernel(radii)                                                                # [r, i, j]
@@ -225,12 +225,12 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         in_channels, out_channels = kernels.size(2), kernels.size(1)
 
         features = features.view(points_num * in_channels)                                          # [b*j]
-        bs_slice = bs_slice.long()
+        bs_slice = bs_slice.long()                                                                  # comes as short int, but only long int can be used as index
 
         out = features.new_zeros(points_num, out_channels)                                          # [a, i]
         ks_start = 0                                                                                # kernels stacked flat - indicate where block of interest begins
         for a, bs in enumerate(bs_slice):
-            bs = bs[1:1+bs[0]]
+            bs = bs[1:1+bs[0]]                                                                      # select data from padded vector
             k_b = features.new_zeros(points_num, out_channels, in_channels)                         # [b, i, j]
             k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
             ks_start += bs.size(0)
@@ -248,24 +248,24 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         points_num, out_channels = grad_output.size(0), grad_output.size(1)
         in_channels = features.size(1)
 
-        bs_slice = bs_slice.long()
+        bs_slice = bs_slice.long()                                                                  # comes as short int, but only long int can be used as index
 
         # region features_grad[b, j] = sum_(a, i){ k_b[a, b, i, j] * grad_output[a, i] }
-        features_grad = torch.zeros_like(features).view(points_num * in_channels)
+        features_grad = torch.zeros_like(features).view(points_num * in_channels)                   # [b*j]
         ks_start = 0
         for a, bs in enumerate(bs_slice):
-            bs = bs[1:1+bs[0]]
+            bs = bs[1:1+bs[0]]                                                                      # select data from padded vector
             k_b = features.new_zeros(points_num, out_channels, in_channels)
             k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
             ks_start += bs.size(0)
-            k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)
+            k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)     # [i, b*j]
 
-            features_grad += (k_b * grad_output[a].unsqueeze(1).expand_as(k_b)).sum(dim=0)
+            features_grad += (k_b * grad_output[a].unsqueeze(1).expand_as(k_b)).sum(dim=0)          # sum(i){ [i, b*j] * ([i] -> [i, b*j]) } -> [b*j]
 
-        features_grad = features_grad.view(points_num, in_channels)
+        features_grad = features_grad.view(points_num, in_channels)                                 # [b, j]
         # endregion
 
-        del kernels
+        del kernels                                                                                 # no longer needed, frees the same amount of memory as kernels_grad is going to take
 
         # region kernels_grad[r, i, j] = features[fb(r), j] * grad_output[fa(r), i].  Each r correspond to unique pair (a, b)
         fa, fb = torch.tensor([(a, b.item()) for a, bs in enumerate(bs_slice) for b in bs[1:1+bs[0]]], dtype=torch.long, device=features.device).t()
