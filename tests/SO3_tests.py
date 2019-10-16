@@ -9,6 +9,18 @@ from se3cnn.SO3 import *
 
 class Tests(unittest.TestCase):
 
+    def test_sh_cuda(self):
+        if torch.cuda.is_available():
+            with torch_default_dtype(torch.float64):
+                for l in range(6 + 1):
+                    x = torch.randn(10, 3)
+                    x_cuda = x.cuda()
+                    Y1 = spherical_harmonics_xyz(l, x)
+                    Y2 = spherical_harmonics_xyz(l, x_cuda).cpu()
+                    self.assertLess((Y1 - Y2).abs().max(), 1e-7)
+        else:
+            print("Cuda is not available! test_sh_cuda skipped!")
+
     def test_sh_partiy(self):
         """
         (-1)^l Y(x) = Y(-x)
