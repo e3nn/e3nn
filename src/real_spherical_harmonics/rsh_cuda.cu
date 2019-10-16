@@ -193,6 +193,11 @@ __constant__ double (*const fptr[]) (const double, const double, const double) =
 	};
 
 
+/*
+    Preceding const means underlying data stays constant.
+    Trailing const means that pointer to the data remains constant.
+    __restrict__ makes a promise that underlying data can be accessed only with this pointer.
+*/
 __global__ void rsh_cuda_kernel(const double* const __restrict__ radii, double* const __restrict__ Ys, const unsigned int batch_size) {
 	const unsigned int entry_pos = blockDim.x*blockIdx.x + threadIdx.x;     // position of entry in batch
 	if (entry_pos >= batch_size) return;                                    // early terminate if outside the batch - last warp (of threads) can be only partially filled
