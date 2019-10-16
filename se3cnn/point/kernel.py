@@ -4,6 +4,7 @@ import math
 import torch
 
 import se3cnn.SO3 as SO3
+import rsh_cuda
 
 
 class Kernel(torch.nn.Module):
@@ -112,11 +113,21 @@ class Kernel(torch.nn.Module):
 
         kernel = r.new_zeros(batch, self.n_out, self.n_in)
 
-        # precompute all needed spherical harmonics
-        Ys = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
-
         # use the radial model to fix all the degrees of freedom
         radii = r.norm(2, dim=1)  # [batch]
+
+        # precompute all needed spherical harmonics
+        if max(self.set_of_l_filters) <= 6:
+            # TODO: fix euler (?) angles + quantum normalization of Ys and singular case
+            Ys = r.new_empty(((1+max(self.set_of_l_filters))**2, r.size(0)))
+            r_tmp = r / radii.unsqueeze(1)
+            r_tmp[torch.isnan(r_tmp)] = 0.
+            rsh_cuda.rsh(Ys, r_tmp)
+        else:
+            Ys = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
+
+        # Ys = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
+
         # note: for the normalization we assume that the variance of coefficients[i] is one
         coefficients = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
         begin_c = 0
