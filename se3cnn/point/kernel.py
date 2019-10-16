@@ -1,6 +1,5 @@
 # pylint: disable=C, R, arguments-differ, no-member
 import math
-
 import torch
 
 import se3cnn.SO3 as SO3
@@ -112,11 +111,12 @@ class Kernel(torch.nn.Module):
 
         kernel = r.new_zeros(batch, self.n_out, self.n_in)
 
+        # use the radial model to fix all the degrees of freedom
+        radii = r.norm(2, dim=1)  # [batch]
+
         # precompute all needed spherical harmonics
         Ys = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
 
-        # use the radial model to fix all the degrees of freedom
-        radii = r.norm(2, dim=1)  # [batch]
         # note: for the normalization we assume that the variance of coefficients[i] is one
         coefficients = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
         begin_c = 0
