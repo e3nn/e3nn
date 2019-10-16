@@ -290,7 +290,6 @@ def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=N
 
 def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None):
     """
-
     spherical harmonics
 
     :param order: int or list
@@ -319,10 +318,10 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
     with torch_default_dtype(torch.float64):
         if device.type == 'cuda' and max(order) <= 6:
             max_l = max(order)
-            out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))                                 # [filters, batch_size]
+            out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))                                    # [filters, batch_size]
             xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
             real_spherical_harmonics.rsh(out, xyz_unit)
-            norm_coef = [elem for l in range((max_l+1)//2) for elem in [1.]*(4*l + 1) + [-1.]*(4*l+3)]  # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined
+            norm_coef = [elem for lh in range((max_l+1)//2) for elem in [1.]*(4*lh + 1) + [-1.]*(4*lh+3)]  # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
             if max_l % 2 == 0:
                 norm_coef.extend([1.]*(2*max_l + 1))
             norm_coef = torch.tensor(norm_coef, device=device).unsqueeze(1)
