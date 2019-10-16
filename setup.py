@@ -2,7 +2,20 @@
 from setuptools import setup, find_packages
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 
-# TODO: resolve issue with putting rsh_cuda in submodule se3cnn.rsh_cuda
+# python setup.py develop    - if you wont to be able to execute from PyCharm (or similar IDE) - places .so file into se3cnn folder from which real_spherical_harmonics imports
+
+# Or:
+# python setup.py build_ext
+# python setup.py install    - PyCharm won't work, because it can't resolve import, but executable from terminal
+
+ext_modules = [
+    CUDAExtension('se3cnn.real_spherical_harmonics',
+                  sources=['src/real_spherical_harmonics/rsh_bind.cpp',
+                           'src/real_spherical_harmonics/rsh_cuda.cu'],
+                  extra_compile_args={'cxx': ['-std=c++14'],
+                                      'nvcc': ['-std=c++14']})
+]
+
 setup(
     name='se3cnn',
     url='https://github.com/mariogeiger/se3cnn',
@@ -16,16 +29,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    ext_modules=[
-        CUDAExtension(
-            name='rsh_cuda',
-            sources=['src/real_spherical_harmonics/rsh_bind.cpp',
-                     'src/real_spherical_harmonics/rsh_cuda.cu'],
-            extra_compile_args={'cxx': ['-std=c++14'],
-                                'nvcc': ['-std=c++14']})
-    ],
-    cmdclass={
-      'build_ext': BuildExtension
-    },
+    ext_modules=ext_modules,
+    cmdclass={'build_ext': BuildExtension},
     packages=find_packages(),
 )
