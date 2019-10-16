@@ -1,6 +1,6 @@
 /*
     Calculates real spherical harmonics up to L=6 (inclusive) from Cartesian coordinates.
-    Coordinate vector is expected to be of unit length.
+    Coordinates x, y, z are expected to form unit length vector.
 */
 
 #include <torch/extension.h>
@@ -107,7 +107,9 @@ __device__ __forceinline__ double f_phi_p6(const double x, const double y) { con
     Functions for specific (L, m). Product of common multiplier from m and polynomial in z.
     In principle, said polynomials can be constructed with another inline proxy function, but it seems to be more on the obfuscation side.
     Polynomials are the same both for -m and +m, but we can't really use that here, because each function below should be "baked".
-
+    Cases (L, 0) with L even and > 0, have additional multiplier to treat special case of input (0, 0, 0) - return 0.
+    Multiplier is either 1. if any of x, y, z is different from 0, or 0. otherwise.
+    It is constructed as a multiplier in opposite to if-else statement in order to avoid branch divergence.
 */
 
 __device__ double sh00 (const double x, const double y, const double z) { return RSH_C00(); }
@@ -118,7 +120,8 @@ __device__ double sh1p1(const double x, const double y, const double z) { return
 
 __device__ double sh2n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * RSH_C22(); }
 __device__ double sh2n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * RSH_C21() * z; }
-__device__ double sh20 (const double x, const double y, const double z) { return 				  RSH_C20_z2() * z * z - RSH_C20_c(); }
+__device__ double sh20 (const double x, const double y, const double z) { const double special_case = (double) (x != 0. || y != 0. || z != 0.);
+                                                                          return   special_case * (RSH_C20_z2() * z * z - RSH_C20_c()); }
 __device__ double sh2p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * RSH_C21() * z; }
 __device__ double sh2p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * RSH_C22(); }
 
@@ -135,7 +138,8 @@ __device__ double sh4n3(const double x, const double y, const double z) { return
 __device__ double sh4n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * (RSH_C42_z2() * z * z - RSH_C42_c()); }
 __device__ double sh4n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * (RSH_C41_z2() * z * z - RSH_C41_c()) * z; }
 __device__ double sh40 (const double x, const double y, const double z) { const double z2 = z * z;
-																		  return 				  (RSH_C40_z4() * z2 * z2 - RSH_C40_z2() * z2 + RSH_C40_c()); }
+                                                                          const double special_case = (double) (x != 0. || y != 0. || z != 0.);
+																		  return   special_case * (RSH_C40_z4() * z2 * z2 - RSH_C40_z2() * z2 + RSH_C40_c()); }
 __device__ double sh4p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * (RSH_C41_z2() * z * z - RSH_C41_c()) * z; }
 __device__ double sh4p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * (RSH_C42_z2() * z * z - RSH_C42_c()); }
 __device__ double sh4p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * RSH_C43() * z; }
@@ -165,7 +169,8 @@ __device__ double sh6n2(const double x, const double y, const double z) { const 
 __device__ double sh6n1(const double x, const double y, const double z) { const double z2 = z*z;
                                                                           return f_phi_n1(x, y) * (RSH_C61_z4() * z2 * z2 - RSH_C61_z2() * z2 + RSH_C61_c()) * z; }
 __device__ double sh60 (const double x, const double y, const double z) { const double z2 = z*z;
-                                                                          return                  RSH_C60_z6() * z2 * z2 * z2 - RSH_C60_z4() * z2 * z2 + RSH_C60_z2() * z2 - RSH_C60_c(); }
+                                                                          const double special_case = (double) (x != 0. || y != 0. || z != 0.);
+                                                                          return   special_case * (RSH_C60_z6() * z2 * z2 * z2 - RSH_C60_z4() * z2 * z2 + RSH_C60_z2() * z2 - RSH_C60_c()); }
 __device__ double sh6p1(const double x, const double y, const double z) { const double z2 = z*z;
                                                                           return f_phi_p1(x, y) * (RSH_C61_z4() * z2 * z2 - RSH_C61_z2() * z2 + RSH_C61_c()) * z; }
 __device__ double sh6p2(const double x, const double y, const double z) { const double z2 = z*z;
@@ -176,7 +181,7 @@ __device__ double sh6p5(const double x, const double y, const double z) { return
 __device__ double sh6p6(const double x, const double y, const double z) { return f_phi_p6(x, y) * RSH_C66(); }
 
 
-// array of pointers to functions stored to "constant memory" (__constant__) in GPU.
+// array of pointers to functions stored to "constant memory" (__constant__) in GPU - common for all blocks.
 __constant__ double (*const fptr[]) (const double, const double, const double) = {
 		                                          sh00, 											//                         0
 		                                   sh1n1, sh10,  sh1p1, 									//                     1,  2,  3
@@ -196,7 +201,7 @@ __global__ void rsh_cuda_kernel(const double* const __restrict__ radii, double* 
 	const double y = radii[3*entry_pos+1];                                  // padding to 4 and packing in double4 (single read transaction) showed no noticeable improvement (is scale to0 small measure?)
 	const double z = radii[3*entry_pos+2];                                  // 100+ GB/s of throughput would be great, but even 3 GB/s does not make a bottleneck
 
-    Ys[blockIdx.y*batch_size + entry_pos] = fptr[blockIdx.y](x, y, z);      // select function, apply and store result to the "global memory"
+    Ys[blockIdx.y*batch_size + entry_pos] = fptr[blockIdx.y](x, y, z);      // select and apply function, store result to the "global memory"
 }
 
 
@@ -209,8 +214,8 @@ void real_spherical_harmonics_cuda(
     double* const Ys_ptr = (double*) output_placeholder.data_ptr();
     const double* const radii_ptr = (const double*) radii.data_ptr();
 
-    const unsigned int threads_per_block = 32;                              // warp size in contemporary GPUs is 32 threads, this variable should be a multiple of warp size
-    dim3 numBlocks((batch_size + threads_per_block - 1)/threads_per_block, filters, 1);
+    const unsigned int threads_per_block = 32;                                              // warp size in contemporary GPUs is 32 threads, this variable should be a multiple of warp size
+    dim3 numBlocks((batch_size + threads_per_block - 1)/threads_per_block, filters, 1);     // batch_size/threads_per_block is fractional in general case - round it up
 
     rsh_cuda_kernel<<<numBlocks, threads_per_block>>>(radii_ptr, Ys_ptr, batch_size);
 }
