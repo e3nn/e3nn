@@ -28,54 +28,54 @@ __device__ constexpr double RSH_C00() 		{ return 		RSQRT_PI()/2.			  		;}
 __device__ constexpr double RSH_C10() 		{ return 		RSQRT_PI()*sqrt(3.)/2.    		;}
 __device__ constexpr double RSH_C11() 		{ return 		RSQRT_PI()*sqrt(3.)/2.    		;}
 
-__device__ constexpr double RSH_C20_c() 	{ return 		RSQRT_PI()*sqrt(5.)/4.    		;}
+__device__ constexpr double RSH_C20_c() 	{ return 	   -RSQRT_PI()*sqrt(5.)/4.    		;}
 __device__ constexpr double RSH_C20_z2() 	{ return 		RSQRT_PI()*sqrt(5.)*3./4.       ;}
 __device__ constexpr double RSH_C21() 		{ return 		RSQRT_PI()*sqrt(15.)/2.   		;}
 __device__ constexpr double RSH_C22() 		{ return 		RSQRT_PI()*sqrt(15.)/4.   		;}
 
-__device__ constexpr double RSH_C30_c() 	{ return 		RSQRT_PI()*sqrt(7.)*3./4.  		;}
+__device__ constexpr double RSH_C30_c() 	{ return 	   -RSQRT_PI()*sqrt(7.)*3./4.  		;}
 __device__ constexpr double RSH_C30_z2() 	{ return 		RSQRT_PI()*sqrt(7.)*5./4.  		;}
-__device__ constexpr double RSH_C31_c() 	{ return 		RSQRT_PI()*sqrt(42.)/8.   		;}
+__device__ constexpr double RSH_C31_c() 	{ return 	   -RSQRT_PI()*sqrt(42.)/8.   		;}
 __device__ constexpr double RSH_C31_z2() 	{ return 		RSQRT_PI()*sqrt(42.)*5./8. 		;}
 __device__ constexpr double RSH_C32() 		{ return 		RSQRT_PI()*sqrt(105.)/4.  		;}
 __device__ constexpr double RSH_C33() 		{ return 		RSQRT_PI()*sqrt(70.)/8.   		;}
 
 __device__ constexpr double RSH_C40_c()		{ return 		RSQRT_PI()*9./16.          		;}
-__device__ constexpr double RSH_C40_z2() 	{ return 		RSQRT_PI()*90./16.         		;}
+__device__ constexpr double RSH_C40_z2() 	{ return 	   -RSQRT_PI()*90./16.         		;}
 __device__ constexpr double RSH_C40_z4() 	{ return 		RSQRT_PI()*105./16.        		;}
-__device__ constexpr double RSH_C41_c() 	{ return 		RSQRT_PI()*sqrt(10.)*9./8.		;}
+__device__ constexpr double RSH_C41_c() 	{ return 	   -RSQRT_PI()*sqrt(10.)*9./8.		;}
 __device__ constexpr double RSH_C41_z2() 	{ return 		RSQRT_PI()*sqrt(10.)*21./8.		;}
-__device__ constexpr double RSH_C42_c() 	{ return 		RSQRT_PI()*sqrt(5.)*3./8.  		;}
+__device__ constexpr double RSH_C42_c() 	{ return 	   -RSQRT_PI()*sqrt(5.)*3./8.  		;}
 __device__ constexpr double RSH_C42_z2() 	{ return 		RSQRT_PI()*sqrt(5.)*21./8. 		;}
 __device__ constexpr double RSH_C43() 		{ return 		RSQRT_PI()*sqrt(70.)*3./8. 		;}
 __device__ constexpr double RSH_C44() 		{ return 		RSQRT_PI()*sqrt(35.)*3./16.		;}
 
 __device__ constexpr double RSH_C50_c() 	{ return 		RSQRT_PI()*sqrt(11.)*15./16. 	;}
-__device__ constexpr double RSH_C50_z2() 	{ return 		RSQRT_PI()*sqrt(11.)*70./16. 	;}
+__device__ constexpr double RSH_C50_z2() 	{ return 	   -RSQRT_PI()*sqrt(11.)*70./16. 	;}
 __device__ constexpr double RSH_C50_z4() 	{ return 		RSQRT_PI()*sqrt(11.)*63./16. 	;}
 __device__ constexpr double RSH_C51_c() 	{ return 		RSQRT_PI()*sqrt(165.)/16.   	;}
-__device__ constexpr double RSH_C51_z2() 	{ return 		RSQRT_PI()*sqrt(165.)*14./16.	;}
+__device__ constexpr double RSH_C51_z2() 	{ return 	   -RSQRT_PI()*sqrt(165.)*14./16.	;}
 __device__ constexpr double RSH_C51_z4() 	{ return 		RSQRT_PI()*sqrt(165.)*21./16.	;}
-__device__ constexpr double RSH_C52_c() 	{ return 		RSQRT_PI()*sqrt(1155.)/8.   	;}
+__device__ constexpr double RSH_C52_c() 	{ return 	   -RSQRT_PI()*sqrt(1155.)/8.   	;}
 __device__ constexpr double RSH_C52_z2() 	{ return 		RSQRT_PI()*sqrt(1155.)*3./8. 	;}
-__device__ constexpr double RSH_C53_c() 	{ return 		RSQRT_PI()*sqrt(770.)/32.   	;}
+__device__ constexpr double RSH_C53_c() 	{ return 	   -RSQRT_PI()*sqrt(770.)/32.   	;}
 __device__ constexpr double RSH_C53_z2() 	{ return 		RSQRT_PI()*sqrt(770.)*9./32. 	;}
 __device__ constexpr double RSH_C54() 		{ return 		RSQRT_PI()*sqrt(385.)*3./16.  	;}
 __device__ constexpr double RSH_C55() 		{ return 		RSQRT_PI()*sqrt(154.)*3./32. 	;}
 
-__device__ constexpr double RSH_C60_c() 	{ return 		RSQRT_PI()*sqrt(13.)*5./32. 	;}
+__device__ constexpr double RSH_C60_c() 	{ return 	   -RSQRT_PI()*sqrt(13.)*5./32. 	;}
 __device__ constexpr double RSH_C60_z2() 	{ return 		RSQRT_PI()*sqrt(13.)*105./32. 	;}
-__device__ constexpr double RSH_C60_z4() 	{ return 		RSQRT_PI()*sqrt(13.)*315./32. 	;}
+__device__ constexpr double RSH_C60_z4() 	{ return 	   -RSQRT_PI()*sqrt(13.)*315./32. 	;}
 __device__ constexpr double RSH_C60_z6() 	{ return 		RSQRT_PI()*sqrt(13.)*231./32. 	;}
 __device__ constexpr double RSH_C61_c() 	{ return 		RSQRT_PI()*sqrt(273.)*5./16.  	;}
-__device__ constexpr double RSH_C61_z2() 	{ return 		RSQRT_PI()*sqrt(273.)*30./16.	;}
+__device__ constexpr double RSH_C61_z2() 	{ return 	   -RSQRT_PI()*sqrt(273.)*30./16.	;}
 __device__ constexpr double RSH_C61_z4() 	{ return 		RSQRT_PI()*sqrt(273.)*33./16.	;}
 __device__ constexpr double RSH_C62_c() 	{ return 		RSQRT_PI()*sqrt(2730.)/64.   	;}
-__device__ constexpr double RSH_C62_z2() 	{ return 		RSQRT_PI()*sqrt(2730.)*18./64. 	;}
+__device__ constexpr double RSH_C62_z2() 	{ return 	   -RSQRT_PI()*sqrt(2730.)*18./64. 	;}
 __device__ constexpr double RSH_C62_z4() 	{ return 		RSQRT_PI()*sqrt(2730.)*33./64. 	;}
-__device__ constexpr double RSH_C63_c() 	{ return 		RSQRT_PI()*sqrt(2730.)*3./32.   ;}
+__device__ constexpr double RSH_C63_c() 	{ return 	   -RSQRT_PI()*sqrt(2730.)*3./32.   ;}
 __device__ constexpr double RSH_C63_z2() 	{ return 		RSQRT_PI()*sqrt(2730.)*11./32. 	;}
-__device__ constexpr double RSH_C64_c() 	{ return 		RSQRT_PI()*sqrt(91.)*3./32.  	;}
+__device__ constexpr double RSH_C64_c() 	{ return 	   -RSQRT_PI()*sqrt(91.)*3./32.  	;}
 __device__ constexpr double RSH_C64_z2() 	{ return 		RSQRT_PI()*sqrt(91.)*33./32.  	;}
 __device__ constexpr double RSH_C65() 		{ return 		RSQRT_PI()*sqrt(2002.)*3./32. 	;}
 __device__ constexpr double RSH_C66() 		{ return 		RSQRT_PI()*sqrt(6006.)/64.  	;}
@@ -104,81 +104,83 @@ __device__ __forceinline__ double f_phi_p6(const double x, const double y) { con
 
 
 /*
+    Polynoms in z.
+*/
+__device__ __forceinline__ double p_c  (const double z, const double c0)                                                    {                           return c0                                   ; }
+__device__ __forceinline__ double p_z  (const double z, const double c1)                                                    {                           return c1 * z                               ; }
+__device__ __forceinline__ double p_z2 (const double z, const double c0, const double c2)                                   {                           return c0 + c2 * z * z                      ; }
+__device__ __forceinline__ double p_z2z(const double z, const double c0, const double c2)                                   {                           return (c0 + c2 * z * z) * z                ; }
+__device__ __forceinline__ double p_z4 (const double z, const double c0, const double c2, const double c4)                  { const double z2 = z*z;    return c0 + (c2 + c4 * z2) * z2             ; }
+__device__ __forceinline__ double p_z4z(const double z, const double c0, const double c2, const double c4)                  { const double z2 = z*z;    return (c0 + (c2 + c4 * z2) * z2) * z       ; }
+__device__ __forceinline__ double p_z6 (const double z, const double c0, const double c2, const double c4, const double c6) { const double z2 = z*z;    return c0 + (c2 + (c4 + c6 * z2) * z2) * z2 ; }
+
+
+/* handle special case of xyz = (0., 0., 0.) with additional multiplier, either 0. or 1. */
+__device__ __forceinline__ double special(const double x, const double y, const double z) { return (double) (x != 0. || y != 0. || z != 0.); }
+
+
+/*
     Functions for specific (L, m). Product of common multiplier from m and polynomial in z.
-    In principle, said polynomials can be constructed with another inline proxy function, but it seems to be more on the obfuscation side.
-    Polynomials are the same both for -m and +m, but we can't really use that here, because each function below should be "baked".
     Cases (L, 0) with L even and > 0, have additional multiplier to treat special case of input (0, 0, 0) - return 0.
     Multiplier is either 1. if any of x, y, z is different from 0, or 0. otherwise.
     It is constructed as a multiplier in opposite to if-else statement in order to avoid branch divergence.
 */
 
-__device__ double sh00 (const double x, const double y, const double z) { return RSH_C00(); }
+__device__ double sh00 (const double x, const double y, const double z) { return RSH_C00()                                                                              ; }
 
-__device__ double sh1n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * RSH_C11(); }
-__device__ double sh10 (const double x, const double y, const double z) { return 				  RSH_C10() * z; }
-__device__ double sh1p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * RSH_C11(); }
+__device__ double sh1n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * p_c  (z, RSH_C11())                                                   ; }
+__device__ double sh10 (const double x, const double y, const double z) { return 				  p_z  (z, RSH_C10())                                                   ; }
+__device__ double sh1p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * p_c  (z, RSH_C11())                                                   ; }
 
-__device__ double sh2n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * RSH_C22(); }
-__device__ double sh2n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * RSH_C21() * z; }
-__device__ double sh20 (const double x, const double y, const double z) { const double special_case = (double) (x != 0. || y != 0. || z != 0.);
-                                                                          return   special_case * (RSH_C20_z2() * z * z - RSH_C20_c()); }
-__device__ double sh2p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * RSH_C21() * z; }
-__device__ double sh2p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * RSH_C22(); }
+__device__ double sh2n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * p_c  (z, RSH_C22())                                                   ; }
+__device__ double sh2n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * p_z  (z, RSH_C21())                                                   ; }
+__device__ double sh20 (const double x, const double y, const double z) { return special(x,y,z) * p_z2 (z, RSH_C20_c(), RSH_C20_z2())                                   ; }
+__device__ double sh2p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * p_z  (z, RSH_C21())                                                   ; }
+__device__ double sh2p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * p_c  (z, RSH_C22())                                                   ; }
 
-__device__ double sh3n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * RSH_C33(); }
-__device__ double sh3n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * RSH_C32() * z; }
-__device__ double sh3n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * (RSH_C31_z2() * z * z - RSH_C31_c()); }
-__device__ double sh30 (const double x, const double y, const double z) { return 				  (RSH_C30_z2() * z * z - RSH_C30_c()) * z; }
-__device__ double sh3p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * (RSH_C31_z2() * z * z - RSH_C31_c()); }
-__device__ double sh3p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * RSH_C32() * z; }
-__device__ double sh3p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * RSH_C33(); }
+__device__ double sh3n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * p_c  (z, RSH_C33())                                                   ; }
+__device__ double sh3n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * p_z  (z, RSH_C32())                                                   ; }
+__device__ double sh3n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * p_z2 (z, RSH_C31_c(), RSH_C31_z2())                                   ; }
+__device__ double sh30 (const double x, const double y, const double z) { return 				  p_z2z(z, RSH_C30_c(), RSH_C30_z2())                                   ; }
+__device__ double sh3p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * p_z2 (z, RSH_C31_c(), RSH_C31_z2())                                   ; }
+__device__ double sh3p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * p_z  (z, RSH_C32())                                                   ; }
+__device__ double sh3p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * p_c  (z, RSH_C33())                                                   ; }
 
-__device__ double sh4n4(const double x, const double y, const double z) { return f_phi_n4(x, y) * RSH_C44(); }
-__device__ double sh4n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * RSH_C43() * z; }
-__device__ double sh4n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * (RSH_C42_z2() * z * z - RSH_C42_c()); }
-__device__ double sh4n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * (RSH_C41_z2() * z * z - RSH_C41_c()) * z; }
-__device__ double sh40 (const double x, const double y, const double z) { const double z2 = z * z;
-                                                                          const double special_case = (double) (x != 0. || y != 0. || z != 0.);
-																		  return   special_case * (RSH_C40_z4() * z2 * z2 - RSH_C40_z2() * z2 + RSH_C40_c()); }
-__device__ double sh4p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * (RSH_C41_z2() * z * z - RSH_C41_c()) * z; }
-__device__ double sh4p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * (RSH_C42_z2() * z * z - RSH_C42_c()); }
-__device__ double sh4p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * RSH_C43() * z; }
-__device__ double sh4p4(const double x, const double y, const double z) { return f_phi_p4(x, y) * RSH_C44(); }
+__device__ double sh4n4(const double x, const double y, const double z) { return f_phi_n4(x, y) * p_c  (z, RSH_C44())                                                   ; }
+__device__ double sh4n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * p_z  (z, RSH_C43())                                                   ; }
+__device__ double sh4n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * p_z2 (z, RSH_C42_c(), RSH_C42_z2())                                   ; }
+__device__ double sh4n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * p_z2z(z, RSH_C41_c(), RSH_C41_z2())                                   ; }
+__device__ double sh40 (const double x, const double y, const double z) { return special(x,y,z) * p_z4 (z, RSH_C40_c(), RSH_C40_z2(), RSH_C40_z4())                     ; }
+__device__ double sh4p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * p_z2z(z, RSH_C41_c(), RSH_C41_z2())                                   ; }
+__device__ double sh4p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * p_z2 (z, RSH_C42_c(), RSH_C42_z2())                                   ; }
+__device__ double sh4p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * p_z  (z, RSH_C43())                                                   ; }
+__device__ double sh4p4(const double x, const double y, const double z) { return f_phi_p4(x, y) * p_c  (z, RSH_C44())                                                   ; }
 
-__device__ double sh5n5(const double x, const double y, const double z) { return f_phi_n5(x, y) * RSH_C55(); }
-__device__ double sh5n4(const double x, const double y, const double z) { return f_phi_n4(x, y) * RSH_C54() * z; }
-__device__ double sh5n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * (RSH_C53_z2() * z * z - RSH_C53_c()); }
-__device__ double sh5n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * (RSH_C52_z2() * z * z - RSH_C52_c()) * z; }
-__device__ double sh5n1(const double x, const double y, const double z) { const double z2 = z*z;
-																		  return f_phi_n1(x, y) * (RSH_C51_z4() * z2 * z2 - RSH_C51_z2() * z2 + RSH_C51_c()); }
-__device__ double sh50 (const double x, const double y, const double z) { const double z2 = z*z;
-																		  return 				  (RSH_C50_z4() * z2 * z2 - RSH_C50_z2() * z2 + RSH_C50_c()) * z; }
-__device__ double sh5p1(const double x, const double y, const double z) { const double z2 = z*z;
-																		  return f_phi_p1(x, y) * (RSH_C51_z4() * z2 * z2 - RSH_C51_z2() * z2 + RSH_C51_c()); }
-__device__ double sh5p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * (RSH_C52_z2() * z * z - RSH_C52_c()) * z; }
-__device__ double sh5p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * (RSH_C53_z2() * z * z - RSH_C53_c()); }
-__device__ double sh5p4(const double x, const double y, const double z) { return f_phi_p4(x, y) * RSH_C54() * z; }
-__device__ double sh5p5(const double x, const double y, const double z) { return f_phi_p5(x, y) * RSH_C55(); }
+__device__ double sh5n5(const double x, const double y, const double z) { return f_phi_n5(x, y) * p_c  (z, RSH_C55())                                                   ; }
+__device__ double sh5n4(const double x, const double y, const double z) { return f_phi_n4(x, y) * p_z  (z, RSH_C54())                                                   ; }
+__device__ double sh5n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * p_z2 (z, RSH_C53_c(), RSH_C53_z2())                                   ; }
+__device__ double sh5n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * p_z2z(z, RSH_C52_c(), RSH_C52_z2())                                   ; }
+__device__ double sh5n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * p_z4 (z, RSH_C51_c(), RSH_C51_z2(), RSH_C51_z4())                     ; }
+__device__ double sh50 (const double x, const double y, const double z) { return 				  p_z4z(z, RSH_C50_c(), RSH_C50_z2(), RSH_C50_z4())                     ; }
+__device__ double sh5p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * p_z4 (z, RSH_C51_c(), RSH_C51_z2(), RSH_C51_z4())                     ; }
+__device__ double sh5p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * p_z2z(z, RSH_C52_c(), RSH_C52_z2())                                   ; }
+__device__ double sh5p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * p_z2 (z, RSH_C53_c(), RSH_C53_z2())                                   ; }
+__device__ double sh5p4(const double x, const double y, const double z) { return f_phi_p4(x, y) * p_z  (z, RSH_C54())                                                   ; }
+__device__ double sh5p5(const double x, const double y, const double z) { return f_phi_p5(x, y) * p_c  (z, RSH_C55())                                                   ; }
 
-__device__ double sh6n6(const double x, const double y, const double z) { return f_phi_n6(x, y) * RSH_C66(); }
-__device__ double sh6n5(const double x, const double y, const double z) { return f_phi_n5(x, y) * RSH_C65() * z; }
-__device__ double sh6n4(const double x, const double y, const double z) { return f_phi_n4(x, y) * (RSH_C64_z2() * z * z - RSH_C64_c()); }
-__device__ double sh6n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * (RSH_C63_z2() * z * z - RSH_C63_c()) * z; }
-__device__ double sh6n2(const double x, const double y, const double z) { const double z2 = z*z;
-                                                                          return f_phi_n2(x, y) * (RSH_C62_z4() * z2 * z2 - RSH_C62_z2() * z2 + RSH_C62_c()); }
-__device__ double sh6n1(const double x, const double y, const double z) { const double z2 = z*z;
-                                                                          return f_phi_n1(x, y) * (RSH_C61_z4() * z2 * z2 - RSH_C61_z2() * z2 + RSH_C61_c()) * z; }
-__device__ double sh60 (const double x, const double y, const double z) { const double z2 = z*z;
-                                                                          const double special_case = (double) (x != 0. || y != 0. || z != 0.);
-                                                                          return   special_case * (RSH_C60_z6() * z2 * z2 * z2 - RSH_C60_z4() * z2 * z2 + RSH_C60_z2() * z2 - RSH_C60_c()); }
-__device__ double sh6p1(const double x, const double y, const double z) { const double z2 = z*z;
-                                                                          return f_phi_p1(x, y) * (RSH_C61_z4() * z2 * z2 - RSH_C61_z2() * z2 + RSH_C61_c()) * z; }
-__device__ double sh6p2(const double x, const double y, const double z) { const double z2 = z*z;
-                                                                          return f_phi_p2(x, y) * (RSH_C62_z4() * z2 * z2 - RSH_C62_z2() * z2 + RSH_C62_c()); }
-__device__ double sh6p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * (RSH_C63_z2() * z * z - RSH_C63_c()) * z; }
-__device__ double sh6p4(const double x, const double y, const double z) { return f_phi_p4(x, y) * (RSH_C64_z2() * z * z - RSH_C64_c()); }
-__device__ double sh6p5(const double x, const double y, const double z) { return f_phi_p5(x, y) * RSH_C65() * z; }
-__device__ double sh6p6(const double x, const double y, const double z) { return f_phi_p6(x, y) * RSH_C66(); }
+__device__ double sh6n6(const double x, const double y, const double z) { return f_phi_n6(x, y) * p_c  (z, RSH_C66())                                                   ; }
+__device__ double sh6n5(const double x, const double y, const double z) { return f_phi_n5(x, y) * p_z  (z, RSH_C65())                                                   ; }
+__device__ double sh6n4(const double x, const double y, const double z) { return f_phi_n4(x, y) * p_z2 (z, RSH_C64_c(), RSH_C64_z2())                                   ; }
+__device__ double sh6n3(const double x, const double y, const double z) { return f_phi_n3(x, y) * p_z2z(z, RSH_C63_c(), RSH_C63_z2())                                   ; }
+__device__ double sh6n2(const double x, const double y, const double z) { return f_phi_n2(x, y) * p_z4 (z, RSH_C62_c(), RSH_C62_z2(), RSH_C62_z4())                     ; }
+__device__ double sh6n1(const double x, const double y, const double z) { return f_phi_n1(x, y) * p_z4z(z, RSH_C61_c(), RSH_C61_z2(), RSH_C61_z4())                     ; }
+__device__ double sh60 (const double x, const double y, const double z) { return special(x,y,z) * p_z6 (z, RSH_C60_c(), RSH_C60_z2(), RSH_C60_z4(), RSH_C60_z6())       ; }
+__device__ double sh6p1(const double x, const double y, const double z) { return f_phi_p1(x, y) * p_z4z(z, RSH_C61_c(), RSH_C61_z2(), RSH_C61_z4())                     ; }
+__device__ double sh6p2(const double x, const double y, const double z) { return f_phi_p2(x, y) * p_z4 (z, RSH_C62_c(), RSH_C62_z2(), RSH_C62_z4())                     ; }
+__device__ double sh6p3(const double x, const double y, const double z) { return f_phi_p3(x, y) * p_z2z(z, RSH_C63_c(), RSH_C63_z2())                                   ; }
+__device__ double sh6p4(const double x, const double y, const double z) { return f_phi_p4(x, y) * p_z2 (z, RSH_C64_c(), RSH_C64_z2())                                   ; }
+__device__ double sh6p5(const double x, const double y, const double z) { return f_phi_p5(x, y) * p_z  (z, RSH_C65())                                                   ; }
+__device__ double sh6p6(const double x, const double y, const double z) { return f_phi_p6(x, y) * p_c  (z, RSH_C66())                                                   ; }
 
 
 // array of pointers to functions stored to "constant memory" (__constant__) in GPU - common for all blocks.
