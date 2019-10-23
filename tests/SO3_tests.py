@@ -12,7 +12,7 @@ class Tests(unittest.TestCase):
     def test_sh_cuda_single(self):
         if torch.cuda.is_available():
             with torch_default_dtype(torch.float64):
-                for l in range(6 + 1):
+                for l in range(10 + 1):
                     x = torch.randn(10, 3)
                     x_cuda = x.cuda()
                     Y1 = spherical_harmonics_xyz(l, x)
@@ -25,7 +25,7 @@ class Tests(unittest.TestCase):
     def test_sh_cuda_ordered_full(self):
         if torch.cuda.is_available():
             with torch_default_dtype(torch.float64):
-                l = [0, 1, 2, 3, 4, 5, 6]
+                l = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
                 x = torch.randn(10, 3)
                 x_cuda = x.cuda()
                 Y1 = spherical_harmonics_xyz(l, x)
@@ -38,7 +38,7 @@ class Tests(unittest.TestCase):
     def test_sh_cuda_ordered_partial(self):
         if torch.cuda.is_available():
             with torch_default_dtype(torch.float64):
-                l = [0, 2, 5]
+                l = [0, 2, 5, 7, 10]
                 x = torch.randn(10, 3)
                 x_cuda = x.cuda()
                 Y1 = spherical_harmonics_xyz(l, x)
