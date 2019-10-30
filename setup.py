@@ -9,7 +9,10 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 # python setup.py build_ext
 # python setup.py install    - PyCharm won't work, because it can't resolve import, but executable from terminal
 
-if torch.cuda.is_available() and CUDA_HOME is not None:
+if not torch.cuda.is_available():
+    ext_modules = None
+    print("GPU is not available. Skip building CUDA extensions.")
+elif torch.cuda.is_available() and CUDA_HOME is not None:
     ext_modules = [
         CUDAExtension('se3cnn.real_spherical_harmonics',
                       sources=['src/real_spherical_harmonics/rsh_bind.cpp',
@@ -18,12 +21,8 @@ if torch.cuda.is_available() and CUDA_HOME is not None:
                                           'nvcc': ['-std=c++14']})
     ]
 else:
-    ext_modules = None
-    print("Skipping building of real spherical harmonics CUDA extension.")
-    if not torch.cuda.is_available():
-        print("PyTorch is unable to find GPU")
-    if CUDA_HOME is None:
-        print("CUDA_HOME is undefined. Is there nvcc compiler (cuda toolkit)?")
+    # GPU is available, but CUDA_HOME is None
+    raise AssertionError("CUDA_HOME is undefined. Make sure nvcc compiler is available (cuda toolkit installed?)")
 
 setup(
     name='se3cnn',
