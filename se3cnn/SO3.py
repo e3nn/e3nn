@@ -11,7 +11,8 @@ import torch
 from se3cnn.util.cache_file import cached_dirpklgz
 from se3cnn.util.default_dtype import torch_default_dtype
 
-from se3cnn import real_spherical_harmonics
+if torch.cuda.is_available():
+    from se3cnn import real_spherical_harmonics
 
 
 def rot_z(gamma):
