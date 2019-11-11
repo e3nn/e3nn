@@ -1,5 +1,7 @@
 # pylint: disable=C, R, arguments-differ, no-member
 import math
+from itertools import repeat
+
 import torch
 
 import se3cnn.SO3 as SO3
@@ -11,7 +13,7 @@ class Kernel(torch.nn.Module):
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
-        :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
+        :param get_l_filters: function of signature (l_in, l_out) -> [l_filter or (l_filter, weighting)]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         :param normalization: either 'norm' or 'component'
 
@@ -28,14 +30,10 @@ class Kernel(torch.nn.Module):
         if get_l_filters is None:
             get_l_filters = lambda l_in, l_out: list(range(abs(l_in - l_out), l_in + l_out + 1))
 
-        def filters(l_in, p_in, l_out, p_out):
-            ls = []
-            for l in get_l_filters(l_in, l_out):
-                if p_out == 0 or p_in * (-1) ** l == p_out:
-                    ls.append(l)
-            return ls
+        get_l_filters_1 = lambda l_in, l_out: [x if isinstance(x, tuple) else (x, 1.0) for x in get_l_filters(l_in, l_out)]
+        get_l_filters_2 = lambda l_in, p_in, l_out, p_out: [(l, w) for l, w in get_l_filters_1(l_in, l_out) if p_out == 0 or p_in * (-1) ** l == p_out]
 
-        self.get_l_filters = filters
+        self.get_l_filters = get_l_filters_2
         self.check_input_output()
 
         if sh is None:
@@ -51,15 +49,16 @@ class Kernel(torch.nn.Module):
         for mul_out, l_out, p_out in self.Rs_out:
             for mul_in, l_in, p_in in self.Rs_in:
                 l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
-                assert l_filters == sorted(set(l_filters)), "get_l_filters must return a sorted list of unique values"
+                assert [l for l, _ in l_filters] == sorted(set(l for l, _ in l_filters)), "get_l_filters must return a sorted list of unique values"
+                assert all(w > 0.0 for _, w in l_filters), "get_l_filters must return tuples (l, w) with w > 0"
 
                 # compute the number of degrees of freedom
                 n_path += mul_out * mul_in * len(l_filters)
 
                 # create the set of all spherical harmonics orders needed
-                set_of_l_filters = set_of_l_filters.union(l_filters)
+                set_of_l_filters = set_of_l_filters.union([l for l, _ in l_filters])
 
-                for l in l_filters:
+                for l, _ in l_filters:
                     # precompute the change of basis Q
                     C = SO3.clebsch_gordan(l_out, l_in, l).type(torch.get_default_dtype())
                     self.register_buffer("cg_{}_{}_{}".format(l_out, l_in, l), C)
@@ -130,8 +129,8 @@ class Kernel(torch.nn.Module):
             # we need to count how many of them we sum in order to normalize the network
             num_summed_elements = 0
             for mul_in, l_in, p_in in self.Rs_in:
-                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
-                num_summed_elements += mul_in * len(l_filters)
+                weightings = [w for _l, w in self.get_l_filters(l_in, p_in, l_out, p_out)]
+                num_summed_elements += mul_in * sum(w ** 2 for w in weightings)
 
             begin_in = 0
             for mul_in, l_in, p_in in self.Rs_in:
@@ -149,14 +148,14 @@ class Kernel(torch.nn.Module):
 
                 # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
                 K = 0
-                for k, l_filter in enumerate(l_filters):
+                for k, (l_filter, w) in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
                     Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
 
                     C = getattr(self, "cg_{}_{}_{}".format(l_out, l_in, l_filter))  # [m_out, m_in, m]
 
                     # note: The multiplication with `c` could also be done outside of the for loop
-                    K += torch.einsum("ijk,kz,zuv->zuivj", (C, Y, c[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
+                    K += torch.einsum("ijk,kz,zuv->zuivj", (C, Y, w * c[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
 
                 # put 2l_in+1 to keep the norm of the m vector constant
                 # put 2l_ou+1 to keep the variance of each m componant constant
