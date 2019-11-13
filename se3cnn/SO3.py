@@ -230,7 +230,6 @@ def formatRs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
-
 ################################################################################
 # Spherical harmonics
 ################################################################################
@@ -286,7 +285,6 @@ def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=N
         return torch.tensor(Y, dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
     else:
         return torch.tensor(Y, dtype=dtype, device=device)
-
 
 
 def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None):
@@ -459,7 +457,6 @@ def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, dev
         return torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
 
 
-
 def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
     """
     Evaluate the signal on the sphere
@@ -478,32 +475,43 @@ def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
     return s
 
 
-
 ################################################################################
 # Linear algebra
 ################################################################################
 
-def get_matrix_kernel(A, eps=1e-10):
-    """
-    Compute an orthonormal basis of the kernel (x_1, x_2, ...)
-    A x_i = 0
-    scalar_product(x_i, x_j) = delta_ij
+def get_d_null_space(l1, l2, l3, eps=1e-10):
+    import scipy
+    import scipy.linalg
+    import gc
 
-    :param A: matrix
-    :return: matrix where each row is a basis vector of the kernel of A
-    """
-    _u, s, v = torch.svd(A)
+    def _DxDxD(a, b, c):
+        D1 = irr_repr(l1, a, b, c)
+        D2 = irr_repr(l2, a, b, c)
+        D3 = irr_repr(l3, a, b, c)
+        return torch.einsum('il,jm,kn->ijklmn', (D1, D2, D3)).view(n, n)
 
-    # A = u @ torch.diag(s) @ v.t()
-    kernel = v.t()[s < eps]
-    return kernel
+    n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
+    random_angles = [
+        [4.41301023, 5.56684102, 4.59384642],
+        [4.93325116, 6.12697327, 4.14574096],
+        [0.53878964, 4.09050444, 5.36539036],
+        [2.16017393, 3.48835314, 5.55174441],
+        [2.52385107, 0.29089583, 3.90040975],
+    ]
 
+    B = torch.zeros((n, n))                                                                             # preallocate memory
+    for abc in random_angles:                                                                           # expand block matrix multiplication with its transpose
+        D = _DxDxD(*abc) - torch.eye(n)
+        B += torch.matmul(D.t(), D)                                                                     # B = sum_i { D^T_i @ D_i }
+        del D
+        gc.collect()
 
-def get_matrices_kernel(As, eps=1e-10):
-    """
-    Computes the commun kernel of all the As matrices
-    """
-    return get_matrix_kernel(torch.cat(As, dim=0), eps)
+    s, v = scipy.linalg.eigh(B.numpy(), eigvals=(0, min(1, B.shape[0] - 1)), overwrite_a=True)          # ask for one (smallest) eigenvalue/eigenvector pair if there is only one exists, otherwise ask for two
+    del B
+    gc.collect()
+
+    kernel = v.T[s < eps]
+    return torch.from_numpy(kernel)
 
 
 def kron(x, y):
@@ -529,7 +537,6 @@ def direct_sum(*matrices):
         i += m
         j += n
     return out
-
 
 
 ################################################################################
@@ -576,22 +583,7 @@ def _clebsch_gordan(l1, l2, l3, _version=2):
     assert abs(l1 - l2) <= l3 <= l1 + l2
 
     with torch_default_dtype(torch.float64):
-        n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
-
-        def _DxDxD(a, b, c):
-            D1 = irr_repr(l1, a, b, c)
-            D2 = irr_repr(l2, a, b, c)
-            D3 = irr_repr(l3, a, b, c)
-            return torch.einsum('il,jm,kn->ijklmn', (D1, D2, D3)).view(n, n)
-
-        random_angles = [
-            [4.41301023, 5.56684102, 4.59384642],
-            [4.93325116, 6.12697327, 4.14574096],
-            [0.53878964, 4.09050444, 5.36539036],
-            [2.16017393, 3.48835314, 5.55174441],
-            [2.52385107, 0.29089583, 3.90040975],
-        ]
-        null_space = get_matrices_kernel([_DxDxD(*abc) - torch.eye(n) for abc in random_angles])
+        null_space = get_d_null_space(l1, l2, l3)
 
         assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
         Q = null_space[0]
@@ -606,7 +598,6 @@ def _clebsch_gordan(l1, l2, l3, _version=2):
 
     assert Q.dtype == torch.float64
     return Q  # [m1, m2, m3]
-
 
 
 ################################################################################
