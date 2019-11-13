@@ -5,6 +5,7 @@ Some functions related to SO3 and his usual representations
 Using ZYZ Euler angles parametrisation
 """
 import math
+from appdirs import user_cache_dir
 
 import torch
 
@@ -570,7 +571,7 @@ def clebsch_gordan(l1, l2, l3):
         return _clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
 
 
-@cached_dirpklgz("cache/clebsch_gordan")
+@cached_dirpklgz(user_cache_dir("se3cnn/clebsch_gordan"))
 def _clebsch_gordan(l1, l2, l3, _version=2):
     """
     Computes the Clebsch–Gordan coefficients
