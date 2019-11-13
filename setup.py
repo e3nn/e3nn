@@ -30,6 +30,7 @@ setup(
     install_requires=[
         'scipy',
         'lie_learn',
+        'appdirs'
     ],
     dependency_links=['https://github.com/AMLab-Amsterdam/lie_learn'],
     classifiers=[
