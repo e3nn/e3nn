@@ -55,8 +55,8 @@ Rs_out = [(1, l) for l in range(10)]
 conv = C(Rs_in, Rs_out)
 
 n = 3  # number of points
-features = torch.ones(1, n)
-geometry = torch.randn(n, 3)
+features = torch.ones(1, n, 1)
+geometry = torch.randn(1, n, 3)
 
 features = conv(features, geometry)
 
