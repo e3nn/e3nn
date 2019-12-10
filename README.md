@@ -1,3 +1,5 @@
+To better reproduce the experiments of the article *3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data* go to [this commit](https://github.com/mariogeiger/se3cnn/tree/546bc682887e1cb5e16b484c158c05f03377e4e9)
+
 # SE3CNN
 The group SE(3) is the group of 3 dimensional rotations and translations.
 This library aims to create [SE(3) equivariant](https://youtu.be/ENLJACPHSEA) convolutional neural networks.
