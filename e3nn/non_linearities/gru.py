@@ -1,8 +1,8 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long
 import torch
 
-from se3cnn.non_linearities import GatedBlock, ScalarActivation
-from se3cnn.non_linearities.rescaled_act import tanh
+from e3nn.non_linearities import GatedBlock, ScalarActivation
+from e3nn.non_linearities.rescaled_act import tanh
 
 
 class GRU(torch.nn.Module):

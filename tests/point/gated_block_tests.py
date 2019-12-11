@@ -4,12 +4,12 @@ from functools import partial
 
 import torch
 
-from se3cnn.non_linearities import GatedBlock, rescaled_act
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.operations import Convolution
-from se3cnn.point.radial import ConstantRadialModel
-from se3cnn.SO3 import direct_sum, irr_repr, rot
-from se3cnn.util.default_dtype import torch_default_dtype
+from e3nn.non_linearities import GatedBlock, rescaled_act
+from e3nn.point.kernel import Kernel
+from e3nn.point.operations import Convolution
+from e3nn.point.radial import ConstantRadialModel
+from e3nn.SO3 import direct_sum, irr_repr, rot
+from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):

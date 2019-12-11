@@ -3,9 +3,9 @@ import unittest
 
 import torch
 
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.radial import ConstantRadialModel
-from se3cnn.util.default_dtype import torch_default_dtype
+from e3nn.point.kernel import Kernel
+from e3nn.point.radial import ConstantRadialModel
+from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):

@@ -4,7 +4,7 @@ typical usage
 
 https://github.com/antigol/obj2voxel is needed
 
-from se3cnn.util.dataset.shapes import CacheNPY, Obj2Voxel, ModelNet10
+from e3nn.util.dataset.shapes import CacheNPY, Obj2Voxel, ModelNet10
 
 cache = CacheNPY("v64", transform=Obj2Voxel(64))
 

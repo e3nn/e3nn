@@ -1,8 +1,6 @@
-To better reproduce the experiments of the article *3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data* go to [this commit](https://github.com/mariogeiger/se3cnn/tree/546bc682887e1cb5e16b484c158c05f03377e4e9)
-
-# SE3CNN
-The group SE(3) is the group of 3 dimensional rotations and translations.
-This library aims to create [SE(3) equivariant](https://youtu.be/ENLJACPHSEA) convolutional neural networks.
+# E3NN
+The group E(3) is the group of 3 dimensional rotations, translations and mirror.
+This library aims to create [E(3) equivariant](https://youtu.be/ENLJACPHSEA) convolutional neural networks.
 
 ![](https://user-images.githubusercontent.com/333780/63736480-135b8700-c838-11e9-873f-2d65c67b98df.gif)
 
@@ -15,7 +13,7 @@ The code is separated in two parts:
 ### Image
 ```python
 import torch
-from se3cnn.image.convolution import SE3Convolution
+from e3nn.image.convolution import SE3Convolution
 
 size = 32  # space size
 
@@ -34,10 +32,10 @@ vector_field = conv(scalar_field)  # [batch, vector component, x, y, z]
 ```python
 from functools import partial
 import torch
-from se3cnn.point.radial import CosineBasisModel
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.operations import Convolution
-from se3cnn.util.plot import plot_sh_signal
+from e3nn.point.radial import CosineBasisModel
+from e3nn.point.kernel import Kernel
+from e3nn.point.operations import Convolution
+from e3nn.util.plot import plot_sh_signal
 import matplotlib.pyplot as plt
 
 # Radial model:  R -> R^d
@@ -70,18 +68,18 @@ plt.gca().view_init(azim=0, elev=45)
 
 ## Hierarchy
 
-- `se3cnn` contains the library
-  - `se3cnn/SO3.py` defines all the needed mathematical functions
-  - `se3cnn/image` contains the code specific to voxels
-  - `se3cnn/point` contains the code specific to points
-  - `se3cnn/non_linearities` non linearities working for both point and voxel code
+- `e3nn` contains the library
+  - `e3nn/SO3.py` defines all the needed mathematical functions
+  - `e3nn/image` contains the code specific to voxels
+  - `e3nn/point` contains the code specific to points
+  - `e3nn/non_linearities` non linearities working for both point and voxel code
 - `examples` simple scripts and experiments
 
 ## Installation
 
 1. install [pytorch](https://pytorch.org)
 2. `pip install git+https://github.com/AMLab-Amsterdam/lie_learn`
-3. `pip install git+https://github.com/mariogeiger/se3cnn`
+3. `pip install git+https://github.com/e3nn/e3nn`
 
 ## Usage
 

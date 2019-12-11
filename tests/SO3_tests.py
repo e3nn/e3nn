@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from se3cnn.SO3 import *
+from e3nn.SO3 import *
 
 
 class Tests(unittest.TestCase):

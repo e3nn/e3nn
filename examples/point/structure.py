@@ -5,11 +5,11 @@ from functools import partial
 import pymatgen
 import torch
 import random
-from se3cnn.non_linearities import GatedBlock
-from se3cnn.non_linearities.rescaled_act import relu, sigmoid
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.operations import PeriodicConvolution
-from se3cnn.point.radial import CosineBasisModel
+from e3nn.non_linearities import GatedBlock
+from e3nn.non_linearities.rescaled_act import relu, sigmoid
+from e3nn.point.kernel import Kernel
+from e3nn.point.operations import PeriodicConvolution
+from e3nn.point.radial import CosineBasisModel
 
 
 def get_dataset(filename):
@@ -89,7 +89,7 @@ def main():
             optimizer.step()
             optimizer.zero_grad()
             # print("step={} loss={:.2e} {}".format(step, loss.item(), success[-10:]))
-    
+
     t2 = time.time()
     print(f"Training time: {t2-t1:.2f} seconds")
 

@@ -8,7 +8,7 @@ import shutil
 from functools import partial
 
 from scipy.ndimage import affine_transform
-from se3cnn.SO3 import rot
+from e3nn.SO3 import rot
 
 
 

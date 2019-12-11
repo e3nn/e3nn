@@ -131,8 +131,8 @@ class SE3BatchNorm(nn.Module):
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
 
 
-from se3cnn.image.kernel import SE3Kernel
-from se3cnn.image import kernel
+from e3nn.image.kernel import SE3Kernel
+from e3nn.image import kernel
 
 
 class SE3BNConvolution(torch.nn.Module):

@@ -4,8 +4,8 @@ import torch.nn.functional as F
 
 from functools import partial
 
-from se3cnn.blocks import GatedBlock
-from se3cnn import basis_kernels
+from e3nn.blocks import GatedBlock
+from e3nn import basis_kernels
 from experiments.util.arch_blocks import Merge
 
 

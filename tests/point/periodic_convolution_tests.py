@@ -3,9 +3,9 @@ import unittest
 
 import torch
 from functools import partial
-from se3cnn.point.operations import PeriodicConvolution
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.radial import ConstantRadialModel
+from e3nn.point.operations import PeriodicConvolution
+from e3nn.point.kernel import Kernel
+from e3nn.point.radial import ConstantRadialModel
 
 
 class Tests(unittest.TestCase):

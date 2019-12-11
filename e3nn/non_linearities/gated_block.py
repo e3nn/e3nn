@@ -1,7 +1,7 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long, unbalanced-tuple-unpacking
 import torch
 
-from se3cnn.SO3 import normalizeRs
+from e3nn.SO3 import normalizeRs
 
 
 class GatedBlock(torch.nn.Module):

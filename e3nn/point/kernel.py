@@ -2,7 +2,7 @@
 import math
 import torch
 
-import se3cnn.SO3 as SO3
+import e3nn.SO3 as SO3
 
 
 class Kernel(torch.nn.Module):

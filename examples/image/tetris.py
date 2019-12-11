@@ -7,10 +7,10 @@ import torch.utils.data
 from scipy.ndimage import zoom
 
 from cath.util import lr_schedulers
-from se3cnn.image.filter import low_pass_filter
-from se3cnn.image.gated_block import GatedBlock
-from se3cnn.image.utils import rotate_scalar
-from se3cnn.SO3 import rot
+from e3nn.image.filter import low_pass_filter
+from e3nn.image.gated_block import GatedBlock
+from e3nn.image.utils import rotate_scalar
+from e3nn.SO3 import rot
 
 
 class AvgSpacial(nn.Module):

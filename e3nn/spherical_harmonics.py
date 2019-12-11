@@ -4,7 +4,7 @@ import math
 import scipy.signal
 import torch
 
-from se3cnn import SO3
+from e3nn import SO3
 
 
 class SphericalHarmonicsProject(torch.nn.Module):
