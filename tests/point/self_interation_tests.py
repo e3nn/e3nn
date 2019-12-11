@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from se3cnn.point.self_interaction import SelfInteraction
+from e3nn.point.self_interaction import SelfInteraction
 
 
 class Tests(unittest.TestCase):

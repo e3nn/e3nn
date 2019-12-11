@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from se3cnn.non_linearities import rescaled_act
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.operations import Convolution
-from se3cnn.point.radial import CosineBasisModel
-from se3cnn.SO3 import spherical_harmonics_xyz_backwardable, spherical_basis_vector_to_xyz_basis
+from e3nn.non_linearities import rescaled_act
+from e3nn.point.kernel import Kernel
+from e3nn.point.operations import Convolution
+from e3nn.point.radial import CosineBasisModel
+from e3nn.SO3 import spherical_harmonics_xyz_backwardable, spherical_basis_vector_to_xyz_basis
 
 torch.set_default_dtype(torch.float64)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 import torch
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 
-# python setup.py develop    - if you wont to be able to execute from PyCharm (or similar IDE) - places .so file into se3cnn folder from which real_spherical_harmonics imports
+# python setup.py develop    - if you wont to be able to execute from PyCharm (or similar IDE) - places .so file into e3nn folder from which real_spherical_harmonics imports
 
 # Or:
 # python setup.py build_ext
@@ -14,7 +14,7 @@ if not torch.cuda.is_available():
     print("GPU is not available. Skip building CUDA extensions.")
 elif torch.cuda.is_available() and CUDA_HOME is not None:
     ext_modules = [
-        CUDAExtension('se3cnn.real_spherical_harmonics',
+        CUDAExtension('e3nn.real_spherical_harmonics',
                       sources=['src/real_spherical_harmonics/rsh_bind.cpp',
                                'src/real_spherical_harmonics/rsh_cuda.cu'],
                       extra_compile_args={'cxx': ['-std=c++14'],
@@ -25,8 +25,8 @@ else:
     raise AssertionError("CUDA_HOME is undefined. Make sure nvcc compiler is available (cuda toolkit installed?)")
 
 setup(
-    name='se3cnn',
-    url='https://github.com/mariogeiger/se3cnn',
+    name='e3nn',
+    url='https://github.com/e3nn/e3nn',
     install_requires=[
         'scipy',
         'lie_learn',

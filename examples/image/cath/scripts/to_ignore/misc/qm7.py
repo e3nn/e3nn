@@ -6,7 +6,7 @@ RMSE test = 5.7
 '''
 import torch
 import torch.utils.data
-from se3cnn.blocks.tensor_product import TensorProductBlock
+from e3nnnsor_product import TensorProductBlock
 
 import numpy as np
 import scipy.io
@@ -109,7 +109,7 @@ class CNN(torch.nn.Module):
         ]
 
 
-        from se3cnn import basis_kernels
+        from e3nn
         radial_window_dict = {'radial_window_fct':basis_kernels.gaussian_window_fct_convenience_wrapper,
                               'radial_window_fct_kwargs':{'mode':'sfcnn', 'border_dist':0., 'sigma':.6}}
         common_block_params = {'size': 7, 'padding': 3, 'batch_norm_momentum': 0.01, 'batch_norm_mode': 'maximum', 'radial_window_dict':radial_window_dict}

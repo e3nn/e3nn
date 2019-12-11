@@ -1,8 +1,8 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, line-too-long
 import torch
 
-from se3cnn.image.kernel import SE3Kernel
-from se3cnn.image.kernel import gaussian_window_wrapper
+from e3nn.image.kernel import SE3Kernel
+from e3nn.image.kernel import gaussian_window_wrapper
 
 
 class SE3Convolution(torch.nn.Module):

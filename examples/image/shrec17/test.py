@@ -10,8 +10,8 @@ import numpy as np
 import requests
 import torch
 
-from se3cnn.image.filter import low_pass_filter
-from se3cnn.util.dataset.shapes import CacheNPY, Obj2Voxel, Shrec17
+from e3nn.image.filter import low_pass_filter
+from e3nn.util.dataset.shapes import CacheNPY, Obj2Voxel, Shrec17
 
 
 class KeepName:

@@ -4,9 +4,9 @@ from functools import partial
 
 import torch
 
-from se3cnn.image.kernel import (SE3Kernel, check_basis_equivariance,
+from e3nn.image.kernel import (SE3Kernel, check_basis_equivariance,
                                  cube_basis_kernels, gaussian_window)
-from se3cnn.util.default_dtype import torch_default_dtype
+from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):

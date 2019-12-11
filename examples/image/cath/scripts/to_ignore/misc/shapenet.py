@@ -6,7 +6,7 @@ classification of 6 classes
 c21
 '''
 import torch
-from se3cnn.blocks.tensor_product import TensorProductBlock
+from e3nnroduct import TensorProductBlock
 from util_cnn.model_backup import ModelBackup
 
 from util_cnn import time_logging

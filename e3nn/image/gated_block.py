@@ -2,13 +2,13 @@
 from functools import partial
 import torch
 import torch.utils.checkpoint
-from se3cnn.image.convolution import SE3Convolution, SE3ConvolutionTranspose
-from se3cnn.image.batchnorm import SE3BNConvolution
-from se3cnn.image.groupnorm import SE3GNConvolution
-from se3cnn.non_linearities import ScalarActivation
-from se3cnn.dropout import SE3Dropout
-from se3cnn.image import kernel
-from se3cnn.image.filter import low_pass_filter
+from e3nn.image.convolution import SE3Convolution, SE3ConvolutionTranspose
+from e3nn.image.batchnorm import SE3BNConvolution
+from e3nn.image.groupnorm import SE3GNConvolution
+from e3nn.non_linearities import ScalarActivation
+from e3nn.dropout import SE3Dropout
+from e3nn.image import kernel
+from e3nn.image.filter import low_pass_filter
 
 
 class GatedBlock(torch.nn.Module):

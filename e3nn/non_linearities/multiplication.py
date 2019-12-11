@@ -1,7 +1,7 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 
-from se3cnn import SO3
+from e3nn import SO3
 
 
 class Multiplication(torch.nn.Module):

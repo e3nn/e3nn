@@ -4,8 +4,8 @@ import argparse
 import matplotlib.pyplot as plt
 import torch
 
-from se3cnn.SO3 import clebsch_gordan, spherical_harmonics
-from se3cnn.util.plot import spherical_surface
+from e3nn.SO3 import clebsch_gordan, spherical_harmonics
+from e3nn.util.plot import spherical_surface
 
 
 def main():

@@ -4,9 +4,9 @@ import torch.utils.data
 import os
 import scipy.io
 import numpy as np
-from se3cnn.util.bounding_sphere import bounding_sphere
+from e3nn.util.bounding_sphere import bounding_sphere
 import glob
-from se3cnn import SO3
+from e3nn import SO3
 
 
 class VoxelizeBlobs:
@@ -117,7 +117,7 @@ class QM9(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.files)
-    
+
     def download(self):
         if not os.path.isdir(self.root):
             os.makedirs(self.root)
@@ -129,7 +129,7 @@ class QM9(torch.utils.data.Dataset):
             data = urllib.request.urlopen(self.url)
             with open(bz2_path, 'wb') as f:
                 f.write(data.read())
-                
+
         tar_path = os.path.join(self.root, "data.xyz.tar")
         if not os.path.isfile(tar_path):
             print("Decompress...")
@@ -138,15 +138,15 @@ class QM9(torch.utils.data.Dataset):
             with open(tar_path, 'wb') as f:
                 f.write(file.read())
             file.close()
-        
+
         xyz_path = os.path.join(self.root, "data.xyz")
         if not os.path.isdir(xyz_path):
             print("Extract...")
             import tarfile
             tar = tarfile.open(tar_path)
             tar.extractall(xyz_path)
-            tar.close()            
-            
+            tar.close()
+
         self.files = sorted(glob.glob(os.path.join(xyz_path, "*.xyz")))
         assert len(self.files) == 133885
 

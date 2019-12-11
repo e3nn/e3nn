@@ -4,8 +4,8 @@ import unittest
 import torch
 import torch.nn as nn
 
-from se3cnn.image.batchnorm import SE3BatchNorm, SE3BNConvolution
-from se3cnn.image.convolution import SE3Convolution
+from e3nn.image.batchnorm import SE3BatchNorm, SE3BNConvolution
+from e3nn.image.convolution import SE3Convolution
 
 
 class JointConvolution(nn.Module):
