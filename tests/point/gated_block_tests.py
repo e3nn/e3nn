@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
 
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
-            f = GatedBlock(Rs_in, Rs_out, rescaled_act.Softplus(beta=5), rescaled_act.sigmoid, C)
+            f = GatedBlock(partial(C, Rs_in), Rs_out, rescaled_act.Softplus(beta=5), rescaled_act.sigmoid)
 
             abc = torch.randn(3)
             D_in = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])

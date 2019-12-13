@@ -5,18 +5,16 @@ from e3nn.SO3 import normalizeRs
 
 
 class GatedBlock(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, scalar_activation, gate_activation, Operation):
+    def __init__(self, Operation, Rs_out, scalar_activation, gate_activation):
         """
-        :param Rs_in: list of triplet (multiplicity, representation order, parity)
+        :param Operation: class of signature (Rs_out)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param scalar_activation: nonlinear function applied on l=0 channels
         :param gate_activation: nonlinear function applied on the gates
-        :param Operation: class of signature (Rs_in, Rs_out)
         """
         super().__init__()
 
         Rs_out = normalizeRs(Rs_out)
-        Rs_in = normalizeRs(Rs_in)
 
         self.scalar_act = scalar_activation
         self.gate_act = gate_activation
@@ -31,7 +29,7 @@ class GatedBlock(torch.nn.Module):
                 Rs_gates.append((mul, 0))
 
         self.Rs = Rs
-        self.op = Operation(Rs_in, normalizeRs(Rs + Rs_gates))
+        self.op = Operation(normalizeRs(Rs + Rs_gates))
 
 
     def forward(self, *args, dim=-1, **kwargs):
