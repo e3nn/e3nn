@@ -69,7 +69,7 @@ class Tests(unittest.TestCase):
             K = partial(Kernel, RadialModel=ConstantRadialModel)
             C = partial(Convolution, K)
 
-            f = GatedBlock(Rs_in, Rs_out, scalar_activation=sigmoid, gate_activation=sigmoid, Operation=C)
+            f = GatedBlock(partial(C, Rs_in), Rs_out, scalar_activation=sigmoid, gate_activation=sigmoid)
 
             abc = torch.randn(3)
             rot_geo = rot(*abc)

@@ -46,7 +46,7 @@ class SE3Net(torch.nn.Module):
         C = partial(Convolution, K)
 
         self.firstlayers = torch.nn.ModuleList([
-            GatedBlock(Rs_in, Rs_out, relu, sigmoid, C)
+            GatedBlock(partial(C, Rs_in), Rs_out, relu, sigmoid)
             for Rs_in, Rs_out in zip(representations, representations[1:])
         ])
         self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
