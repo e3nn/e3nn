@@ -38,8 +38,8 @@ Rs_in2 = [(1, 1)]
 Rs_out1 = [(3, 0), (1, 1)]
 Rs_out2 = [(3, 1)]
 
-m1 = GatedBlock(partial(M, (Rs_in1, Rs_in2)), Rs_out1, swish, sigmoid)  # (Rs1, Rs2) --> Rs1
-m2 = GatedBlock(partial(M, (Rs_in1, Rs_in2)), Rs_out2, swish, sigmoid)  # (Rs1, Rs2) --> Rs2
+m1 = GatedBlock(partial(M, [Rs_in1, Rs_in2]), Rs_out1, swish, sigmoid)  # (Rs1, Rs2) --> Rs1
+m2 = GatedBlock(partial(M, [Rs_in1, Rs_in2]), Rs_out2, swish, sigmoid)  # (Rs1, Rs2) --> Rs2
 # partial(M, (Rs1, Rs2)) is an operation of signature (Rs_out), it will be instantiate by GatedBlock
 
 # First type of atom (eg. Hydrogen)
