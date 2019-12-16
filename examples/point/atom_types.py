@@ -32,21 +32,24 @@ K = partial(Kernel, RadialModel=R)
 C = partial(Convolution, K)
 M = partial(Mixer, C)  # wrap C to accept many input types
 
-Rs1 = [(2, 0), (1, 1)]
-Rs2 = [(1, 1)]
+Rs_in1 = [(2, 0), (1, 1)]
+Rs_in2 = [(1, 1)]
 
-m1 = GatedBlock(partial(M, (Rs1, Rs2)), Rs1, swish, sigmoid)  # (Rs1, Rs2) --> Rs1
-m2 = GatedBlock(partial(M, (Rs1, Rs2)), Rs2, swish, sigmoid)  # (Rs1, Rs2) --> Rs2
+Rs_out1 = [(3, 0), (1, 1)]
+Rs_out2 = [(3, 1)]
+
+m1 = GatedBlock(partial(M, (Rs_in1, Rs_in2)), Rs_out1, swish, sigmoid)  # (Rs1, Rs2) --> Rs1
+m2 = GatedBlock(partial(M, (Rs_in1, Rs_in2)), Rs_out2, swish, sigmoid)  # (Rs1, Rs2) --> Rs2
 # partial(M, (Rs1, Rs2)) is an operation of signature (Rs_out), it will be instantiate by GatedBlock
 
 # First type of atom (eg. Hydrogen)
 # There is 2 atoms with their features and positions
-fea1 = torch.randn(10, 2, sum(mul * (2 * l + 1) for mul, l in Rs1))
+fea1 = torch.randn(10, 2, sum(mul * (2 * l + 1) for mul, l in Rs_in1))
 geo1 = torch.randn(10, 2, 3)
 
 # Second type of atom (eg. Oxygen)
 # There is 3 atoms with their features and positions
-fea2 = torch.randn(10, 3, sum(mul * (2 * l + 1) for mul, l in Rs2))
+fea2 = torch.randn(10, 3, sum(mul * (2 * l + 1) for mul, l in Rs_in2))
 geo2 = torch.randn(10, 3, 3)
 
 # The layer is splited in two parts for the two output types of atoms
