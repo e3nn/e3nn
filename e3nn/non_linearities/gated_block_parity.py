@@ -1,8 +1,8 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, unbalanced-tuple-unpacking
 import torch
 
-from se3cnn.non_linearities.activation import Activation
-from se3cnn.non_linearities.multiplication import Multiplication
+from e3nn.non_linearities.activation import Activation
+from e3nn.non_linearities.multiplication import Multiplication
 
 
 def split_features(features, *Rss):

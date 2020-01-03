@@ -1,7 +1,7 @@
 # pylint: disable=no-member, arguments-differ, missing-docstring, invalid-name
 import unittest
 import torch
-from se3cnn.dropout import SE3Dropout
+from e3nn.dropout import SE3Dropout
 
 class Tests(unittest.TestCase):
     def test_that_it_runs(self):

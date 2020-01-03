@@ -12,8 +12,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from se3cnn.image.filter import low_pass_filter
-from se3cnn.util.dataset.shapes import CacheNPY, EqSampler, Obj2Voxel, Shrec17
+from e3nn.image.filter import low_pass_filter
+from e3nn.util.dataset.shapes import CacheNPY, EqSampler, Obj2Voxel, Shrec17
 
 
 def main(log_dir, model_path, augmentation, dataset, batch_size, learning_rate, num_workers, restore_dir, lr_value, lr_steps):

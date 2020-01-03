@@ -1,7 +1,7 @@
 # pylint: disable=C,E1101,E1102
 import unittest
 import torch
-from se3cnn.image.gated_block import GatedBlock
+from e3nn.image.gated_block import GatedBlock
 
 class Tests(unittest.TestCase):
     def test_grad(self):

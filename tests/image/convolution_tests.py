@@ -2,7 +2,7 @@
 import unittest, torch
 import torch.nn as nn
 
-from se3cnn.image.convolution import SE3Convolution, SE3ConvolutionTranspose
+from e3nn.image.convolution import SE3Convolution, SE3ConvolutionTranspose
 
 class Tests(unittest.TestCase):
     def _test_equivariance(self, f):

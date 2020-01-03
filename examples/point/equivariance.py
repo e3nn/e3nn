@@ -2,13 +2,13 @@ from functools import partial
 
 import torch
 
-from se3cnn.non_linearities.gated_block import GatedBlock
-from se3cnn.non_linearities.rescaled_act import relu, sigmoid, tanh, absolute
-from se3cnn.non_linearities.gated_block_parity import GatedBlockParity
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.operations import Convolution
-from se3cnn.point.radial import ConstantRadialModel
-from se3cnn.SO3 import rep, rot
+from e3nn.non_linearities.gated_block import GatedBlock
+from e3nn.non_linearities.rescaled_act import relu, sigmoid, tanh, absolute
+from e3nn.non_linearities.gated_block_parity import GatedBlockParity
+from e3nn.point.kernel import Kernel
+from e3nn.point.operations import Convolution
+from e3nn.point.radial import ConstantRadialModel
+from e3nn.SO3 import rep, rot
 
 
 def check_rotation(batch: int = 10, n_atoms: int = 25):
@@ -18,11 +18,10 @@ def check_rotation(batch: int = 10, n_atoms: int = 25):
     Rs_in = [(1, 0), (1, 1)]
     Rs_out = [(1, 0), (1, 1), (1, 2)]
     f = GatedBlock(
-        Rs_in,
+        partial(C, Rs_in),
         Rs_out,
         scalar_activation=sigmoid,
         gate_activation=absolute,
-        Operation=C
     )
 
     # Setup the data. The geometry, input features, and output features must all rotate.

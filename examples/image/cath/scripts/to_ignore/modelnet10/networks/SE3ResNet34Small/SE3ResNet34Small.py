@@ -3,7 +3,7 @@ import torch.nn as nn
 from functools import partial
 
 from experiments.util.arch_blocks import *
-from se3cnn import basis_kernels
+from e3nnmport basis_kernels
 
 
 class network(ResNet):

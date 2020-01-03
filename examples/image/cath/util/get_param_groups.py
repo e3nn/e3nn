@@ -1,17 +1,17 @@
 import torch.nn as nn
 
-from se3cnn.blocks import GatedBlock
-from se3cnn.blocks import NormBlock
-from se3cnn import SE3BatchNorm
-from se3cnn import SE3GroupNorm
-from se3cnn import SE3Convolution
-from se3cnn import SE3BNConvolution
-from se3cnn import SE3GNConvolution
+from e3nn.blocks import GatedBlock
+from e3nn.blocks import NormBlock
+from e3nn import SE3BatchNorm
+from e3nn import SE3GroupNorm
+from e3nn import SE3Convolution
+from e3nn import SE3BNConvolution
+from e3nn import SE3GNConvolution
 
-from se3cnn.non_linearities import NormRelu
-from se3cnn.non_linearities import NormSoftplus
-from se3cnn.non_linearities import ScalarActivation
-from se3cnn.non_linearities import GatedActivation
+from e3nn.non_linearities import NormRelu
+from e3nn.non_linearities import NormSoftplus
+from e3nn.non_linearities import ScalarActivation
+from e3nn.non_linearities import GatedActivation
 
 # ONLY REGULATIZATION PARAMETERS REGISTERED HERE WILL BE CONSIDERED
 lamb_dict = {

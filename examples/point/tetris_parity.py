@@ -3,12 +3,12 @@ from functools import partial
 
 import torch
 
-from se3cnn.non_linearities.gated_block_parity import GatedBlockParity
-from se3cnn.point.operations import Convolution
-from se3cnn.non_linearities.rescaled_act import relu, sigmoid, tanh
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.radial import CosineBasisModel
-from se3cnn.SO3 import rand_rot, formatRs
+from e3nn.non_linearities.gated_block_parity import GatedBlockParity
+from e3nn.point.operations import Convolution
+from e3nn.non_linearities.rescaled_act import relu, sigmoid, tanh
+from e3nn.point.kernel import Kernel
+from e3nn.point.radial import CosineBasisModel
+from e3nn.SO3 import rand_rot, formatRs
 
 
 def get_dataset():

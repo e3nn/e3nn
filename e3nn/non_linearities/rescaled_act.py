@@ -38,3 +38,30 @@ def relu(x):
 
 def absolute(x):
     return x.abs()
+
+
+@torch.jit.script
+def swish_jit_fwd(x):
+    return x * torch.sigmoid(x) * 1.6768
+
+
+@torch.jit.script
+def swish_jit_bwd(x, grad_output):
+    x_sigmoid = torch.sigmoid(x)
+    return grad_output * (x_sigmoid * (1 + x * (1 - x_sigmoid))) * 1.6768
+
+
+class SwishJitAutoFn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        return swish_jit_fwd(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        x = ctx.saved_variables[0]
+        return swish_jit_bwd(x, grad_output)
+
+
+def swish(x):
+    return SwishJitAutoFn.apply(x)

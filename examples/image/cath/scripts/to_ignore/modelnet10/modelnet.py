@@ -4,9 +4,9 @@ import numpy as np
 import torch.utils.data
 import torch.nn as nn
 import torch.nn.functional as F
-from se3cnn import basis_kernels
+from e3nnbasis_kernels
 from functools import partial
-from se3cnn.blocks import GatedBlock
+from e3nnk
 from experiments.datasets.modelnet.modelnet_old import ModelNet10, Obj2Voxel, CacheNPY
 from sklearn.model_selection import StratifiedKFold
 import itertools

@@ -14,9 +14,9 @@ Therefore
     K(0, g |x| e) = R_out(g) K(0, |x| e) R_in(g^{-1})  where e is a prefered chosen unit vector and g is in SO(3)
 '''
 import torch
-from se3cnn.SO3 import irr_repr, spherical_harmonics_xyz, clebsch_gordan
-from se3cnn.util.default_dtype import torch_default_dtype
-from se3cnn.util.cache_file import cached_dirpklgz
+from e3nn.SO3 import irr_repr, spherical_harmonics_xyz, clebsch_gordan
+from e3nn.util.default_dtype import torch_default_dtype
+from e3nn.util.cache_file import cached_dirpklgz
 import math
 
 
@@ -320,7 +320,7 @@ class SE3Kernel(torch.nn.Module):
 ################################################################################
 
 def check_basis_equivariance(basis, order_in, order_out, alpha, beta, gamma):
-    from se3cnn import SO3
+    from e3nn import SO3
     from scipy.ndimage import affine_transform
     import numpy as np
 

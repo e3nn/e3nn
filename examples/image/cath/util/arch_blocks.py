@@ -2,16 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from se3cnn.blocks import GatedBlock
-from se3cnn.blocks import NormBlock
-from se3cnn import SE3BatchNorm
-from se3cnn import SE3Convolution
-from se3cnn import kernel
+from e3nn.blocks import GatedBlock
+from e3nn.blocks import NormBlock
+from e3nn import SE3BatchNorm
+from e3nn import SE3Convolution
+from e3nn import kernel
 
-from se3cnn.non_linearities import NormRelu
-from se3cnn.non_linearities import NormSoftplus
-from se3cnn.non_linearities import ScalarActivation
-from se3cnn.non_linearities import GatedActivation
+from e3nn.non_linearities import NormRelu
+from e3nn.non_linearities import NormSoftplus
+from e3nn.non_linearities import ScalarActivation
+from e3nn.non_linearities import GatedActivation
 
 
 class Merge(nn.Module):

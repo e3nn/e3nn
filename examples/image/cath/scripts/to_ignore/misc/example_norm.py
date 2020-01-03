@@ -13,19 +13,19 @@ import numpy as np
 
 import torch.nn as nn
 
-from se3cnn.non_linearities import NormRelu
-from se3cnn.non_linearities import NormSoftplus
-from se3cnn.non_linearities import ScalarActivation
-from se3cnn import SO3
+from e3nn.non_linearities import NormRelu
+from e3nn.non_linearities import NormSoftplus
+from e3nn.non_linearities import ScalarActivation
+from e3nn import SO3
 
-from se3cnn.batchnorm import SE3BatchNorm
-from se3cnn.convolution import SE3Convolution
-from se3cnn import SE3BNConvolution, SE3ConvolutionBN
+from e3nn.batchnorm import SE3BatchNorm
+from e3nn.convolution import SE3Convolution
+from e3nn import SE3BNConvolution, SE3ConvolutionBN
 
-from se3cnn.blocks import NormBlock
+from e3nn.blocks import NormBlock
 
-from se3cnn.util.optimizers_L1L2 import Adam
-from se3cnn.util.lr_schedulers import lr_scheduler_exponential
+from e3nn.util.optimizers_L1L2 import Adam
+from e3nn.util.lr_schedulers import lr_scheduler_exponential
 
 
 class AvgSpacial(torch.nn.Module):
@@ -54,7 +54,7 @@ class CNN(torch.nn.Module):
 
 
 
-        from se3cnn import basis_kernels
+        from e3nn import basis_kernels
         radial_window_dict = {'radial_window_fct':basis_kernels.gaussian_window_fct_convenience_wrapper,
                               'radial_window_fct_kwargs':{'mode':'compromise', 'border_dist':0., 'sigma':.6}}
         common_block_params = {'size': 5, 'stride': 2, 'padding': 3, 'batch_norm_before_conv': False, 'radial_window_dict':radial_window_dict}
