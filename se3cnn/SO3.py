@@ -320,10 +320,7 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
     with torch_default_dtype(torch.float64):
         if device.type == 'cuda' and max(order) <= 10:
             max_l = max(order)
-            out = xyz.new_empty(
-                size=((max_l + 1)*(max_l + 1), xyz.size(0)),  # [ filters, batch_size]
-                dtype=torch.get_default_dtype()
-            )
+            out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))  # [ filters, batch_size]
             xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
             real_spherical_harmonics.rsh(out, xyz_unit)
             # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
