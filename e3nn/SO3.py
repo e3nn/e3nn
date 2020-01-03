@@ -9,11 +9,11 @@ from appdirs import user_cache_dir
 
 import torch
 
-from se3cnn.util.cache_file import cached_dirpklgz
-from se3cnn.util.default_dtype import torch_default_dtype
+from e3nn.util.cache_file import cached_dirpklgz
+from e3nn.util.default_dtype import torch_default_dtype
 
 if torch.cuda.is_available():
-    from se3cnn import real_spherical_harmonics
+    from e3nn import real_spherical_harmonics
 
 
 def rot_z(gamma):
@@ -574,7 +574,7 @@ def clebsch_gordan(l1, l2, l3):
         return _clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
 
 
-@cached_dirpklgz(user_cache_dir("se3cnn/clebsch_gordan"))
+@cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))
 def _clebsch_gordan(l1, l2, l3, _version=3):
     """
     Computes the Clebsch–Gordan coefficients

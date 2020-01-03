@@ -1,7 +1,7 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, no-member
 import torch
 
-from se3cnn import SO3
+from e3nn import SO3
 import copy
 
 

@@ -3,12 +3,12 @@ from functools import partial
 
 import torch
 
-from se3cnn.non_linearities import GatedBlock
-from se3cnn.point.operations import Convolution
-from se3cnn.non_linearities.rescaled_act import relu, sigmoid
-from se3cnn.point.kernel import Kernel
-from se3cnn.point.radial import CosineBasisModel
-from se3cnn.SO3 import rand_rot
+from e3nn.non_linearities import GatedBlock
+from e3nn.point.operations import Convolution
+from e3nn.non_linearities.rescaled_act import relu, sigmoid
+from e3nn.point.kernel import Kernel
+from e3nn.point.radial import CosineBasisModel
+from e3nn.SO3 import rand_rot
 
 
 def get_dataset():
@@ -46,7 +46,7 @@ class SE3Net(torch.nn.Module):
         C = partial(Convolution, K)
 
         self.firstlayers = torch.nn.ModuleList([
-            GatedBlock(Rs_in, Rs_out, relu, sigmoid, C)
+            GatedBlock(partial(C, Rs_in), Rs_out, relu, sigmoid)
             for Rs_in, Rs_out in zip(representations, representations[1:])
         ])
         self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))

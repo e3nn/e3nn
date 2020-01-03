@@ -8,11 +8,11 @@ RMSE train = 7e-3
 '''
 import torch
 import torch.nn as nn
-from se3cnn.convolution import SE3Convolution
-from se3cnn.batchnorm import SE3BatchNorm
-from se3cnn.non_linearities.scalar_activation import BiasRelu
-from se3cnn.non_linearities.tensor_product import TensorProduct
-from se3cnn import SO3
+from e3nn.convolution import SE3Convolution
+from e3nn.batchnorm import SE3BatchNorm
+from e3nn.non_linearities.scalar_activation import BiasRelu
+from e3nn.non_linearities.tensor_product import TensorProduct
+from e3nn import SO3
 from util_cnn.model_backup import ModelBackup
 
 from util_cnn import time_logging

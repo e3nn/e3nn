@@ -10,7 +10,7 @@ import types
 import torch
 import torch.nn as nn
 
-from se3cnn.util.dataset.molecules import (QM9, VoxelizeBlobs,
+from e3nn.util.dataset.molecules import (QM9, VoxelizeBlobs,
                                            center_positions,
                                            random_rotate_translate)
 

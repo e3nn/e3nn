@@ -1,8 +1,8 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long
 import torch
 
-from se3cnn.non_linearities import GatedBlock, ScalarActivation
-from se3cnn.non_linearities.rescaled_act import tanh
+from e3nn.non_linearities import GatedBlock, ScalarActivation
+from e3nn.non_linearities.rescaled_act import tanh
 
 
 class GRU(torch.nn.Module):
@@ -15,7 +15,7 @@ class GRU(torch.nn.Module):
     def __init__(self, repr, Operation):
         """
         :param repr: multiplicities
-        :param Operation: class of signature (Rs_in, Rs_out)
+        :param Operation: class of signature (Rs_out)
         """
         super().__init__()
 
@@ -24,7 +24,7 @@ class GRU(torch.nn.Module):
         self.z_conv = Operation([(mul, l) for l, mul in enumerate(repr)], [(sum(repr), 0)])
         self.z_act = ScalarActivation([(sum(repr), torch.sigmoid)], bias=False)
 
-        self.h_tilde = GatedBlock(repr, repr, tanh, tanh, Operation)
+        self.h_tilde = GatedBlock(Operation, repr, tanh, tanh)
 
 
     def forward(self, h, *args, **kwargs):

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from se3cnn.image.gated_block import GatedBlock
+from e3nn.image.gated_block import GatedBlock
 
 
 class AvgSpacial(torch.nn.Module):

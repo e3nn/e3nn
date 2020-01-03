@@ -7,15 +7,18 @@ class Convolution(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry, n_norm=1):
+    def forward(self, features, geometry, out_geometry=None, n_norm=1):
         """
-        :param features: tensor [batch, point, channel]
-        :param geometry: tensor [batch, point, xyz]
-        :return:         tensor [batch, point, channel]
+        :param features:     tensor [batch,  in_point, channel]
+        :param geometry:     tensor [batch,  in_point, xyz]
+        :param out_geometry: tensor [batch, out_point, xyz]
+        :return:             tensor [batch, out_point, channel]
         """
         assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
+        if out_geometry is None:
+            out_geometry = geometry
         rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
-        ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
+        ra = out_geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, i, j]
         k.div_(n_norm ** 0.5)
         return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]

@@ -1,5 +1,5 @@
 # pylint: disable=E1101,R,C,W1202,E1102
-from se3cnn.util.dataset.shapes import ModelNet10
+from e3nn.util.dataset.shapes import ModelNet10
 import math
 import random
 import subprocess
@@ -7,10 +7,10 @@ import numpy as np
 import os
 
 import torch
-from se3cnn.SO3 import irr_repr, xyz_vector_basis_to_spherical_basis
+from e3nn.SO3 import irr_repr, xyz_vector_basis_to_spherical_basis
 import torch.nn.functional as F
 
-from se3cnn.image.gated_block import GatedBlock
+from e3nn.image.gated_block import GatedBlock
 
 
 class Obj2OrientedVoxel:
@@ -96,7 +96,7 @@ class Model(torch.nn.Module):
 
 
 def rotation_from_orientations(t1, f1, t2, f2):
-    from se3cnn.SO3 import xyz_to_angles, rot
+    from e3nn.SO3 import xyz_to_angles, rot
 
     zero = t1.new_tensor(0)
 
@@ -127,7 +127,7 @@ def overlap(a, b):
 
 
 def train_step(item, top, front, model, optimizer):
-    from se3cnn.SO3 import rot
+    from e3nn.SO3 import rot
 
     model.train()
 

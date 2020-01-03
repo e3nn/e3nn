@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import
 
-from se3cnn.SO3 import angles_to_xyz, spherical_harmonics_coeff_to_sphere
+from e3nn.SO3 import angles_to_xyz, spherical_harmonics_coeff_to_sphere
 
 
 def spherical_surface(n):

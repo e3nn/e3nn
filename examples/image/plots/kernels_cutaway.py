@@ -1,6 +1,6 @@
 # pylint: disable=C,R,E1101
-from se3cnn import kernel
-from se3cnn import SO3
+from e3nn import kernel
+from e3nn import SO3
 import numpy as np
 import matplotlib.pyplot as plt
 from functools import partial

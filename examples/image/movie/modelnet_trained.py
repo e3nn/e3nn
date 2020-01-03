@@ -5,18 +5,18 @@ import numpy as np
 import torch.utils.data
 import torch.nn as nn
 import torch.nn.functional as F
-from se3cnn.blocks import GatedBlock
-from se3cnn.util.dataset.shapes import ModelNet10, Obj2Voxel, CacheNPY, EqSampler
+from e3nn.blocks import GatedBlock
+from e3nn.util.dataset.shapes import ModelNet10, Obj2Voxel, CacheNPY, EqSampler
 import matplotlib
 matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.colors as mcolors
-from se3cnn.util import time_logging
-from se3cnn.SE3 import rotate_scalar
-from se3cnn.SO3 import rot
-from se3cnn.SO3 import irr_repr
+from e3nn.util import time_logging
+from e3nn.SE3 import rotate_scalar
+from e3nn.SO3 import rot
+from e3nn.SO3 import irr_repr
 import os
 from threading import Thread
 
