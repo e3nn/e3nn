@@ -7,7 +7,7 @@ python train.py --log_dir myrun --model_path model.py --dataset train --batch_si
 The script will automatically 
 - download the dataset (and fix the .obj files)
 - load the model given by `model_path` (must be named `Model`)
-- train for 2000 epoch with two steps of learning rate decay (each epoch is small because we [equalize the classes](https://github.com/mariogeiger/se3cnn/blob/master/se3cnn/util/dataset/shapes.py#L34-L60))
+- train for 2000 epoch with two steps of learning rate decay (each epoch is small because we [equalize the classes](https://github.com/mariogeiger/e3nn/blob/master/e3nn/util/dataset/shapes.py#L34-L60))
 
 additional optional arguments are 
 - `augmentation` (default: 1) the number of data augmentation by rotation.
