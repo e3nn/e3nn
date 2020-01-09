@@ -22,11 +22,18 @@ def rot_z(gamma):
     """
     if not torch.is_tensor(gamma):
         gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
-    return gamma.new_tensor([
-        [gamma.cos(), -gamma.sin(), 0],
-        [gamma.sin(), gamma.cos(), 0],
-        [0, 0, 1]
-    ])
+
+    return torch.stack([
+        torch.stack([gamma.cos(), 
+                     -gamma.sin(),
+                     gamma.new_zeros(gamma.shape)], dim=-1),
+        torch.stack([gamma.sin(), 
+                     gamma.cos(), 
+                     gamma.new_zeros(gamma.shape)], dim=-1),
+        torch.stack([gamma.new_zeros(gamma.shape),
+                     gamma.new_zeros(gamma.shape),
+                     gamma.new_ones(gamma.shape)], dim=-1)
+    ], dim=-2)
 
 
 def rot_y(beta):
@@ -35,11 +42,17 @@ def rot_y(beta):
     """
     if not torch.is_tensor(beta):
         beta = torch.tensor(beta, dtype=torch.get_default_dtype())
-    return beta.new_tensor([
-        [beta.cos(), 0, beta.sin()],
-        [0, 1, 0],
-        [-beta.sin(), 0, beta.cos()]
-    ])
+    return torch.stack([
+        torch.stack([beta.cos(),
+                     beta.new_zeros(beta.shape),
+                     beta.sin()], dim=-1),
+        torch.stack([beta.new_zeros(beta.shape),
+                     beta.new_ones(beta.shape),
+                     beta.new_zeros(beta.shape)], dim=-1),
+        torch.stack([-beta.sin(),
+                     beta.new_zeros(beta.shape),
+                     beta.cos()], dim=-1),
+    ], dim=-2)
 
 
 # The following two functions (rot and xyz_to_angles) satisfies that
@@ -102,8 +115,8 @@ def rot_to_abc(R):
     """
     x = R @ R.new_tensor([0, 0, 1])
     a, b = xyz_to_angles(x)
-    R = rot(a, b, 0).t() @ R
-    c = torch.atan2(R[1, 0], R[0, 0])
+    R = rot(a, b, a.new_zeros(a.shape)).transpose(-1, -2) @ R
+    c = torch.atan2(R[..., 1, 0], R[..., 0, 0])
     return a, b, c
 
 
