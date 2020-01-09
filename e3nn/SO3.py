@@ -473,7 +473,7 @@ def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
         c = coeff[i: i + d]
         i += d
 
-        s += torch.einsum("i,i...->...", c, spherical_harmonics(l, alpha, beta))
+        s += torch.einsum("i,i...->...", (c, spherical_harmonics(l, alpha, beta)))
     return s
 
 
