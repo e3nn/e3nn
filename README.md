@@ -100,7 +100,7 @@ python setup.py install
                   Michał Tyszkiewicz and
                   Jes Frellsen and
                   Benjamin K. Miller},
-  title        = {mariogeiger/se3cnn: Point cloud support},
+  title        = {mariogeiger/e3nn: Point cloud support},
   month        = jul,
   year         = 2019,
   doi          = {10.5281/zenodo.3348277},
