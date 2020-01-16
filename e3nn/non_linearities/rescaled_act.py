@@ -59,7 +59,7 @@ class SwishJitAutoFn(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        x = ctx.saved_variables[0]
+        x = ctx.saved_tensors[0]
         return swish_jit_bwd(x, grad_output)
 
 
