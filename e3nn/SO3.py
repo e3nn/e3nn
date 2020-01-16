@@ -1,19 +1,20 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg
 """
 Some functions related to SO3 and his usual representations
 
 Using ZYZ Euler angles parametrisation
 """
 import math
-from appdirs import user_cache_dir
+from functools import lru_cache
 
 import torch
+from appdirs import user_cache_dir
 
 from e3nn.util.cache_file import cached_dirpklgz
 from e3nn.util.default_dtype import torch_default_dtype
 
 if torch.cuda.is_available():
-    from e3nn import real_spherical_harmonics
+    from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module
 
 
 def rot_z(gamma):
@@ -24,11 +25,11 @@ def rot_z(gamma):
         gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
 
     return torch.stack([
-        torch.stack([gamma.cos(), 
+        torch.stack([gamma.cos(),
                      -gamma.sin(),
                      gamma.new_zeros(gamma.shape)], dim=-1),
-        torch.stack([gamma.sin(), 
-                     gamma.cos(), 
+        torch.stack([gamma.sin(),
+                     gamma.cos(),
                      gamma.new_zeros(gamma.shape)], dim=-1),
         torch.stack([gamma.new_zeros(gamma.shape),
                      gamma.new_zeros(gamma.shape),
@@ -342,7 +343,8 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             out.mul_(norm_coef)
             if order != list(range(max_l+1)):
                 keep_rows = torch.zeros(out.size(0), dtype=torch.bool)
-                [keep_rows[(l*l):((l+1)*(l+1))].fill_(True) for l in order]
+                for l in order:
+                    keep_rows[(l*l):((l+1)*(l+1))].fill_(True)
                 out = out[keep_rows.to(device)]
         else:
             alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
@@ -494,7 +496,115 @@ def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
 # Linear algebra
 ################################################################################
 
-def get_d_null_space(l1, l2, l3, eps=1e-10):
+def kron(x, y):
+    """
+    Kroneker product between two matrices
+    """
+    assert x.dim() == 2
+    assert y.dim() == 2
+    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+
+
+def direct_sum(*matrices):
+    """
+    Direct sum of matrices, put them in the diagonal
+    """
+    m = sum(x.size(0) for x in matrices)
+    n = sum(x.size(1) for x in matrices)
+    out = matrices[0].new_zeros(m, n)
+    i, j = 0, 0
+    for x in matrices:
+        m, n = x.size()
+        out[i: i + m, j: j + n] = x
+        i += m
+        j += n
+    return out
+
+
+################################################################################
+# Clebsch Gordan
+################################################################################
+
+def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None):
+    """
+    Computes the Clebsch–Gordan coefficients
+
+    D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
+    """
+    if dtype is None:
+        if like is not None:
+            dtype = like.dtype
+        else:
+            dtype = torch.get_default_dtype()
+    if device is None:
+        if like is not None:
+            device = like.device
+        else:
+            device = 'cpu'
+
+    if cached:
+        return _cached_clebsch_gordan(l1, l2, l3, dtype, device)
+    return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
+
+
+@lru_cache(maxsize=None)
+def _cached_clebsch_gordan(l1, l2, l3, dtype, device):
+    return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
+
+
+def _clebsch_gordan(l1, l2, l3):
+    if torch.is_tensor(l1):
+        l1 = l1.item()
+    if torch.is_tensor(l2):
+        l2 = l2.item()
+    if torch.is_tensor(l3):
+        l3 = l3.item()
+
+    if l1 <= l2 <= l3:
+        return __clebsch_gordan(l1, l2, l3)
+    if l1 <= l3 <= l2:
+        return __clebsch_gordan(l1, l3, l2).transpose(1, 2).contiguous()
+    if l2 <= l1 <= l3:
+        return __clebsch_gordan(l2, l1, l3).transpose(0, 1).contiguous()
+    if l3 <= l2 <= l1:
+        return __clebsch_gordan(l3, l2, l1).transpose(0, 2).contiguous()
+    if l2 <= l3 <= l1:
+        return __clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2).contiguous()
+    if l3 <= l1 <= l2:
+        return __clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
+
+
+@cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))
+def __clebsch_gordan(l1, l2, l3, _version=3):
+    """
+    Computes the Clebsch–Gordan coefficients
+
+    D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
+    """
+    # these three propositions are equivalent
+    assert abs(l2 - l3) <= l1 <= l2 + l3
+    assert abs(l3 - l1) <= l2 <= l3 + l1
+    assert abs(l1 - l2) <= l3 <= l1 + l2
+
+    with torch_default_dtype(torch.float64):
+        null_space = _get_d_null_space(l1, l2, l3)
+
+        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
+        Q = null_space[0]
+        Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+
+        if Q.sum() < 0:
+            Q.neg_()
+
+        abc = torch.rand(3)
+        _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
+        assert torch.allclose(Q, _Q)
+
+    assert Q.dtype == torch.float64
+    return Q  # [m1, m2, m3]
+
+
+def _get_d_null_space(l1, l2, l3, eps=1e-10):
     import scipy
     import scipy.linalg
     import gc
@@ -527,92 +637,6 @@ def get_d_null_space(l1, l2, l3, eps=1e-10):
 
     kernel = v.T[s < eps]
     return torch.from_numpy(kernel)
-
-
-def kron(x, y):
-    """
-    Kroneker product between two matrices
-    """
-    assert x.dim() == 2
-    assert y.dim() == 2
-    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
-
-
-def direct_sum(*matrices):
-    """
-    Direct sum of matrices, put them in the diagonal
-    """
-    m = sum(x.size(0) for x in matrices)
-    n = sum(x.size(1) for x in matrices)
-    out = matrices[0].new_zeros(m, n)
-    i, j = 0, 0
-    for x in matrices:
-        m, n = x.size()
-        out[i: i + m, j: j + n] = x
-        i += m
-        j += n
-    return out
-
-
-################################################################################
-# Clebsch Gordan
-################################################################################
-
-def clebsch_gordan(l1, l2, l3):
-    """
-    Computes the Clebsch–Gordan coefficients
-
-    D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
-    """
-    if torch.is_tensor(l1):
-        l1 = l1.item()
-    if torch.is_tensor(l2):
-        l2 = l2.item()
-    if torch.is_tensor(l3):
-        l3 = l3.item()
-
-    if l1 <= l2 <= l3:
-        return _clebsch_gordan(l1, l2, l3)
-    if l1 <= l3 <= l2:
-        return _clebsch_gordan(l1, l3, l2).transpose(1, 2).contiguous()
-    if l2 <= l1 <= l3:
-        return _clebsch_gordan(l2, l1, l3).transpose(0, 1).contiguous()
-    if l3 <= l2 <= l1:
-        return _clebsch_gordan(l3, l2, l1).transpose(0, 2).contiguous()
-    if l2 <= l3 <= l1:
-        return _clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2).contiguous()
-    if l3 <= l1 <= l2:
-        return _clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
-
-
-@cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))
-def _clebsch_gordan(l1, l2, l3, _version=3):
-    """
-    Computes the Clebsch–Gordan coefficients
-
-    D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
-    """
-    # these three propositions are equivalent
-    assert abs(l2 - l3) <= l1 <= l2 + l3
-    assert abs(l3 - l1) <= l2 <= l3 + l1
-    assert abs(l1 - l2) <= l3 <= l1 + l2
-
-    with torch_default_dtype(torch.float64):
-        null_space = get_d_null_space(l1, l2, l3)
-
-        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
-        Q = null_space[0]
-        Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
-
-        if Q.sum() < 0:
-            Q.neg_()
-
-        abc = torch.rand(3)
-        _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
-        assert torch.allclose(Q, _Q)
-
-    assert Q.dtype == torch.float64
-    return Q  # [m1, m2, m3]
 
 
 ################################################################################
