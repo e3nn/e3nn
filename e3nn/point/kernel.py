@@ -78,11 +78,6 @@ class Kernel(torch.nn.Module):
                 # create the set of all spherical harmonics orders needed
                 set_of_l_filters = set_of_l_filters.union(l_filters)
 
-                for l in l_filters:
-                    # precompute the change of basis Q
-                    C = SO3.clebsch_gordan(l_out, l_in, l).type(torch.get_default_dtype())
-                    self.register_buffer("cg_{}_{}_{}".format(l_out, l_in, l), C)
-
         # create the radial model: R+ -> R^n_path
         # it contains the learned parameters
         self.R = RadialModel(n_path)
@@ -163,7 +158,7 @@ class Kernel(torch.nn.Module):
                     tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
                     Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
 
-                    C = getattr(self, "cg_{}_{}_{}".format(l_out, l_in, l_filter))  # [m_out, m_in, m]
+                    C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
 
                     # note: The multiplication with `c` could also be done outside of the for loop
                     K += torch.einsum("ijk,kz,zuv->zuivj", (C, Y, c[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
