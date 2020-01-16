@@ -575,7 +575,7 @@ def _clebsch_gordan(l1, l2, l3):
 
 
 @cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))
-def __clebsch_gordan(l1, l2, l3, _version=3):
+def __clebsch_gordan(l1, l2, l3, _version=4):
     """
     Computes the Clebsch–Gordan coefficients
 
@@ -593,7 +593,7 @@ def __clebsch_gordan(l1, l2, l3, _version=3):
         Q = null_space[0]
         Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
 
-        if Q.sum() < 0:
+        if next(x for x in Q.flatten() if x.abs() > 1e-10 * Q.abs().max()) < 0:
             Q.neg_()
 
         abc = torch.rand(3)
