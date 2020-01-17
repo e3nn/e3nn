@@ -135,11 +135,26 @@ class Kernel(torch.nn.Module):
 class KernelFn(torch.autograd.Function):
     @staticmethod
     def forward(ctx, Ys, coefficients, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+        """
+        :param Ys: tensor [l_filter * m_filter, batch]
+        :param coefficients: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
+        :param norm_coef: tensor [l_out, l_in, batch]
+        :return: tensor [batch, l_out * mul_out * m_out, l_in * mul_in * m_in]
+        """
         ctx.Rs_in = Rs_in
         ctx.Rs_out = Rs_out
         ctx.get_l_filters = get_l_filters
         ctx.set_of_l_filters = set_of_l_filters
-        ctx.save_for_backward(Ys, coefficients, norm_coef)
+        ctx.Ys_shape = Ys.shape
+        ctx.coefficients_shape = coefficients.shape
+
+        saved_Ys = saved_coefficients = None
+        if Ys.requires_grad:
+            saved_coefficients = coefficients
+        if coefficients.requires_grad:
+            saved_Ys = Ys
+
+        ctx.save_for_backward(saved_Ys, saved_coefficients, norm_coef)
 
         batch = Ys.shape[1]
         n_in = sum(mul * (2 * l + 1) for mul, l, _ in ctx.Rs_in)
@@ -194,71 +209,47 @@ class KernelFn(torch.autograd.Function):
         grad_Ys = grad_coefficients = None
 
         if ctx.needs_input_grad[0]:
-            grad_Ys = torch.zeros_like(Ys)  # [l_filter * m_filter, batch]
-            begin_c = 0
-
-            begin_out = 0
-            for i, (mul_out, l_out, p_out) in enumerate(ctx.Rs_out):
-                s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-                begin_out += mul_out * (2 * l_out + 1)
-
-                begin_in = 0
-                for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
-                    s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                    begin_in += mul_in * (2 * l_in + 1)
-
-                    l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
-                    if not l_filters:
-                        continue
-
-                    # extract the subset of the `coefficients` that corresponds to the couple (l_out, l_in)
-                    n = mul_out * mul_in * len(l_filters)
-                    c = coefficients[:, begin_c: begin_c + n].view(-1, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
-                    begin_c += n
-
-                    grad_K = grad_kernel[:, s_out, s_in].view(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
-
-                    n = norm_coef[i, j]  # [batch]
-
-                    for k, l_filter in enumerate(l_filters):
-                        tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
-                        grad_Y = grad_Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
-
-                        C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
-                        grad_Y.add_(torch.einsum("zuivj,ijk,zuv,z->kz", grad_K, C, c[..., k], n))
-
-
+            grad_Ys = grad_kernel.new_zeros(*ctx.Ys_shape)  # [l_filter * m_filter, batch]
         if ctx.needs_input_grad[1]:
-            grad_coefficients = torch.zeros_like(coefficients)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
-            begin_c = 0
+            grad_coefficients = grad_kernel.new_zeros(*ctx.coefficients_shape)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
-            begin_out = 0
-            for i, (mul_out, l_out, p_out) in enumerate(ctx.Rs_out):
-                s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-                begin_out += mul_out * (2 * l_out + 1)
+        begin_c = 0
 
-                begin_in = 0
-                for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
-                    s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                    begin_in += mul_in * (2 * l_in + 1)
+        begin_out = 0
+        for i, (mul_out, l_out, p_out) in enumerate(ctx.Rs_out):
+            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+            begin_out += mul_out * (2 * l_out + 1)
 
-                    l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
-                    if not l_filters:
-                        continue
+            begin_in = 0
+            for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
+                s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
+                begin_in += mul_in * (2 * l_in + 1)
 
-                    # extract the subset of the `coefficients` that corresponds to the couple (l_out, l_in)
-                    n = mul_out * mul_in * len(l_filters)
+                l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
+                if not l_filters:
+                    continue
+
+                # extract the subset of the `coefficients` that corresponds to the couple (l_out, l_in)
+                n = mul_out * mul_in * len(l_filters)
+                if grad_Ys is not None:
+                    c = coefficients[:, begin_c: begin_c + n].view(-1, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
+                if grad_coefficients is not None:
                     grad_c = grad_coefficients[:, begin_c: begin_c + n].view(-1, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
-                    begin_c += n
+                begin_c += n
 
-                    grad_K = grad_kernel[:, s_out, s_in].view(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
-                    n = norm_coef[i, j]  # [batch]
+                grad_K = grad_kernel[:, s_out, s_in].view(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
 
-                    for k, l_filter in enumerate(l_filters):
-                        tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
+                n = norm_coef[i, j]  # [batch]
+
+                for k, l_filter in enumerate(l_filters):
+                    tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
+                    C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
+
+                    if grad_Ys is not None:
+                        grad_Y = grad_Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
+                        grad_Y.add_(torch.einsum("zuivj,ijk,zuv,z->kz", grad_K, C, c[..., k], n))
+                    if grad_coefficients is not None:
                         Y = Ys[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
-
-                        C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
                         grad_c[..., k] = torch.einsum("zuivj,ijk,kz,z->zuv", grad_K, C, Y, n)
 
         return grad_Ys, grad_coefficients, None, None, None, None, None
