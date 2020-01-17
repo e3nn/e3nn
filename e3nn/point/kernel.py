@@ -1,4 +1,4 @@
-# pylint: disable=C, R, arguments-differ, no-member
+# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member
 import math
 import torch
 
@@ -117,14 +117,14 @@ class Kernel(torch.nn.Module):
         assert xyz == 3
         r = r.view(-1, 3)
 
-        # use the radial model to fix all the degrees of freedom
-        radii = r.norm(2, dim=1)  # [batch]
-
         # precompute all needed spherical harmonics
         Y = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
 
+        # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
+        radii = r.norm(2, dim=1)  # [batch]
         R = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
+
         norm_coef = getattr(self, 'norm_coef')
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
@@ -145,15 +145,15 @@ class KernelFn(torch.autograd.Function):
         ctx.Rs_out = Rs_out
         ctx.get_l_filters = get_l_filters
         ctx.set_of_l_filters = set_of_l_filters
-        ctx.Y_shape = Y.shape
-        ctx.R_shape = R.shape
 
+        # save necessary tensors for backward
         saved_Y = saved_R = None
         if Y.requires_grad:
+            ctx.Y_shape = Y.shape
             saved_R = R
         if R.requires_grad:
+            ctx.R_shape = R.shape
             saved_Y = Y
-
         ctx.save_for_backward(saved_Y, saved_R, norm_coef)
 
         batch = Y.shape[1]
@@ -229,7 +229,6 @@ class KernelFn(torch.autograd.Function):
                 if not l_filters:
                     continue
 
-                # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
                 n = mul_out * mul_in * len(l_filters)
                 if grad_Y is not None:
                     sub_R = R[:, begin_R: begin_R + n].view(-1, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
@@ -251,4 +250,5 @@ class KernelFn(torch.autograd.Function):
                         sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
                         sub_grad_R[..., k] = torch.einsum("zuivj,ijk,kz,z->zuv", grad_K, C, sub_Y, sub_norm_coef)
 
+        del ctx
         return grad_Y, grad_R, None, None, None, None, None
