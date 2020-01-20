@@ -1,7 +1,13 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
-from setuptools import setup, find_packages
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, bare-except
+import os
+import tarfile
+
+import requests
+import setuptools.command.install
+from setuptools import find_packages, setup
 import torch
-from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
+from torch.utils.cpp_extension import CUDA_HOME, BuildExtension, CUDAExtension
+from appdirs import user_cache_dir
 
 # python setup.py develop    - if you wont to be able to execute from PyCharm (or similar IDE) - places .so file into e3nn folder from which real_spherical_harmonics imports
 
@@ -24,6 +30,30 @@ else:
     # GPU is available, but CUDA_HOME is None
     raise AssertionError("CUDA_HOME is undefined. Make sure nvcc compiler is available (cuda toolkit installed?)")
 
+class PostInstallCommand(setuptools.command.install.install):
+    """Post-installation for installation mode."""
+
+    def run(self):
+        setuptools.command.install.install.run(self)
+        setuptools.command.install.install.do_egg_install(self)
+
+        try:
+            url = 'https://github.com/e3nn/e3nn/releases/download/v0.2-alpha/cache.tar'
+            root = user_cache_dir("e3nn")
+
+            if not os.path.isdir(root):
+                os.makedirs(root)
+
+            tar_path = os.path.join(root, "cache.tar")
+            r = requests.get(url)
+            open(tar_path, 'wb').write(r.content)
+
+            tar = tarfile.open(tar_path)
+            tar.extractall(root)
+            tar.close()
+        except:
+            pass
+
 setup(
     name='e3nn',
     url='https://github.com/e3nn/e3nn',
@@ -39,6 +69,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     ext_modules=ext_modules,
-    cmdclass={'build_ext': BuildExtension},
+    cmdclass={'build_ext': BuildExtension, 'install': PostInstallCommand},
     packages=find_packages(),
 )
