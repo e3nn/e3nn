@@ -94,3 +94,23 @@ def get_truncated_shuffled_Q(Rs):
 
     new_Q_trunc = new_Q[:, :, :total]
     return Rs_new_trunc, new_Q_trunc
+
+
+def test_split_Rs():
+    Rs = [(2, 0)]
+    rearrange, indices = split_Rs(Rs)
+    assert (rearrange == torch.eye(2).unsqueeze(-2)).all()
+    
+    Rs = [(3, 0), (2, 1)]
+    try:
+        rearrange, indices = split_Rs(Rs)
+        assert False
+    except:
+        assert True
+    
+    Rs = [(3, 0), (3, 1)]
+    rearrange, indices = split_Rs(Rs)
+    assert (rearrange[range(3), 0, range(3)] == 1.).all()
+    assert (rearrange[0, 1:, 3:6] == torch.eye(3)).all() == True
+    assert (rearrange[1, 1:, 6:9] == torch.eye(3)).all() == True
+    assert (rearrange[2, 1:, 9:12] == torch.eye(3)).all() == True
