@@ -114,3 +114,22 @@ def test_split_Rs():
     assert (rearrange[0, 1:, 3:6] == torch.eye(3)).all() == True
     assert (rearrange[1, 1:, 6:9] == torch.eye(3)).all() == True
     assert (rearrange[2, 1:, 9:12] == torch.eye(3)).all() == True
+
+
+def test_simplify_Rs():
+    L_max = 5
+    mul = 7
+    Rs_single = [(1, L, 0) for L in range(L_max + 1)]
+    Rs = [(mul, L) for L in range(L_max + 1)]
+    Rs_out, shuffle = simplify_Rs(Rs_single * mul)
+    assert Rs_out == Rs
+    
+    Rs_orig = [(1, 0, 0), (3, 2, 0), (2, 1, 0)]
+    Rs_check = [(1, 0), (2, 1), (3, 2)]
+    Rs_out, shuffle = simplify_Rs(Rs_orig)
+    assert Rs_out == Rs_check
+    
+    Rs_orig = [(1, 0, 0), (3, 2, 0), (2, 1, 0), (2, 0, 0)]
+    Rs_check = [(3, 0), (2, 1), (3, 2)]
+    Rs_out, shuffle = simplify_Rs(Rs_orig)
+    assert Rs_out == Rs_check
