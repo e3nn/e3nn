@@ -5,26 +5,35 @@ import torch
 
 from e3nn.point.kernel import Kernel
 from e3nn.point.radial import ConstantRadialModel
+from e3nn import SO3
 
 
 class SortSphericalSignals(torch.nn.Module):
+    """
+    Sort the representation order of a tensor
+    """
     def __init__(self, Rs):
         super().__init__()
-        ljds = []
 
-        j = 0
-        for mul, l in Rs:
+        self.Rs_in = SO3.normalizeRs(Rs)
+        xs = []
+
+        j = 0  # input offset
+        for mul, l, p in self.Rs_in:
             d = mul * (2 * l + 1)
-            ljds.append((l, j, d))
+            xs.append((l, p, mul, j, d))
             j += d
 
         mixing_matrix = torch.zeros(j, j)
 
-        i = 0
-        for _l, j, d in sorted(ljds):
+        Rs_out = []
+        i = 0  # output offset
+        for l, p, mul, j, d in sorted(xs):
+            Rs_out.append((mul, l, p))
             mixing_matrix[i:i+d, j:j+d] = torch.eye(d)
             i += d
 
+        self.Rs_out = SO3.normalizeRs(Rs_out)
         self.register_buffer('mixing_matrix', mixing_matrix)
 
     def forward(self, x):
@@ -36,10 +45,14 @@ class SortSphericalSignals(torch.nn.Module):
 
 
 class ConcatenateSphericalSignals(torch.nn.Module):
+    """
+    Concatenate tensors
+    """
     def __init__(self, *Rs):
         super().__init__()
         Rs = reduce(list.__add__, Rs, [])
         self.sort = SortSphericalSignals(Rs)
+        self.Rs_out = self.sort.Rs_out
 
     def forward(self, *signals):
         combined = torch.cat(signals, dim=1)
@@ -54,7 +67,7 @@ class SelfInteraction(torch.nn.Module):
     def forward(self, features):
         """
         :param features: tensor [..., channel]
-        :return:         tensro [..., channel]
+        :return:         tensor [..., channel]
         """
         *size, n = features.size()
         features = features.view(-1, n)
