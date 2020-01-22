@@ -15,7 +15,6 @@ Therefore
 '''
 import torch
 from e3nn.SO3 import irr_repr, spherical_harmonics_xyz, clebsch_gordan
-from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.cache_file import cached_dirpklgz
 import math
 
@@ -56,7 +55,7 @@ def _sample_cube(size, order_in, order_out):
         Y_J = _sample_sh_cube(size, J)  # [m, x, y, z]
 
         # compute basis transformation matrix Q_J
-        Q_J = clebsch_gordan(order_out, order_in, J).view(-1, 2 * J + 1)  # [m_out * m_in, m]
+        Q_J = clebsch_gordan(order_out, order_in, J, dtype=torch.float64).view(-1, 2 * J + 1)  # [m_out * m_in, m]
         K_J = torch.einsum('mn,nxyz->mxyz', (Q_J, Y_J))  # [m_out * m_in, x, y, z]
         K_J = K_J.view(2 * order_out + 1, 2 * order_in + 1, size, size, size)  # [m_out, m_in, x, y, z]
         solutions.append(K_J)
