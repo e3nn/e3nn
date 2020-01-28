@@ -19,6 +19,6 @@ class SelfInteraction(torch.nn.Module):
         features = features.view(-1, n)
 
         k = self.kernel(features.new_zeros(3))
-        features = torch.einsum("ij,zj->zi", (k, features))
+        features = torch.einsum("ij,zj->zi", k, features)
         features = features.view(*size, -1)
         return features
