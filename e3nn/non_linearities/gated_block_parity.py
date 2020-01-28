@@ -2,7 +2,7 @@
 import torch
 
 from e3nn.non_linearities.activation import Activation
-from e3nn.non_linearities.multiplication import Multiplication
+from e3nn.non_linearities.multiplication import ElementwiseMultiplication
 
 
 def split_features(features, *Rss):
@@ -29,7 +29,7 @@ class GatedBlockParity(torch.nn.Module):
         self.act_gates = Activation(Rs_gates, act_gates)
         Rs_gates = self.act_gates.Rs_out
 
-        self.mul = Multiplication(Rs_nonscalars, Rs_gates)
+        self.mul = ElementwiseMultiplication(Rs_nonscalars, Rs_gates)
         Rs_nonscalars = self.mul.Rs_out
 
         self.Rs_out = Rs_scalars + Rs_nonscalars
