@@ -5,12 +5,12 @@ from e3nn.non_linearities.self_interaction import SelfInteraction
 
 
 class TensorProduct(torch.nn.Module):
-    def __init__(self, Operation, Rs_out, Rs_mid, mul_mid):
+    def __init__(self, Operation, Rs_out, Rs_mid_1, Rs_mid_2, mul_mid, get_l_mul=None):
         super().__init__()
         self.mul_mid = mul_mid
-        self.f1 = Operation(mul_mid * Rs_mid)
-        self.f2 = Operation(mul_mid * Rs_mid)
-        self.m = Multiplication(Rs_mid, Rs_mid)
+        self.f1 = Operation(mul_mid * Rs_mid_1)
+        self.f2 = Operation(mul_mid * Rs_mid_2)
+        self.m = Multiplication(Rs_mid_1, Rs_mid_2, get_l_mul)
         self.si = SelfInteraction(mul_mid * self.m.Rs_out, Rs_out)
 
     def forward(self, *args):
