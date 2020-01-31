@@ -527,6 +527,8 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
 
     with torch_default_dtype(torch.float64):
         if device.type == 'cuda' and max(order) <= 10 and real_spherical_harmonics is not None:
+            *size, _ = xyz.size()
+            xyz = xyz.view(-1, 3)
             max_l = max(order)
             out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))  # [ filters, batch_size]
             xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
@@ -542,6 +544,7 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
                 for l in order:
                     keep_rows[(l*l):((l+1)*(l+1))].fill_(True)
                 out = out[keep_rows.to(device)]
+            out = out.view(-1, *size)
         else:
             alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
             out = spherical_harmonics(order, alpha, beta)  # [m, ...]
