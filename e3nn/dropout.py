@@ -2,7 +2,7 @@
 import torch
 
 
-class SE3Dropout(torch.nn.Module):
+class Dropout(torch.nn.Module):
     def __init__(self, Rs, p=0.5):
         super().__init__()
         self.Rs = [(mul, dim) for mul, dim in Rs if mul * dim > 0]

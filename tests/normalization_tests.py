@@ -3,8 +3,8 @@ import unittest
 
 import torch
 
-from e3nn.point.kernel import Kernel
-from e3nn.point.radial import ConstantRadialModel
+from e3nn.kernel import Kernel
+from e3nn.radial import ConstantRadialModel
 from e3nn.util.default_dtype import torch_default_dtype
 
 

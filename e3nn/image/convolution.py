@@ -1,41 +1,24 @@
-# pylint: disable=arguments-differ, redefined-builtin, missing-docstring, line-too-long
+# pylint: disable=arguments-differ, redefined-builtin, missing-docstring, line-too-long, no-member, invalid-name
+from functools import partial
+
 import torch
 
-from e3nn.image.kernel import SE3Kernel
-from e3nn.image.kernel import gaussian_window_wrapper
+from e3nn.non_linearities import rescaled_act
+from e3nn.kernel import Kernel
+from e3nn.radial import CosineBasisModel
 
 
-class SE3Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=gaussian_window_wrapper, dyn_iso=False, verbose=False, **kwargs):
+class Convolution(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, size, **kwargs):
         super().__init__()
 
-        self.kernel = SE3Kernel(Rs_in, Rs_out, size, radial_window=radial_window, dyn_iso=dyn_iso, verbose=verbose)
+        R = partial(CosineBasisModel, max_radius=1.0, number_of_basis=(size+1)//2, h=50, L=3, act=rescaled_act.relu)
+        self.kernel = Kernel(Rs_in, Rs_out, R, normalization='component')
+        x = torch.linspace(-1, 1, size)
+        self.r = torch.stack(torch.meshgrid(x, x, x), dim=-1)
         self.kwargs = kwargs
 
-    def __repr__(self):
-        return "{name} ({kernel}, kwargs={kwargs})".format(
-            name=self.__class__.__name__,
-            kernel=self.kernel,
-            kwargs=self.kwargs,
-        )
-
-    def forward(self, input):
-        return torch.nn.functional.conv3d(input, self.kernel(), **self.kwargs)
-
-
-class SE3ConvolutionTranspose(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, radial_window=gaussian_window_wrapper, dyn_iso=False, verbose=False, **kwargs):
-        super().__init__()
-
-        self.kernel = SE3Kernel(Rs_out, Rs_in, size, radial_window=radial_window, dyn_iso=dyn_iso, verbose=verbose)
-        self.kwargs = kwargs
-
-    def __repr__(self):
-        return "{name} ({kernel}, kwargs={kwargs})".format(
-            name=self.__class__.__name__,
-            kernel=self.kernel,
-            kwargs=self.kwargs,
-        )
-
-    def forward(self, input):
-        return torch.nn.functional.conv_transpose3d(input, self.kernel(), **self.kwargs)
+    def forward(self, features):
+        k = torch.einsum('xyzij->ijxyz', self.kernel(self.r))
+        k.mul_(2 / k[0, 0].numel() ** 0.5)
+        return torch.nn.functional.conv3d(features, k, **self.kwargs)

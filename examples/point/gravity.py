@@ -7,9 +7,9 @@ import numpy as np
 import torch
 
 from e3nn.non_linearities import rescaled_act
-from e3nn.point.kernel import Kernel
+from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
-from e3nn.point.radial import CosineBasisModel
+from e3nn.radial import CosineBasisModel
 from e3nn.SO3 import spherical_harmonics_xyz_backwardable, spherical_basis_vector_to_xyz_basis
 
 torch.set_default_dtype(torch.float64)
