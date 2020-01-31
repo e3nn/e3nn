@@ -7,9 +7,9 @@ import torch
 from e3nn.non_linearities.gated_block import GatedBlock
 from e3nn.non_linearities.gated_block_parity import GatedBlockParity
 from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
-from e3nn.point.kernel import Kernel
+from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
-from e3nn.point.radial import ConstantRadialModel
+from e3nn.radial import ConstantRadialModel
 from e3nn.SO3 import (clebsch_gordan, direct_sum, irr_repr, rot,
                       spherical_harmonics_xyz)
 from e3nn.util.default_dtype import torch_default_dtype

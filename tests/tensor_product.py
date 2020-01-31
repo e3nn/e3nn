@@ -4,8 +4,7 @@ import unittest
 import torch
 
 from e3nn import SO3
-from e3nn.tensor_product import (ElementwiseTensorProduct, TensorProduct,
-                                 elementwise_tensor_product, tensor_product)
+from e3nn.tensor_product import ElementwiseTensorProduct, TensorProduct
 
 
 class Tests(unittest.TestCase):
@@ -16,7 +15,7 @@ class Tests(unittest.TestCase):
         Rs_1 = [(3, 0), (2, 1), (5, 2)]
         Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
 
-        Rs_out, m = elementwise_tensor_product(Rs_1, Rs_2)
+        Rs_out, m = SO3.elementwise_tensor_productRs(Rs_1, Rs_2)
         mul = ElementwiseTensorProduct(Rs_1, Rs_2)
 
         x1 = torch.randn(1, SO3.dimRs(Rs_1))
@@ -35,7 +34,7 @@ class Tests(unittest.TestCase):
         Rs_1 = [(3, 0), (2, 1), (5, 2)]
         Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
 
-        Rs_out, m = tensor_product(Rs_1, Rs_2)
+        Rs_out, m = SO3.tensor_productRs(Rs_1, Rs_2)
         mul = TensorProduct(Rs_1, Rs_2)
 
         x1 = torch.randn(1, SO3.dimRs(Rs_1))

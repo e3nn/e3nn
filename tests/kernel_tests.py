@@ -2,8 +2,8 @@
 import unittest
 
 import torch
-from e3nn.point.kernel import Kernel, KernelFn
-from e3nn.point.radial import ConstantRadialModel
+from e3nn.kernel import Kernel, KernelFn
+from e3nn.radial import ConstantRadialModel
 
 
 class Tests(unittest.TestCase):

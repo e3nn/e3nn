@@ -1,8 +1,8 @@
 # pylint: disable=arguments-differ, no-member, missing-docstring, invalid-name, line-too-long
 import torch
 
-from e3nn.point.kernel import Kernel
-from e3nn.point.radial import ConstantRadialModel
+from e3nn.kernel import Kernel
+from e3nn.radial import ConstantRadialModel
 
 
 class Linear(torch.nn.Module):

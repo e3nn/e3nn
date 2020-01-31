@@ -6,8 +6,8 @@ import torch
 from e3nn.non_linearities.gated_block_parity import GatedBlockParity
 from e3nn.point.operations import Convolution
 from e3nn.non_linearities.rescaled_act import relu, sigmoid, tanh
-from e3nn.point.kernel import Kernel
-from e3nn.point.radial import CosineBasisModel
+from e3nn.kernel import Kernel
+from e3nn.radial import CosineBasisModel
 from e3nn.SO3 import rand_rot, formatRs
 
 

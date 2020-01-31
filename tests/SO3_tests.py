@@ -198,13 +198,13 @@ class Tests(unittest.TestCase):
                 D_j = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_j for _ in range(mul)])
                 D = direct_sum(*[irr_repr(l, *abc) for mul, l, _ in Rs for _ in range(mul)])
 
-                Q1 = torch.einsum("ijk,kl->ijl", (Q, D))
-                Q2 = torch.einsum("li,mj,ijk->lmk", (D_i, D_j, Q))
+                Q1 = torch.einsum("ijk,il->ljk", (Q, D))
+                Q2 = torch.einsum("li,mj,kij->klm", (D_i, D_j, Q))
 
                 d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
                 self.assertLess(d, 1e-10)
 
-                n = Q.size(2)
+                n = Q.size(0)
                 M = Q.view(n, n)
                 I = torch.eye(n, dtype=M.dtype)
 
