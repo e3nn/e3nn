@@ -2,7 +2,7 @@
 The group E(3) is the group of 3 dimensional rotations, translations and mirror.
 This library aims to create E(3) equivariant convolutional neural networks.
 
-![](https://user-images.githubusercontent.com/333780/63736480-135b8700-c838-11e9-873f-2d65c67b98df.gif)
+![](https://user-images.githubusercontent.com/333780/73550102-425bd180-4444-11ea-8b69-8a4241ffa9c9.gif)
 
 ## Example
 ```python
