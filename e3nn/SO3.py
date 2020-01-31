@@ -5,7 +5,7 @@ Some functions related to SO3 and his usual representations
 Using ZYZ Euler angles parametrisation
 """
 import math
-from functools import lru_cache
+from functools import lru_cache, partial
 
 import torch
 from appdirs import user_cache_dir
@@ -319,6 +319,124 @@ def formatRs(Rs):
     }
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
+
+def sorted_truncated_tensor_productRs(Rs_1, Rs_2, lmax):
+    """
+    :param Rs_1: input representation
+    :param Rs_2: input representation
+    :param lmax: maximum l for the output
+    :return: Rs_out, change of basis
+
+    example: sorted_truncated_tensor_productRs([(1, 1), (2, 2)], [(2, 2)], 1) = ([(4, 0, 0), (6, 1, 0)], matrix)
+    """
+    Rs, tensor_product = tensor_productRs(Rs_1, Rs_2, partial(selection_rule, lmax=lmax))
+    Rs, sort = sortRs(Rs)
+    Rs = simplifyRs(Rs)
+    matrix = torch.einsum('ij,jkl->ikl', sort, tensor_product)
+    return Rs, matrix
+
+
+def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
+    """
+    Compute the orthonormal change of basis Q
+    from Rs_out to Rs_1 tensor product with Rs_2
+    where Rs_out is a direct sum of irreducible representations
+
+    :return: Rs_out, Q
+
+    Q_kij A_i B_j
+    """
+    Rs_1 = simplifyRs(Rs_1)
+    Rs_2 = simplifyRs(Rs_2)
+
+    Rs_out = []
+    for mul_1, l_1, p_1 in Rs_1:
+        for mul_2, l_2, p_2 in Rs_2:
+            for l in get_l_output(l_1, l_2):
+                Rs_out.append((mul_1 * mul_2, l, p_1 * p_2))
+
+    Rs_out = simplifyRs(Rs_out)
+
+    mixing_matrix = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+
+    index_out = 0
+
+    index_1 = 0
+    for mul_1, l_1, _p_1 in Rs_1:
+        dim_1 = mul_1 * (2 * l_1 + 1)
+
+        index_2 = 0
+        for mul_2, l_2, _p_2 in Rs_2:
+            dim_2 = mul_2 * (2 * l_2 + 1)
+            for l in get_l_output(l_1, l_2):
+                dim_out = mul_1 * mul_2 * (2 * l + 1)
+                C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
+                I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
+                m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
+                mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+                index_out += dim_out
+
+            index_2 += dim_2
+        index_1 += dim_1
+
+    return Rs_out, mixing_matrix
+
+
+def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
+    """
+    :return: Rs_out, matrix
+
+    m_kij A_i B_j
+    """
+    Rs_1 = simplifyRs(Rs_1)
+    Rs_2 = simplifyRs(Rs_2)
+
+    assert sum(mul for mul, _, _ in Rs_1) == sum(mul for mul, _, _ in Rs_2)
+
+    i = 0
+    while i < len(Rs_1):
+        mul_1, l_1, p_1 = Rs_1[i]
+        mul_2, l_2, p_2 = Rs_2[i]
+
+        if mul_1 < mul_2:
+            Rs_2[i] = (mul_1, l_2, p_2)
+            Rs_2.insert(i + 1, (mul_2 - mul_1, l_2, p_2))
+
+        if mul_2 < mul_1:
+            Rs_1[i] = (mul_2, l_1, p_1)
+            Rs_1.insert(i + 1, (mul_1 - mul_2, l_1, p_1))
+        i += 1
+
+    Rs_out = []
+    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
+        assert mul == mul_2
+        for l in get_l_output(l_1, l_2):
+            Rs_out.append((mul, l, p_1 * p_2))
+
+    Rs_out = simplifyRs(Rs_out)
+
+    mixing_matrix = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+
+    index_out = 0
+    index_1 = 0
+    index_2 = 0
+    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
+        assert mul == mul_2
+        dim_1 = mul * (2 * l_1 + 1)
+        dim_2 = mul * (2 * l_2 + 1)
+
+        for l in get_l_output(l_1, l_2):
+            dim_out = mul * (2 * l + 1)
+            C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
+            I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
+            m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
+            mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+            index_out += dim_out
+
+        index_1 += dim_1
+        index_2 += dim_2
+
+    return Rs_out, mixing_matrix
 
 ################################################################################
 # Spherical harmonics
@@ -784,49 +902,3 @@ def tensor3x3_repr_basis_to_spherical_basis():
         assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
-
-
-def reduce_tensor_product(Rs_i, Rs_j):
-    """
-    Compute the orthonormal change of basis Q
-    from Rs_reduced to Rs_i tensor product with Rs_j
-    where Rs_reduced is a direct sum of irreducible representations
-
-    :return: Rs_reduced, Q
-    """
-    with torch_default_dtype(torch.float64):
-        Rs_i = simplifyRs(Rs_i)
-        Rs_j = simplifyRs(Rs_j)
-
-        n_i = sum(mul * (2 * l + 1) for mul, l, p in Rs_i)
-        n_j = sum(mul * (2 * l + 1) for mul, l, p in Rs_j)
-        out = torch.zeros(n_i, n_j, n_i * n_j, dtype=torch.float64)
-
-        Rs_reduced = []
-        beg = 0
-
-        beg_i = 0
-        for mul_i, l_i, p_i in Rs_i:
-            n_i = mul_i * (2 * l_i + 1)
-
-            beg_j = 0
-            for mul_j, l_j, p_j in Rs_j:
-                n_j = mul_j * (2 * l_j + 1)
-
-                for l in range(abs(l_i - l_j), l_i + l_j + 1):
-                    Rs_reduced.append((mul_i * mul_j, l, p_i * p_j))
-                    n = mul_i * mul_j * (2 * l + 1)
-
-                    # put sqrt(2l+1) to get an orthonormal output
-                    Q = math.sqrt(2 * l + 1) * clebsch_gordan(l_i, l_j, l)  # [m_i, m_j, m]
-                    I = torch.eye(mul_i * mul_j).view(mul_i, mul_j, mul_i * mul_j)  # [mul_i, mul_j, mul_i * mul_j]
-
-                    Q = torch.einsum("ijk,mno->imjnko", (I, Q))
-
-                    view = out[beg_i: beg_i + n_i, beg_j: beg_j + n_j, beg: beg + n]
-                    view.add_(Q.view_as(view))
-
-                    beg += n
-                beg_j += n_j
-            beg_i += n_i
-        return Rs_reduced, out

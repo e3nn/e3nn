@@ -4,48 +4,6 @@ from e3nn.linear import Linear
 from e3nn import SO3
 
 
-def tensor_product(Rs_1, Rs_2, get_l_output=SO3.selection_rule):
-    """
-    :return: Rs_out, matrix
-
-    m_kij A_i B_j
-    """
-    Rs_1 = SO3.simplifyRs(Rs_1)
-    Rs_2 = SO3.simplifyRs(Rs_2)
-
-    Rs_out = []
-    for mul_1, l_1, p_1 in Rs_1:
-        for mul_2, l_2, p_2 in Rs_2:
-            for l in get_l_output(l_1, l_2):
-                Rs_out.append((mul_1 * mul_2, l, p_1 * p_2))
-
-    Rs_out = SO3.simplifyRs(Rs_out)
-
-    mixing_matrix = torch.zeros(SO3.dimRs(Rs_out), SO3.dimRs(Rs_1), SO3.dimRs(Rs_2))
-
-    index_out = 0
-
-    index_1 = 0
-    for mul_1, l_1, _p_1 in Rs_1:
-        dim_1 = mul_1 * (2 * l_1 + 1)
-
-        index_2 = 0
-        for mul_2, l_2, _p_2 in Rs_2:
-            dim_2 = mul_2 * (2 * l_2 + 1)
-            for l in get_l_output(l_1, l_2):
-                dim_out = mul_1 * mul_2 * (2 * l + 1)
-                C = SO3.clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
-                I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
-                m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-                mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
-                index_out += dim_out
-
-            index_2 += dim_2
-        index_1 += dim_1
-
-    return Rs_out, mixing_matrix
-
-
 # TODO test performance
 class TensorProduct(torch.nn.Module):
     """
@@ -106,63 +64,6 @@ class TensorProduct(torch.nn.Module):
 
         output = torch.cat(output, dim=1)
         return output.view(*size_1, -1)
-
-
-def elementwise_tensor_product(Rs_1, Rs_2, get_l_output=SO3.selection_rule):
-    """
-    :return: Rs_out, matrix
-
-    m_kij A_i B_j
-    """
-    Rs_1 = SO3.simplifyRs(Rs_1)
-    Rs_2 = SO3.simplifyRs(Rs_2)
-
-    assert sum(mul for mul, _, _ in Rs_1) == sum(mul for mul, _, _ in Rs_2)
-
-    i = 0
-    while i < len(Rs_1):
-        mul_1, l_1, p_1 = Rs_1[i]
-        mul_2, l_2, p_2 = Rs_2[i]
-
-        if mul_1 < mul_2:
-            Rs_2[i] = (mul_1, l_2, p_2)
-            Rs_2.insert(i + 1, (mul_2 - mul_1, l_2, p_2))
-
-        if mul_2 < mul_1:
-            Rs_1[i] = (mul_2, l_1, p_1)
-            Rs_1.insert(i + 1, (mul_1 - mul_2, l_1, p_1))
-        i += 1
-
-    Rs_out = []
-    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
-        assert mul == mul_2
-        for l in get_l_output(l_1, l_2):
-            Rs_out.append((mul, l, p_1 * p_2))
-
-    Rs_out = SO3.simplifyRs(Rs_out)
-
-    mixing_matrix = torch.zeros(SO3.dimRs(Rs_out), SO3.dimRs(Rs_1), SO3.dimRs(Rs_2))
-
-    index_out = 0
-    index_1 = 0
-    index_2 = 0
-    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
-        assert mul == mul_2
-        dim_1 = mul * (2 * l_1 + 1)
-        dim_2 = mul * (2 * l_2 + 1)
-
-        for l in get_l_output(l_1, l_2):
-            dim_out = mul * (2 * l + 1)
-            C = SO3.clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
-            I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
-            m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-            mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
-            index_out += dim_out
-
-        index_1 += dim_1
-        index_2 += dim_2
-
-    return Rs_out, mixing_matrix
 
 
 class ElementwiseTensorProduct(torch.nn.Module):

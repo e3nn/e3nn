@@ -190,7 +190,7 @@ class Tests(unittest.TestCase):
     def test_reduce_tensor_product(self):
         for Rs_i, Rs_j in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
             with torch_default_dtype(torch.float64):
-                Rs, Q = reduce_tensor_product(Rs_i, Rs_j)
+                Rs, Q = tensor_productRs(Rs_i, Rs_j)
 
                 abc = torch.rand(3, dtype=torch.float64)
 
