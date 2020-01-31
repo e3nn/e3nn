@@ -24,7 +24,9 @@ class GRU(torch.nn.Module):
         self.z_conv = Operation([(mul, l) for l, mul in enumerate(repr)], [(sum(repr), 0)])
         self.z_act = ScalarActivation([(sum(repr), torch.sigmoid)], bias=False)
 
-        self.h_tilde = GatedBlock(Operation, repr, tanh, tanh)
+        gb = GatedBlock(repr, tanh, tanh)
+        self.h_tilde_op = Operation(gb.Rs_in)
+        self.h_tilde_gb = gb
 
 
     def forward(self, h, *args, **kwargs):
@@ -37,7 +39,8 @@ class GRU(torch.nn.Module):
         z = self.z_conv(h, *args, **kwargs)  # [batch, channel, ...]
         z = self.z_act(z)  # [batch, channel, ...]
 
-        h_tilde = self.h_tilde(h, *args, **kwargs)
+        h_tilde = self.h_tilde_op(h, *args, **kwargs)
+        h_tilde = self.h_tilde_gb(h_tilde)
 
         outs = []
         i = 0

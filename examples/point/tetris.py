@@ -43,17 +43,22 @@ class SE3Net(torch.nn.Module):
 
         R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=relu)
         K = partial(Kernel, RadialModel=R)
-        C = partial(Convolution, K)
+
+        def make_layer(Rs_in, Rs_out):
+            act = GatedBlock(Rs_out, relu, sigmoid)
+            conv = Convolution(K, Rs_in, act.Rs_in)
+            return torch.nn.ModuleList([conv, act])
 
         self.firstlayers = torch.nn.ModuleList([
-            GatedBlock(partial(C, Rs_in), Rs_out, relu, sigmoid)
+            make_layer(Rs_in, Rs_out)
             for Rs_in, Rs_out in zip(representations, representations[1:])
         ])
         self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
 
     def forward(self, features, geometry):
-        for m in self.firstlayers:
-            features = m(features.div(4 ** 0.5), geometry)
+        for conv, act in self.firstlayers:
+            features = conv(features, geometry, n_norm=4)
+            features = act(features)
 
         return self.lastlayers(features)
 
