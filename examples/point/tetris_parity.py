@@ -48,7 +48,6 @@ class Network(torch.nn.Module):
 
         R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=3, act=relu)
         K = partial(Kernel, RadialModel=R)
-        C = partial(Convolution, K)
 
         mul = 7
         layers = []
@@ -64,11 +63,16 @@ class Network(torch.nn.Module):
 
             print("layer {}: from {} to {}".format(i, formatRs(rs), formatRs(scalars + nonscalars)))
 
-            block = GatedBlockParity(C, rs, scalars, act_scalars, gates, act_gates, nonscalars)
-            rs = block.Rs_out
+            act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
+            conv = Convolution(K, rs, act.Rs_in)
+            block = torch.nn.ModuleList([conv, act])
             layers.append(block)
+            rs = act.Rs_out
 
-        layers.append(GatedBlockParity(C, rs, [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)], [], [], []))
+        act = GatedBlockParity([(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)], [], [], [])
+        conv = Convolution(K, rs, act.Rs_in)
+        block = torch.nn.ModuleList([conv, act])
+        layers.append(block)
 
         self.firstlayers = torch.nn.ModuleList(layers)
 
@@ -76,8 +80,9 @@ class Network(torch.nn.Module):
         self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(mul + mul, num_classes))
 
     def forward(self, features, geometry):
-        for m in self.firstlayers:
-            features = m(features, geometry, 4)
+        for conv, act in self.firstlayers:
+            features = conv(features, geometry, n_norm=4)
+            features = act(features)
 
         return self.lastlayers(features)
 

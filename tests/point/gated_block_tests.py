@@ -18,9 +18,10 @@ class Tests(unittest.TestCase):
             Rs_in = [(3, 0), (3, 1), (2, 0), (1, 2)]
             Rs_out = [(3, 0), (3, 1), (1, 2), (3, 0)]
 
+            f = GatedBlock(Rs_out, rescaled_act.Softplus(beta=5), rescaled_act.sigmoid)
+
             K = partial(Kernel, RadialModel=ConstantRadialModel)
-            C = partial(Convolution, K)
-            f = GatedBlock(partial(C, Rs_in), Rs_out, rescaled_act.Softplus(beta=5), rescaled_act.sigmoid)
+            c = Convolution(K, Rs_in, f.Rs_in)
 
             abc = torch.randn(3)
             D_in = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
@@ -32,10 +33,10 @@ class Tests(unittest.TestCase):
             rx = torch.einsum("ij,zaj->zai", (D_in, x))
             rgeo = geo @ rot(*abc).t()
 
-            y = f(x, geo, dim=2)
+            y = f(c(x, geo), dim=2)
             ry = torch.einsum("ij,zaj->zai", (D_out, y))
 
-            self.assertLess((f(rx, rgeo) - ry).norm(), 1e-10 * ry.norm())
+            self.assertLess((f(c(rx, rgeo)) - ry).norm(), 1e-10 * ry.norm())
 
 
 unittest.main()

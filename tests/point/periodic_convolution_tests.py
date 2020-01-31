@@ -18,7 +18,7 @@ class Tests(unittest.TestCase):
         Rs_out = [(2, 0), (2, 1), (2, 2)]
         max_radius = 3.0
         K = partial(Kernel, RadialModel=ConstantRadialModel)
-        m = PeriodicConvolution(Rs_in, Rs_out, Kernel=K, max_radius=max_radius)
+        m = PeriodicConvolution(K, Rs_in, Rs_out, max_radius=max_radius)
         n = sum(mul * (2 * l + 1) for mul, l in Rs_in)
 
         x = torch.randn(2, 3, n)
