@@ -8,7 +8,7 @@ class Norm(torch.nn.Module):
     def __init__(self, Rs, normalization='norm'):
         super().__init__()
 
-        Rs = SO3.normalizeRs(Rs)
+        Rs = SO3.simplifyRs(Rs)
         n = sum(mul for mul, _, _ in Rs)
         self.Rs_in = Rs
         self.Rs_out = [(n, 0, +1)]

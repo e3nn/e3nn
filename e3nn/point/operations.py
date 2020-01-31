@@ -1,6 +1,8 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable
 import torch
 
+from e3nn import SO3
+
 
 class Convolution(torch.nn.Module):
     def __init__(self, Kernel, Rs_in, Rs_out):
@@ -142,7 +144,7 @@ class NeighborsConvolution(torch.nn.Module):
 
 
 class PeriodicConvolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, Kernel, max_radius):
+    def __init__(self, Kernel, Rs_in, Rs_out, max_radius):
         super().__init__()
         self.max_radius = max_radius
         self.kernel = Kernel(Rs_in, Rs_out)
@@ -160,7 +162,7 @@ class PeriodicConvolution(torch.nn.Module):
         import numpy as np
 
         batch_size, points_num = features.size(0), features.size(1)
-        in_channels, out_channels = self.kernel.n_in, self.kernel.n_out
+        in_channels, out_channels = SO3.dimRs(self.kernel.Rs_in), SO3.dimRs(self.kernel.Rs_out)
 
         geometry = geometry.cpu().numpy()
         features = features.view(batch_size, points_num * in_channels)                                               # [z, b*j]

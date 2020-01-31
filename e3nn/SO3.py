@@ -179,10 +179,22 @@ def rep(Rs, alpha, beta, gamma, parity=None):
     """
     abc = [alpha, beta, gamma]
     if parity is None:
-        return direct_sum(*[irr_repr(l, *abc) for mul, l, _ in normalizeRs(Rs) for _ in range(mul)])
+        return direct_sum(*[irr_repr(l, *abc) for mul, l, _ in simplifyRs(Rs) for _ in range(mul)])
     else:
-        assert all(parity != 0 for _, _, parity in normalizeRs(Rs))
-        return direct_sum(*[(p ** parity) * irr_repr(l, *abc) for mul, l, p in normalizeRs(Rs) for _ in range(mul)])
+        assert all(parity != 0 for _, _, parity in simplifyRs(Rs))
+        return direct_sum(*[(p ** parity) * irr_repr(l, *abc) for mul, l, p in simplifyRs(Rs) for _ in range(mul)])
+
+
+def selection_rule(l1, l2, lmax=None):
+    """
+    selection rule
+    :return: list from |l1-l2|... to l1+l2
+    """
+    if lmax is None:
+        l_max = l1 + l2
+    else:
+        l_max = min(lmax, l1 + l2)
+    return list(range(abs(l1 - l2), l_max + 1))
 
 
 ################################################################################
@@ -204,7 +216,70 @@ def haslinearpathRs(Rs_in, l_out, p_out):
     return False
 
 
-def normalizeRs(Rs):
+def splitRs(Rs, cmul=-1):
+    """
+    :param Rs: [(mul, 0), (mul, 1), (mul, 2)]
+    :return:   mul * [(1, 0), (1, 1), (1, 2)]
+    """
+    Rs = simplifyRs(Rs)
+    muls = {mul for mul, _, _ in Rs}
+    if cmul == -1:
+        from fractions import gcd
+        from functools import reduce
+        cmul = reduce(gcd, muls)
+    assert all(mul % cmul == 0 for mul, _, _ in Rs)
+
+    return cmul * [(mul // cmul, l, p) for mul, l, p in Rs]
+
+
+def rearrangeRs(Rs_in, Rs_out):
+    """
+    :return: mixing_matrix
+    output = einsum('ij,j->i', mixing_matrix, input)
+    """
+    Rs_in, a = sortRs(Rs_in)
+    Rs_out, b = sortRs(Rs_out)
+    assert simplifyRs(Rs_in) == simplifyRs(Rs_out)
+    return b.T @ a
+
+
+def sortRs(Rs):
+    """
+    :return: (Rs_out, mixing_matrix)
+    stable sorting of the representation by (l, p)
+    output = einsum('ij,j->i', mixing_matrix, input)
+    """
+    Rs_in = simplifyRs(Rs)
+    xs = []
+
+    j = 0  # input offset
+    for mul, l, p in Rs_in:
+        d = mul * (2 * l + 1)
+        xs.append((l, p, mul, j, d))
+        j += d
+
+    mixing_matrix = torch.zeros(j, j)
+
+    Rs_out = []
+    i = 0  # output offset
+    for l, p, mul, j, d in sorted(xs):
+        Rs_out.append((mul, l, p))
+        mixing_matrix[i:i+d, j:j+d] = torch.eye(d)
+        i += d
+
+    return Rs_out, mixing_matrix
+
+
+def dimRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: dimention of the representation
+    """
+    Rs = simplifyRs(Rs)
+    return sum(mul * (2 * l + 1) for mul, l, _ in Rs)
+
+
+def simplifyRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: simplified version of the same list with the parity
@@ -720,8 +795,8 @@ def reduce_tensor_product(Rs_i, Rs_j):
     :return: Rs_reduced, Q
     """
     with torch_default_dtype(torch.float64):
-        Rs_i = normalizeRs(Rs_i)
-        Rs_j = normalizeRs(Rs_j)
+        Rs_i = simplifyRs(Rs_i)
+        Rs_j = simplifyRs(Rs_j)
 
         n_i = sum(mul * (2 * l + 1) for mul, l, p in Rs_i)
         n_j = sum(mul * (2 * l + 1) for mul, l, p in Rs_j)

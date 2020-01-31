@@ -1,4 +1,4 @@
-import copy
+# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import math
 
 import torch
@@ -19,7 +19,7 @@ class S2Activation(torch.nn.Module):
         '''
         super().__init__()
 
-        Rs = SO3.normalizeRs(Rs)
+        Rs = SO3.simplifyRs(Rs)
         mul0, _, p0 = Rs[0]
         assert all(mul0 == mul for mul, _, _ in Rs)
         assert [l for _, l, _ in Rs] == list(range(len(Rs)))
@@ -31,13 +31,13 @@ class S2Activation(torch.nn.Module):
             x = torch.linspace(0, 10, 256)
             a1, a2 = act(x), act(-x)
             if (a1 - a2).abs().max() < a1.abs().max() * 1e-10:
-                p_act = 1
+                # p_act = 1
                 self.Rs_out = [(mul, l, -p) for mul, l, p in Rs]
             elif (a1 + a2).abs().max() < a1.abs().max() * 1e-10:
-                p_act = -1
+                # p_act = -1
                 self.Rs_out = Rs
             else:
-                p_act = 0
+                # p_act = 0
                 raise ValueError("warning! the parity is violated")
 
         x = torch.randn(n, 3)
@@ -57,4 +57,3 @@ class S2Activation(torch.nn.Module):
         out_features = out_features.view(*features.shape)
         out_features = out_features.transpose(0, dim)
         return out_features
-

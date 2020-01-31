@@ -14,7 +14,7 @@ class Activation(torch.nn.Module):
         '''
         super().__init__()
 
-        Rs = SO3.normalizeRs(Rs)
+        Rs = SO3.simplifyRs(Rs)
         acts = copy.deepcopy(acts)
 
         n1 = sum(mul for mul, _, _ in Rs)
