@@ -6,7 +6,7 @@ import e3nn.SO3 as SO3
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=None, sh=SO3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=SO3.selection_rule, sh=SO3.spherical_harmonics_xyz, normalization='norm'):
         '''
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -19,16 +19,12 @@ class Kernel(torch.nn.Module):
         '''
         super().__init__()
 
-        self.Rs_in = SO3.normalizeRs(Rs_in)
-        self.Rs_out = SO3.normalizeRs(Rs_out)
+        self.Rs_in = SO3.simplifyRs(Rs_in)
+        self.Rs_out = SO3.simplifyRs(Rs_out)
 
         def filters_with_parity(l_in, p_in, l_out, p_out):
-            def filters(l_in, l_out):
-                return list(range(abs(l_in - l_out), l_in + l_out + 1))
-
             nonlocal get_l_filters
-            fn = filters if get_l_filters is None else get_l_filters
-            return [l for l in fn(l_in, l_out) if p_out == 0 or p_in * (-1) ** l == p_out]
+            return [l for l in get_l_filters(l_in, l_out) if p_out == 0 or p_in * (-1) ** l == p_out]
 
         self.get_l_filters = filters_with_parity
         self.check_input_output()
@@ -115,7 +111,7 @@ class Kernel(torch.nn.Module):
         """
         *size, xyz = r.size()
         assert xyz == 3
-        r = r.view(-1, 3)
+        r = r.reshape(-1, 3)
 
         # precompute all needed spherical harmonics
         Y = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
@@ -157,8 +153,8 @@ class KernelFn(torch.autograd.Function):
         ctx.save_for_backward(saved_Y, saved_R, norm_coef)
 
         batch = Y.shape[1]
-        n_in = sum(mul * (2 * l + 1) for mul, l, _ in ctx.Rs_in)
-        n_out = sum(mul * (2 * l + 1) for mul, l, _ in ctx.Rs_out)
+        n_in = SO3.dimRs(ctx.Rs_in)
+        n_out = SO3.dimRs(ctx.Rs_out)
 
         kernel = Y.new_zeros(batch, n_out, n_in)
 
