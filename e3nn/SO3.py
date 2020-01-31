@@ -14,7 +14,10 @@ from e3nn.util.cache_file import cached_dirpklgz
 from e3nn.util.default_dtype import torch_default_dtype
 
 if torch.cuda.is_available():
-    from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module
+    try:
+        from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module
+    except ImportError:
+        real_spherical_harmonics = None
 
 
 def rot_z(gamma):
@@ -523,7 +526,7 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
         xyz = torch.tensor(xyz, dtype=torch.float64)
 
     with torch_default_dtype(torch.float64):
-        if device.type == 'cuda' and max(order) <= 10:
+        if device.type == 'cuda' and max(order) <= 10 and real_spherical_harmonics is not None:
             max_l = max(order)
             out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))  # [ filters, batch_size]
             xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
