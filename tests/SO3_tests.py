@@ -132,18 +132,18 @@ class Tests(unittest.TestCase):
             self._test_is_representation(partial(irr_repr, l__))
 
 
-    def _test_is_representation(self, rep):
+    def _test_is_representation(self, R):
         """
-        rep(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = rep(Z(a1) Y(b1) Z(c1)) rep(Z(a2) Y(b2) Z(c2))
+        R(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = R(Z(a1) Y(b1) Z(c1)) R(Z(a2) Y(b2) Z(c2))
         """
         with torch_default_dtype(torch.float64):
             a1, b1, c1, a2, b2, c2 = torch.rand(6)
 
-            r1 = rep(a1, b1, c1)
-            r2 = rep(a2, b2, c2)
+            r1 = R(a1, b1, c1)
+            r2 = R(a2, b2, c2)
 
             a, b, c = compose(a1, b1, c1, a2, b2, c2)
-            r = rep(a, b, c)
+            r = R(a, b, c)
 
             r_ = r1 @ r2
 

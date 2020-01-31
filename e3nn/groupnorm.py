@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 
-class SE3GroupNorm(nn.Module):
+class GroupNorm(nn.Module):
     def __init__(self, Rs, eps=1e-5, affine=True):
         '''
         :param Rs: list of tuple (multiplicity, dimension)
@@ -69,34 +69,9 @@ class SE3GroupNorm(nn.Module):
 
 
 def test_groupnorm():
-    bn = SE3GroupNorm([(3, 1), (4, 3), (1, 5)])
+    bn = GroupNorm([(3, 1), (4, 3), (1, 5)])
 
     x = torch.rand(16, 3 + 12 + 5, 10, 10, 10)
 
     y = bn(x)
     return y
-
-
-from e3nn.image.convolution import SE3Convolution
-
-
-class SE3GNConvolution(torch.nn.Module):
-    '''
-    This class is the analog of SE3BNConvolution
-    Unfortunately the optimization done in SE3BNConvolution
-    cannot be ported for group normalization
-    '''
-
-    def __init__(self, Rs_in, Rs_out, size, eps=1e-5, Rs_gn=None, **kwargs):
-        super().__init__()
-        if Rs_gn is None:
-            Rs_gn = [(m, 2 * l + 1) for m, l in Rs_in]
-        self.gn = SE3GroupNorm(Rs_gn, eps=eps)
-        self.conv = SE3Convolution(Rs_in=Rs_in, Rs_out=Rs_out, size=size, **kwargs)
-
-    def forward(self, input):  # pylint: disable=W
-        return self.conv(self.gn(input))
-
-
-if __name__ == "__main__":
-    test_groupnorm()
