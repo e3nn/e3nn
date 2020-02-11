@@ -23,7 +23,22 @@ class Convolution(torch.nn.Module):
         ra = out_geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, i, j]
         k.div_(n_norm ** 0.5)
-        return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]
+        return ConvolutionEinsum.apply(k, features)  # [batch, point, channel]
+
+
+class ConvolutionEinsum(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, k, features):
+        ctx.save_for_backward(k, features)
+        return torch.einsum("zabij,zbj->zai", k, features)  # [batch, point, channel]    @staticmethod
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        k, features = ctx.saved_tensors
+        del ctx
+        grad_k = torch.einsum("zai,zbj->zabij", grad_output, features)
+        grad_features = torch.einsum("zabij,zai->zbj", k, grad_output)
+        return grad_k, grad_features
 
 
 class PairConvolution(torch.nn.Module):
