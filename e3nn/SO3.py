@@ -282,10 +282,10 @@ def dimRs(Rs):
     return sum(mul * (2 * l + 1) for mul, l, _ in Rs)
 
 
-def simplifyRs(Rs):
+def conventionRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: simplified version of the same list with the parity
+    :return: conventional version of the same list with the parity
     """
     out = []
     for r in Rs:
@@ -302,11 +302,23 @@ def simplifyRs(Rs):
         if mul == 0:
             continue
 
+        out.append((mul, l, p))
+    return out
+
+
+def simplifyRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: simplified version of the same list with the parity
+    """
+    out = []
+    Rs = conventionRs(Rs)
+    for r in Rs:
+        mul, l, p = r
         if out and out[-1][1:] == (l, p):
             out[-1] = (out[-1][0] + mul, l, p)
         else:
             out.append((mul, l, p))
-
     return out
 
 
@@ -321,6 +333,49 @@ def formatRs(Rs):
         -1: "-",
     }
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
+
+
+def rep_mixing_matrixRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: mixing matrix for irreps and full representation order
+    """
+    Rs = conventionRs(Rs)
+    num_irreps = sum([2 * L + 1 for mult, L, p in Rs])
+    num_reps = sum([mult * (2 * L + 1) for mult, L, p in Rs])
+    mixing_matrix = torch.zeros(num_irreps, num_reps)
+    start_irrep = 0
+    start_rep = 0
+    for mult, L, p in Rs:
+        for i in range(mult):
+            irrep_slice = slice(start_irrep, start_irrep + 2 * L + 1)
+            rep_slice = slice(start_rep, start_rep + 2 * L + 1)
+            mixing_matrix[irrep_slice, rep_slice] = torch.eye(2 * L + 1)
+            start_rep += 2 * L + 1
+        start_irrep += 2 * L + 1
+    
+    return mixing_matrix  # [irreps, full]
+
+
+def multiplicity_mixing_matrixRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: mixing matrix for multiplicity and full representation order
+    """
+    Rs = conventionRs(Rs)
+    num_mults = sum([mult for mult, L, p in Rs])
+    k = sum([mult * (2 * L + 1) for mult, L, p in Rs])
+    mixing_matrix = torch.zeros(num_mults, k)
+    start_mult = 0
+    start_rep = 0
+    for mult, L, p in Rs:
+        for i in range(mult):
+            mult_slice = slice(start_mult, start_mult + 1)
+            rep_slice = slice(start_rep, start_rep + 2 * L + 1)
+            mixing_matrix[mult_slice, rep_slice] = 1.0
+            start_mult += 1
+            start_rep += 2 * L + 1
+    return mixing_matrix  # [mults, full]
 
 
 def sorted_truncated_tensor_productRs(Rs_1, Rs_2, lmax):
@@ -339,7 +394,7 @@ def sorted_truncated_tensor_productRs(Rs_1, Rs_2, lmax):
     return Rs, matrix
 
 
-def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
+def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule, paths=False):
     """
     Compute the orthonormal change of basis Q
     from Rs_out to Rs_1 tensor product with Rs_2
@@ -353,9 +408,14 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
     Rs_2 = simplifyRs(Rs_2)
 
     Rs_out = []
+
+    if paths:
+        path_list = []
     for mul_1, l_1, p_1 in Rs_1:
         for mul_2, l_2, p_2 in Rs_2:
             for l in get_l_output(l_1, l_2):
+                if paths:
+                    path_list.extend([[l_1, l_2, l]] * (mul_1 * mul_2))
                 Rs_out.append((mul_1 * mul_2, l, p_1 * p_2))
 
     Rs_out = simplifyRs(Rs_out)
@@ -382,6 +442,8 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
             index_2 += dim_2
         index_1 += dim_1
 
+    if paths:
+        return Rs_out, mixing_matrix, path_list
     return Rs_out, mixing_matrix
 
 
