@@ -267,7 +267,7 @@ def sortRs(Rs):
     i = 0  # output offset
     for l, p, mul, j, d in sorted(xs):
         Rs_out.append((mul, l, p))
-        mixing_matrix[i:i+d, j:j+d] = torch.eye(d)
+        mixing_matrix[i:i + d, j:j + d] = torch.eye(d)
         i += d
 
     return Rs_out, mixing_matrix
@@ -376,7 +376,7 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
                 C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-                mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+                mixing_matrix[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
                 index_out += dim_out
 
             index_2 += dim_2
@@ -433,7 +433,7 @@ def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
             C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-            mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+            mixing_matrix[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
             index_out += dim_out
 
         index_1 += dim_1
@@ -444,6 +444,7 @@ def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
 ################################################################################
 # Spherical harmonics
 ################################################################################
+
 
 def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=None):
     """
@@ -530,19 +531,19 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             *size, _ = xyz.size()
             xyz = xyz.view(-1, 3)
             max_l = max(order)
-            out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))  # [ filters, batch_size]
+            out = xyz.new_empty(((max_l + 1) * (max_l + 1), xyz.size(0)))  # [ filters, batch_size]
             xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
             real_spherical_harmonics.rsh(out, xyz_unit)
             # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
-            norm_coef = [elem for lh in range((max_l+1)//2) for elem in [1.]*(4*lh + 1) + [-1.]*(4*lh+3)]
+            norm_coef = [elem for lh in range((max_l + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
             if max_l % 2 == 0:
-                norm_coef.extend([1.]*(2*max_l + 1))
+                norm_coef.extend([1.] * (2 * max_l + 1))
             norm_coef = torch.tensor(norm_coef, device=device).unsqueeze(1)
             out.mul_(norm_coef)
-            if order != list(range(max_l+1)):
+            if order != list(range(max_l + 1)):
                 keep_rows = torch.zeros(out.size(0), dtype=torch.bool)
                 for l in order:
-                    keep_rows[(l*l):((l+1)*(l+1))].fill_(True)
+                    keep_rows[(l * l):((l + 1) * (l + 1))].fill_(True)
                 out = out[keep_rows.to(device)]
             out = out.view(-1, *size)
         else:
@@ -830,7 +831,8 @@ def _get_d_null_space(l1, l2, l3, eps=1e-10):
         del D
         gc.collect()
 
-    s, v = scipy.linalg.eigh(B.numpy(), eigvals=(0, min(1, n - 1)), overwrite_a=True)                   # ask for one (smallest) eigenvalue/eigenvector pair if there is only one exists, otherwise ask for two
+    # ask for one (smallest) eigenvalue/eigenvector pair if there is only one exists, otherwise ask for two
+    s, v = scipy.linalg.eigh(B.numpy(), eigvals=(0, min(1, n - 1)), overwrite_a=True)
     del B
     gc.collect()
 
@@ -901,7 +903,7 @@ def tensor3x3_repr_basis_to_spherical_basis():
         to5 = torch.tensor([
             [0, 1, 0, 1, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 1, 0, 1, 0],
-            [-3**.5/3, 0, 0, 0, -3**.5/3, 0, 0, 0, 12**.5/3],
+            [-3**.5 / 3, 0, 0, 0, -3**.5 / 3, 0, 0, 0, 12**.5 / 3],
             [0, 0, 1, 0, 0, 0, 1, 0, 0],
             [1, 0, 0, 0, -1, 0, 0, 0, 0]
         ], dtype=torch.get_default_dtype())

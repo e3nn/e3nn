@@ -41,10 +41,10 @@ class NormActivation(torch.nn.Module):
 
         for dim, scalar_bool in zip(self.dimensionalities, self.is_scalar):
             # take capsule out of input
-            capsule = input[:, idx_capsule_begin:idx_capsule_begin+dim]
+            capsule = input[:, idx_capsule_begin:idx_capsule_begin + dim]
             # act on scalar capsules with scalar activation
             if scalar_bool:
-                if self.scalar_act == None:
+                if self.scalar_act is None:
                     capsule_activ = capsule
                 else:
                     capsule_activ = self.scalar_act(capsule)
@@ -54,7 +54,7 @@ class NormActivation(torch.nn.Module):
                 b = self.bias[idx_bias].expand_as(norm)  # [batch, 1, x, y, z]
                 activ_factor = self.tensor_act(norm - b)  # [batch, 1, x, y, z]
                 # activ_factor = 1 + torch.nn.ELU(norm - b.expand_as(norm)) # add 1 to make scaling factor positive
-                capsule_activ = activ_factor * (capsule/norm)
+                capsule_activ = activ_factor * (capsule / norm)
                 idx_bias += 1
             # append to list of nonlinearly transformed capsules
             capsule_activations.append(capsule_activ)
@@ -102,10 +102,10 @@ class NormSoftplus(torch.nn.Module):
 
         for dim, scalar_bool in zip(self.dimensionalities, self.is_scalar):
             # take capsule out of input
-            capsule = input[:, idx_capsule_begin:idx_capsule_begin+dim]
+            capsule = input[:, idx_capsule_begin:idx_capsule_begin + dim]
             # act on scalar capsules with scalar activation
             if scalar_bool:
-                if self.scalar_act == None:
+                if self.scalar_act is None:
                     capsule_activ = capsule
                 else:
                     capsule_activ = self.scalar_act(capsule)
@@ -115,7 +115,7 @@ class NormSoftplus(torch.nn.Module):
                 b = self.bias[idx_bias].expand_as(norm)  # [batch, 1, x, y, z]
                 activ_factor = torch.nn.Softplus(beta=1, threshold=20)(norm - b)  # [batch, 1, x, y, z]
                 # activ_factor = 1 + torch.nn.ELU(norm - b.expand_as(norm)) # add 1 to make scaling factor positive
-                capsule_activ = activ_factor * (capsule/norm)
+                capsule_activ = activ_factor * (capsule / norm)
                 idx_bias += 1
             # append to list of nonlinearly transformed capsules
             capsule_activations.append(capsule_activ)

@@ -291,7 +291,7 @@ class Shrec17(torch.utils.data.Dataset):
     def __init__(self, root, mode, perturbed=True, download=False, transform=None, target_transform=None):
         self.root = os.path.expanduser(root)
 
-        if not mode in ["train", "test", "val"]:
+        if mode not in ["train", "test", "val"]:
             raise ValueError("Invalid mode")
 
         self.dir = os.path.join(self.root, mode + ("_perturbed" if perturbed else ""))
@@ -302,8 +302,7 @@ class Shrec17(torch.utils.data.Dataset):
             self.download(mode, perturbed)
 
         if not self._check_exists():
-            raise RuntimeError('Dataset not found.' +
-                               ' You can use download=True to download it')
+            raise RuntimeError('Dataset not found. You can use download=True to download it')
 
         self.files = sorted(glob.glob(os.path.join(self.dir, '*.obj')))
         if mode != "test":
