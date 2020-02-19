@@ -30,14 +30,20 @@ class ConvolutionEinsum(torch.autograd.Function):
     @staticmethod
     def forward(ctx, k, features):
         ctx.save_for_backward(k, features)
-        return torch.einsum("zabij,zbj->zai", k, features)  # [batch, point, channel]    @staticmethod
+        print("begin convolution forward", torch.cuda.memory_reserved() / 1e6, torch.cuda.memory_allocated() / 1e6)
+        a = torch.einsum("zabij,zbj->zai", k, features)  # [batch, point, channel]    @staticmethod
+        print("end convolution forward", torch.cuda.memory_reserved() / 1e6, torch.cuda.memory_allocated() / 1e6)
+        return a
 
     @staticmethod
     def backward(ctx, grad_output):
         k, features = ctx.saved_tensors
+        print("begin convolution backward", torch.cuda.memory_reserved() / 1e6, torch.cuda.memory_allocated() / 1e6)
         del ctx
+        print("begin convolution backward (del ctx)", torch.cuda.memory_reserved() / 1e6, torch.cuda.memory_allocated() / 1e6)
         grad_k = torch.einsum("zai,zbj->zabij", grad_output, features)
         grad_features = torch.einsum("zabij,zai->zbj", k, grad_output)
+        print("end convolution backward", torch.cuda.memory_reserved() / 1e6, torch.cuda.memory_allocated() / 1e6)
         return grad_k, grad_features
 
 
