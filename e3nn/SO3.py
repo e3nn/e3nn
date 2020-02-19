@@ -342,8 +342,7 @@ def irrep_mixing_matrixRs(Rs):
     """
     Rs = conventionRs(Rs)
     num_irreps = sum([2 * L + 1 for mult, L, p in Rs])
-    num_reps = sum([mult * (2 * L + 1) for mult, L, p in Rs])
-    mixing_matrix = torch.zeros(num_irreps, num_reps)
+    mixing_matrix = torch.zeros(num_irreps, dimRs(Rs))
     start_irrep = 0
     start_rep = 0
     for mult, L, p in Rs:
@@ -364,15 +363,13 @@ def multiplicity_mixing_matrixRs(Rs):
     """
     Rs = conventionRs(Rs)
     num_mults = sum([mult for mult, L, p in Rs])
-    k = sum([mult * (2 * L + 1) for mult, L, p in Rs])
-    mixing_matrix = torch.zeros(num_mults, k)
+    mixing_matrix = torch.zeros(num_mults, dimRs(Rs))
     start_mult = 0
     start_rep = 0
     for mult, L, p in Rs:
         for i in range(mult):
-            mult_slice = slice(start_mult, start_mult + 1)
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
-            mixing_matrix[mult_slice, rep_slice] = 1.0
+            mixing_matrix[start_mult, rep_slice] = 1.0
             start_mult += 1
             start_rep += 2 * L + 1
     return mixing_matrix  # [mults, full]
