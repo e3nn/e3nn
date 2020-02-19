@@ -204,7 +204,7 @@ def selection_rule(l1, l2, lmax=None):
 # Rs lists
 ################################################################################
 
-def haslinearpathRs(Rs_in, l_out, p_out):
+def haslinearpathRs(Rs_in, l_out, p_out, get_l_output=selection_rule):
     """
     :param Rs_in: list of triplet (multiplicity, representation order, parity)
     :return: if there is a linear operation between them
@@ -213,8 +213,8 @@ def haslinearpathRs(Rs_in, l_out, p_out):
         if mul_in == 0:
             continue
 
-        for l in range(abs(l_in - l_out), l_in + l_out + 1):
-            if p_out == 0 or p_in * (-1) ** l == p_out:
+        for l in get_l_output(l_in, l_out):
+            if p_out in (0, p_in * (-1) ** l):
                 return True
     return False
 
