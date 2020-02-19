@@ -190,8 +190,18 @@ class KernelFn(torch.autograd.Function):
 
                     C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
 
+                    print(
+                        f"kernel pre ein i={i}, j={j}, k={k}",
+                        torch.cuda.memory_reserved() / 1e6,
+                        torch.cuda.memory_allocated() / 1e6
+                    )
                     # note: The multiplication with `sub_R` could also be done outside of the for loop
                     K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
+                    print(
+                        f"kernel post ein i={i}, j={j}, k={k}",
+                        torch.cuda.memory_reserved() / 1e6,
+                        torch.cuda.memory_allocated() / 1e6
+                    )
 
                 if K is not 0:
                     kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
@@ -246,5 +256,15 @@ class KernelFn(torch.autograd.Function):
                         sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
                         sub_grad_R[..., k] = torch.einsum("zuivj,ijk,kz,z->zuv", grad_K, C, sub_Y, sub_norm_coef)
 
+        print(
+            f"kernel backward end",
+            torch.cuda.memory_reserved() / 1e6,
+            torch.cuda.memory_allocated() / 1e6
+        )
         del ctx
+        print(
+            f"kernel backward end (del ctx)",
+            torch.cuda.memory_reserved() / 1e6,
+            torch.cuda.memory_allocated() / 1e6
+        )
         return grad_Y, grad_R, None, None, None, None, None
