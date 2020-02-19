@@ -105,15 +105,15 @@ class Kernel(torch.nn.Module):
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
         radii = r.norm(2, dim=1)  # [batch]
-        R = self.R(radii)  # [batch, npath (mults)]
+        R = self.R(radii)  # [batch, n_path (mults)]
         assert R.shape[-1] == self.n_path
 
         ylm_mix = self.ylm_mixing_matrix  # [irreps, filter]
         rf_mix = self.rf_mixing_matrix  # [mults, filter]
         cg = self.filter_mixing_matrix  # [filter, in, out]
 
-        R = torch.einsum('ij,i->j', rf_mix, R)
-        Y = torch.einsum('ij,i->j', ylm_mix, Y)
+        R = torch.einsum('ij,zi->zj', rf_mix, R)
+        Y = torch.einsum('ij,iz->zj', ylm_mix, Y)
         #TODO: Add norms
-        kernel = torch.einsum('kij,kz,kz->zij', cg, R, Y)
+        kernel = torch.einsum('kij,zk,zk->zij', cg, R, Y)
         return kernel.view(*size, kernel.shape[1], kernel.shape[2])
