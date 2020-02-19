@@ -30,7 +30,6 @@ class GatedBlock(torch.nn.Module):
         self.Rs = Rs
         self.Rs_in = simplifyRs(Rs + Rs_gates)
 
-
     def forward(self, features, dim=-1):
         """
         :param features: tensor [..., channel, ...]

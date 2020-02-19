@@ -21,7 +21,7 @@ class Tests(unittest.TestCase):
         inp_r = rotate(inp)
 
         diff_inp = (inp - unrotate(inp_r)).abs().max().item()
-        self.assertLess(diff_inp, 1e-10) # sanity check
+        self.assertLess(diff_inp, 1e-10)  # sanity check
 
         out = f(inp)
         out_r = f(inp_r)
@@ -63,5 +63,6 @@ class Tests(unittest.TestCase):
 
     def test_normalization_conv(self):
         self._test_normalization(Convolution)
+
 
 unittest.main()
