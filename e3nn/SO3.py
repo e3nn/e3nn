@@ -237,8 +237,16 @@ def splitRs(Rs, cmul=-1):
 
 def rearrangeRs(Rs_in, Rs_out):
     """
-    :return: mixing_matrix
-    output = einsum('ij,j->i', mixing_matrix, input)
+    :return: permutation_matrix
+
+    >>> rearrangeRs([(1, 0), (1, 1)], [(1, 1), (1, 0)])
+    tensor([[0., 1., 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+            [1., 0., 0., 0.]])
+
+    Example usage:
+    permuted_input = einsum('ij,j->i', rearrangeRs(Rs_in, Rs_out), input)
     """
     Rs_in, a = sortRs(Rs_in)
     Rs_out, b = sortRs(Rs_out)
@@ -248,9 +256,19 @@ def rearrangeRs(Rs_in, Rs_out):
 
 def sortRs(Rs):
     """
-    :return: (Rs_out, mixing_matrix)
+    :return: (Rs_out, permutation_matrix)
     stable sorting of the representation by (l, p)
-    output = einsum('ij,j->i', mixing_matrix, input)
+
+    >>> sortRs([(1, 1), (1, 0)])
+    ([(1, 0, 0), (1, 1, 0)],
+    tensor([[0., 0., 0., 1.],
+            [1., 0., 0., 0.],
+            [0., 1., 0., 0.],
+            [0., 0., 1., 0.]]))
+
+    Example usage:
+    sortedRs, permutation_matrix = sortRs(Rs)
+    permuted_input = einsum('ij,j->i', permutation_matrix, input)
     """
     Rs_in = simplifyRs(Rs)
     xs = []
@@ -261,16 +279,16 @@ def sortRs(Rs):
         xs.append((l, p, mul, j, d))
         j += d
 
-    mixing_matrix = torch.zeros(j, j)
+    permutation_matrix = torch.zeros(j, j)
 
     Rs_out = []
     i = 0  # output offset
     for l, p, mul, j, d in sorted(xs):
         Rs_out.append((mul, l, p))
-        mixing_matrix[i:i+d, j:j+d] = torch.eye(d)
+        permutation_matrix[i:i+d, j:j+d] = torch.eye(d)
         i += d
 
-    return Rs_out, mixing_matrix
+    return Rs_out, permutation_matrix
 
 
 def dimRs(Rs):
@@ -285,7 +303,19 @@ def dimRs(Rs):
 def simplifyRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: simplified version of the same list with the parity
+    :return: An equivalent list with parity = {-1, 0, 1} and neighboring orders consolidated into higher multiplicity.
+
+    Note that simplifyRs does not sort the Rs.
+    >>> simplifyRs([(1, 1), (1, 1), (1, 0)])
+    [(2, 1, 0), (1, 0, 0)]
+
+    Same order Rs which are seperated from each other are not combined
+    >>> simplifyRs([(1, 1), (1, 1), (1, 0), (1, 1)])
+    [(2, 1, 0), (1, 0, 0), (1, 1, 0)]
+
+    Parity is normalized to {-1, 0, 1}
+    >>> simplifyRs([(1, 1, -1), (1, 1, 50), (1, 0, 0)])
+    [(1, 1, -1), (1, 1, 1), (1, 0, 0)]
     """
     out = []
     for r in Rs:
@@ -360,7 +390,7 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
 
     Rs_out = simplifyRs(Rs_out)
 
-    mixing_matrix = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+    Q = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
 
     index_out = 0
 
@@ -376,13 +406,13 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
                 C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-                mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+                Q[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
                 index_out += dim_out
 
             index_2 += dim_2
         index_1 += dim_1
 
-    return Rs_out, mixing_matrix
+    return Rs_out, Q
 
 
 def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
