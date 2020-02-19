@@ -335,7 +335,7 @@ def formatRs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
-def rep_mixing_matrixRs(Rs):
+def irrep_mixing_matrixRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: mixing matrix for irreps and full representation order
