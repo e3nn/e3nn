@@ -1,13 +1,12 @@
-from os.path import join, isfile, isdir
+# pylint: disable=no-member, not-callable, missing-docstring, line-too-long, invalid-name
 from os import mkdir
+from os.path import isdir, isfile, join
 from shutil import rmtree
-
-import torch
-from torch.utils.data import Dataset
 
 import numpy as np
 import pymatgen
-
+import torch
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
 
@@ -72,7 +71,8 @@ class CrystalCIF(Dataset):
     def __getitem__(self, item_id):
         properties = None if self.properties is None else self.properties[item_id]
         radii_start, radii_end, bs_start, bs_end = self.partitions[item_id]
-        return self.names[item_id], self.radii[radii_start:radii_end], self.bs[bs_start:bs_end], self.geometries[item_id], self.atomic_charges[item_id], self.lattice_params[item_id], properties
+        return self.names[item_id], self.radii[radii_start:radii_end], self.bs[bs_start:bs_end], self.geometries[item_id], \
+            self.atomic_charges[item_id], self.lattice_params[item_id], properties
 
     def __len__(self):
         return self.size
@@ -110,7 +110,7 @@ class CrystalCIF(Dataset):
         index = np.load(join(root, 'index.npy'))
 
         # TODO: preallocate memory for tensors and write into it, instead of using lists.
-        #  Can save ~30% on peak memory, but requires proper reallocation on the go for radii as shape isn't known beforehand.  
+        #  Can save ~30% on peak memory, but requires proper reallocation on the go for radii as shape isn't known beforehand.
 
         site_a_coords_list = []
         atomic_charges_list = []
@@ -142,13 +142,14 @@ class CrystalCIF(Dataset):
                     nei = structure.get_sites_in_sphere(site_a_coords.numpy(), max_radius, include_index=True)
                     assert nei, f"Encountered empty nei for {file_rel_path}: {site_a_coords}"
 
-                    bs_entry = np.zeros(bs_pad, dtype=np.short)                                     # save storage/RAM, transfer of small parts to the long "register" (for indexing) on the fly is comp. cheap
+                    # save storage/RAM, transfer of small parts to the long "register" (for indexing) on the fly is comp. cheap
+                    bs_entry = np.zeros(bs_pad, dtype=np.short)
                     bs_entry_data = [entry[2] for entry in nei]
                     bs_entry_data_len = len(bs_entry_data)
                     assert bs_entry_data_len < bs_pad, f"Encountered bs vector ({bs_entry_data_len}) longer than provided bs_pad ({bs_pad})"
 
                     bs_entry[0] = bs_entry_data_len                                                 # store number of meaningful entries as a first element
-                    bs_entry[1:1+bs_entry_data_len] = bs_entry_data                                 # store said meaningful entries in consecutive cells
+                    bs_entry[1:1 + bs_entry_data_len] = bs_entry_data                                 # store said meaningful entries in consecutive cells
                     bs_proxy_list.append(bs_entry)
 
                     site_b_coords = np.array([entry[0].coords for entry in nei])                    # [r_part_a, 3]
@@ -195,6 +196,7 @@ class CrystalCIF(Dataset):
             torch.save(radii, join(max_radius_dir, 'radii.pth'))                                    # tensor [sum(r_i), 3]                  - xyz
             del radii
 
-            torch.save(partitions, join(max_radius_dir, 'partitions.pth'))                          # tensor [z, 4]                         - start/end of radii slice and bs slice corresponding to z
+            # tensor [z, 4]                         - start/end of radii slice and bs slice corresponding to z
+            torch.save(partitions, join(max_radius_dir, 'partitions.pth'))
             del partitions
         # endregion
