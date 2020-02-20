@@ -42,7 +42,7 @@ class S2Activation(torch.nn.Module):
 
         x = torch.randn(n, 3)
         x = torch.cat([x, -x])
-        Y = SO3.spherical_harmonics_xyz(list(range(len(Rs))), x)
+        Y = SO3.spherical_harmonics_xyz(list(range(len(Rs))), x)  # [lm, z]
         self.register_buffer('Y', Y)
         self.act = act
 
