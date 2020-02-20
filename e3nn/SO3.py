@@ -484,7 +484,7 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule, paths=False):
 
     Rs_out = simplifyRs(Rs_out)
 
-    Q = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+    clebsch_gordan_tensor = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
 
     index_out = 0
 
@@ -500,15 +500,15 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule, paths=False):
                 C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-                Q[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
                 index_out += dim_out
 
             index_2 += dim_2
         index_1 += dim_1
 
     if paths:
-        return Rs_out, Q, path_list
-    return Rs_out, Q
+        return Rs_out, clebsch_gordan_tensor, path_list
+    return Rs_out, clebsch_gordan_tensor
 
 
 def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
@@ -544,7 +544,7 @@ def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
 
     Rs_out = simplifyRs(Rs_out)
 
-    mixing_matrix = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+    clebsch_gordan_tensor = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
 
     index_out = 0
     index_1 = 0
@@ -559,13 +559,13 @@ def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
             C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-            mixing_matrix[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+            clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
             index_out += dim_out
 
         index_1 += dim_1
         index_2 += dim_2
 
-    return Rs_out, mixing_matrix
+    return Rs_out, clebsch_gordan_tensor
 
 ################################################################################
 # Spherical harmonics
