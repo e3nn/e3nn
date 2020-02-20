@@ -58,7 +58,7 @@ class Kernel(torch.nn.Module):
         # Helper matrix for spherical harmonics
         Rs_filter_sorted, sort_mix = SO3.sortRs(Rs_filter)
         Rs_filter_simplify = SO3.simplifyRs(Rs_filter_sorted)
-        irrep_mix = SO3.rep_mixing_matrixRs(Rs_filter_simplify)
+        irrep_mix = SO3.map_irrep_to_Rs(Rs_filter_simplify)
         # Contract sort_mix with rep_mix
         ylm_mix = torch.einsum('ij,il->jl', sort_mix, irrep_mix) 
         
@@ -66,7 +66,7 @@ class Kernel(torch.nn.Module):
         assert sum([2 * L + 1 for L in set_of_l_filters]) = irrep_mix.shape[-1]
 
         # Create and sort mix matrix for radial functions
-        rf_mix = SO3.multiplicity_mixing_matrixRs(Rs_filter)
+        rf_mix = SO3.map_mul_to_Rs(Rs_filter)
 
         ###########################################
         #TODO: Write normalization based on paths #
@@ -75,7 +75,7 @@ class Kernel(torch.nn.Module):
         # Create the radial model: R+ -> R^n_path
         # It contains the learned parameters
         self.R = RadialModel(n_path)
-        self.set_of_l_filters = [L for mult, L, p in Rs_filter_simplify]
+        self.set_of_l_filters = [L for mul, L, p in Rs_filter_simplify]
 
         # Register mixing matrix buffers
         self.register_buffer('filter_mixing_matrix', filter_mixing_matrix)
@@ -105,15 +105,15 @@ class Kernel(torch.nn.Module):
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
         radii = r.norm(2, dim=1)  # [batch]
-        R = self.R(radii)  # [batch, n_path (mults)]
+        R = self.R(radii)  # [batch, n_path (muls)]
         assert R.shape[-1] == self.n_path
 
         ylm_mix = self.ylm_mixing_matrix  # [irreps, filter]
-        rf_mix = self.rf_mixing_matrix  # [mults, filter]
+        rf_mix = self.rf_mixing_matrix  # [muls, filter]
         cg = self.filter_mixing_matrix  # [filter, in, out]
 
-        R = torch.einsum('ij,zi->zj', rf_mix, R)
-        Y = torch.einsum('ij,iz->zj', ylm_mix, Y)
+        R = torch.einsum('ij,zj->zi', rf_mix, R)
+        Y = torch.einsum('ij,jz->zi', ylm_mix, Y)
         #TODO: Add norms
         kernel = torch.einsum('kij,zk,zk->zij', cg, R, Y)
         return kernel.view(*size, kernel.shape[1], kernel.shape[2])
