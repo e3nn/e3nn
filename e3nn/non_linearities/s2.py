@@ -46,7 +46,6 @@ class S2Activation(torch.nn.Module):
         self.register_buffer('Y', Y)
         self.act = act
 
-
     def forward(self, features, dim=-1):
         '''
         :param features: [..., channels, ...]
