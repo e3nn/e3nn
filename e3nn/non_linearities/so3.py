@@ -27,6 +27,7 @@ class SO3Activation(torch.nn.Module):
 
         x = [SO3.rand_rot() for _ in range(n)]
         Z = torch.stack([torch.cat([SO3.irr_repr(l, *SO3.rot_to_abc(R)).flatten() * (2 * l + 1)**0.5 for l in range(len(Rs))]) for R in x])  # [z, lmn]
+        Z.div_(Z.shape[1]**0.5)
         self.register_buffer('Z', Z)
         self.act = act
 
@@ -37,7 +38,7 @@ class SO3Activation(torch.nn.Module):
         '''
         assert features.shape[dim] == self.Z.shape[1]  # assert mul == 1 for now
         features = features.transpose(0, dim)
-        out_features = (self.Z.shape[1]**0.5 / self.Z.shape[0]) * self.Z.T @ self.act(self.Z @ features.flatten(1) / self.Z.shape[1]**0.5)
+        out_features = (self.Z.shape[1] / self.Z.shape[0]) * self.Z.T @ self.act(self.Z @ features.flatten(1))
         out_features = out_features.view(*features.shape)
         out_features = out_features.transpose(0, dim)
         return out_features
