@@ -27,7 +27,6 @@ class Kernel(torch.nn.Module):
             return [l for l in get_l_filters(l_in, l_out) if p_out == 0 or p_in * (-1) ** l == p_out]
 
         self.get_l_filters = filters_with_parity
-        self.check_input_output()
         self.sh = sh
 
         assert isinstance(normalization, str), "normalization should be passed as a string value"
@@ -48,7 +47,7 @@ class Kernel(torch.nn.Module):
         # Clebsch-Gordan for filter, input, output
         # Rs_filter contains all degrees of freedom and L's for filters
         # paths contains [l_in, l_out, l_filter for each filter channel]
-        Rs_filter, filter_mixing_matrix, paths = SO3.tensor_productRs(Rs_in,
+        Rs_filter, filter_mapping_matrix, paths = SO3.tensor_productRs(Rs_in,
                                                                       Rs_out,
                                                                       get_l_output=get_l_filters,
                                                                       paths=True)
@@ -62,8 +61,6 @@ class Kernel(torch.nn.Module):
         # Contract sort_mix with rep_mix
         ylm_mix = torch.einsum('ij,il->jl', sort_mix, irrep_mix) 
         
-        # Check l_filters and rep_mix have same dim
-        assert sum([2 * L + 1 for L in set_of_l_filters]) = irrep_mix.shape[-1]
 
         # Create and sort mix matrix for radial functions
         rf_mix = SO3.map_mul_to_Rs(Rs_filter)
@@ -74,13 +71,15 @@ class Kernel(torch.nn.Module):
 
         # Create the radial model: R+ -> R^n_path
         # It contains the learned parameters
-        self.R = RadialModel(n_path)
+        self.R = RadialModel(self.n_path)
         self.set_of_l_filters = [L for mul, L, p in Rs_filter_simplify]
+        # Check l_filters and rep_mix have same dim
+        assert sum([2 * L + 1 for L in self.set_of_l_filters]) == irrep_mix.shape[-1]
 
         # Register mixing matrix buffers
-        self.register_buffer('filter_mixing_matrix', filter_mixing_matrix)
-        self.register_buffer('ylm_mixing_matrix', ylm_mix)
-        self.register_buffer('radial_mixing_matrix', rf_mix)
+        self.register_buffer('filter_clebsch_gordan', filter_mapping_matrix)
+        self.register_buffer('ylm_mapping_matrix', ylm_mix)
+        self.register_buffer('radial_mapping_matrix', rf_mix)
         #self.register_buffer('norm_coef', norm_coef)
 
     def __repr__(self):
@@ -105,12 +104,12 @@ class Kernel(torch.nn.Module):
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
         radii = r.norm(2, dim=1)  # [batch]
-        R = self.R(radii)  # [batch, n_path (muls)]
+        R = self.R(radii)  # [batch, mul_dimRs(Rs_filter)] == [batch, self.n_paths]
         assert R.shape[-1] == self.n_path
 
-        ylm_mix = self.ylm_mixing_matrix  # [irreps, filter]
-        rf_mix = self.rf_mixing_matrix  # [muls, filter]
-        cg = self.filter_mixing_matrix  # [filter, in, out]
+        ylm_mix = self.ylm_mapping_matrix  # [dimRs(Rs_filter), irrep_dimRs(Rs_filter)]
+        rf_mix = self.radial_mapping_matrix  # [dimRs(Rs_filter), mul_dimRs(Rs_filter)]
+        cg = self.filter_clebsch_gordan  # [dimRs(Rs_filter), dimRs(Rs_in), dimRs(Rs_out)]
 
         R = torch.einsum('ij,zj->zi', rf_mix, R)
         Y = torch.einsum('ij,jz->zi', ylm_mix, Y)
