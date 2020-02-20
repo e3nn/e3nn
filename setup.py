@@ -30,6 +30,7 @@ else:
     # GPU is available, but CUDA_HOME is None
     raise AssertionError("CUDA_HOME is undefined. Make sure nvcc compiler is available (cuda toolkit installed?)")
 
+
 class PostInstallCommand(setuptools.command.install.install):
     """Post-installation for installation mode."""
 
@@ -53,6 +54,7 @@ class PostInstallCommand(setuptools.command.install.install):
             tar.close()
         except:
             pass
+
 
 setup(
     name='e3nn',
