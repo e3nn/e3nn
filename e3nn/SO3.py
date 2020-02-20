@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines
 """
 Some functions related to SO3 and his usual representations
 
@@ -360,7 +360,7 @@ def map_irrep_to_Rs(Rs):
     that einsum('ij,j->i', mapping_matrix, irrep_rep) will have channel
     dimension of dimRs(Rs).
 
-    examples: 
+    examples:
     Rs = [(1, 0), (2, 1), (1, 0)] will return a matrix with 0s and 1s with
     shape [dimRs(Rs), 1 + 3 + 1] such there is only one 1 in each row, but
     there can be multiple 1s per column.
@@ -373,8 +373,8 @@ def map_irrep_to_Rs(Rs):
     mapping_matrix = torch.zeros(dimRs(Rs), irrep_dimRs(Rs))
     start_irrep = 0
     start_rep = 0
-    for mult, L, p in Rs:
-        for i in range(mult):
+    for mult, L, _ in Rs:
+        for _ in range(mult):
             irrep_slice = slice(start_irrep, start_irrep + 2 * L + 1)
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
             mapping_matrix[rep_slice, irrep_slice] = torch.eye(2 * L + 1)
@@ -389,7 +389,7 @@ def map_mul_to_Rs(Rs):
     :return: mapping matrix for multiplicity and full representation order (Rs)
     such that einsum('ij,j->i', mapping_matrix, mul_rep) will have channel
     dimension of dimRs(Rs)
-    
+
     examples:
     Rs = [(1, 0), (2, 1), (1, 0)] will return a matrix with 0s and 1s with
     shape [dimRs(Rs), 1 + 2 + 1] such there is only one 1 in each row, but
@@ -403,8 +403,8 @@ def map_mul_to_Rs(Rs):
     mapping_matrix = torch.zeros(dimRs(Rs), mul_dimRs(Rs))
     start_mul = 0
     start_rep = 0
-    for mult, L, p in Rs:
-        for i in range(mult):
+    for mult, L, _ in Rs:
+        for _ in range(mult):
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
             mapping_matrix[rep_slice, start_mul] = 1.0
             start_mul += 1
