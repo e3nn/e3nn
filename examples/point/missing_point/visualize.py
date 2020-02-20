@@ -1,4 +1,3 @@
-import plotly.graph_objs as go
 
 
 def visualize_missing_point(fixed, removed, guessed, votes=None, probabilities=None, show_votes=False):

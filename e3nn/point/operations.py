@@ -92,7 +92,6 @@ class ApplyKernel(torch.nn.Module):
         return torch.einsum("zabij,zbj->zabi", (k, features))  # [batch, point, point, channel]
 
 
-# TODO optimize this class
 class NeighborsConvolution(torch.nn.Module):
     def __init__(self, Kernel, Rs_in, Rs_out, radius):
         super().__init__()
@@ -189,10 +188,11 @@ class PeriodicConvolution(torch.nn.Module):
             radius = torch.from_numpy(radius).to(features.device)                                                    # [r, 3]
             kernels = self.kernel(radius)                                                                            # [r, i, j]
 
-            ks_start = 0                                                                                             # kernels stacked flat - indicate where block of interest begins
+            # kernels stacked flat - indicate where block of interest begins
+            ks_start = 0
             for a, bs in enumerate(bs_list):
                 k_b = features.new_zeros(points_num, out_channels, in_channels)                                      # [b, i, j]
-                k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start+bs.size(0)])
+                k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
                 ks_start += bs.size(0)
                 k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)                  # [i, b*j]
 
@@ -235,7 +235,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         out = features.new_zeros(points_num, out_channels)                                          # [a, i]
         ks_start = 0                                                                                # kernels stacked flat - indicate where block of interest begins
         for a, bs in enumerate(bs_slice):
-            bs = bs[1:1+bs[0]]                                                                      # select data from padded vector
+            bs = bs[1:1 + bs[0]]                                                                      # select data from padded vector
             k_b = features.new_zeros(points_num, out_channels, in_channels)                         # [b, i, j]
             k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
             ks_start += bs.size(0)
@@ -248,7 +248,8 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad_output):
         kernels, bs_slice, features = ctx.saved_tensors                                             # restore input from context
-        del ctx                                                                                     # pros: allows to decrease peak memory usage (del kernels); cons: backward cannot be called more than once!
+        # pros: allows to decrease peak memory usage (del kernels); cons: backward cannot be called more than once!
+        del ctx
 
         points_num, out_channels = grad_output.size(0), grad_output.size(1)
         in_channels = features.size(1)
@@ -259,7 +260,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         features_grad = torch.zeros_like(features).view(points_num * in_channels)                   # [b*j]
         ks_start = 0
         for a, bs in enumerate(bs_slice):
-            bs = bs[1:1+bs[0]]                                                                      # select data from padded vector
+            bs = bs[1:1 + bs[0]]                                                                      # select data from padded vector
             k_b = features.new_zeros(points_num, out_channels, in_channels)
             k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
             ks_start += bs.size(0)
@@ -270,10 +271,11 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         features_grad = features_grad.view(points_num, in_channels)                                 # [b, j]
         # endregion
 
-        del kernels                                                                                 # no longer needed, frees the same amount of memory as kernels_grad is going to take
+        # no longer needed, frees the same amount of memory as kernels_grad is going to take
+        del kernels
 
         # region kernels_grad[r, i, j] = features[fb(r), j] * grad_output[fa(r), i].  Each r correspond to unique pair (a, b)
-        fa, fb = torch.tensor([(a, b.item()) for a, bs in enumerate(bs_slice) for b in bs[1:1+bs[0]]], dtype=torch.long, device=features.device).t()
+        fa, fb = torch.tensor([(a, b.item()) for a, bs in enumerate(bs_slice) for b in bs[1:1 + bs[0]]], dtype=torch.long, device=features.device).t()
         kernels_grad = features[fb].unsqueeze(1) * grad_output[fa].unsqueeze(2)                     # implicit broadcasting: [r, 1, j] and [r, i, 1] -> [r, i ,j]
         # endregion
 

@@ -30,7 +30,6 @@ class BatchNorm(nn.Module):
 
         self.reduce = reduce
 
-
     def __repr__(self):
         return "{} (Rs={}, eps={}, momentum={})".format(
             self.__class__.__name__,
@@ -38,10 +37,8 @@ class BatchNorm(nn.Module):
             self.eps,
             self.momentum)
 
-
     def _roll_avg(self, curr, update):
         return (1 - self.momentum) * curr + self.momentum * update.detach()
-
 
     def forward(self, input):  # pylint: disable=W
         '''
@@ -69,7 +66,7 @@ class BatchNorm(nn.Module):
                 if self.training:
                     field_mean = field.mean(0).mean(-1).view(-1)  # [feature]
                     new_means.append(
-                        self._roll_avg(self.running_mean[irm:irm+m], field_mean)
+                        self._roll_avg(self.running_mean[irm:irm + m], field_mean)
                     )
                 else:
                     field_mean = self.running_mean[irm: irm + m]
@@ -88,7 +85,7 @@ class BatchNorm(nn.Module):
                     raise ValueError("Invalid reduce option {}".format(self.reduce))
 
                 field_norm = field_norm.mean(0)  # [feature]
-                new_vars.append(self._roll_avg(self.running_var[irv: irv+m], field_norm))
+                new_vars.append(self._roll_avg(self.running_var[irv: irv + m], field_norm))
             else:
                 field_norm = self.running_var[irv: irv + m]
             irv += m

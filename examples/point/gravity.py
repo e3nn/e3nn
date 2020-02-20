@@ -35,6 +35,7 @@ class GravityNet(torch.nn.Module):
 EPSILON = 1e-8
 rbf_high = 2.0
 
+
 def accelerations(points, masses=None):
     """
     inputs:
@@ -104,7 +105,7 @@ def train(net):
         points = torch.from_numpy(points).view(1, -1, 3)
         masses = torch.from_numpy(masses).view(1, -1, 1)
         accels = torch.from_numpy(accels).view(1, -1, 3)
-        output = net(masses, points) # [3, N]
+        output = net(masses, points)  # [3, N]
 
         # spherical harmonics are given in y,z,x order
         loss = torch.mean((output - accels)**2)
@@ -136,7 +137,7 @@ def train(net):
             y = net.conv.kernel.R(torch.from_numpy(x)).detach().numpy()
             plt.plot(x, y)
             start = 25
-            plt.plot(x[start:], -1/ (x[start:]**2))
+            plt.plot(x[start:], -1 / (x[start:]**2))
             plt.savefig('validation_result_{0}.png'.format(step))
 
         if step % 500 == 0:

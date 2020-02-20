@@ -14,7 +14,6 @@ class Norm(torch.nn.Module):
         self.Rs_out = [(n, 0, +1)]
         self.normalization = normalization
 
-
     def forward(self, features):
         '''
         :param features: [..., channels]
