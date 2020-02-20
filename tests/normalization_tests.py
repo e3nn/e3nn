@@ -23,7 +23,6 @@ class Tests(unittest.TestCase):
                     self.assertLess(k.mean().item(), 1e-3)
                     self.assertAlmostEqual(k.var().item() * mul * (2 * l_in + 1), 1, places=1)
 
-
     def test2(self):
         with torch_default_dtype(torch.float64):
             mul = 100000
@@ -37,5 +36,6 @@ class Tests(unittest.TestCase):
 
                     self.assertLess(k.mean().item(), 1e-3)
                     self.assertAlmostEqual(k.var().item() * mul, 1 / (2 * l_out + 1), places=1)
+
 
 unittest.main()
