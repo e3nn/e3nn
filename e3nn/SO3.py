@@ -237,8 +237,8 @@ def splitRs(Rs, cmul=-1):
 
 def rearrangeRs(Rs_in, Rs_out):
     """
-    :return: mixing_matrix
-    output = einsum('ij,j->i', mixing_matrix, input)
+    :return: permutation_matrix
+    output = einsum('ij,j->i', permutation_matrix, input)
     """
     Rs_in, a = sortRs(Rs_in)
     Rs_out, b = sortRs(Rs_out)
@@ -248,9 +248,9 @@ def rearrangeRs(Rs_in, Rs_out):
 
 def sortRs(Rs):
     """
-    :return: (Rs_out, mixing_matrix)
+    :return: (Rs_out, permutation_matrix)
     stable sorting of the representation by (l, p)
-    output = einsum('ij,j->i', mixing_matrix, input)
+    output = einsum('ij,j->i', permutation_matrix, input)
     """
     Rs_in = simplifyRs(Rs)
     xs = []
@@ -261,16 +261,34 @@ def sortRs(Rs):
         xs.append((l, p, mul, j, d))
         j += d
 
-    mixing_matrix = torch.zeros(j, j)
+    permutation_matrix = torch.zeros(j, j)
 
     Rs_out = []
     i = 0  # output offset
     for l, p, mul, j, d in sorted(xs):
         Rs_out.append((mul, l, p))
-        mixing_matrix[i:i+d, j:j+d] = torch.eye(d)
+        permutation_matrix[i:i+d, j:j+d] = torch.eye(d)
         i += d
 
-    return Rs_out, mixing_matrix
+    return Rs_out, permutation_matrix
+
+
+def irrep_dimRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: number of irreps of the representation without multiplicities
+    """
+    Rs = conventionRs(Rs)
+    return sum(2 * l + 1 for _, l, _ in Rs)
+
+
+def mul_dimRs(Rs):
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: number of multiplicities of the representation
+    """
+    Rs = conventionRs(Rs)
+    return sum(mul for mul, _, _ in Rs)
 
 
 def dimRs(Rs):
@@ -278,14 +296,14 @@ def dimRs(Rs):
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: dimention of the representation
     """
-    Rs = simplifyRs(Rs)
+    Rs = conventionRs(Rs)
     return sum(mul * (2 * l + 1) for mul, l, _ in Rs)
 
 
 def conventionRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: conventional version of the same list with the parity
+    :return: conventional version of the same list which always includes parity
     """
     out = []
     for r in Rs:
@@ -335,44 +353,63 @@ def formatRs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
-def irrep_mixing_matrixRs(Rs):
+def map_irrep_to_Rs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: mixing matrix for irreps and full representation order
+    :return: mapping matrix from irreps to full representation order (Rs) such
+    that einsum('ij,j->i', mapping_matrix, irrep_rep) will have channel
+    dimension of dimRs(Rs).
+
+    examples: 
+    Rs = [(1, 0), (2, 1), (1, 0)] will return a matrix with 0s and 1s with
+    shape [dimRs(Rs), 1 + 3 + 1] such there is only one 1 in each row, but
+    there can be multiple 1s per column.
+
+    Rs = [(2, 0), (2, 1)] will return a matrix with 0s and 1s with
+    shape [dimRs(Rs), 1 + 3] such there is only one 1 in each row (rep), but
+    there can be multiple 1s per column (irrep).
     """
     Rs = conventionRs(Rs)
-    num_irreps = sum([2 * L + 1 for mult, L, p in Rs])
-    mixing_matrix = torch.zeros(num_irreps, dimRs(Rs))
+    mapping_matrix = torch.zeros(dimRs(Rs), irrep_dimRs(Rs))
     start_irrep = 0
     start_rep = 0
     for mult, L, p in Rs:
         for i in range(mult):
             irrep_slice = slice(start_irrep, start_irrep + 2 * L + 1)
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
-            mixing_matrix[irrep_slice, rep_slice] = torch.eye(2 * L + 1)
+            mapping_matrix[rep_slice, irrep_slice] = torch.eye(2 * L + 1)
             start_rep += 2 * L + 1
         start_irrep += 2 * L + 1
-    
-    return mixing_matrix  # [irreps, full]
+    return mapping_matrix  # [dimRs(Rs), irrep_dimRs(Rs)]
 
 
-def multiplicity_mixing_matrixRs(Rs):
+def map_mul_to_Rs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: mixing matrix for multiplicity and full representation order
+    :return: mapping matrix for multiplicity and full representation order (Rs)
+    such that einsum('ij,j->i', mapping_matrix, mul_rep) will have channel
+    dimension of dimRs(Rs)
+    
+    examples:
+    Rs = [(1, 0), (2, 1), (1, 0)] will return a matrix with 0s and 1s with
+    shape [dimRs(Rs), 1 + 2 + 1] such there is only one 1 in each row, but
+    there can be multiple 1s per column.
+
+    Rs = [(2, 0), (2, 1)] will return a matrix with 0s and 1s with
+    shape [dimRs(Rs), 2 + 2] such there is only one 1 in each row (rep), but
+    there can be multiple 1s per column (irrep).
     """
     Rs = conventionRs(Rs)
-    num_mults = sum([mult for mult, L, p in Rs])
-    mixing_matrix = torch.zeros(num_mults, dimRs(Rs))
-    start_mult = 0
+    mapping_matrix = torch.zeros(dimRs(Rs), mul_dimRs(Rs))
+    start_mul = 0
     start_rep = 0
     for mult, L, p in Rs:
         for i in range(mult):
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
-            mixing_matrix[start_mult, rep_slice] = 1.0
-            start_mult += 1
+            mapping_matrix[rep_slice, start_mul] = 1.0
+            start_mul += 1
             start_rep += 2 * L + 1
-    return mixing_matrix  # [mults, full]
+    return mapping_matrix  # [dimRs(Rs), mul_dimRs(Rs)]
 
 
 def sorted_truncated_tensor_productRs(Rs_1, Rs_2, lmax):
