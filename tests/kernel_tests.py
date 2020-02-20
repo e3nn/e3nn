@@ -33,5 +33,21 @@ class Tests(unittest.TestCase):
             )
             self.assertTrue(torch.autograd.gradcheck(KernelFn.apply, inputs))
 
+    def test_kernel_mod(self):
+        from e3nn.kernel_mod import Kernel as KernelMod
+        import e3nn.SO3 as SO3
+        torch.set_default_dtype(torch.float64)
+        Rs_in = [(2, 0), (2, 1), (1, 0), (2, 1)]
+        Rs_out = [(3, 0), (4, 1), (1, 2)]
+        kernel = KernelMod(Rs_in, Rs_out, ConstantRadialModel)
+
+        N = 3
+        input = torch.randn(1, N, SO3.dimRs(Rs_in))
+        geom = torch.randn(1, N, 3)
+        self.assertSequenceEqual(kernel(geom).shape, (1, 3,
+                                                      SO3.dimRs(Rs_in),
+                                                      SO3.dimRs(Rs_out)))
+
+
 
 unittest.main()
