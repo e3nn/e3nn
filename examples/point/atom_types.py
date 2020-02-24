@@ -29,6 +29,7 @@ class Mixer(torch.nn.Module):
             y += m(*x, n_norm=n_norm)
         return y
 
+
 R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=3, act=swish)
 K = partial(Kernel, RadialModel=R)
 C = partial(Convolution, K)

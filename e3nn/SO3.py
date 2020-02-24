@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines
 """
 Some functions related to SO3 and his usual representations
 
@@ -204,7 +204,7 @@ def selection_rule(l1, l2, lmax=None):
 # Rs lists
 ################################################################################
 
-def haslinearpathRs(Rs_in, l_out, p_out):
+def haslinearpathRs(Rs_in, l_out, p_out, get_l_output=selection_rule):
     """
     :param Rs_in: list of triplet (multiplicity, representation order, parity)
     :return: if there is a linear operation between them
@@ -213,8 +213,8 @@ def haslinearpathRs(Rs_in, l_out, p_out):
         if mul_in == 0:
             continue
 
-        for l in range(abs(l_in - l_out), l_in + l_out + 1):
-            if p_out == 0 or p_in * (-1) ** l == p_out:
+        for l in get_l_output(l_in, l_out):
+            if p_out in (0, p_in * (-1) ** l):
                 return True
     return False
 
@@ -238,7 +238,15 @@ def splitRs(Rs, cmul=-1):
 def rearrangeRs(Rs_in, Rs_out):
     """
     :return: permutation_matrix
-    output = einsum('ij,j->i', permutation_matrix, input)
+
+    >>> rearrangeRs([(1, 0), (1, 1)], [(1, 1), (1, 0)])
+    tensor([[0., 1., 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+            [1., 0., 0., 0.]])
+
+    Example usage:
+    permuted_input = einsum('ij,j->i', rearrangeRs(Rs_in, Rs_out), input)
     """
     Rs_in, a = sortRs(Rs_in)
     Rs_out, b = sortRs(Rs_out)
@@ -250,7 +258,17 @@ def sortRs(Rs):
     """
     :return: (Rs_out, permutation_matrix)
     stable sorting of the representation by (l, p)
-    output = einsum('ij,j->i', permutation_matrix, input)
+
+    >>> sortRs([(1, 1), (1, 0)])
+    ([(1, 0, 0), (1, 1, 0)],
+    tensor([[0., 0., 0., 1.],
+            [1., 0., 0., 0.],
+            [0., 1., 0., 0.],
+            [0., 0., 1., 0.]]))
+
+    Example usage:
+    sortedRs, permutation_matrix = sortRs(Rs)
+    permuted_input = einsum('ij,j->i', permutation_matrix, input)
     """
     Rs_in = simplifyRs(Rs)
     xs = []
@@ -267,7 +285,7 @@ def sortRs(Rs):
     i = 0  # output offset
     for l, p, mul, j, d in sorted(xs):
         Rs_out.append((mul, l, p))
-        permutation_matrix[i:i+d, j:j+d] = torch.eye(d)
+        permutation_matrix[i:i + d, j:j + d] = torch.eye(d)
         i += d
 
     return Rs_out, permutation_matrix
@@ -327,7 +345,19 @@ def conventionRs(Rs):
 def simplifyRs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: simplified version of the same list with the parity
+    :return: An equivalent list with parity = {-1, 0, 1} and neighboring orders consolidated into higher multiplicity.
+
+    Note that simplifyRs does not sort the Rs.
+    >>> simplifyRs([(1, 1), (1, 1), (1, 0)])
+    [(2, 1, 0), (1, 0, 0)]
+
+    Same order Rs which are seperated from each other are not combined
+    >>> simplifyRs([(1, 1), (1, 1), (1, 0), (1, 1)])
+    [(2, 1, 0), (1, 0, 0), (1, 1, 0)]
+
+    Parity is normalized to {-1, 0, 1}
+    >>> simplifyRs([(1, 1, -1), (1, 1, 50), (1, 0, 0)])
+    [(1, 1, -1), (1, 1, 1), (1, 0, 0)]
     """
     out = []
     Rs = conventionRs(Rs)
@@ -360,7 +390,7 @@ def map_irrep_to_Rs(Rs):
     that einsum('ij,j->i', mapping_matrix, irrep_rep) will have channel
     dimension of dimRs(Rs).
 
-    examples: 
+    examples:
     Rs = [(1, 0), (2, 1), (1, 0)] will return a matrix with 0s and 1s with
     shape [dimRs(Rs), 1 + 3 + 1] such there is only one 1 in each row, but
     there can be multiple 1s per column.
@@ -373,8 +403,8 @@ def map_irrep_to_Rs(Rs):
     mapping_matrix = torch.zeros(dimRs(Rs), irrep_dimRs(Rs))
     start_irrep = 0
     start_rep = 0
-    for mult, L, p in Rs:
-        for i in range(mult):
+    for mult, L, _ in Rs:
+        for _ in range(mult):
             irrep_slice = slice(start_irrep, start_irrep + 2 * L + 1)
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
             mapping_matrix[rep_slice, irrep_slice] = torch.eye(2 * L + 1)
@@ -389,7 +419,7 @@ def map_mul_to_Rs(Rs):
     :return: mapping matrix for multiplicity and full representation order (Rs)
     such that einsum('ij,j->i', mapping_matrix, mul_rep) will have channel
     dimension of dimRs(Rs)
-    
+
     examples:
     Rs = [(1, 0), (2, 1), (1, 0)] will return a matrix with 0s and 1s with
     shape [dimRs(Rs), 1 + 2 + 1] such there is only one 1 in each row, but
@@ -403,8 +433,8 @@ def map_mul_to_Rs(Rs):
     mapping_matrix = torch.zeros(dimRs(Rs), mul_dimRs(Rs))
     start_mul = 0
     start_rep = 0
-    for mult, L, p in Rs:
-        for i in range(mult):
+    for mult, L, _ in Rs:
+        for _ in range(mult):
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
             mapping_matrix[rep_slice, start_mul] = 1.0
             start_mul += 1
@@ -454,7 +484,7 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule, paths=False):
 
     Rs_out = simplifyRs(Rs_out)
 
-    mixing_matrix = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+    clebsch_gordan_tensor = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
 
     index_out = 0
 
@@ -470,15 +500,15 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule, paths=False):
                 C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-                mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+                clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
                 index_out += dim_out
 
             index_2 += dim_2
         index_1 += dim_1
 
     if paths:
-        return Rs_out, mixing_matrix, path_list
-    return Rs_out, mixing_matrix
+        return Rs_out, clebsch_gordan_tensor, path_list
+    return Rs_out, clebsch_gordan_tensor
 
 
 def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
@@ -514,7 +544,7 @@ def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
 
     Rs_out = simplifyRs(Rs_out)
 
-    mixing_matrix = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
+    clebsch_gordan_tensor = torch.zeros(dimRs(Rs_out), dimRs(Rs_1), dimRs(Rs_2))
 
     index_out = 0
     index_1 = 0
@@ -529,17 +559,18 @@ def elementwise_tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule):
             C = clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-            mixing_matrix[index_out:index_out+dim_out, index_1:index_1+dim_1, index_2:index_2+dim_2] = m
+            clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
             index_out += dim_out
 
         index_1 += dim_1
         index_2 += dim_2
 
-    return Rs_out, mixing_matrix
+    return Rs_out, clebsch_gordan_tensor
 
 ################################################################################
 # Spherical harmonics
 ################################################################################
+
 
 def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=None):
     """
@@ -626,19 +657,19 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             *size, _ = xyz.size()
             xyz = xyz.view(-1, 3)
             max_l = max(order)
-            out = xyz.new_empty(((max_l + 1)*(max_l + 1), xyz.size(0)))  # [ filters, batch_size]
+            out = xyz.new_empty(((max_l + 1) * (max_l + 1), xyz.size(0)))  # [ filters, batch_size]
             xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
             real_spherical_harmonics.rsh(out, xyz_unit)
             # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
-            norm_coef = [elem for lh in range((max_l+1)//2) for elem in [1.]*(4*lh + 1) + [-1.]*(4*lh+3)]
+            norm_coef = [elem for lh in range((max_l + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
             if max_l % 2 == 0:
-                norm_coef.extend([1.]*(2*max_l + 1))
+                norm_coef.extend([1.] * (2 * max_l + 1))
             norm_coef = torch.tensor(norm_coef, device=device).unsqueeze(1)
             out.mul_(norm_coef)
-            if order != list(range(max_l+1)):
+            if order != list(range(max_l + 1)):
                 keep_rows = torch.zeros(out.size(0), dtype=torch.bool)
                 for l in order:
-                    keep_rows[(l*l):((l+1)*(l+1))].fill_(True)
+                    keep_rows[(l * l):((l + 1) * (l + 1))].fill_(True)
                 out = out[keep_rows.to(device)]
             out = out.view(-1, *size)
         else:
@@ -926,7 +957,8 @@ def _get_d_null_space(l1, l2, l3, eps=1e-10):
         del D
         gc.collect()
 
-    s, v = scipy.linalg.eigh(B.numpy(), eigvals=(0, min(1, n - 1)), overwrite_a=True)                   # ask for one (smallest) eigenvalue/eigenvector pair if there is only one exists, otherwise ask for two
+    # ask for one (smallest) eigenvalue/eigenvector pair if there is only one exists, otherwise ask for two
+    s, v = scipy.linalg.eigh(B.numpy(), eigvals=(0, min(1, n - 1)), overwrite_a=True)
     del B
     gc.collect()
 
@@ -997,7 +1029,7 @@ def tensor3x3_repr_basis_to_spherical_basis():
         to5 = torch.tensor([
             [0, 1, 0, 1, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 1, 0, 1, 0],
-            [-3**.5/3, 0, 0, 0, -3**.5/3, 0, 0, 0, 12**.5/3],
+            [-3**.5 / 3, 0, 0, 0, -3**.5 / 3, 0, 0, 0, 12**.5 / 3],
             [0, 0, 1, 0, 0, 0, 1, 0, 0],
             [1, 0, 0, 0, -1, 0, 0, 0, 0]
         ], dtype=torch.get_default_dtype())

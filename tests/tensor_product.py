@@ -27,7 +27,6 @@ class Tests(unittest.TestCase):
         self.assertEqual(SO3.dimRs(Rs_out), y1.shape[1])
         self.assertLess((y1 - y2).abs().max(), 1e-7 * y1.abs().max())
 
-
     def test_tensor_product(self):
         torch.set_default_dtype(torch.float64)
 
@@ -45,6 +44,7 @@ class Tests(unittest.TestCase):
 
         self.assertEqual(SO3.dimRs(Rs_out), y1.shape[1])
         self.assertLess((y1 - y2).abs().max(), 1e-7 * y1.abs().max())
+
 
 if __name__ == '__main__':
     unittest.main()

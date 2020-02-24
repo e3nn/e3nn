@@ -1,8 +1,9 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, no-member
+import copy
+
 import torch
 
 from e3nn import SO3
-import copy
 
 
 class Activation(torch.nn.Module):
@@ -61,10 +62,8 @@ class Activation(torch.nn.Module):
             if p_in != 0 and p == 0:
                 raise ValueError("warning! the parity is violated")
 
-
         self.Rs_out = Rs_out
         self.acts = acts
-
 
     def forward(self, features, dim=-1):
         '''
