@@ -47,10 +47,10 @@ class Kernel(torch.nn.Module):
         # Clebsch-Gordan for filter, input, output
         # Rs_filter contains all degrees of freedom and L's for filters
         # paths contains [l_in, l_out, l_filter for each filter channel]
-        Rs_filter, filter_mapping_matrix, paths = SO3.tensor_productRs(Rs_in,
-                                                                      Rs_out,
-                                                                      get_l_output=get_l_filters,
-                                                                      paths=True)
+        Rs_filter, filter_clebsch_gordan, paths = SO3.tensor_productRs(Rs_in,
+                                                                       Rs_out,
+                                                                       get_l_output=get_l_filters,
+                                                                       paths=True)
 
         self.n_path = len(paths)
 
@@ -76,8 +76,8 @@ class Kernel(torch.nn.Module):
         # Check l_filters and rep_mix have same dim
         assert sum([2 * L + 1 for L in self.set_of_l_filters]) == irrep_mix.shape[-1]
 
-        # Register mixing matrix buffers
-        self.register_buffer('filter_clebsch_gordan', filter_mapping_matrix)
+        # Register mapping matrix buffers
+        self.register_buffer('filter_clebsch_gordan', filter_clebsch_gordan)
         self.register_buffer('ylm_mapping_matrix', ylm_mix)
         self.register_buffer('radial_mapping_matrix', rf_mix)
         #self.register_buffer('norm_coef', norm_coef)
