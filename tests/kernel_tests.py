@@ -34,5 +34,4 @@ class Tests(unittest.TestCase):
             self.assertTrue(torch.autograd.gradcheck(KernelFn.apply, inputs))
 
 
-if __name__ == '__main__':
-    unittest.main()
+unittest.main()
