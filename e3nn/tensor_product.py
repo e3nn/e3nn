@@ -14,14 +14,14 @@ class TensorProduct(torch.nn.Module):
     def __init__(self, Rs_1, Rs_2, get_l_output=SO3.selection_rule):
         super().__init__()
 
-        self.get_ls = get_l_output 
+        self.get_ls = get_l_output
         self.Rs_1 = SO3.simplifyRs(Rs_1)
         self.Rs_2 = SO3.simplifyRs(Rs_2)
 
         Rs_out, mixing_matrix = SO3.tensor_productRs(Rs_1, Rs_2,
                                                      get_l_output=get_l_output)
         self.Rs_out = SO3.simplifyRs(Rs_out)
-        self.register_buffer('mixing_matrix', mixing_matrix) 
+        self.register_buffer('mixing_matrix', mixing_matrix)
 
     def forward(self, features_1, features_2):
         '''
@@ -32,7 +32,6 @@ class TensorProduct(torch.nn.Module):
         *size_2, n_2 = features_2.size()
         features_2 = features_2.view(-1, n_2)
         assert size_1 == size_2
-        batch = features_1.size(0)
 
         output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1,
                               features_2)
@@ -64,7 +63,6 @@ class ElementwiseTensorProduct(torch.nn.Module):
         *size_2, n_2 = features_2.size()
         features_2 = features_2.view(-1, n_2)
         assert size_1 == size_2
-        batch = features_1.size(0)
 
         output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1,
                               features_2)

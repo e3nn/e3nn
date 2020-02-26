@@ -1,16 +1,20 @@
+# pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long, unbalanced-tuple-unpacking
 from time import perf_counter
 import torch
 
 DATA_TIMES = {}
 
+
 def clear():
     global DATA_TIMES
     DATA_TIMES = {}
+
 
 def start():
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     return perf_counter()
+
 
 def end(name, begin_time):
     global DATA_TIMES
@@ -25,6 +29,7 @@ def end(name, begin_time):
     except KeyError:
         DATA_TIMES[name] = [delta]
     return end_time
+
 
 def text_statistics():
     text = "[time logging] ...............unit is seconds... [tot time]/ [nbr] = [per call] [percent]\n"

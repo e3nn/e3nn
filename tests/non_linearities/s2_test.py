@@ -1,7 +1,6 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
 import itertools
 import unittest
-from functools import partial
 
 import torch
 
@@ -13,6 +12,7 @@ class Tests(unittest.TestCase):
 
     def test_equivariance(self):
         torch.set_default_dtype(torch.float64)
+
         def test(Rs, act):
             x = torch.randn(55, sum(2 * l + 1 for _, l, _ in Rs))
             ac = S2Activation(Rs, act, 1000)
@@ -44,4 +44,6 @@ class Tests(unittest.TestCase):
         for Rs, act in itertools.product(Rss, acts):
             test(Rs, act)
 
-unittest.main()
+
+if __name__ == '__main__':
+    unittest.main()

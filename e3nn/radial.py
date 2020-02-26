@@ -84,13 +84,17 @@ def FiniteElementFCModel(out_dim, position, basis, h, L, act):
 def CosineBasisModel(out_dim, max_radius, number_of_basis, h, L, act):
     radii = torch.linspace(0, max_radius, steps=number_of_basis)
     step = radii[1] - radii[0]
-    basis = lambda x: x.div(step).add(1).relu().sub(2).neg().relu().add(1).mul(math.pi / 2).cos().pow(2)
+
+    def basis(x):
+        return x.div(step).add(1).relu().sub(2).neg().relu().add(1).mul(math.pi / 2).cos().pow(2)
     return FiniteElementFCModel(out_dim, radii, basis, h, L, act)
 
 
-def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_radius = 0.):
+def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_radius=0.):
     spacing = (max_radius - min_radius) / number_of_basis
     radii = torch.linspace(min_radius, max_radius, number_of_basis)
     gamma = 1. / spacing
-    basis = lambda x: torch.exp(-gamma * x ** 2)
+
+    def basis(x):
+        return torch.exp(-gamma * x ** 2)
     return FiniteElementFCModel(out_dim, radii, basis, h, L, act)
