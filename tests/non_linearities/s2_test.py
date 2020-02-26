@@ -45,4 +45,5 @@ class Tests(unittest.TestCase):
             test(Rs, act)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()

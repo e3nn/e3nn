@@ -38,4 +38,5 @@ class Tests(unittest.TestCase):
                     self.assertAlmostEqual(k.var().item() * mul, 1 / (2 * l_out + 1), places=1)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()
