@@ -26,4 +26,5 @@ class Tests(unittest.TestCase):
         m(x, g, lattice, max_radius)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()

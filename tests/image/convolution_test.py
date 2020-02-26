@@ -65,4 +65,5 @@ class Tests(unittest.TestCase):
         self._test_normalization(Convolution)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()
