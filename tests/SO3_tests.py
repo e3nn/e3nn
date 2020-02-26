@@ -257,5 +257,4 @@ class Tests(unittest.TestCase):
             self.assertTrue(torch.allclose(mapping_matrix, check_matrix))
 
 
-if __name__ == '__main__':
-    unittest.main()
+unittest.main()
