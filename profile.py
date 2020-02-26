@@ -6,6 +6,7 @@ from e3nn.radial import CosineBasisModel
 from e3nn.non_linearities.rescaled_act import ShiftedSoftplus
 from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
+from e3nn.point.kernelconv import KernelConv
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -16,11 +17,9 @@ features = torch.rand(100, 40, 2, dtype=torch.float32).to(device)
 def main():
     print("name: reserved allocated")
     ssp = ShiftedSoftplus(5.0)
-    # radial_model = CosineBasisModel(64, 10, 25, 100, 3, ssp)
     radial = partial(CosineBasisModel, max_radius=10., number_of_basis=25, h=100, L=3, act=ssp)
-    kernel = partial(Kernel, RadialModel=radial)
-    convolution = Convolution(kernel, [(2, 0)], [(5, 0), (5, 1)]).to(device)
-    f2 = convolution(features, geometry)
+    kernel_conv = KernelConv([(2, 0)], [(5, 0), (5, 1)], RadialModel=radial)
+    f2 = kernel_conv(features, geometry)
     loss = torch.norm(f2 - torch.zeros_like(f2))
     loss.backward()
     print('done')
