@@ -466,7 +466,9 @@ def tensor_productRs(Rs_1, Rs_2, get_l_output=selection_rule, paths=False):
 
     :return: Rs_out, Q
 
-    Q_kij A_i B_j
+    example:
+    _, Q = tensor_productRs(Rs1, Rs2)
+    torch.einsum('kij,i,j->k', Q, A, B)
     """
     Rs_1 = simplifyRs(Rs_1)
     Rs_2 = simplifyRs(Rs_2)
