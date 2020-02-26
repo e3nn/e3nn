@@ -39,7 +39,7 @@ features = conv(features, geometry)
 ## Hierarchy
 
 - `e3nn` contains the library
-  - `e3nn/SO3.py` defines all the needed mathematical functions
+  - `e3nn/o3.py` defines all the needed mathematical functions
   - `e3nn/image` contains voxels linear operations
   - `e3nn/point` contains points linear operations
   - `e3nn/non_linearities` non linearities operations

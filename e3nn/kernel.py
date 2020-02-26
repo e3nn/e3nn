@@ -1,12 +1,13 @@
 # pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member
 import math
+
 import torch
 
-import e3nn.SO3 as SO3
+from e3nn import o3, rs
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=SO3.selection_rule, sh=SO3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
         '''
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -19,8 +20,8 @@ class Kernel(torch.nn.Module):
         '''
         super().__init__()
 
-        self.Rs_in = SO3.simplifyRs(Rs_in)
-        self.Rs_out = SO3.simplifyRs(Rs_out)
+        self.Rs_in = rs.simplify(Rs_in)
+        self.Rs_out = rs.simplify(Rs_out)
 
         def filters_with_parity(l_in, p_in, l_out, p_out):
             nonlocal get_l_filters
@@ -81,8 +82,8 @@ class Kernel(torch.nn.Module):
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
             name=self.__class__.__name__,
-            Rs_in=SO3.formatRs(self.Rs_in),
-            Rs_out=SO3.formatRs(self.Rs_out),
+            Rs_in=rs.format_Rs(self.Rs_in),
+            Rs_out=rs.format_Rs(self.Rs_out),
         )
 
     def check_input_output(self):
@@ -153,8 +154,8 @@ class KernelFn(torch.autograd.Function):
         ctx.save_for_backward(saved_Y, saved_R, norm_coef)
 
         batch = Y.shape[1]
-        n_in = SO3.dimRs(ctx.Rs_in)
-        n_out = SO3.dimRs(ctx.Rs_out)
+        n_in = rs.dim(ctx.Rs_in)
+        n_out = rs.dim(ctx.Rs_out)
 
         kernel = Y.new_zeros(batch, n_out, n_in)
 
@@ -188,7 +189,7 @@ class KernelFn(torch.autograd.Function):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
                     sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
 
-                    C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
+                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
 
                     # note: The multiplication with `sub_R` could also be done outside of the for loop
                     K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
@@ -238,7 +239,7 @@ class KernelFn(torch.autograd.Function):
 
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
-                    C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
+                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
 
                     if grad_Y is not None:
                         grad_Y[tmp: tmp + 2 * l_filter + 1] += torch.einsum("zuivj,ijk,zuv,z->kz", grad_K, C, sub_R[..., k], sub_norm_coef)

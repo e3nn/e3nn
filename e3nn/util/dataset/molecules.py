@@ -6,7 +6,7 @@ import scipy.io
 import numpy as np
 from e3nn.util.bounding_sphere import bounding_sphere
 import glob
-from e3nn import SO3
+from e3nn import o3
 
 
 class VoxelizeBlobs:
@@ -45,7 +45,7 @@ def random_rotate_translate(positions, rotation=True, translation=1):
         trans = torch.rand(3) * 2 - 1
         if trans.norm() <= 1:
             break
-    rot = SO3.rot(*torch.rand(3) * 6.2832).type(torch.float32)
+    rot = o3.rot(*torch.rand(3) * 6.2832).type(torch.float32)
     return [rot @ pos + translation * trans for pos in positions]
 
 

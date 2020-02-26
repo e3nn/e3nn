@@ -1,7 +1,7 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 
-from e3nn import SO3
+from e3nn import o3, rs
 
 
 class SO3Activation(torch.nn.Module):
@@ -17,7 +17,7 @@ class SO3Activation(torch.nn.Module):
         '''
         super().__init__()
 
-        Rs = SO3.simplifyRs(Rs)
+        Rs = rs.simplify(Rs)
         mul0, _, _ = Rs[0]
         assert all(mul0 * (2 * l + 1) == mul for mul, l, _ in Rs)
         assert [l for _, l, _ in Rs] == list(range(len(Rs)))
@@ -25,8 +25,8 @@ class SO3Activation(torch.nn.Module):
 
         self.Rs_out = Rs
 
-        x = [SO3.rand_rot() for _ in range(n)]
-        Z = torch.stack([torch.cat([SO3.irr_repr(l, *SO3.rot_to_abc(R)).flatten() * (2 * l + 1)**0.5 for l in range(len(Rs))]) for R in x])  # [z, lmn]
+        x = [o3.rand_rot() for _ in range(n)]
+        Z = torch.stack([torch.cat([o3.irr_repr(l, *o3.rot_to_abc(R)).flatten() * (2 * l + 1)**0.5 for l in range(len(Rs))]) for R in x])  # [z, lmn]
         Z.div_(Z.shape[1]**0.5)
         self.register_buffer('Z', Z)
         self.act = act
