@@ -3,7 +3,7 @@ import math
 
 import torch
 
-from e3nn import SO3
+from e3nn import o3, rs
 
 
 class S2Activation(torch.nn.Module):
@@ -19,7 +19,7 @@ class S2Activation(torch.nn.Module):
         '''
         super().__init__()
 
-        Rs = SO3.simplifyRs(Rs)
+        Rs = rs.simplify(Rs)
         mul0, _, p0 = Rs[0]
         assert all(mul0 == mul for mul, _, _ in Rs)
         assert [l for _, l, _ in Rs] == list(range(len(Rs)))
@@ -42,7 +42,7 @@ class S2Activation(torch.nn.Module):
 
         x = torch.randn(n, 3)
         x = torch.cat([x, -x])
-        Y = SO3.spherical_harmonics_xyz(list(range(len(Rs))), x)  # [lm, z]
+        Y = o3.spherical_harmonics_xyz(list(range(len(Rs))), x)  # [lm, z]
         self.register_buffer('Y', Y)
         self.act = act
 

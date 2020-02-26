@@ -3,14 +3,13 @@ from functools import partial
 
 import torch
 
-from e3nn import SO3
-from e3nn.non_linearities.gated_block import GatedBlock
-from e3nn.non_linearities.rescaled_act import relu, sigmoid, tanh, absolute
-from e3nn.non_linearities.gated_block_parity import GatedBlockParity
+from e3nn import o3, rs
 from e3nn.kernel import Kernel
+from e3nn.non_linearities.gated_block import GatedBlock
+from e3nn.non_linearities.gated_block_parity import GatedBlockParity
+from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
 from e3nn.point.operations import Convolution
 from e3nn.radial import ConstantRadialModel
-from e3nn.SO3 import rep, rot
 
 
 def check_rotation(batch: int = 10, n_atoms: int = 25):
@@ -27,11 +26,11 @@ def check_rotation(batch: int = 10, n_atoms: int = 25):
 
     # Setup the data. The geometry, input features, and output features must all rotate.
     abc = torch.randn(3)  # Rotation seed of euler angles.
-    rot_geo = rot(*abc)
-    D_in = rep(Rs_in, *abc)
-    D_out = rep(Rs_out, *abc)
+    rot_geo = o3.rot(*abc)
+    D_in = rs.rep(Rs_in, *abc)
+    D_out = rs.rep(Rs_out, *abc)
 
-    feat = torch.randn(batch, n_atoms, SO3.dimRs(Rs_in))  # Transforms with wigner D matrix
+    feat = torch.randn(batch, n_atoms, rs.dim(Rs_in))  # Transforms with wigner D matrix
     geo = torch.randn(batch, n_atoms, 3)  # Transforms with rotation matrix.
 
     # Test equivariance.
@@ -57,11 +56,11 @@ def check_rotation_parity(batch: int = 10, n_atoms: int = 25):
 
     # Setup the data. The geometry, input features, and output features must all rotate and observe parity.
     abc = torch.randn(3)  # Rotation seed of euler angles.
-    rot_geo = -rot(*abc)  # Negative because geometry has odd parity. i.e. improper rotation.
-    D_in = rep(Rs_in, *abc, parity=1)
-    D_out = rep(Rs_out, *abc, parity=1)
+    rot_geo = -o3.rot(*abc)  # Negative because geometry has odd parity. i.e. improper rotation.
+    D_in = rs.rep(Rs_in, *abc, parity=1)
+    D_out = rs.rep(Rs_out, *abc, parity=1)
 
-    feat = torch.randn(batch, n_atoms, SO3.dimRs(Rs_in))  # Transforms with wigner D matrix and parity.
+    feat = torch.randn(batch, n_atoms, rs.dim(Rs_in))  # Transforms with wigner D matrix and parity.
     geo = torch.randn(batch, n_atoms, 3)  # Transforms with rotation matrix and parity.
 
     # Test equivariance.

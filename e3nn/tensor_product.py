@@ -1,26 +1,24 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 from e3nn.linear import Linear
-from e3nn import SO3
+from e3nn import o3, rs
 
 
-# TODO test performance
 class TensorProduct(torch.nn.Module):
     """
     (A x B)_k =  C_ijk A_i B_j
 
     [(2, 0), (1, 1)] x [(1, 1), (2, 0)] = [(2, 1), (5, 0), (1, 1), (1, 2), (2, 1)]
     """
-    def __init__(self, Rs_1, Rs_2, get_l_output=SO3.selection_rule):
+    def __init__(self, Rs_1, Rs_2, get_l_output=o3.selection_rule):
         super().__init__()
 
         self.get_ls = get_l_output
-        self.Rs_1 = SO3.simplifyRs(Rs_1)
-        self.Rs_2 = SO3.simplifyRs(Rs_2)
+        self.Rs_1 = rs.simplify(Rs_1)
+        self.Rs_2 = rs.simplify(Rs_2)
 
-        Rs_out, mixing_matrix = SO3.tensor_productRs(Rs_1, Rs_2,
-                                                     get_l_output=get_l_output)
-        self.Rs_out = SO3.simplifyRs(Rs_out)
+        Rs_out, mixing_matrix = rs.tensor_product(Rs_1, Rs_2, get_l_output=get_l_output)
+        self.Rs_out = rs.simplify(Rs_out)
         self.register_buffer('mixing_matrix', mixing_matrix)
 
     def forward(self, features_1, features_2):
@@ -42,17 +40,16 @@ class ElementwiseTensorProduct(torch.nn.Module):
     """
     [(2, 0), (1, 1)] x [(1, 1), (2, 0)] = [(1, 1), (1, 0), (1, 1)]
     """
-    def __init__(self, Rs_1, Rs_2, get_l_output=SO3.selection_rule):
+    def __init__(self, Rs_1, Rs_2, get_l_output=o3.selection_rule):
         super().__init__()
 
-        Rs_1 = SO3.simplifyRs(Rs_1)
-        Rs_2 = SO3.simplifyRs(Rs_2)
+        Rs_1 = rs.simplify(Rs_1)
+        Rs_2 = rs.simplify(Rs_2)
         assert sum(mul for mul, _, _ in Rs_1) == sum(mul for mul, _, _ in Rs_2)
 
-        Rs_out, mixing_matrix = SO3.elementwise_tensor_productRs(Rs_1, Rs_2,
-                                                                 get_l_output)
+        Rs_out, mixing_matrix = rs.elementwise_tensor_product(Rs_1, Rs_2, get_l_output)
         self.register_buffer("mixing_matrix", mixing_matrix)
-        self.Rs_out = SO3.simplifyRs(Rs_out)
+        self.Rs_out = rs.simplify(Rs_out)
 
     def forward(self, features_1, features_2):
         '''
@@ -70,7 +67,7 @@ class ElementwiseTensorProduct(torch.nn.Module):
 
 
 class LearnableTensorProduct(torch.nn.Module):
-    def __init__(self, Rs_mid_1, Rs_mid_2, mul_mid, Rs_out, get_l_mul=SO3.selection_rule):
+    def __init__(self, Rs_mid_1, Rs_mid_2, mul_mid, Rs_out, get_l_mul=o3.selection_rule):
         super().__init__()
         self.mul_mid = mul_mid
         self.m = TensorProduct(Rs_mid_1, Rs_mid_2, get_l_mul)
