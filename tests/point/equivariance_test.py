@@ -40,7 +40,6 @@ class Tests(unittest.TestCase):
 
                 self.assertLess((W1 - W2).norm(), 1e-5 * W.norm(), l_f)
 
-
     def test2(self):
         """Test rotation equivariance on Kernel."""
         with torch_default_dtype(torch.float64):
@@ -54,11 +53,9 @@ class Tests(unittest.TestCase):
             D_in = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
             D_out = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
 
-
             W1 = D_out @ k(r)  # [i, j]
             W2 = k(rot(*abc) @ r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
-
 
     def test3(self):
         """Test rotation equivariance on GatedBlock and dependencies."""
@@ -83,7 +80,6 @@ class Tests(unittest.TestCase):
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), torch.einsum("ij,zaj->zai", rot_geo, geo)))
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
-
     def test4(self):
         """Test parity equivariance on Kernel."""
         with torch_default_dtype(torch.float64):
@@ -96,11 +92,9 @@ class Tests(unittest.TestCase):
             D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
             D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
 
-
             W1 = D_out @ k(r)  # [i, j]
             W2 = k(-r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
-
 
     def test5(self):
         """Test parity equivariance on GatedBlockParity and dependencies."""
@@ -127,7 +121,6 @@ class Tests(unittest.TestCase):
             x1 = torch.einsum("ij,zaj->zai", (D_out, act(conv(fea, geo))))
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo))
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
-
 
     def test6(self):
         """Test parity and rotation equivariance on GatedBlockParity and dependencies."""
@@ -157,4 +150,6 @@ class Tests(unittest.TestCase):
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), torch.einsum("ij,zaj->zai", rot_geo, geo)))
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
-unittest.main()
+
+if __name__ == '__main__':
+    unittest.main()

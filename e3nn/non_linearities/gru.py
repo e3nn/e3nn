@@ -28,7 +28,6 @@ class GRU(torch.nn.Module):
         self.h_tilde_op = Operation(gb.Rs_in)
         self.h_tilde_gb = gb
 
-
     def forward(self, h, *args, **kwargs):
         """
         :param h: tensor [batch, channel, ...]
@@ -47,9 +46,9 @@ class GRU(torch.nn.Module):
         j = 0
         for l, mul in enumerate(self.repr):
             d = mul * (2 * l + 1)
-            h_ = h[:, i: i+d].contiguous().view(batch, mul, 2 * l + 1, *size)
-            h_tilde_ = h_tilde[:, i: i+d].contiguous().view(batch, mul, 2 * l + 1, *size)
-            z_ = z[:, j: j+mul].view(batch, mul, 1, *size)
+            h_ = h[:, i: i + d].contiguous().view(batch, mul, 2 * l + 1, *size)
+            h_tilde_ = h_tilde[:, i: i + d].contiguous().view(batch, mul, 2 * l + 1, *size)
+            z_ = z[:, j: j + mul].view(batch, mul, 1, *size)
             i += d
             j += mul
 

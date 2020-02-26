@@ -60,7 +60,6 @@ def main():
 
                 ax.view_init(90, 0)
 
-
     plt.savefig("kernels{}to{}.png".format(args.l_in, args.l_out), transparent=True)
 
 

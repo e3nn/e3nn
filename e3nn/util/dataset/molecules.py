@@ -149,4 +149,3 @@ class QM9(torch.utils.data.Dataset):
 
         self.files = sorted(glob.glob(os.path.join(xyz_path, "*.xyz")))
         assert len(self.files) == 133885
-

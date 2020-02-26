@@ -92,7 +92,7 @@ def fit_sphere(array, eps):
         n = n / np.linalg.norm(n)
         r = np.cross(n, np.array([0, 0, 1]))
         if np.linalg.norm(r) > 0:
-            r = np.arccos(n[2]) * r / np.linalg.norm(r) # Euler rotation vector
+            r = np.arccos(n[2]) * r / np.linalg.norm(r)  # Euler rotation vector
 
         Rmat = linalg.expm(np.array([
             [0., -r[2], r[1]],
@@ -103,7 +103,7 @@ def fit_sphere(array, eps):
         Xr = np.transpose(np.dot(Rmat, np.transpose(array)))
 
         # Circle centroid
-        x = Xr[:,:2]
+        x = Xr[:, :2]
         A = 2 * (x[1:] - np.full(2, x[0]))
         b = np.sum((np.square(x[1:]) - np.square(np.full(2, x[0]))), axis=1)
         C = np.transpose(np.linalg.solve(A, b))
@@ -112,7 +112,7 @@ def fit_sphere(array, eps):
         R = np.sqrt(np.sum(np.square(x[0] - C)))
 
         # Rotate centroid back into the original frame of reference
-        C = np.append(C, [np.mean(Xr[:,2])], axis=0)
+        C = np.append(C, [np.mean(Xr[:, 2])], axis=0)
         C = np.transpose(np.dot(np.transpose(Rmat), C))
         return R, C
 
@@ -131,7 +131,7 @@ def fit_sphere(array, eps):
             return R, C
 
         # Centroid of the sphere
-        A = 2 * (array[1:] - np.full(len(array)-1, array[0]))
+        A = 2 * (array[1:] - np.full(len(array) - 1, array[0]))
         b = np.sum((np.square(array[1:]) - np.square(np.full(len(array) - 1, array[0]))), axis=1)
         C = np.transpose(np.linalg.solve(A, b))
 
