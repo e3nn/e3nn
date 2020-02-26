@@ -33,4 +33,5 @@ class Tests(unittest.TestCase):
                 test(Rs, ac)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()
