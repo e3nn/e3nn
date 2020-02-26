@@ -39,5 +39,4 @@ class Tests(unittest.TestCase):
             self.assertLess((f(c(rx, rgeo)) - ry).norm(), 1e-10 * ry.norm())
 
 
-if __name__ == '__main__':
-    unittest.main()
+unittest.main()
