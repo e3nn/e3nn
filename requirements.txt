@@ -1,3 +1,4 @@
 scipy
--e git+https://github.com/AMLab-Amsterdam/lie_learn#egg=lie_learn
+# -e git+https://github.com/AMLab-Amsterdam/lie_learn#egg=lie_learn
+-e git+https://github.com/bkmi/lie_learn.git#egg=lie_learn
 appdirs
