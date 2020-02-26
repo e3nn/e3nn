@@ -151,5 +151,4 @@ class Tests(unittest.TestCase):
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 
-if __name__ == '__main__':
-    unittest.main()
+unittest.main()
