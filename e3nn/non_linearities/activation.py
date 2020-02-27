@@ -3,7 +3,7 @@ import copy
 
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 
 
 class Activation(torch.nn.Module):
@@ -15,7 +15,7 @@ class Activation(torch.nn.Module):
         '''
         super().__init__()
 
-        Rs = SO3.simplifyRs(Rs)
+        Rs = rs.simplify(Rs)
         acts = copy.deepcopy(acts)
 
         n1 = sum(mul for mul, _, _ in Rs)

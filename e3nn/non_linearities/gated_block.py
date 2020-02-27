@@ -1,7 +1,7 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, redefined-builtin, arguments-differ, line-too-long, unbalanced-tuple-unpacking
 import torch
 
-from e3nn.SO3 import simplifyRs
+from e3nn import rs
 
 
 class GatedBlock(torch.nn.Module):
@@ -13,7 +13,7 @@ class GatedBlock(torch.nn.Module):
         """
         super().__init__()
 
-        Rs_out = simplifyRs(Rs_out)
+        Rs_out = rs.simplify(Rs_out)
 
         self.scalar_act = scalar_activation
         self.gate_act = gate_activation
@@ -28,7 +28,7 @@ class GatedBlock(torch.nn.Module):
                 Rs_gates.append((mul, 0))
 
         self.Rs = Rs
-        self.Rs_in = simplifyRs(Rs + Rs_gates)
+        self.Rs_in = rs.simplify(Rs + Rs_gates)
 
     def forward(self, features, dim=-1):
         """
