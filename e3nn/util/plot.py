@@ -1,9 +1,7 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, missing-docstring
 import math
 
-import matplotlib.pyplot as plt
 import torch
-from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import # noqa
 
 from e3nn import o3
 
@@ -32,6 +30,8 @@ def plot_sphere(fun, n=20):
     :param fun: function of (alpha, beta)
     :param n: precision
     """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import # noqa
     x, y, z, a, b = spherical_surface(n)
 
     f = fun(a, b)
