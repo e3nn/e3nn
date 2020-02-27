@@ -4,7 +4,7 @@ import argparse
 import matplotlib.pyplot as plt
 import torch
 
-from e3nn.SO3 import clebsch_gordan, spherical_harmonics
+from e3nn import o3
 from e3nn.util.plot import spherical_surface
 
 
@@ -24,8 +24,8 @@ def main():
 
     out = []
     for l in range(abs(args.l_out - args.l_in), args.l_out + args.l_in + 1):
-        C = clebsch_gordan(args.l_out, args.l_in, l)
-        Y = spherical_harmonics(l, alpha, beta)
+        C = o3.clebsch_gordan(args.l_out, args.l_in, l)
+        Y = o3.spherical_harmonics(l, alpha, beta)
         out.append(torch.einsum("ijk,k...->ij...", (C, Y)))
     f = torch.stack(out)
 
