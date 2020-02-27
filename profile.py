@@ -7,8 +7,10 @@ from e3nn.non_linearities.rescaled_act import ShiftedSoftplus
 from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
 from e3nn.point.kernelconv import KernelConv
+from e3nn.rs import dim
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = torch.device('cpu')
 
 geometry = torch.rand(100, 40, 3, dtype=torch.float32).to(device)
 features = torch.rand(100, 40, 2, dtype=torch.float32).to(device)
