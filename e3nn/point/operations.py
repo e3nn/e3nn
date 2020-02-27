@@ -1,7 +1,7 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 
 
 class Convolution(torch.nn.Module):
@@ -182,7 +182,7 @@ class PeriodicConvolution(torch.nn.Module):
         import numpy as np
 
         batch_size, points_num = features.size(0), features.size(1)
-        in_channels, out_channels = SO3.dimRs(self.kernel.Rs_in), SO3.dimRs(self.kernel.Rs_out)
+        in_channels, out_channels = rs.dim(self.kernel.Rs_in), rs.dim(self.kernel.Rs_out)
 
         geometry = geometry.cpu().numpy()
         features = features.view(batch_size, points_num * in_channels)                                               # [z, b*j]

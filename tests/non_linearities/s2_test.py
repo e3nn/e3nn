@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 from e3nn.non_linearities.s2 import S2Activation
 
 
@@ -17,8 +17,8 @@ class Tests(unittest.TestCase):
             x = torch.randn(55, sum(2 * l + 1 for _, l, _ in Rs))
             ac = S2Activation(Rs, act, 1000)
 
-            y1 = ac(x, dim=-1) @ SO3.rep(ac.Rs_out, 0, 0, 0, -1).T
-            y2 = ac(x @ SO3.rep(Rs, 0, 0, 0, -1).T, dim=-1)
+            y1 = ac(x, dim=-1) @ rs.rep(ac.Rs_out, 0, 0, 0, -1).T
+            y2 = ac(x @ rs.rep(Rs, 0, 0, 0, -1).T, dim=-1)
             self.assertLess((y1 - y2).abs().max(), 1e-10)
 
         L = 5

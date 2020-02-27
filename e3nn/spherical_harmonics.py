@@ -4,13 +4,13 @@ import math
 import scipy.signal
 import torch
 
-from e3nn import SO3
+from e3nn import o3
 
 
 class SphericalHarmonicsProject(torch.nn.Module):
     def __init__(self, alpha, beta, lmax):
         super().__init__()
-        sh = torch.cat([SO3.spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)])
+        sh = torch.cat([o3.spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)])
         self.register_buffer("sh", sh)
 
     def forward(self, coeff):
@@ -23,10 +23,10 @@ class SphericalHarmonicsFindPeaks(torch.nn.Module):
         self.n = n
         self.lmax = lmax
 
-        R = SO3.rot(math.pi / 2, math.pi / 2, math.pi / 2)
+        R = o3.rot(math.pi / 2, math.pi / 2, math.pi / 2)
         self.xyz1, self.proj1 = self.precompute(R)
 
-        R = SO3.rot(0, 0, 0)
+        R = o3.rot(0, 0, 0)
         self.xyz2, self.proj2 = self.precompute(R)
 
     def precompute(self, R):
@@ -34,8 +34,8 @@ class SphericalHarmonicsFindPeaks(torch.nn.Module):
         b = torch.linspace(0, math.pi, self.n)[2:-2]
         a, b = torch.meshgrid(a, b)
 
-        xyz = torch.stack(SO3.angles_to_xyz(a, b), dim=-1) @ R.t()
-        a, b = SO3.xyz_to_angles(xyz)
+        xyz = torch.stack(o3.angles_to_xyz(a, b), dim=-1) @ R.t()
+        a, b = o3.xyz_to_angles(xyz)
 
         proj = SphericalHarmonicsProject(a, b, self.lmax)
         return xyz, proj

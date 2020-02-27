@@ -1,7 +1,7 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, unbalanced-tuple-unpacking
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 from e3nn.non_linearities.activation import Activation
 from e3nn.tensor_product import ElementwiseTensorProduct
 
@@ -10,7 +10,7 @@ def split_features(features, *Rss, dim=-1):
     index = 0
     outputs = []
     for Rs in Rss:
-        n = SO3.dimRs(Rs)
+        n = rs.dim(Rs)
         outputs.append(features.narrow(dim, index, n))
         index += n
     assert index == features.size(dim)
