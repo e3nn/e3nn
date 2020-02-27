@@ -150,52 +150,53 @@ def kernel_conv_automatic_backward(features, Y, R, norm_coef, Rs_in, Rs_out, get
     features = features.reshape(batch, n_in)
     kernel_conv = Y.new_zeros(batch, n_out)
 
-    for atom in range(n_atom):
-        # note: for the normalization we assume that the variance of R[i] is one
-        begin_R = 0
+    # note: for the normalization we assume that the variance of R[i] is one
+    begin_R = 0
 
-        begin_out = 0
-        for i, (mul_out, l_out, p_out) in enumerate(Rs_out):
-            len_s_out = mul_out * (2 * l_out + 1)
-            s_out = slice(begin_out, begin_out + len_s_out)
-            begin_out += mul_out * (2 * l_out + 1)
+    begin_out = 0
+    for i, (mul_out, l_out, p_out) in enumerate(Rs_out):
+        len_s_out = mul_out * (2 * l_out + 1)
+        s_out = slice(begin_out, begin_out + len_s_out)
+        begin_out += mul_out * (2 * l_out + 1)
 
-            begin_in = 0
-            for j, (mul_in, l_in, p_in) in enumerate(Rs_in):
-                len_s_in = mul_in * (2 * l_in + 1)
-                s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                begin_in += mul_in * (2 * l_in + 1)
+        begin_in = 0
+        for j, (mul_in, l_in, p_in) in enumerate(Rs_in):
+            len_s_in = mul_in * (2 * l_in + 1)
+            s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
+            begin_in += mul_in * (2 * l_in + 1)
 
-                l_filters = get_l_filters(l_in, p_in, l_out, p_out)
-                if not l_filters:
-                    continue
+            l_filters = get_l_filters(l_in, p_in, l_out, p_out)
+            if not l_filters:
+                continue
 
-                # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
-                n = mul_out * mul_in * len(l_filters)
-                sub_R = R[..., atom, begin_R: begin_R + n].view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
-                begin_R += n
+            # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
+            n = mul_out * mul_in * len(l_filters)
+            sub_R = R[..., begin_R: begin_R + n].view(batch, n_atom, mul_out, mul_in, -1)  # [batch, n_atom, mul_out, mul_in, l_filter]
+            begin_R += n
 
-                sub_norm_coef = norm_coef[i, j, :, atom]  # [batch]
+            sub_norm_coef = norm_coef[i, j, :]  # [batch, n_atom]
 
-                K = 0
-                for k, l_filter in enumerate(l_filters):
-                    tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
-                    sub_Y = Y[tmp: tmp + 2 * l_filter + 1, :, atom]  # [m, batch]
+            K = 0
+            for k, l_filter in enumerate(l_filters):
+                tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
+                sub_Y = Y[tmp: tmp + 2 * l_filter + 1, :]  # [m, batch, n_atom]
 
-                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
+                C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
 
-                    K += torch.einsum(
-                        "ijk,kz,zuv,z->zuivj", C, sub_Y, sub_R[..., k], sub_norm_coef
-                    )  # [batch, mul_out, m_out, mul_in, m_in]
+                K += torch.einsum(
+                    "ijk,kza,zauv,za,zvj->zui",
+                    C, sub_Y, sub_R[..., k], sub_norm_coef, features[..., s_in].reshape(batch, mul_in, -1)
+                )  # [batch, mul_out, m_out]
 
-                if K is not 0:
-                    kernel_conv[:, s_out] += torch.einsum(
-                        'zj,zij->zi',
-                        features[:, s_in],
-                        K.reshape(batch, len_s_out, len_s_in)
-                    )
-                else:
-                    raise NotImplementedError("Does this even happen?")
+            if K is not 0:
+                # kernel_conv[:, s_out] += torch.einsum(
+                #     'zj,zij->zi',
+                #     features[:, s_in],
+                #     K.reshape(batch, len_s_out, len_s_in)
+                # )
+                kernel_conv[:, s_out] += K.reshape(batch, -1)
+            else:
+                raise NotImplementedError("Does this even happen?")
     return kernel_conv
 
 
