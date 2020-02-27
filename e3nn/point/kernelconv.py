@@ -1,11 +1,13 @@
 import math
 import torch
 
-import e3nn.SO3 as SO3
+import e3nn.o3 as o3
+import e3nn.rs as rs
 
 
 class KernelConv(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=SO3.selection_rule, sh=SO3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz,
+                 normalization='norm'):
         '''
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -15,11 +17,12 @@ class KernelConv(torch.nn.Module):
         :param normalization: either 'norm' or 'component'
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
+        TODO fix doc
         '''
         super().__init__()
 
-        self.Rs_in = SO3.simplifyRs(Rs_in)
-        self.Rs_out = SO3.simplifyRs(Rs_out)
+        self.Rs_in = rs.simplify(Rs_in)
+        self.Rs_out = rs.simplify(Rs_out)
 
         def filters_with_parity(l_in, p_in, l_out, p_out):
             nonlocal get_l_filters
@@ -80,8 +83,8 @@ class KernelConv(torch.nn.Module):
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
             name=self.__class__.__name__,
-            Rs_in=SO3.formatRs(self.Rs_in),
-            Rs_out=SO3.formatRs(self.Rs_out),
+            Rs_in=rs.format_Rs(self.Rs_in),
+            Rs_out=rs.format_Rs(self.Rs_out),
         )
 
     def check_input_output(self):
@@ -105,104 +108,182 @@ class KernelConv(torch.nn.Module):
 
     def forward(self, features, geometry):
         """
-        :param features: tensor [batch, in_point, l_in * mul_in * m_in]
+        :param features: tensor [batch, in_point, l_in * mul_in * m_in] TODO fix doc
         :param geometry: tensor [batch, in_point, xyz]
         :return:         tensor [batch, out_point, l_out * mul_out * m_out]
         """
-        *size, xyz = geometry.size()
+        *size, n_atoms, xyz = geometry.size()
         assert xyz == 3
         assert geometry.ndim == 3
 
-        rb = geometry.unsqueeze(-2)  # [batch, 1, b, xyz]
-        ra = geometry.unsqueeze(-3)  # [batch, a, 1, xyz]
-        r = rb - ra  # [batch, a, b, xyz]
+        # TODO consider putting this outside somehow?
+        rb = geometry.unsqueeze(-2)  # [..., 1, n_atom, xyz]
+        ra = geometry.unsqueeze(-3)  # [..., a, 1, xyz]
+        r = (rb - ra).reshape(-1, n_atoms, xyz)  # [... * a, b, xyz]
+        # Henceforth [... * a] is known as batch!!
 
         # precompute all needed spherical harmonics
-        Y = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
+        Y = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch, n_atom]
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
-        radii = r.norm(2, dim=-1)  # [batch, a, b]
-        R = self.R(radii)  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
+        radii = r.norm(2, dim=-1)  # [batch, n_atoms]
+        R = self.R(radii.flatten()).reshape(*radii.shape, -1)  # [batch, n_atoms, l_out * l_in * mul_out * mul_in *  l_filter]
 
         norm_coef = getattr(self, 'norm_coef')
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
+        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, n_atom]
 
-        kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
-        return kernel.view(*size, kernel.shape[1], kernel.shape[2])
+        # kernel_conv = KernelFn.apply(
+        #     features, Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters
+        # )
+        kernel_conv = kernel_conv_automatic_backward(
+            features, Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters
+        )
+        return kernel_conv.view(*size, n_atoms, kernel_conv.shape[1])
 
-class KernelFn(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
-        """
-        :param Y: tensor [l_filter * m_filter, batch]
-        :param R: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
-        :param norm_coef: tensor [l_out, l_in, batch]
-        :return: tensor [batch, l_out * mul_out * m_out, l_in * mul_in * m_in]
-        """
-        ctx.Rs_in = Rs_in
-        ctx.Rs_out = Rs_out
-        ctx.get_l_filters = get_l_filters
-        ctx.set_of_l_filters = set_of_l_filters
 
-        # save necessary tensors for backward
-        saved_Y = saved_R = None
-        if Y.requires_grad:
-            ctx.Y_shape = Y.shape
-            saved_R = R
-        if R.requires_grad:
-            ctx.R_shape = R.shape
-            saved_Y = Y
-        ctx.save_for_backward(saved_Y, saved_R, norm_coef)
+def kernel_conv_automatic_backward(features, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+    n_in = rs.dim(Rs_in)
+    n_out = rs.dim(Rs_out)
+    batch, n_atom = Y.shape[1:]
 
-        batch = Y.shape[1]
-        n_in = SO3.dimRs(ctx.Rs_in)
-        n_out = SO3.dimRs(ctx.Rs_out)
+    features = features.reshape(batch, n_in)
+    kernel_conv = Y.new_zeros(batch, n_out)
 
-        kernel = Y.new_zeros(batch, n_out, n_in)
-
-        print(kernel.shape)
-        print(ctx.Rs_in)
-        print(ctx.Rs_out)
+    for atom in range(n_atom):
         # note: for the normalization we assume that the variance of R[i] is one
         begin_R = 0
 
         begin_out = 0
-        for i, (mul_out, l_out, p_out) in enumerate(ctx.Rs_out):
-            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+        for i, (mul_out, l_out, p_out) in enumerate(Rs_out):
+            len_s_out = mul_out * (2 * l_out + 1)
+            s_out = slice(begin_out, begin_out + len_s_out)
             begin_out += mul_out * (2 * l_out + 1)
 
             begin_in = 0
-            for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
+            for j, (mul_in, l_in, p_in) in enumerate(Rs_in):
+                len_s_in = mul_in * (2 * l_in + 1)
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
                 begin_in += mul_in * (2 * l_in + 1)
 
-                l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
+                l_filters = get_l_filters(l_in, p_in, l_out, p_out)
                 if not l_filters:
                     continue
 
                 # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
                 n = mul_out * mul_in * len(l_filters)
-                sub_R = R[:, begin_R: begin_R + n].contiguous().view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
+                sub_R = R[..., atom, begin_R: begin_R + n].view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
                 begin_R += n
 
-                sub_norm_coef = norm_coef[i, j]  # [batch]
+                sub_norm_coef = norm_coef[i, j, :, atom]  # [batch]
 
-                # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
                 K = 0
                 for k, l_filter in enumerate(l_filters):
-                    tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
-                    sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
+                    tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
+                    sub_Y = Y[tmp: tmp + 2 * l_filter + 1, :, atom]  # [m, batch]
 
-                    C = SO3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
+                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
 
-                    # note: The multiplication with `sub_R` could also be done outside of the for loop
-                    K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
+                    K += torch.einsum(
+                        "ijk,kz,zuv,z->zuivj", C, sub_Y, sub_R[..., k], sub_norm_coef
+                    )  # [batch, mul_out, m_out, mul_in, m_in]
 
                 if K is not 0:
-                    kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
+                    kernel_conv[:, s_out] += torch.einsum(
+                        'zj,zij->zi',
+                        features[:, s_in],
+                        K.reshape(batch, len_s_out, len_s_in)
+                    )
+                else:
+                    raise NotImplementedError("Does this even happen?")
+    return kernel_conv
 
-        return kernel
+
+class KernelFn(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, features, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+        """
+        :param features: tensor [batch, a, l_in * mul_in * m_in]
+        :param Y: tensor [l_filter * m_filter, batch]  TODO fix these
+        :param R: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
+        :param norm_coef: tensor [l_out, l_in, batch]
+        :return: tensor [batch, l_out * mul_out * m_out, l_in * mul_in * m_in]
+        """
+        # FUNCTION ABOVE IS UPDATED
+
+        # ctx.Rs_in = Rs_in
+        # ctx.Rs_out = Rs_out
+        # ctx.get_l_filters = get_l_filters
+        # ctx.set_of_l_filters = set_of_l_filters
+        #
+        # # save necessary tensors for backward
+        # saved_Y = saved_R = None
+        # if Y.requires_grad:
+        #     ctx.Y_shape = Y.shape
+        #     saved_R = R
+        # if R.requires_grad:
+        #     ctx.R_shape = R.shape
+        #     saved_Y = Y
+        # ctx.save_for_backward(saved_Y, saved_R, norm_coef)
+        #
+        # batch, n_a, n_b = Y.shape[1:]
+        # n_in = rs.dim(ctx.Rs_in)
+        # n_out = rs.dim(ctx.Rs_out)
+        #
+        # kernel_conv = Y.new_zeros(batch, n_a, n_out)
+        #
+        # print(kernel_conv.shape)
+        # print(ctx.Rs_in)
+        # print(ctx.Rs_out)
+        # for b in range(n_b):
+        #     # note: for the normalization we assume that the variance of R[i] is one
+        #     begin_R = 0
+        #
+        #     begin_out = 0
+        #     for i, (mul_out, l_out, p_out) in enumerate(ctx.Rs_out):
+        #         len_s_out = mul_out * (2 * l_out + 1)
+        #         s_out = slice(begin_out, begin_out + len_s_out)
+        #         begin_out += mul_out * (2 * l_out + 1)
+        #
+        #         begin_in = 0
+        #         for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
+        #             len_s_in = mul_in * (2 * l_in + 1)
+        #             s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
+        #             begin_in += mul_in * (2 * l_in + 1)
+        #
+        #             l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
+        #             if not l_filters:
+        #                 continue
+        #
+        #             # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
+        #             n = mul_out * mul_in * len(l_filters)
+        #             sub_R = R[..., b, begin_R: begin_R + n].view(batch, n_a, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
+        #             begin_R += n
+        #
+        #             # TODO figure out norm
+        #             # sub_norm_coef = norm_coef[i, j]  # [batch]
+        #
+        #             K = 0
+        #             for k, l_filter in enumerate(l_filters):
+        #                 tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
+        #                 sub_Y = Y[tmp: tmp + 2 * l_filter + 1, :, b]  # [m, batch, a]
+        #
+        #                 C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
+        #
+        #                 K += torch.einsum(
+        #                     "ijk,kza,zauv->zauivj", C, sub_Y, sub_R[..., k]
+        #                 )  # [batch, a, mul_out, m_out, mul_in, m_in]
+        #
+        #             if K is not 0:
+        #                 kernel_conv[:, :, s_out] += torch.einsum(
+        #                     'zaj,zaij->zai',
+        #                     features[:, :, s_in],
+        #                     K.reshape(batch, n_a, len_s_out, len_s_in)
+        #                 )
+        #             else:
+        #                 raise NotImplementedError("Does this even happen?")
+        #
+        # return kernel_conv
 
     @staticmethod
     def backward(ctx, grad_kernel):
