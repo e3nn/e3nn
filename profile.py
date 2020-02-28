@@ -20,11 +20,13 @@ def main():
     print("name: reserved allocated")
     ssp = ShiftedSoftplus(5.0)
     radial = partial(CosineBasisModel, max_radius=10., number_of_basis=25, h=100, L=3, act=ssp)
-    # kernel_conv = KernelConv([(2, 0)], [(5, 0), (5, 1)], RadialModel=radial)
-    # f2 = kernel_conv(features, geometry)
-    K9 = partial(KernelQM9, RadialModel=radial)
-    C9 = Convolution(K9, [(2, 0)], [(5, 0), (5, 1)])
-    f2 = C9(features, geometry)
+    kernel_conv = KernelConv([(2, 0)], [(5, 0), (5, 1)], RadialModel=radial)
+    rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
+    ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
+    f2 = kernel_conv(features, rb - ra)
+    # K9 = partial(KernelQM9, RadialModel=radial)
+    # C9 = Convolution(K9, [(2, 0)], [(5, 0), (5, 1)])
+    # f2 = C9(features, geometry)
     loss = torch.norm(f2 - torch.zeros_like(f2))
     loss.backward()
     print('done')
