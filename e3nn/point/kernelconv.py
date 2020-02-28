@@ -189,11 +189,6 @@ def kernel_conv_automatic_backward(features, Y, R, norm_coef, Rs_in, Rs_out, get
                 )  # [batch, mul_out, m_out]
 
             if K is not 0:
-                # kernel_conv[:, s_out] += torch.einsum(
-                #     'zj,zij->zi',
-                #     features[:, s_in],
-                #     K.reshape(batch, len_s_out, len_s_in)
-                # )
                 kernel_conv[:, s_out] += K.reshape(batch, -1)
             else:
                 raise NotImplementedError("Does this even happen?")
