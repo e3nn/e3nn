@@ -20,16 +20,20 @@ class Tests(unittest.TestCase):
 
         self.geometry = torch.rand(100, 40, 3)
         self.features = torch.rand(100, 40, dim(self.Rs_in), requires_grad=True)
+        torch.backends.cudnn.deterministic = True
 
     def test_compare_forward_norm(self):
         for normalization in ["norm", "component"]:
+            torch.manual_seed(0)
             K = partial(Kernel, RadialModel=ConstantRadialModel, normalization=normalization)
             C = Convolution(K, self.Rs_in, self.Rs_out)
             new_features = C(self.features, self.geometry)
 
+            torch.manual_seed(0)
             KC = KernelConv(self.Rs_in, self.Rs_out, RadialModel=ConstantRadialModel, normalization=normalization)
             check_new_features = KC(self.features, self.geometry)
 
+            assert all(torch.all(a == b) for a, b in zip(C.kernel.parameters(), KC.parameters()))
             self.assertTrue(torch.allclose(new_features, check_new_features))
 
     def test_compare_backward_features(self):
@@ -37,12 +41,16 @@ class Tests(unittest.TestCase):
         check_geometry = self.geometry.clone().detach()
 
         for normalization in ["norm", "component"]:
+            torch.manual_seed(0)
             K = partial(Kernel, RadialModel=ConstantRadialModel, normalization=normalization)
             C = Convolution(K, self.Rs_in, self.Rs_out)
             new_features = C(self.features, self.geometry)
 
+            torch.manual_seed(0)
             KC = KernelConv(self.Rs_in, self.Rs_out, RadialModel=ConstantRadialModel, normalization=normalization)
             check_new_features = KC(check_features, check_geometry)
+
+            assert all(torch.all(a == b) for a, b in zip(C.kernel.parameters(), KC.parameters()))
 
             # Capture ground truth gradient
             target = torch.rand_like(new_features)
