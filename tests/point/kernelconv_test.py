@@ -15,23 +15,22 @@ class TestKernelConv(unittest.TestCase):
     def setUp(self):
         super(TestKernelConv, self).setUp()
         torch.set_default_dtype(torch.float64)
+        torch.backends.cudnn.deterministic = True
         self.Rs_in = [(1, 0), (1, 1), (2, 0), (1, 2)]
         self.Rs_out = [(2, 0), (1, 1), (1, 2), (3, 0)]
 
         batch = 100
         atoms = 40
-
         self.geometry = torch.rand(batch, atoms, 3)
         rb = self.geometry.unsqueeze(1)  # [batch, 1, b, xyz]
         ra = self.geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         self.r = rb - ra
         self.features = torch.rand(batch, atoms, dim(self.Rs_in), requires_grad=True)
         self.mask = torch.ones(batch, atoms)
-        torch.backends.cudnn.deterministic = True
 
-        self.msg = "Convolution parameters were not identical. This means the test cannot compare outputs."
+        self.msg = "Kernel or Convolution parameters were not identical. This means the test cannot compare outputs."
 
-    def test_compare_forward_norm(self):
+    def test_compare_forward(self):
         for normalization in ["norm", "component"]:
             torch.manual_seed(0)
             K = partial(Kernel, RadialModel=ConstantRadialModel, normalization=normalization)
@@ -45,7 +44,7 @@ class TestKernelConv(unittest.TestCase):
             assert all(torch.all(a == b) for a, b in zip(C.kernel.parameters(), KC.parameters())), self.msg
             self.assertTrue(torch.allclose(new_features, check_new_features))
 
-    def test_compare_backward_features(self):
+    def test_compare_backward(self):
         check_features = self.features.clone().detach().requires_grad_()
         check_r = self.r.clone().detach()
         check_mask = self.mask.clone().detach()
