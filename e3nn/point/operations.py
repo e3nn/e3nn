@@ -26,6 +26,26 @@ class Convolution(torch.nn.Module):
         return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]
 
 
+class ConvolutionEinsumFn(torch.autograd.Function):
+    """
+    Forward and backward written explicitly for the Convolution Function.
+    Educational rather than used in practice.
+    """
+    @staticmethod
+    def forward(ctx, k, features):
+        ctx.save_for_backward(k, features)
+        a = torch.einsum("zabij,zbj->zai", k, features)  # [batch, point, channel]
+        return a
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        k, features = ctx.saved_tensors
+        del ctx
+        grad_k = torch.einsum("zai,zbj->zabij", grad_output, features)
+        grad_features = torch.einsum("zabij,zai->zbj", k, grad_output)
+        return grad_k, grad_features
+
+
 class PairConvolution(torch.nn.Module):
     def __init__(self, Kernel, Rs_in, Rs_out):
         super().__init__()
