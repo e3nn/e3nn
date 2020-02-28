@@ -23,7 +23,7 @@ class KernelConv(Kernel):
         """
         :param features: tensor [batch, b, l_in * mul_in * m_in]
         :param geometry: tensor [batch, a, b, xyz]
-        :param mask:     tensor [batch, b] (In order to zero contributions from padded atoms.)
+        :param mask:     tensor [batch, a] (In order to zero contributions from padded atoms.)
         :param y:        Optional precomputed spherical harmonics.
         :param radii:    Optional precomputed normed geometry.
         :return:         tensor [batch, a, l_out * mul_out * m_out]
