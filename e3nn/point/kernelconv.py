@@ -39,7 +39,7 @@ class KernelConv(Kernel):
         # note: for the normalization we assume that the variance of R[i] is one
         if radii is None:
             radii = geometry.norm(2, dim=-1)  # [batch, a, b]
-        r = self.R(radii.flatten()).reshape(
+        r = self.R(radii.flatten()).view(
             *radii.shape, -1
         )  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
 
