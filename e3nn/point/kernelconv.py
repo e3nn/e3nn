@@ -19,26 +19,26 @@ class KernelConv(Kernel):
         """
         super(KernelConv, self).__init__(Rs_in, Rs_out, RadialModel, get_l_filters, sh, normalization)
 
-    def forward(self, features, geometry, mask, y=None, radii=None):
+    def forward(self, features, difference_geometry, mask, y=None, radii=None):
         """
         :param features: tensor [batch, b, l_in * mul_in * m_in]
-        :param geometry: tensor [batch, a, b, xyz]
+        :param difference_geometry: tensor [batch, a, b, xyz]
         :param mask:     tensor [batch, a] (In order to zero contributions from padded atoms.)
         :param y:        Optional precomputed spherical harmonics.
         :param radii:    Optional precomputed normed geometry.
         :return:         tensor [batch, a, l_out * mul_out * m_out]
         """
-        batch, a, b, xyz = geometry.size()
+        batch, a, b, xyz = difference_geometry.size()
         assert xyz == 3
 
         # precompute all needed spherical harmonics
         if y is None:
-            y = self.sh(self.set_of_l_filters, geometry)  # [l_filter * m_filter, batch, a, b]
+            y = self.sh(self.set_of_l_filters, difference_geometry)  # [l_filter * m_filter, batch, a, b]
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
         if radii is None:
-            radii = geometry.norm(2, dim=-1)  # [batch, a, b]
+            radii = difference_geometry.norm(2, dim=-1)  # [batch, a, b]
         r = self.R(radii.flatten()).view(
             *radii.shape, -1
         )  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
