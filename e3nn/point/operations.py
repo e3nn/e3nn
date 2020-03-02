@@ -9,11 +9,12 @@ class Convolution(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, geometry, out_geometry=None, n_norm=1):
+    def forward(self, features, geometry, out_geometry=None, n_norm=1, custom_backward=False):
         """
         :param features:     tensor [batch,  in_point, channel]
         :param geometry:     tensor [batch,  in_point, xyz]
         :param out_geometry: tensor [batch, out_point, xyz]
+        :param custom_backward: call ConvolutionEinsumFn rather than using automatic differentiation
         :return:             tensor [batch, out_point, channel]
         """
         assert features.size()[:2] == geometry.size()[:2], "features size ({}) and geometry size ({}) should match".format(features.size(), geometry.size())
@@ -23,7 +24,10 @@ class Convolution(torch.nn.Module):
         ra = out_geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         k = self.kernel(rb - ra)  # [batch, a, b, i, j]
         k.div_(n_norm ** 0.5)
-        return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]
+        if custom_backward:
+            return ConvolutionEinsumFn.apply(k, features)  # [batch, point, channel]
+        else:
+            return torch.einsum("zabij,zbj->zai", (k, features))  # [batch, point, channel]
 
 
 class ConvolutionEinsumFn(torch.autograd.Function):

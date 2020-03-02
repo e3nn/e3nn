@@ -8,7 +8,7 @@ from e3nn import o3, rs
 
 class Kernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz,
-                 normalization='norm', custom_backward=False):
+                 normalization='norm'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -16,13 +16,10 @@ class Kernel(torch.nn.Module):
         :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         :param normalization: either 'norm' or 'component'
-        :param custom_backward: call KernelFn rather than using automatic differentiation
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
         """
         super().__init__()
-        self.custom_backward = custom_backward
-
         self.Rs_in = rs.simplify(Rs_in)
         self.Rs_out = rs.simplify(Rs_out)
 
@@ -108,9 +105,10 @@ class Kernel(torch.nn.Module):
             if not has_path:
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
 
-    def forward(self, r):
+    def forward(self, r, custom_backward=False):
         """
         :param r: tensor [..., 3]
+        :param custom_backward: call KernelFn rather than using automatic differentiation
         :return: tensor [..., l_out * mul_out * m_out, l_in * mul_in * m_in]
         """
         *size, xyz = r.size()
@@ -128,7 +126,7 @@ class Kernel(torch.nn.Module):
         norm_coef = getattr(self, 'norm_coef')
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
-        if self.custom_backward:
+        if custom_backward:
             kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
         else:
             batch = Y.shape[1]
