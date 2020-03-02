@@ -7,7 +7,8 @@ from e3nn import o3, rs
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz,
+                 normalization='norm', custom_backward=False):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -15,10 +16,12 @@ class Kernel(torch.nn.Module):
         :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         :param normalization: either 'norm' or 'component'
+        :param custom_backward: call KernelFn rather than using automatic differentiation
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
         """
         super().__init__()
+        self.custom_backward = custom_backward
 
         self.Rs_in = rs.simplify(Rs_in)
         self.Rs_out = rs.simplify(Rs_out)
@@ -125,7 +128,52 @@ class Kernel(torch.nn.Module):
         norm_coef = getattr(self, 'norm_coef')
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
-        kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
+        if self.custom_backward:
+            kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
+        else:
+            batch = Y.shape[1]
+            n_in = rs.dim(self.Rs_in)
+            n_out = rs.dim(self.Rs_out)
+
+            kernel = Y.new_zeros(batch, n_out, n_in)
+
+            # note: for the normalization we assume that the variance of R[i] is one
+            begin_R = 0
+            begin_out = 0
+            for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
+                s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+                begin_out += mul_out * (2 * l_out + 1)
+
+                begin_in = 0
+                for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
+                    s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
+                    begin_in += mul_in * (2 * l_in + 1)
+
+                    l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
+                    if not l_filters:
+                        continue
+
+                    # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
+                    n = mul_out * mul_in * len(l_filters)
+                    sub_R = R[:, begin_R: begin_R + n].contiguous().view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
+                    begin_R += n
+
+                    sub_norm_coef = norm_coef[i, j]  # [batch]
+
+                    # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
+                    K = 0
+                    for k, l_filter in enumerate(l_filters):
+                        tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
+                        sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
+
+                        C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
+
+                        # note: The multiplication with `sub_R` could also be done outside of the for loop
+                        K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
+
+                    if K is not 0:
+                        kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
+
         return kernel.view(*size, kernel.shape[1], kernel.shape[2])
 
 
@@ -249,73 +297,3 @@ class KernelFn(torch.autograd.Function):
 
         del ctx
         return grad_Y, grad_R, None, None, None, None, None
-
-
-class KernelAutoBackward(Kernel):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
-        super(KernelAutoBackward, self).__init__(Rs_in, Rs_out, RadialModel, get_l_filters, sh, normalization)
-
-    def forward(self, r):
-        """
-        :param r: tensor [..., 3]
-        :return: tensor [..., l_out * mul_out * m_out, l_in * mul_in * m_in]
-        """
-        *size, xyz = r.size()
-        assert xyz == 3
-        r = r.reshape(-1, 3)
-
-        # precompute all needed spherical harmonics
-        Y = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
-
-        # use the radial model to fix all the degrees of freedom
-        # note: for the normalization we assume that the variance of R[i] is one
-        radii = r.norm(2, dim=1)  # [batch]
-        R = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
-
-        norm_coef = getattr(self, 'norm_coef')
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
-
-        batch = Y.shape[1]
-        n_in = rs.dim(self.Rs_in)
-        n_out = rs.dim(self.Rs_out)
-
-        kernel = Y.new_zeros(batch, n_out, n_in)
-
-        # note: for the normalization we assume that the variance of R[i] is one
-        begin_R = 0
-        begin_out = 0
-        for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
-            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-            begin_out += mul_out * (2 * l_out + 1)
-
-            begin_in = 0
-            for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
-                s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                begin_in += mul_in * (2 * l_in + 1)
-
-                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
-                if not l_filters:
-                    continue
-
-                # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
-                n = mul_out * mul_in * len(l_filters)
-                sub_R = R[:, begin_R: begin_R + n].contiguous().view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
-                begin_R += n
-
-                sub_norm_coef = norm_coef[i, j]  # [batch]
-
-                # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
-                K = 0
-                for k, l_filter in enumerate(l_filters):
-                    tmp = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_filter)
-                    sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
-
-                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
-
-                    # note: The multiplication with `sub_R` could also be done outside of the for loop
-                    K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
-
-                if K is not 0:
-                    kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
-
-        return kernel.view(*size, kernel.shape[1], kernel.shape[2])
