@@ -174,8 +174,6 @@ class KernelConvFn(torch.autograd.Function):
                 if not l_filters:
                     continue
 
-                # if grad_F is not None:
-                #     pass  # TODO
                 n = mul_out * mul_in * len(l_filters)
                 if grad_Y is not None:
                     sub_R = R[:, :, :, begin_R: begin_R + n].contiguous().view(
@@ -187,6 +185,13 @@ class KernelConvFn(torch.autograd.Function):
                     )  # [batch, a, b, mul_out, mul_in, l_filter]
                 begin_R += n
 
+                if grad_F is not None:
+                    sub_grad_F = grad_F[:, :, s_in].contiguous().view(
+                        batch, b, mul_in, 2 * l_in + 1
+                    )  # [batch, b, mul_in, 2 * l_in + 1]
+                if (grad_Y is not None) or (grad_R is not None):
+                    sub_F = F[..., s_in].view(batch, b, mul_in, 2 * l_in + 1)
+
                 grad_K = grad_kernel[:, :, s_out].view(
                     batch, a, mul_out, 2 * l_out + 1
                 )
@@ -197,19 +202,23 @@ class KernelConvFn(torch.autograd.Function):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
                     C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
 
+                    if (grad_F is not None) or (grad_R is not None):
+                        sub_Y = Y[tmp: tmp + 2 * l_filter + 1, ...]  # [m, batch, a, b]
+
                     if grad_F is not None:
-                        pass  # TODO
+                        sub_grad_F += torch.einsum(
+                            "zaui,ijk,kzab,zabuv,zab->zbvj",
+                            grad_K, C, sub_Y, sub_R[..., k], sub_norm_coef
+                        )  # [batch, b, mul_in, 2 * l_in + 1
                     if grad_Y is not None:
                         grad_Y[tmp: tmp + 2 * l_filter + 1, ...] += torch.einsum(
-                            "zui,ijk,zuv,z->kz",
-                            grad_K, C, sub_R[..., k], sub_norm_coef
-                        )
+                            "zaui,ijk,zabuv,zab,zbvj->kzab",
+                            grad_K, C, sub_R[..., k], sub_norm_coef, sub_F
+                        )  # [m, batch, a, b]
                     if grad_R is not None:
-                        sub_Y = Y[tmp: tmp + 2 * l_filter + 1, ...]  # [m, batch, a, b]
                         sub_grad_R[..., k] = torch.einsum(
                             "zaui,ijk,kzab,zab,zbvj->zabuv",
-                            grad_K, C, sub_Y, sub_norm_coef, F[..., s_in].view(batch, b, mul_in, -1)
-                        )  # TODO did this one??!!
-
+                            grad_K, C, sub_Y, sub_norm_coef, sub_F
+                        )  # [batch, a, b, mul_out, mul_in]
 
         return grad_F, grad_Y, grad_R, None, None, None, None, None
