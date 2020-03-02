@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn.kernel import Kernel, KernelFn, KernelAutoBackward
+from e3nn.kernel import Kernel, KernelFn
 from e3nn.radial import ConstantRadialModel
 
 
@@ -56,8 +56,8 @@ class TestCompare(unittest.TestCase):
             new_features = K(self.geometry)
 
             torch.manual_seed(0)
-            K = KernelAutoBackward(self.Rs_in, self.Rs_out, RadialModel=ConstantRadialModel, normalization=normalization)
-            check_new_features = K(self.geometry)
+            K2 = Kernel(self.Rs_in, self.Rs_out, RadialModel=ConstantRadialModel, normalization=normalization)
+            check_new_features = K2(self.geometry, custom_backward=True)
 
             assert all(torch.all(a == b) for a, b in zip(K.parameters(), K.parameters())), self.msg
             self.assertTrue(torch.allclose(new_features, check_new_features))

@@ -131,13 +131,16 @@ class KernelConvFn(torch.autograd.Function):
         saved_Y = saved_R = saved_F = None
         if F.requires_grad:
             ctx.F_shape = F.shape
-            saved_F = F
+            saved_R = R
+            saved_Y = Y
         if Y.requires_grad:
             ctx.Y_shape = Y.shape
             saved_R = R
+            saved_F = F
         if R.requires_grad:
             ctx.R_shape = R.shape
             saved_Y = Y
+            saved_F = F
         ctx.save_for_backward(saved_F, saved_Y, saved_R, norm_coef)
 
         return kernel_conv_fn_forward(
@@ -175,7 +178,7 @@ class KernelConvFn(torch.autograd.Function):
                     continue
 
                 n = mul_out * mul_in * len(l_filters)
-                if grad_Y is not None:
+                if (grad_Y is not None) or (grad_F is not None):
                     sub_R = R[:, :, :, begin_R: begin_R + n].contiguous().view(
                         batch, a, b, mul_out, mul_in, -1
                     )  # [batch, a, b, mul_out, mul_in, l_filter]
