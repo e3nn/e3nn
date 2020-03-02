@@ -34,7 +34,7 @@ class TestKernelConvFn(unittest.TestCase):
             F = torch.randn(batch, atoms, dim(Rs_in), requires_grad=rg_F)
             geo = torch.randn(batch, atoms, 3)
             r = geo.unsqueeze(1) - geo.unsqueeze(2)
-            radii = r.norm(batch, dim=1)  # [batch, a, b]
+            radii = r.norm(batch, dim=-1)  # [batch, a, b]
             Y = KC.sh(KC.set_of_l_filters, r)  # [l_filter * m_filter, batch, a, b]
             Y = Y.clone().detach().requires_grad_(rg_Y)
             R = torch.randn(
