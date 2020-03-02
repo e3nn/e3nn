@@ -31,12 +31,13 @@ class Convolution(torch.nn.Module):
 
 
 class ConvolutionEinsumFn(torch.autograd.Function):
-    """
-    Forward and backward written explicitly for the Convolution Function.
-    Educational rather than used in practice.
-    """
+    """Forward and backward written explicitly for the Convolution Function."""
     @staticmethod
     def forward(ctx, k, features):
+        """
+        :param k:        tensor [batch, out_point, in_point, l_out * mul_out * m_out, l_in * mul_in * m_in]
+        :param features: tensor [batch, in_point, l_in * mul_in * m_in]
+        """
         ctx.save_for_backward(k, features)
         return torch.einsum("zabij,zbj->zai", k, features)  # [batch, point, channel]
 
