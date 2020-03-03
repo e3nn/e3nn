@@ -187,6 +187,10 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_fi
 
 
 class KernelFn(torch.autograd.Function):
+    """
+    The math is presented here:
+    https://slides.com/mariogeiger/backward/
+    """
     @staticmethod
     def forward(ctx, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
         f"""{kernel_fn_forward.__doc__}"""
