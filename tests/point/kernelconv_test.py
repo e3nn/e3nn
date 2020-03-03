@@ -14,10 +14,15 @@ from e3nn.rs import dim
 
 class TestKernelConvFn(unittest.TestCase):
     def test1(self):
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+
         torch.set_default_dtype(torch.float64)
         Rs_in = [(1, 0), (1, 1), (2, 0), (1, 2)]
         Rs_out = [(2, 0), (1, 1), (1, 2), (3, 0)]
-        KC = KernelConv(Rs_in, Rs_out, ConstantRadialModel)
+        KC = KernelConv(Rs_in, Rs_out, ConstantRadialModel).to(device)
 
         n_path = 0
         for mul_out, l_out, p_out in KC.Rs_out:
@@ -25,23 +30,23 @@ class TestKernelConvFn(unittest.TestCase):
                 l_filters = KC.get_l_filters(l_in, p_in, l_out, p_out)
                 n_path += mul_out * mul_in * len(l_filters)
 
-        batch = 10
-        atoms = 12
+        batch = 2
+        atoms = 3
 
         true_false = [False, True]
         options = set(product(true_false, repeat=3)) - {(False, False, False)}
         for rg_F, rg_Y, rg_R in options:
-            F = torch.randn(batch, atoms, dim(Rs_in), requires_grad=rg_F)
+            F = torch.randn(batch, atoms, dim(Rs_in), requires_grad=rg_F).to(device)
             geo = torch.randn(batch, atoms, 3)
-            r = geo.unsqueeze(1) - geo.unsqueeze(2)
+            r = (geo.unsqueeze(1) - geo.unsqueeze(2)).to(device)
             radii = r.norm(batch, dim=-1)  # [batch, a, b]
             Y = KC.sh(KC.set_of_l_filters, r)  # [l_filter * m_filter, batch, a, b]
-            Y = Y.clone().detach().requires_grad_(rg_Y)
+            Y = Y.clone().detach().requires_grad_(rg_Y).to(device)
             R = torch.randn(
                 batch, atoms, atoms, n_path, requires_grad=rg_R
-            )  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
+            ).to(device)  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
             norm_coef = KC.norm_coef
-            norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
+            norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)].to(device)  # [l_out, l_in, batch, a, b]
 
             inputs = (
                 F, Y, R, norm_coef, KC.Rs_in, KC.Rs_out, KC.get_l_filters, KC.set_of_l_filters
