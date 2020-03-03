@@ -19,14 +19,14 @@ class KernelConv(Kernel):
         """
         super(KernelConv, self).__init__(Rs_in, Rs_out, RadialModel, get_l_filters, sh, normalization)
 
-    def forward(self, features, difference_geometry, mask, y=None, radii=None, custom_backward=False):
+    def forward(self, features, difference_geometry, mask, y=None, radii=None, custom_backward=True):
         """
         :param features: tensor [batch, b, l_in * mul_in * m_in]
         :param difference_geometry: tensor [batch, a, b, xyz]
         :param mask:     tensor [batch, a] (In order to zero contributions from padded atoms.)
         :param y:        Optional precomputed spherical harmonics.
         :param radii:    Optional precomputed normed geometry.
-        :param custom_backward: call KernelConvFn rather than using automatic differentiation
+        :param custom_backward: call KernelConvFn rather than using automatic differentiation, (default True)
         :return:         tensor [batch, a, l_out * mul_out * m_out]
         """
         batch, a, b, xyz = difference_geometry.size()
