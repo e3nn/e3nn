@@ -82,7 +82,7 @@ class TestKernelConv(unittest.TestCase):
         KC = KernelConv(self.Rs_in, self.Rs_out, RadialModel=ConstantRadialModel, normalization=normalization)
         return K, C, KC
 
-    def insure_parameters_same(self, conv, kernel_conv):
+    def ensure_parameters_same(self, conv, kernel_conv):
         assert all(torch.all(a == b) for a, b in zip(conv.kernel.parameters(), kernel_conv.parameters())), self.msg
 
     def test_compare_forward(self):
@@ -91,7 +91,7 @@ class TestKernelConv(unittest.TestCase):
             new_features = C(self.features, self.geometry) * self.mask.unsqueeze(dim=-1)
             check_new_features = KC(self.features, self.r, self.mask)
 
-            self.insure_parameters_same(C, KC)
+            self.ensure_parameters_same(C, KC)
             self.assertTrue(torch.allclose(new_features, check_new_features))
 
     def test_compare_backward(self):
@@ -104,7 +104,7 @@ class TestKernelConv(unittest.TestCase):
             new_features = C(self.features, self.geometry) * self.mask.unsqueeze(dim=-1)
             check_new_features = KC(check_features, check_r, check_mask)
 
-            self.insure_parameters_same(C, KC)
+            self.ensure_parameters_same(C, KC)
 
             # Capture ground truth gradient
             target = torch.rand_like(new_features)
@@ -127,7 +127,7 @@ class TestKernelConv(unittest.TestCase):
             new_features = C(self.features, self.geometry) * self.mask.unsqueeze(dim=-1)
             check_new_features = KC(check_features, check_r, check_mask, custom_backward=True)
 
-            self.insure_parameters_same(C, KC)
+            self.ensure_parameters_same(C, KC)
 
             # Capture ground truth gradient
             target = torch.rand_like(new_features)
