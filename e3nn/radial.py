@@ -82,6 +82,12 @@ def FiniteElementFCModel(out_dim, position, basis, h, L, act):
 
 
 def CosineBasisModel(out_dim, max_radius, number_of_basis, h, L, act):
+    """ The tex for the math reads
+    \begin{cases}
+        cos^2 (\gamma (d_{ab} - \mu_{k}) \frac{\pi}{2}) & 1 \geq \gamma (d_{ab} - \mu_{k}) \geq -1 \\
+        0 & otherwise
+    \end{cases}
+    """
     radii = torch.linspace(0, max_radius, steps=number_of_basis)
     step = radii[1] - radii[0]
 
@@ -91,6 +97,7 @@ def CosineBasisModel(out_dim, max_radius, number_of_basis, h, L, act):
 
 
 def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_radius=0.):
+    """exp(-x^2 /spacing)"""
     spacing = (max_radius - min_radius) / number_of_basis
     radii = torch.linspace(min_radius, max_radius, number_of_basis)
     gamma = 1. / spacing
@@ -98,3 +105,23 @@ def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_rad
     def basis(x):
         return torch.exp(-gamma * x ** 2)
     return FiniteElementFCModel(out_dim, radii, basis, h, L, act)
+
+
+class BesselRadialModel(torch.nn.Module):
+    """\sqrt{\frac{2}{c}} \frac{sin(\frac{n \pi}{c} d)}{d}
+    c = max_radius (cutoff), n = number_of_basis, d = distance (in R_{+})"""
+    def __init__(self, out_dim, max_radius, number_of_basis, h, L, act, epsilon=1e-8):
+        super().__init__()
+        n = torch.linspace(1, number_of_basis, number_of_basis).unsqueeze(0)
+        n_scaled = n * math.pi / max_radius
+        self.register_buffer('n_scaled', n_scaled)
+        self.factor = math.sqrt(2/max_radius)
+        self.max_radius = max_radius
+        self.epsilon = epsilon
+
+        self.f = FC(number_of_basis, out_dim, h=h, L=L, act=act)
+
+    def forward(self, x):
+        x = x.unsqueeze(-1)
+        x = self.factor * torch.sin(self.n_scaled * x) / (x + self.epsilon)
+        return self.f(x)
