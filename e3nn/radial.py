@@ -126,6 +126,7 @@ class BesselRadialModel(torch.nn.Module):
         self.f = FC(number_of_basis, out_dim, h=h, L=L, act=act)
 
     def basis(self, x):
+        assert x.ndim == 1
         x_within_cutoff = torch.logical_not((x < 0.0) + (x > self.max_radius)) * x
         x_within_cutoff = x_within_cutoff.unsqueeze(-1)
         return self.factor * torch.sin(self.n_scaled * x_within_cutoff) / (x_within_cutoff + self.epsilon)
