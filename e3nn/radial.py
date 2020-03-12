@@ -108,7 +108,11 @@ def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_rad
 
 
 class BesselRadialModel(torch.nn.Module):
-    """\sqrt{\frac{2}{c}} \frac{sin(\frac{n \pi}{c} d)}{d}
+    """The tex for the math reads
+    \begin{cases}
+        \sqrt{\frac{2}{c}} \frac{sin(\frac{n \pi}{c} d)}{d} & 0 \leq x \leq max_radius \\
+        0 & otherwise
+    \end{cases}
     c = max_radius (cutoff), n = number_of_basis, d = distance (in R_{+})"""
     def __init__(self, out_dim, max_radius, number_of_basis, h, L, act, epsilon=1e-8):
         super().__init__()
@@ -121,7 +125,11 @@ class BesselRadialModel(torch.nn.Module):
 
         self.f = FC(number_of_basis, out_dim, h=h, L=L, act=act)
 
+    def basis(self, x):
+        x_within_cutoff = torch.logical_not((x < 0.0) + (x > self.max_radius)) * x
+        x_within_cutoff = x_within_cutoff.unsqueeze(-1)
+        return self.factor * torch.sin(self.n_scaled * x_within_cutoff) / (x_within_cutoff + self.epsilon)
+
     def forward(self, x):
-        x = x.unsqueeze(-1)
-        x = self.factor * torch.sin(self.n_scaled * x) / (x + self.epsilon)
+        x = self.basis(x)
         return self.f(x)
