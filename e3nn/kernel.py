@@ -49,6 +49,7 @@ class Kernel(torch.nn.Module):
 
         n_path = 0
         set_of_l_filters = set()
+        list_of_l_filters = []
 
         for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
             # consider that we sum a bunch of [lambda_(m_out)] vectors
@@ -57,6 +58,8 @@ class Kernel(torch.nn.Module):
             for mul_in, l_in, p_in in self.Rs_in:
                 l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
                 num_summed_elements += mul_in * len(l_filters)
+                list_of_l_filters += [l for l in l_filters for i in range
+                                      (mul_in * mul_out)]
 
             for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
                 # normalization assuming that each terms are of order 1 and uncorrelated
@@ -74,6 +77,7 @@ class Kernel(torch.nn.Module):
 
         # create the radial model: R+ -> R^n_path
         # it contains the learned parameters
+        self.list_of_l_filters = list_of_l_filters
         self.R = RadialModel(n_path)
         self.set_of_l_filters = sorted(set_of_l_filters)
         self.register_buffer('norm_coef', norm_coef)
