@@ -8,7 +8,7 @@ from e3nn.point.operations import Convolution
 from e3nn.non_linearities.rescaled_act import relu, sigmoid
 from e3nn.kernel import Kernel
 from e3nn.radial import CosineBasisModel
-from e3nn.SO3 import rand_rot
+from e3nn.o3 import rand_rot
 
 
 def get_dataset():
