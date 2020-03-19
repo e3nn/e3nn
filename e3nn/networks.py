@@ -20,7 +20,7 @@ class GatedConvNetwork(torch.nn.Module):
         representations += [Rs_hidden] * layers
         representations += [Rs_out]
         
-        get_l_filters=partial(o3.selection_rule, lmax=lmax)
+        get_l_filters = partial(o3.selection_rule, lmax=lmax)
 
         RadialModel = partial(GaussianRadialModel, max_radius=max_radius,
                               number_of_basis=number_of_basis, h=100,
