@@ -110,7 +110,7 @@ class BatchNorm(nn.Module):
                 weight = self.weight[iw: iw + m]  # [mul]
                 iw += m
 
-                field_norm = field_norm * weight.view  # [mul]
+                field_norm = field_norm * weight  # [mul]
 
             field = field * field_norm.view(m, 1)  # [batch, sample, mul, repr]
 
