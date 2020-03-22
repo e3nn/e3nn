@@ -55,18 +55,21 @@ features = conv(features, geometry)
 [![DOI](https://zenodo.org/badge/116704656.svg)](https://zenodo.org/badge/latestdoi/116704656)
 
 ```
-@misc{mario_geiger_2019_3348277,
+@software{mario_geiger_2020_3723557,
   author       = {Mario Geiger and
                   Tess Smidt and
+                  Benjamin K. Miller and
                   Wouter Boomsma and
+                  Kostiantyn Lapchevskyi and
                   Maurice Weiler and
                   Michał Tyszkiewicz and
-                  Jes Frellsen and
-                  Benjamin K. Miller},
-  title        = {mariogeiger/e3nn: Point cloud support},
-  month        = jul,
-  year         = 2019,
-  doi          = {10.5281/zenodo.3348277},
-  url          = {https://doi.org/10.5281/zenodo.3348277}
+                  Jes Frellsen},
+  title        = {github.com/e3nn/e3nn},
+  month        = mar,
+  year         = 2020,
+  publisher    = {Zenodo},
+  version      = {v0.3-alpha},
+  doi          = {10.5281/zenodo.3723557},
+  url          = {https://doi.org/10.5281/zenodo.3723557}
 }
 ```
