@@ -52,10 +52,10 @@ features = conv(features, geometry)
 3. `pip install git+https://github.com/e3nn/e3nn`
 
 ## Citing
-[![DOI](https://zenodo.org/badge/116704656.svg)](https://zenodo.org/badge/latestdoi/116704656)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
 
 ```
-@software{mario_geiger_2020_3723557,
+@software{e3nn_2020_3723557,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Benjamin K. Miller and
