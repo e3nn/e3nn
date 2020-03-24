@@ -6,16 +6,36 @@ from e3nn.batchnorm import BatchNorm
 
 class Tests(unittest.TestCase):
     def test_that_it_runs(self):
+        torch.set_default_dtype(torch.float64)
+
+        batch, n = 20, 20
         Rs = [(3, 1), (4, 3)]
-        m = BatchNorm(Rs)
 
-        m.to(dtype=torch.float64)
-        x = torch.randn(10, sum(mul * d for mul, d in Rs), dtype=torch.float64)
-        m(x)
+        m = BatchNorm(Rs, normalization='norm')
 
-        m.to(dtype=torch.float32)
-        x = torch.randn(10, sum(mul * d for mul, d in Rs), dtype=torch.float32)
-        m(x)
+        x = torch.randn(batch, n, sum(mul * d for mul, d in Rs)).mul(5.0).add(10.0)
+        x = m(x)
+
+        a = x[..., :3]  # [batch, space, mul]
+        assert a.mean([0, 1]).abs().max() < 1e-10
+        assert a.pow(2).mean([0, 1]).sub(1).abs().max() < 1e-5
+
+        a = x[..., 3:].reshape(batch, n, 4, 3)  # [batch, space, mul, repr]
+        assert a.pow(2).sum(3).mean([0, 1]).sub(1).abs().max() < 1e-5
+
+        #
+
+        m = BatchNorm(Rs, normalization='component')
+
+        x = torch.randn(batch, n, sum(mul * d for mul, d in Rs)).mul(5.0).add(10.0)
+        x = m(x)
+
+        a = x[..., :3]  # [batch, space, mul]
+        assert a.mean([0, 1]).abs().max() < 1e-10
+        assert a.pow(2).mean([0, 1]).sub(1).abs().max() < 1e-5
+
+        a = x[..., 3:].reshape(batch, n, 4, 3)  # [batch, space, mul, repr]
+        assert a.pow(2).mean(3).mean([0, 1]).sub(1).abs().max() < 1e-5
 
 
 if __name__ == '__main__':
