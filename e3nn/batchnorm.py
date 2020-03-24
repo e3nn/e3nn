@@ -1,10 +1,10 @@
-# pylint: disable=no-member, arguments-differ, missing-docstring, invalid-name
+# pylint: disable=no-member, arguments-differ, missing-docstring, invalid-name, line-too-long
 import torch
 import torch.nn as nn
 
 
 class BatchNorm(nn.Module):
-    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean'):
+    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean', normalization='norm'):
         '''
         Batch normalization layer for orthonormal representations
         It normalizes by the norm of the representations.
@@ -39,7 +39,13 @@ class BatchNorm(nn.Module):
             self.register_parameter('weight', None)
             self.register_parameter('bias', None)
 
+        assert isinstance(reduce, str), "reduce should be passed as a string value"
+        assert reduce in ['mean', 'max'], "reduce needs to be 'mean' or 'max'"
         self.reduce = reduce
+
+        assert isinstance(normalization, str), "normalization should be passed as a string value"
+        assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+        self.normalization = normalization
 
     def __repr__(self):
         return "{} (Rs={}, eps={}, momentum={})".format(
@@ -90,7 +96,13 @@ class BatchNorm(nn.Module):
                 field = field - field_mean.view(m, 1)
 
             if self.training:
-                field_norm = field.pow(2).sum(3)  # [batch, sample, mul]
+                if self.normalization == 'norm':
+                    field_norm = field.pow(2).sum(3)  # [batch, sample, mul]
+                elif self.normalization == 'component':
+                    field_norm = field.pow(2).mean(3)  # [batch, sample, mul]
+                else:
+                    raise ValueError("Invalid normalization option {}".format(self.normalization))
+
                 if self.reduce == 'mean':
                     field_norm = field_norm.mean(1)  # [batch, mul]
                 elif self.reduce == 'max':
