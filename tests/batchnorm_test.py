@@ -5,7 +5,7 @@ from e3nn.batchnorm import BatchNorm
 
 
 class Tests(unittest.TestCase):
-    def test_that_it_runs(self):
+    def test_normalization(self):
         torch.set_default_dtype(torch.float64)
 
         batch, n = 20, 20
