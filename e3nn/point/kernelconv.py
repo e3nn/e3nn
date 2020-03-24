@@ -1,3 +1,4 @@
+# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member, pointless-statement
 import torch
 
 import e3nn.o3 as o3
@@ -6,18 +7,18 @@ from e3nn.kernel import Kernel
 
 
 class KernelConv(Kernel):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
-        """
-        :param Rs_in: list of triplet (multiplicity, representation order, parity)
-        :param Rs_out: list of triplet (multiplicity, representation order, parity)
-        :param RadialModel: Class(d), trainable model: R -> R^d
-        :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
-        :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
-        :param normalization: either 'norm' or 'component'
-        representation order = nonnegative integer
-        parity = 0 (no parity), 1 (even), -1 (odd)
-        """
-        super(KernelConv, self).__init__(Rs_in, Rs_out, RadialModel, get_l_filters, sh, normalization)
+    # def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    #     """
+    #     :param Rs_in: list of triplet (multiplicity, representation order, parity)
+    #     :param Rs_out: list of triplet (multiplicity, representation order, parity)
+    #     :param RadialModel: Class(d), trainable model: R -> R^d
+    #     :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
+    #     :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
+    #     :param normalization: either 'norm' or 'component'
+    #     representation order = nonnegative integer
+    #     parity = 0 (no parity), 1 (even), -1 (odd)
+    #     """
+    #     super(KernelConv, self).__init__(Rs_in, Rs_out, RadialModel, get_l_filters, sh, normalization)
 
     def forward(self, features, difference_geometry, mask, y=None, radii=None, custom_backward=True):
         """
@@ -29,7 +30,7 @@ class KernelConv(Kernel):
         :param custom_backward: call KernelConvFn rather than using automatic differentiation, (default True)
         :return:         tensor [batch, a, l_out * mul_out * m_out]
         """
-        batch, a, b, xyz = difference_geometry.size()
+        _batch, _a, _b, xyz = difference_geometry.size()
         assert xyz == 3
 
         # precompute all needed spherical harmonics
@@ -68,7 +69,6 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set
     :return: tensor [batch, a, l_out * mul_out * m_out, l_in * mul_in * m_in]
     """
     batch, a, b = Y.shape[1:]
-    n_in = rs.dim(Rs_in)
     n_out = rs.dim(Rs_out)
 
     kernel_conv = Y.new_zeros(batch, a, n_out)
@@ -111,7 +111,7 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set
                     C, sub_Y, sub_R[..., k], sub_norm_coef, F[..., s_in].view(batch, b, mul_in, -1)
                 )  # [batch, a, mul_out, m_out]
 
-            if K is not 0:
+            if not isinstance(K, int):
                 kernel_conv[:, :, s_out] += K.view(batch, a, -1)
 
     return kernel_conv
