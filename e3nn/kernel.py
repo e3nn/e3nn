@@ -1,4 +1,4 @@
-# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member
+# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member, pointless-statement
 import math
 
 import torch
@@ -185,7 +185,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_fi
                 # note: The multiplication with `sub_R` could also be done outside of the for loop
                 K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
 
-            if K is not 0:
+            if not isinstance(K, int):
                 kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
     return kernel
 
