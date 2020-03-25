@@ -55,7 +55,7 @@ class GatedConvNetwork(torch.nn.Module):
         output = input
         _, N, _ = geometry.shape
 
-        if feature_product:
+        if self.feature_product:
             for tp, lin, conv, act in self.layers[:-1]:
                 output = tp(output)
                 output = lin(output)
