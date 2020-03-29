@@ -47,13 +47,13 @@ class Kernel(torch.nn.Module):
 
         # Clebsch-Gordan for filter, input, output
         # Rs_filter contains all degrees of freedom and L's for filters
-        # paths contains [l_in, l_out, l_filter for each filter channel]
-        # We reverse order of Rs_in and Rs_out so paths are given in order for
-        # output multiplicity
+        # Because we give Rs_out and then Rs_in
+        # paths contains [l_out, l_in, l_filter for each filter channel]
         Rs_filter, filter_clebsch_gordan, paths = rs.tensor_product(
             Rs_out, Rs_in, get_l_output=get_l_filters, paths=True)
 
         self.n_path = len(paths)
+        num_summed_list = rs.num_summed_elements(paths)
 
         # Helper matrix for spherical harmonics
         Rs_filter_sorted, sort_mix = rs.sort(Rs_filter)
@@ -67,22 +67,6 @@ class Kernel(torch.nn.Module):
 
         # Write normalization based on paths #
         norm_coef = torch.zeros((len(self.Rs_out), len(self.Rs_in), 2))
-
-        def num_summed_elements(paths):
-            num_summed_list = []
-            num, cur = 0, None
-            for index, (one, two, three) in enumerate(paths):
-                if one != cur:
-                    if index != 0:
-                        num_summed_list.append(num)
-                    num, cur = 0, one
-                else:
-                    num += 1
-            if cur is not None:
-                num_summed_list.append(num)
-            return num_summed_list
-        num_summed_list = num_summed_elements(paths)
-
         for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
             # consider that we sum a bunch of [lambda_(m_out)] vectors
             # we need to count how many of them we sum in order to normalize the network
@@ -102,7 +86,7 @@ class Kernel(torch.nn.Module):
         # Check l_filters and rep_mix have same dim
         assert sum([2 * L + 1 for L in self.set_of_l_filters]) == irrep_mix.shape[-1]
 
-        # Register mapping matrix buffers
+        # Register mapping matrix buffers and normalization coefficients
         self.register_buffer('filter_clebsch_gordan', filter_clebsch_gordan)
         self.register_buffer('ylm_mapping_matrix', ylm_mix)
         self.register_buffer('radial_mapping_matrix', rf_mix)

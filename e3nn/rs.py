@@ -203,6 +203,21 @@ def format_Rs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
+def num_summed_elements(paths):
+    num_summed_list = []
+    num, cur = 0, None
+    for index, (one, two, three) in enumerate(paths):
+        if one != cur:
+            if index != 0:
+                num_summed_list.append(num)
+            num, cur = 0, one
+        else:
+            num += 1
+    if cur is not None:
+        num_summed_list.append(num)
+    return num_summed_list
+
+
 def map_tuple_to_Rs(Rs):
     pass
     Rs = convention(Rs)
