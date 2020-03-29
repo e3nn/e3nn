@@ -203,6 +203,21 @@ def format_Rs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
+def map_tuple_to_Rs(Rs):
+    pass
+    Rs = convention(Rs)
+    mapping_matrix = torch.zeros(dim(Rs), len(Rs))
+    start_tuple = 0
+    start_rep = 0
+    for i, (mult, L, _) in enumerate(Rs):
+        for _ in range(mult):
+            tuple_index = i 
+            rep_slice = slice(start_rep, start_rep + 2 * L + 1)
+            mapping_matrix[rep_slice, tuple_index] = 1.
+            start_rep += 2 * L + 1
+    return mapping_matrix  # [dim(Rs), irrep_dim(Rs)]
+
+
 def map_irrep_to_Rs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])

@@ -2,11 +2,12 @@
 import math
 import torch
 
-import e3nn.SO3 as SO3
-
+import e3nn.o3 as o3
+import e3nn.rs as rs
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=SO3.selection_rule, sh=SO3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel,
+                 get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
         '''
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -19,8 +20,8 @@ class Kernel(torch.nn.Module):
         '''
         super().__init__()
 
-        self.Rs_in = SO3.simplifyRs(Rs_in)
-        self.Rs_out = SO3.simplifyRs(Rs_out)
+        self.Rs_in = rs.simplify(Rs_in)
+        self.Rs_out = rs.simplify(Rs_out)
 
         def filters_with_parity(l_in, p_in, l_out, p_out):
             nonlocal get_l_filters
@@ -47,27 +48,52 @@ class Kernel(torch.nn.Module):
         # Clebsch-Gordan for filter, input, output
         # Rs_filter contains all degrees of freedom and L's for filters
         # paths contains [l_in, l_out, l_filter for each filter channel]
-        Rs_filter, filter_clebsch_gordan, paths = SO3.tensor_productRs(Rs_in,
-                                                                       Rs_out,
-                                                                       get_l_output=get_l_filters,
-                                                                       paths=True)
+        # We reverse order of Rs_in and Rs_out so paths are given in order for
+        # output multiplicity
+        Rs_filter, filter_clebsch_gordan, paths = rs.tensor_product(
+            Rs_out, Rs_in, get_l_output=get_l_filters, paths=True)
 
         self.n_path = len(paths)
 
         # Helper matrix for spherical harmonics
-        Rs_filter_sorted, sort_mix = SO3.sortRs(Rs_filter)
-        Rs_filter_simplify = SO3.simplifyRs(Rs_filter_sorted)
-        irrep_mix = SO3.map_irrep_to_Rs(Rs_filter_simplify)
+        Rs_filter_sorted, sort_mix = rs.sort(Rs_filter)
+        Rs_filter_simplify = rs.simplify(Rs_filter_sorted)
+        irrep_mix = rs.map_irrep_to_Rs(Rs_filter_simplify)
         # Contract sort_mix with rep_mix
         ylm_mix = torch.einsum('ij,il->jl', sort_mix, irrep_mix) 
         
-
         # Create and sort mix matrix for radial functions
-        rf_mix = SO3.map_mul_to_Rs(Rs_filter)
+        rf_mix = rs.map_mul_to_Rs(Rs_filter)
 
-        ###########################################
-        #TODO: Write normalization based on paths #
-        ###########################################
+        # Write normalization based on paths #
+        norm_coef = torch.zeros((len(self.Rs_out), len(self.Rs_in), 2))
+
+        def num_summed_elements(paths):
+            num_summed_list = []
+            num, cur = 0, None
+            for index, (one, two, three) in enumerate(paths):
+                if one != cur:
+                    if index != 0:
+                        num_summed_list.append(num)
+                    num, cur = 0, one
+                else:
+                    num += 1
+            if cur is not None:
+                num_summed_list.append(num)
+            return num_summed_list
+        num_summed_list = num_summed_elements(paths)
+
+        for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
+            # consider that we sum a bunch of [lambda_(m_out)] vectors
+            # we need to count how many of them we sum in order to normalize the network
+            for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
+                # normalization assuming that each terms are of order 1 and uncorrelated
+                norm_coef[i, j, 0] = lm_normalization(l_out, l_in) / math.sqrt(num_summed_list[i])
+                norm_coef[i, j, 1] = lm_normalization(l_out, l_in) / math.sqrt(mul_in)
+        full_norm_coef = torch.einsum('nmx,in,jm->ijx',
+                                      norm_coef,
+                                      rs.map_tuple_to_Rs(self.Rs_out),
+                                      rs.map_tuple_to_Rs(self.Rs_in))
 
         # Create the radial model: R+ -> R^n_path
         # It contains the learned parameters
@@ -80,13 +106,13 @@ class Kernel(torch.nn.Module):
         self.register_buffer('filter_clebsch_gordan', filter_clebsch_gordan)
         self.register_buffer('ylm_mapping_matrix', ylm_mix)
         self.register_buffer('radial_mapping_matrix', rf_mix)
-        #self.register_buffer('norm_coef', norm_coef)
+        self.register_buffer('norm_coef', full_norm_coef)
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
             name=self.__class__.__name__,
-            Rs_in=SO3.formatRs(self.Rs_in),
-            Rs_out=SO3.formatRs(self.Rs_out),
+            Rs_in=rs.format(self.Rs_in),
+            Rs_out=rs.format(self.Rs_out),
         )
 
     def forward(self, r):
@@ -113,6 +139,6 @@ class Kernel(torch.nn.Module):
 
         R = torch.einsum('ij,zj->zi', rf_mix, R)
         Y = torch.einsum('ij,jz->zi', ylm_mix, Y)
-        #TODO: Add norms
-        kernel = torch.einsum('kij,zk,zk->zij', cg, R, Y)
+        norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]
+        kernel = torch.einsum('kij,zk,zk,ijz->zij', cg, R, Y, norm_coef)
         return kernel.view(*size, kernel.shape[1], kernel.shape[2])
