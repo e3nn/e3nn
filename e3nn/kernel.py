@@ -79,6 +79,7 @@ class Kernel(torch.nn.Module):
         # it contains the learned parameters
         self.list_of_l_filters = list_of_l_filters
         self.R = RadialModel(n_path)
+        self.weight = torch.nn.Parameter(torch.randn(n_path))
         self.set_of_l_filters = sorted(set_of_l_filters)
         self.register_buffer('norm_coef', norm_coef)
 
@@ -125,6 +126,7 @@ class Kernel(torch.nn.Module):
         # note: for the normalization we assume that the variance of R[i] is one
         radii = r.norm(2, dim=1)  # [batch]
         R = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
+        R[radii == 0] = self.weight
 
         norm_coef = getattr(self, 'norm_coef')
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
