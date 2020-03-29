@@ -57,7 +57,6 @@ class Kernel(torch.nn.Module):
 
         ## NORAMALIZATION
         num_summed_list = rs.num_summed_elements(paths)
-        print(num_summed_list)
         # Write normalization based on paths #
         norm_coef = torch.zeros((len(self.Rs_out), len(self.Rs_in), 2))
         for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
@@ -67,7 +66,6 @@ class Kernel(torch.nn.Module):
                 # normalization assuming that each terms are of order 1 and uncorrelated
                 norm_coef[i, j, 0] = lm_normalization(l_out, l_in) / math.sqrt(num_summed_list[i] / mul_out)
                 norm_coef[i, j, 1] = lm_normalization(l_out, l_in) / math.sqrt(mul_in)
-        print(norm_coef)
         full_norm_coef = torch.einsum('nmx,in,jm->ijx',
                                       norm_coef,
                                       rs.map_tuple_to_Rs(self.Rs_out),
