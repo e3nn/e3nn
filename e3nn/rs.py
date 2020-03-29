@@ -211,8 +211,7 @@ def num_summed_elements(paths):
             if index != 0:
                 num_summed_list.append(num)
             num, cur = 0, one
-        else:
-            num += 1
+        num += 1
     if cur is not None:
         num_summed_list.append(num)
     return num_summed_list
