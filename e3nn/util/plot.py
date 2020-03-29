@@ -1,18 +1,16 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, missing-docstring
 import math
 
-import matplotlib.pyplot as plt
 import torch
-from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import # noqa
 
-from e3nn.SO3 import angles_to_xyz, spherical_harmonics_coeff_to_sphere
+from e3nn import o3
 
 
 def spherical_surface(n):
     beta = torch.linspace(1e-16, math.pi - 1e-16, 2 * n)
     alpha = torch.linspace(0, 2 * math.pi, 2 * n)
     beta_, alpha_ = torch.meshgrid(beta, alpha)
-    x, y, z = angles_to_xyz(beta_, alpha_)
+    x, y, z = o3.angles_to_xyz(beta_, alpha_)
 
     beta = 0.5 * (beta[1:] + beta[:-1])
     alpha = 0.5 * (alpha[1:] + alpha[:-1])
@@ -23,7 +21,7 @@ def spherical_surface(n):
 def plot_sh_signal(coeff, n=20):
     from functools import partial
 
-    fun = partial(spherical_harmonics_coeff_to_sphere, coeff)
+    fun = partial(o3.spherical_harmonics_coeff_to_sphere, coeff)
     plot_sphere(fun, n)
 
 
@@ -32,6 +30,8 @@ def plot_sphere(fun, n=20):
     :param fun: function of (alpha, beta)
     :param n: precision
     """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import # noqa
     x, y, z, a, b = spherical_surface(n)
 
     f = fun(a, b)
@@ -65,7 +65,7 @@ def plotly_sphere(fun, n=240, radius=False, center=None, relu=False):
     f = fun(a, b)
     f = f.relu() if relu else f
 
-    x, y, z = angles_to_xyz(a, b)
+    x, y, z = o3.angles_to_xyz(a, b)
 
     if radius:
         r = f.abs()

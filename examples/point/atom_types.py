@@ -3,7 +3,7 @@ from functools import partial
 
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 from e3nn.non_linearities import GatedBlock
 from e3nn.non_linearities.rescaled_act import sigmoid, swish
 from e3nn.kernel import Kernel
@@ -47,12 +47,12 @@ mix2 = Mixer(C, [Rs_in1, Rs_in2], act2.Rs_in)
 
 # First type of atom (eg. Hydrogen)
 # There is 2 atoms with their features and positions
-fea1 = torch.randn(10, 2, SO3.dimRs(Rs_in1))
+fea1 = torch.randn(10, 2, rs.dim(Rs_in1))
 geo1 = torch.randn(10, 2, 3)
 
 # Second type of atom (eg. Oxygen)
 # There is 3 atoms with their features and positions
-fea2 = torch.randn(10, 3, SO3.dimRs(Rs_in2))
+fea2 = torch.randn(10, 3, rs.dim(Rs_in2))
 geo2 = torch.randn(10, 3, 3)
 
 # The layer is splited in two parts for the two output types of atoms

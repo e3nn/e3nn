@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 from e3nn.image.convolution import Convolution
 
 
@@ -48,8 +48,8 @@ class Tests(unittest.TestCase):
 
         conv = f(Rs_in, Rs_out, size)
 
-        n_in = SO3.dimRs(Rs_in)
-        n_out = SO3.dimRs(Rs_out)
+        n_in = rs.dim(Rs_in)
+        n_out = rs.dim(Rs_out)
 
         x = torch.randn(batch, n_in, input_size, input_size, input_size)
         y = conv(x)
@@ -65,4 +65,5 @@ class Tests(unittest.TestCase):
         self._test_normalization(Convolution)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()

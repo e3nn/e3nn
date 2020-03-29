@@ -1,14 +1,14 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 
 
 class Norm(torch.nn.Module):
     def __init__(self, Rs, normalization='norm'):
         super().__init__()
 
-        Rs = SO3.simplifyRs(Rs)
+        Rs = rs.simplify(Rs)
         n = sum(mul for mul, _, _ in Rs)
         self.Rs_in = Rs
         self.Rs_out = [(n, 0, +1)]

@@ -10,8 +10,7 @@ from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
 from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
 from e3nn.radial import ConstantRadialModel
-from e3nn.SO3 import (clebsch_gordan, direct_sum, irr_repr, rot,
-                      spherical_harmonics_xyz)
+from e3nn import o3
 from e3nn.util.default_dtype import torch_default_dtype
 
 
@@ -24,17 +23,17 @@ class Tests(unittest.TestCase):
 
             for l_f in range(abs(l_in - l_out), l_in + l_out + 1):
                 r = torch.randn(100, 3)
-                Q = clebsch_gordan(l_out, l_in, l_f)
+                Q = o3.clebsch_gordan(l_out, l_in, l_f)
 
                 abc = torch.randn(3)
-                D_in = irr_repr(l_in, *abc)
-                D_out = irr_repr(l_out, *abc)
+                D_in = o3.irr_repr(l_in, *abc)
+                D_out = o3.irr_repr(l_out, *abc)
 
-                Y = spherical_harmonics_xyz(l_f, r @ rot(*abc).t())
+                Y = o3.spherical_harmonics_xyz(l_f, r @ o3.rot(*abc).t())
                 W = torch.einsum("ijk,kz->zij", (Q, Y))
                 W1 = torch.einsum("zij,jk->zik", (W, D_in))
 
-                Y = spherical_harmonics_xyz(l_f, r)
+                Y = o3.spherical_harmonics_xyz(l_f, r)
                 W = torch.einsum("ijk,kz->zij", (Q, Y))
                 W2 = torch.einsum("ij,zjk->zik", (D_out, W))
 
@@ -50,11 +49,11 @@ class Tests(unittest.TestCase):
             r = torch.randn(3)
 
             abc = torch.randn(3)
-            D_in = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
-            D_out = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
+            D_in = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
+            D_out = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
 
             W1 = D_out @ k(r)  # [i, j]
-            W2 = k(rot(*abc) @ r) @ D_in  # [i, j]
+            W2 = k(o3.rot(*abc) @ r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
 
     def test3(self):
@@ -69,9 +68,9 @@ class Tests(unittest.TestCase):
             conv = Convolution(K, Rs_in, act.Rs_in)
 
             abc = torch.randn(3)
-            rot_geo = rot(*abc)
-            D_in = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
-            D_out = direct_sum(*[irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
+            rot_geo = o3.rot(*abc)
+            D_in = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
+            D_out = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
 
             fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l in Rs_in))
             geo = torch.randn(1, 4, 3)
@@ -89,8 +88,8 @@ class Tests(unittest.TestCase):
             k = Kernel(Rs_in, Rs_out, ConstantRadialModel)
             r = torch.randn(3)
 
-            D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
+            D_in = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
+            D_out = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
 
             W1 = D_out @ k(r)  # [i, j]
             W2 = k(-r) @ D_in  # [i, j]
@@ -112,8 +111,8 @@ class Tests(unittest.TestCase):
             act = GatedBlockParity(*scalars, *gates, rs_nonscalars)
             conv = Convolution(K, Rs_in, act.Rs_in)
 
-            D_in = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in act.Rs_out for _ in range(mul)])
+            D_in = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
+            D_out = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in act.Rs_out for _ in range(mul)])
 
             fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
             geo = torch.randn(1, 4, 3)
@@ -139,9 +138,9 @@ class Tests(unittest.TestCase):
             conv = Convolution(K, Rs_in, act.Rs_in)
 
             abc = torch.randn(3)
-            rot_geo = -rot(*abc)
-            D_in = direct_sum(*[p * irr_repr(l, *abc) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = direct_sum(*[p * irr_repr(l, *abc) for mul, l, p in act.Rs_out for _ in range(mul)])
+            rot_geo = -o3.rot(*abc)
+            D_in = o3.direct_sum(*[p * o3.irr_repr(l, *abc) for mul, l, p in Rs_in for _ in range(mul)])
+            D_out = o3.direct_sum(*[p * o3.irr_repr(l, *abc) for mul, l, p in act.Rs_out for _ in range(mul)])
 
             fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
             geo = torch.randn(1, 4, 3)
@@ -151,4 +150,5 @@ class Tests(unittest.TestCase):
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()

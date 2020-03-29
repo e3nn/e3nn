@@ -39,7 +39,7 @@ features = conv(features, geometry)
 ## Hierarchy
 
 - `e3nn` contains the library
-  - `e3nn/SO3.py` defines all the needed mathematical functions
+  - `e3nn/o3.py` defines all the needed mathematical functions
   - `e3nn/image` contains voxels linear operations
   - `e3nn/point` contains points linear operations
   - `e3nn/non_linearities` non linearities operations
@@ -52,21 +52,24 @@ features = conv(features, geometry)
 3. `pip install git+https://github.com/e3nn/e3nn`
 
 ## Citing
-[![DOI](https://zenodo.org/badge/116704656.svg)](https://zenodo.org/badge/latestdoi/116704656)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
 
 ```
-@misc{mario_geiger_2019_3348277,
+@software{e3nn_2020_3723557,
   author       = {Mario Geiger and
                   Tess Smidt and
+                  Benjamin K. Miller and
                   Wouter Boomsma and
+                  Kostiantyn Lapchevskyi and
                   Maurice Weiler and
                   Michał Tyszkiewicz and
-                  Jes Frellsen and
-                  Benjamin K. Miller},
-  title        = {mariogeiger/e3nn: Point cloud support},
-  month        = jul,
-  year         = 2019,
-  doi          = {10.5281/zenodo.3348277},
-  url          = {https://doi.org/10.5281/zenodo.3348277}
+                  Jes Frellsen},
+  title        = {github.com/e3nn/e3nn},
+  month        = mar,
+  year         = 2020,
+  publisher    = {Zenodo},
+  version      = {v0.3-alpha},
+  doi          = {10.5281/zenodo.3723557},
+  url          = {https://doi.org/10.5281/zenodo.3723557}
 }
 ```

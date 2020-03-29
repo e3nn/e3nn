@@ -8,7 +8,7 @@ from e3nn.point.operations import Convolution
 from e3nn.non_linearities.rescaled_act import relu, sigmoid, tanh
 from e3nn.kernel import Kernel
 from e3nn.radial import CosineBasisModel
-from e3nn.SO3 import rand_rot, formatRs
+from e3nn import o3, rs
 
 
 def get_dataset():
@@ -24,7 +24,7 @@ def get_dataset():
     labels = torch.arange(len(tetris))
 
     # apply random rotation
-    tetris = torch.stack([torch.einsum("ij,nj->ni", (rand_rot(), x)) for x in tetris])
+    tetris = torch.stack([torch.einsum("ij,nj->ni", (o3.rand_rot(), x)) for x in tetris])
 
     return tetris, labels
 
@@ -52,25 +52,25 @@ class Network(torch.nn.Module):
         mul = 7
         layers = []
 
-        rs = [(1, 0, +1)]
+        Rs = [(1, 0, +1)]
         for i in range(3):
-            scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1), (mul, 0, -1)] if haspath(rs, l, p)]
+            scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1), (mul, 0, -1)] if haspath(Rs, l, p)]
             act_scalars = [(mul, relu if p == 1 else tanh) for mul, l, p in scalars]
 
-            nonscalars = [(mul, l, p) for mul, l, p in [(mul, 1, +1), (mul, 1, -1)] if haspath(rs, l, p)]
+            nonscalars = [(mul, l, p) for mul, l, p in [(mul, 1, +1), (mul, 1, -1)] if haspath(Rs, l, p)]
             gates = [(sum(mul for mul, l, p in nonscalars), 0, +1)]
             act_gates = [(-1, sigmoid)]
 
-            print("layer {}: from {} to {}".format(i, formatRs(rs), formatRs(scalars + nonscalars)))
+            print("layer {}: from {} to {}".format(i, rs.format_Rs(Rs), rs.format_Rs(scalars + nonscalars)))
 
             act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
-            conv = Convolution(K, rs, act.Rs_in)
+            conv = Convolution(K, Rs, act.Rs_in)
             block = torch.nn.ModuleList([conv, act])
             layers.append(block)
-            rs = act.Rs_out
+            Rs = act.Rs_out
 
         act = GatedBlockParity([(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)], [], [], [])
-        conv = Convolution(K, rs, act.Rs_in)
+        conv = Convolution(K, Rs, act.Rs_in)
         block = torch.nn.ModuleList([conv, act])
         layers.append(block)
 

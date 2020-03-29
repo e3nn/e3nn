@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn import SO3
+from e3nn import rs
 from e3nn.non_linearities.so3 import SO3Activation
 
 
@@ -13,13 +13,13 @@ class Tests(unittest.TestCase):
         torch.set_default_dtype(torch.float64)
 
         def test(Rs, ac):
-            x = torch.randn(99, SO3.dimRs(Rs))
+            x = torch.randn(99, rs.dim(Rs))
             a, b = torch.rand(2)
             c = 1
 
-            y1 = ac(x, dim=-1) @ SO3.rep(ac.Rs_out, a, b, c).T
-            y2 = ac(x @ SO3.rep(Rs, a, b, c).T, dim=-1)
-            y3 = ac(x @ SO3.rep(Rs, -c, -b, -a).T, dim=-1)
+            y1 = ac(x, dim=-1) @ rs.rep(ac.Rs_out, a, b, c).T
+            y2 = ac(x @ rs.rep(Rs, a, b, c).T, dim=-1)
+            y3 = ac(x @ rs.rep(Rs, -c, -b, -a).T, dim=-1)
             self.assertLess((y1 - y2).norm(), (y1 - y3).norm())
 
         L = 5
@@ -33,4 +33,5 @@ class Tests(unittest.TestCase):
                 test(Rs, ac)
 
 
-unittest.main()
+if __name__ == '__main__':
+    unittest.main()
