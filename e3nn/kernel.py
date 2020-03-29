@@ -126,6 +126,7 @@ class Kernel(torch.nn.Module):
         # note: for the normalization we assume that the variance of R[i] is one
         radii = r.norm(2, dim=1)  # [batch]
         R = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
+        R = R.clone()
         R[radii == 0] = self.weight
 
         norm_coef = getattr(self, 'norm_coef')

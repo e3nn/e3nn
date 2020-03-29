@@ -44,6 +44,8 @@ class KernelConv(Kernel):
         r = self.R(radii.flatten()).view(
             *radii.shape, -1
         )  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
+        r = r.clone()
+        r[radii == 0] = self.weight
 
         norm_coef = getattr(self, 'norm_coef')
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
