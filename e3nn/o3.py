@@ -497,7 +497,7 @@ def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None)
             device = 'cpu'
 
     if cached:
-        return _cached_clebsch_gordan(l1, l2, l3, dtype, device)
+        return _cached_clebsch_gordan(l1, l2, l3, dtype, device).clone()
     return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
 
 

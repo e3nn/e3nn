@@ -31,8 +31,7 @@ class TensorProduct(torch.nn.Module):
         features_2 = features_2.view(-1, n_2)
         assert size_1 == size_2
 
-        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1,
-                              features_2)
+        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
         return output.view(*size_1, -1)
 
 
@@ -61,8 +60,7 @@ class ElementwiseTensorProduct(torch.nn.Module):
         features_2 = features_2.view(-1, n_2)
         assert size_1 == size_2
 
-        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1,
-                              features_2)
+        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
         return output.view(*size_1, -1)
 
 
