@@ -17,7 +17,7 @@ class TensorProduct(torch.nn.Module):
         self.Rs_1 = rs.simplify(Rs_1)
         self.Rs_2 = rs.simplify(Rs_2)
 
-        Rs_out, mixing_matrix = rs.tensor_product(Rs_1, Rs_2, get_l_output=get_l_output)
+        Rs_out, mixing_matrix = rs.tensor_product_in_in(Rs_1, Rs_2, get_l_output=get_l_output)
         self.Rs_out = rs.simplify(Rs_out)
         self.register_buffer('mixing_matrix', mixing_matrix)
 

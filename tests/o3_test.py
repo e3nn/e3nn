@@ -174,33 +174,6 @@ class Tests(unittest.TestCase):
 
             self.assertLess((r1 - r2).abs().max(), 1e-10)
 
-    def test_reduce_tensor_product(self):
-        for Rs_i, Rs_j in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
-            with o3.torch_default_dtype(torch.float64):
-                Rs, Q = rs.tensor_product(Rs_i, Rs_j)
-
-                abc = torch.rand(3, dtype=torch.float64)
-
-                D_i = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_i for _ in range(mul)])
-                D_j = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_j for _ in range(mul)])
-                D = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l, _ in Rs for _ in range(mul)])
-
-                Q1 = torch.einsum("ijk,il->ljk", (Q, D))
-                Q2 = torch.einsum("li,mj,kij->klm", (D_i, D_j, Q))
-
-                d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                n = Q.size(0)
-                M = Q.view(n, n)
-                I = torch.eye(n, dtype=M.dtype)
-
-                d = ((M @ M.t()) - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                d = ((M.t() @ M) - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
     def test_conventionRs(self):
         Rs = [(1, 0)]
         Rs_out = rs.convention(Rs)
