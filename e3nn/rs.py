@@ -222,9 +222,8 @@ def map_tuple_to_Rs(Rs):
     mapping_matrix = torch.zeros(dim(Rs), len(Rs))
     start_tuple = 0
     start_rep = 0
-    for i, (mult, L, _) in enumerate(Rs):
+    for tuple_index, (mult, L, _) in enumerate(Rs):
         for _ in range(mult):
-            tuple_index = i 
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
             mapping_matrix[rep_slice, tuple_index] = 1.
             start_rep += 2 * L + 1
