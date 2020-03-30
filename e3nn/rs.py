@@ -299,7 +299,7 @@ def tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule, paths=False):
         path_list = []
     for mul_1, l_1, p_1 in Rs_1:
         for mul_2, l_2, p_2 in Rs_2:
-            for l in get_l_output(l_1, l_2):
+            for l in get_l_output(l_1, p_1, l_2, p_2):
                 if paths:
                     path_list.extend([[l_1, l_2, l]] * (mul_1 * mul_2))
                 Rs_out.append((mul_1 * mul_2, l, p_1 * p_2))
