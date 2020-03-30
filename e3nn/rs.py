@@ -218,7 +218,6 @@ def num_summed_elements(paths):
 
 
 def map_tuple_to_Rs(Rs):
-    pass
     Rs = convention(Rs)
     mapping_matrix = torch.zeros(dim(Rs), len(Rs))
     start_tuple = 0
