@@ -229,7 +229,7 @@ def map_tuple_to_Rs(Rs):
             rep_slice = slice(start_rep, start_rep + 2 * L + 1)
             mapping_matrix[rep_slice, tuple_index] = 1.
             start_rep += 2 * L + 1
-    return mapping_matrix  # [dim(Rs), irrep_dim(Rs)]
+    return mapping_matrix  # [dim(Rs), len(Rs)]
 
 
 def map_irrep_to_Rs(Rs):
