@@ -7,12 +7,12 @@ from e3nn import o3, rs
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
-        :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
+        :param get_l_filters: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         :param normalization: either 'norm' or 'component'
         representation order = nonnegative integer
@@ -22,11 +22,7 @@ class Kernel(torch.nn.Module):
         self.Rs_in = rs.simplify(Rs_in)
         self.Rs_out = rs.simplify(Rs_out)
 
-        def filters_with_parity(l_in, p_in, l_out, p_out):
-            nonlocal get_l_filters
-            return [l for l in get_l_filters(l_in, l_out) if p_out == 0 or p_in * (-1) ** l == p_out]
-
-        self.get_l_filters = filters_with_parity
+        self.get_l_filters = get_l_filters
         self.check_input_output()
         self.sh = sh
 
@@ -49,7 +45,6 @@ class Kernel(torch.nn.Module):
 
         n_path = 0
         set_of_l_filters = set()
-        list_of_l_filters = []
 
         for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
             # consider that we sum a bunch of [lambda_(m_out)] vectors
@@ -58,8 +53,6 @@ class Kernel(torch.nn.Module):
             for mul_in, l_in, p_in in self.Rs_in:
                 l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
                 num_summed_elements += mul_in * len(l_filters)
-                list_of_l_filters += [l for l in l_filters for i in range
-                                      (mul_in * mul_out)]
 
             for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
                 # normalization assuming that each terms are of order 1 and uncorrelated
@@ -68,6 +61,8 @@ class Kernel(torch.nn.Module):
 
                 l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
                 assert l_filters == sorted(set(l_filters)), "get_l_filters must return a sorted list of unique values"
+                if p_out != 0:
+                    assert all(p_in * (-1) ** l == p_out for l in l_filters), "get_l_filters must return l's compatible with SH parity"
 
                 # compute the number of degrees of freedom
                 n_path += mul_out * mul_in * len(l_filters)
@@ -77,7 +72,6 @@ class Kernel(torch.nn.Module):
 
         # create the radial model: R+ -> R^n_path
         # it contains the learned parameters
-        self.list_of_l_filters = list_of_l_filters
         self.R = RadialModel(n_path)
         self.weight = torch.nn.Parameter(torch.randn(n_path))
         self.set_of_l_filters = sorted(set_of_l_filters)

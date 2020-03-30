@@ -176,7 +176,7 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return dDda, dDdb, dDdc
 
 
-def selection_rule(l1, l2, lmax=None):
+def selection_rule(l1, _p1, l2, _p2, lmax=None):
     """
     selection rule
     :return: list from |l1-l2|... to l1+l2
@@ -187,6 +187,13 @@ def selection_rule(l1, l2, lmax=None):
         l_max = min(lmax, l1 + l2)
     return list(range(abs(l1 - l2), l_max + 1))
 
+
+def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
+    """
+    all possible spherical harmonics such that
+    Input * SH = Output
+    """
+    return [l for l, p in selection_rule(l_in, p_in, l_out, p_out, lmax) if p_out in [0, p_in * p]]
 
 ################################################################################
 # Spherical harmonics
