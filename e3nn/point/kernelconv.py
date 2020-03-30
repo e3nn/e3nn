@@ -47,8 +47,7 @@ class KernelConv(Kernel):
         r = r.clone()
         r[radii == 0] = self.weight
 
-        norm_coef = getattr(self, 'norm_coef')
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
+        norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
 
         if custom_backward:
             kernel_conv = KernelConvFn.apply(

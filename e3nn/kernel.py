@@ -129,8 +129,7 @@ class Kernel(torch.nn.Module):
         R = R.clone()
         R[radii == 0] = self.weight
 
-        norm_coef = getattr(self, 'norm_coef')
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
+        norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
         if custom_backward:
             kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
