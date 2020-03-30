@@ -33,8 +33,7 @@ class Linear(torch.nn.Module):
             # we need to count how many of them we sum in order to normalize the network
             for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
                 # normalization assuming that each terms are of order 1 and uncorrelated
-                if (l_out, p_out) == (l_in, p_in):
-                    norm_coef[i, j] = 1. / math.sqrt(num_summed_list[i] / mul_out)
+                norm_coef[i, j] = 1. / math.sqrt(num_summed_list[i] / mul_out)
 
         full_norm_coef = torch.einsum('nm,in,jm->ij',
                                       norm_coef,
