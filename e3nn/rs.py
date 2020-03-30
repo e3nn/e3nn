@@ -203,6 +203,33 @@ def format_Rs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
+def num_summed_elements(paths):
+    num_summed_list = []
+    num, cur = 0, None
+    for index, (one, two, three) in enumerate(paths):
+        if one != cur:
+            if index != 0:
+                num_summed_list.append(num)
+            num, cur = 0, one
+        num += 1
+    if cur is not None:
+        num_summed_list.append(num)
+    return num_summed_list
+
+
+def map_tuple_to_Rs(Rs):
+    Rs = convention(Rs)
+    mapping_matrix = torch.zeros(dim(Rs), len(Rs))
+    start_tuple = 0
+    start_rep = 0
+    for tuple_index, (mult, L, _) in enumerate(Rs):
+        for _ in range(mult):
+            rep_slice = slice(start_rep, start_rep + 2 * L + 1)
+            mapping_matrix[rep_slice, tuple_index] = 1.
+            start_rep += 2 * L + 1
+    return mapping_matrix  # [dim(Rs), len(Rs)]
+
+
 def map_irrep_to_Rs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
