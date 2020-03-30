@@ -27,11 +27,15 @@ class Linear(torch.nn.Module):
         )
 
         num_summed_list = rs.num_summed_elements(paths)
-        factors = [1. / math.sqrt(num_summed / mul_out)
-                   for num_summed, (mul_out, L, p) in zip(num_summed_list,
-                                                          self.Rs_out)]
-        norm_coef = torch.eye(len(Rs_out)) * torch.tensor(factors)
-        print(norm_coef)
+        norm_coef = torch.zeros((len(self.Rs_out), len(self.Rs_in)))
+        for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
+            # consider that we sum a bunch of [lambda_(m_out)] vectors
+            # we need to count how many of them we sum in order to normalize the network
+            for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
+                # normalization assuming that each terms are of order 1 and uncorrelated
+                if (l_out, p_out) == (l_in, p_in):
+                    norm_coef[i, j] = 1. / math.sqrt(num_summed_list[i] / mul_out)
+
         full_norm_coef = torch.einsum('nm,in,jm->ij',
                                       norm_coef,
                                       rs.map_tuple_to_Rs(self.Rs_out),
