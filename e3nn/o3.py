@@ -193,7 +193,7 @@ def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
     all possible spherical harmonics such that
     Input * SH = Output
     """
-    return [l for l, p in selection_rule(l_in, p_in, l_out, p_out, lmax) if p_out in [0, p_in * p]]
+    return [l for l in selection_rule(l_in, p_in, l_out, p_out, lmax) if p_out in [0, p_in * (-1) ** l]]
 
 ################################################################################
 # Spherical harmonics
