@@ -30,26 +30,31 @@ class Kernel(torch.nn.Module):
         assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
 
+        # Compute Clebsh-Gordan coefficients
         Rs_f, Q = rs.tensor_product_in_out(self.Rs_in, self.Rs_out, self.get_l_filters, normalization)  # [out, in, Y]
 
+        # Sort filters representation
+        Rs_f, perm = rs.sort(Rs_f)
+        Rs_f = rs.simplify(Rs_f)
+        Q = torch.einsum('ijk,lk->ijl', Q, perm)
+        del perm
+
+        # Get L's of the spherical harmonics
         self.set_of_l_filters = sorted({l for _mul, l, _p in Rs_f})
+        assert rs.irrep_dim(Rs_f) == sum(2 * l + 1 for l in self.set_of_l_filters)
 
-        mat_Y = Q.new_zeros(rs.dim(Rs_f), sum(2 * l + 1 for l in self.set_of_l_filters))  # [Rs_f, Y]
-        i = 0
-        for mul, l_Y, _p in Rs_f:
-            dim_Y = 2 * l_Y + 1
-            # Normalize the spherical harmonics
-            if normalization == 'norm':
-                x = math.sqrt(4 * math.pi) / math.sqrt(dim_Y)
-            if normalization == 'component':
-                x = math.sqrt(4 * math.pi)
-            j = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_Y)
+        # Normalize the spherical harmonics
+        if normalization == 'component':
+            diag = torch.ones(rs.irrep_dim(Rs_f))
+        if normalization == 'norm':
+            diag = torch.cat([torch.ones(2 * l + 1) / math.sqrt(2 * l + 1) for l in self.set_of_l_filters])
+        norm_Y = math.sqrt(4 * math.pi) * torch.diag(diag)  # [Y, Y]
 
-            for _ in range(mul):
-                mat_Y[i:i + dim_Y, j:j + dim_Y] = x * torch.eye(dim_Y)
-                i += dim_Y
+        # Matrix to dispatch the spherical harmonics
+        mat_Y = rs.map_irrep_to_Rs(Rs_f)  # [Rs_f, Y]
+        mat_Y = mat_Y @ norm_Y
 
-        # create the radial model: R+ -> R^n_path
+        # Create the radial model: R+ -> R^n_path
         n_path = rs.mul_dim(Rs_f)
         self.R = RadialModel(n_path)
         self.weight = torch.nn.Parameter(torch.randn(n_path))
