@@ -5,7 +5,6 @@ import torch
 
 from e3nn.kernel import Kernel, KernelFn
 from e3nn.radial import ConstantRadialModel
-from e3nn import rs, o3
 
 
 class Tests(unittest.TestCase):
@@ -34,20 +33,6 @@ class Tests(unittest.TestCase):
                 Y, R, norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.get_l_filters, kernel.set_of_l_filters
             )
             self.assertTrue(torch.autograd.gradcheck(KernelFn.apply, inputs))
-
-    def test_equiv(self):
-        torch.set_default_dtype(torch.float64)
-        Rs_in = [(5, 0), (15, 1), (5, 0), (10, 2)]
-        Rs_out = [(2, 0), (1, 1), (1, 2), (3, 0)]
-
-        ker = Kernel(Rs_in, Rs_out, ConstantRadialModel)
-        r = torch.randn(10, 3)
-
-        a = torch.randn(3)
-        y1 = torch.einsum('zij,jk->zik', ker(torch.einsum('ij,zj->zi', o3.rot(*a), r)), rs.rep(Rs_in, *a))
-        y2 = torch.einsum('ki,zij->zkj', rs.rep(Rs_out, *a), ker(r))
-
-        self.assertLess((y1 - y2).abs().max(), 1e-10)
 
 
 class TestCompare(unittest.TestCase):
