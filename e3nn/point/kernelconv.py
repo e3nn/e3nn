@@ -80,7 +80,7 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set
 
             # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
             n = mul_out * mul_in * len(l_filters)
-            sub_R = R[:, :, :, begin_R: begin_R + n].contiguous().view(
+            sub_R = R[:, :, :, begin_R: begin_R + n].reshape(
                 batch, a, b, mul_out, mul_in, -1
             )  # [batch, a, b, mul_out, mul_in, l_filter]
             begin_R += n
@@ -167,16 +167,16 @@ class KernelConvFn(torch.autograd.Function):
 
                 n = mul_out * mul_in * len(l_filters)
                 if (grad_Y is not None) or (grad_F is not None):
-                    sub_R = R[:, :, :, begin_R: begin_R + n].contiguous().view(
+                    sub_R = R[:, :, :, begin_R: begin_R + n].reshape(
                         batch, a, b, mul_out, mul_in, -1
                     )  # [batch, a, b, mul_out, mul_in, l_filter]
                 if grad_R is not None:
-                    sub_grad_R = grad_R[:, :, :, begin_R: begin_R + n].contiguous().view(
+                    sub_grad_R = grad_R[:, :, :, begin_R: begin_R + n].reshape(
                         batch, a, b, mul_out, mul_in, -1
                     )  # [batch, a, b, mul_out, mul_in, l_filter]
 
                 if grad_F is not None:
-                    sub_grad_F = grad_F[:, :, s_in].contiguous().view(
+                    sub_grad_F = grad_F[:, :, s_in].reshape(
                         batch, b, mul_in, 2 * l_in + 1
                     )  # [batch, b, mul_in, 2 * l_in + 1]
                 if (grad_Y is not None) or (grad_R is not None):
