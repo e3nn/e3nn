@@ -7,12 +7,12 @@ from e3nn import o3, rs
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
-        :param get_l_filters: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
+        :param selection_rule: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
         :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
         :param normalization: either 'norm' or 'component'
         representation order = nonnegative integer
@@ -22,7 +22,7 @@ class Kernel(torch.nn.Module):
         self.Rs_in = rs.simplify(Rs_in)
         self.Rs_out = rs.simplify(Rs_out)
 
-        self.get_l_filters = get_l_filters
+        self.selection_rule = selection_rule
         self.check_input_output()
         self.sh = sh
 
@@ -51,7 +51,7 @@ class Kernel(torch.nn.Module):
             # we need to count how many of them we sum in order to normalize the network
             num_summed_elements = 0
             for mul_in, l_in, p_in in self.Rs_in:
-                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
+                l_filters = self.selection_rule(l_in, p_in, l_out, p_out)
                 num_summed_elements += mul_in * len(l_filters)
 
             for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
@@ -59,10 +59,10 @@ class Kernel(torch.nn.Module):
                 norm_coef[i, j, 0] = lm_normalization(l_out, l_in) / math.sqrt(num_summed_elements)
                 norm_coef[i, j, 1] = lm_normalization(l_out, l_in) / math.sqrt(mul_in)
 
-                l_filters = self.get_l_filters(l_in, p_in, l_out, p_out)
-                assert l_filters == sorted(set(l_filters)), "get_l_filters must return a sorted list of unique values"
+                l_filters = self.selection_rule(l_in, p_in, l_out, p_out)
+                assert l_filters == sorted(set(l_filters)), "selection_rule must return a sorted list of unique values"
                 if p_out != 0:
-                    assert all(p_in * (-1) ** l == p_out for l in l_filters), "get_l_filters must return l's compatible with SH parity"
+                    assert all(p_in * (-1) ** l == p_out for l in l_filters), "selection_rule must return l's compatible with SH parity"
 
                 # compute the number of degrees of freedom
                 n_path += mul_out * mul_in * len(l_filters)
@@ -86,21 +86,11 @@ class Kernel(torch.nn.Module):
 
     def check_input_output(self):
         for _, l_out, p_out in self.Rs_out:
-            has_path = False
-            for _, l_in, p_in in self.Rs_in:
-                if self.get_l_filters(l_in, p_in, l_out, p_out):
-                    has_path = True
-                    break
-            if not has_path:
+            if not any(self.selection_rule(l_in, p_in, l_out, p_out) for _, l_in, p_in in self.Rs_in):
                 raise ValueError("warning! the output (l={}, p={}) cannot be generated".format(l_out, p_out))
 
         for _, l_in, p_in in self.Rs_in:
-            has_path = False
-            for _, l_out, p_out in self.Rs_out:
-                if self.get_l_filters(l_in, p_in, l_out, p_out):
-                    has_path = True
-                    break
-            if not has_path:
+            if not any(self.selection_rule(l_in, p_in, l_out, p_out) for _, l_out, p_out in self.Rs_out):
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
 
     def forward(self, r, custom_backward=False):
@@ -126,14 +116,14 @@ class Kernel(torch.nn.Module):
         norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
         if custom_backward:
-            kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
+            kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
         else:
-            kernel = kernel_fn_forward(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters)
+            kernel = kernel_fn_forward(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
 
         return kernel.view(*size, kernel.shape[1], kernel.shape[2])
 
 
-def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
     """
     :param Y: tensor [l_filter * m_filter, batch]
     :param R: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
@@ -159,7 +149,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_fi
             s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
             begin_in += mul_in * (2 * l_in + 1)
 
-            l_filters = get_l_filters(l_in, p_in, l_out, p_out)
+            l_filters = selection_rule(l_in, p_in, l_out, p_out)
             if not l_filters:
                 continue
 
@@ -188,11 +178,11 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_fi
 
 class KernelFn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+    def forward(ctx, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
         f"""{kernel_fn_forward.__doc__}"""
         ctx.Rs_in = Rs_in
         ctx.Rs_out = Rs_out
-        ctx.get_l_filters = get_l_filters
+        ctx.selection_rule = selection_rule
         ctx.set_of_l_filters = set_of_l_filters
 
         # save necessary tensors for backward
@@ -205,7 +195,7 @@ class KernelFn(torch.autograd.Function):
             saved_Y = Y
         ctx.save_for_backward(saved_Y, saved_R, norm_coef)
 
-        return kernel_fn_forward(Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.get_l_filters, ctx.set_of_l_filters)
+        return kernel_fn_forward(Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.selection_rule, ctx.set_of_l_filters)
 
     @staticmethod
     def backward(ctx, grad_kernel):
@@ -230,7 +220,7 @@ class KernelFn(torch.autograd.Function):
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
                 begin_in += mul_in * (2 * l_in + 1)
 
-                l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
+                l_filters = ctx.selection_rule(l_in, p_in, l_out, p_out)
                 if not l_filters:
                     continue
 

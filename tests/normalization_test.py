@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
                     Rs_out = [(1, l_out)]
 
                     k = Kernel(Rs_in, Rs_out, ConstantRadialModel, normalization='component',
-                               get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=3))
+                               selection_rule=partial(o3.selection_rule_in_out_sh, lmax=3))
                     k = k(torch.randn(1, 3))
 
                     self.assertLess(k.mean().item(), 1e-3)
@@ -35,7 +35,7 @@ class Tests(unittest.TestCase):
                     Rs_out = [(1, l_out)]
 
                     k = Kernel(Rs_in, Rs_out, ConstantRadialModel, normalization='norm',
-                               get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=3))
+                               selection_rule=partial(o3.selection_rule_in_out_sh, lmax=3))
                     k = k(torch.randn(1, 3))
 
                     self.assertLess(k.mean().item(), 1e-3)
