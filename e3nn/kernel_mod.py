@@ -36,16 +36,18 @@ class Kernel(torch.nn.Module):
 
         mat_Y = Q.new_zeros(rs.dim(Rs_f), sum(2 * l + 1 for l in self.set_of_l_filters))  # [Rs_f, Y]
         i = 0
-        for _mul, l_Y, _p in Rs_f:
+        for mul, l_Y, _p in Rs_f:
+            dim_Y = 2 * l_Y + 1
             # Normalize the spherical harmonics
             if normalization == 'norm':
-                x = math.sqrt(4 * math.pi) / math.sqrt(2 * l_Y + 1)
+                x = math.sqrt(4 * math.pi) / math.sqrt(dim_Y)
             if normalization == 'component':
                 x = math.sqrt(4 * math.pi)
-
             j = sum(2 * l + 1 for l in self.set_of_l_filters if l < l_Y)
-            mat_Y[i:i + 2 * l_Y + 1, j:j + 2 * l_Y + 1] = x
-            i += 2 * l_Y + 1
+
+            for _ in range(mul):
+                mat_Y[i:i + dim_Y, j:j + dim_Y] = x * torch.eye(dim_Y)
+                i += dim_Y
 
         # create the radial model: R+ -> R^n_path
         n_path = rs.mul_dim(Rs_f)
@@ -83,7 +85,7 @@ class Kernel(torch.nn.Module):
             if not has_path:
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
 
-    def forward(self, r):
+    def forward(self, r, **_kwargs):
         """
         :param r: tensor [..., 3]
         :return: tensor [..., l_out * mul_out * m_out, l_in * mul_in * m_in]
