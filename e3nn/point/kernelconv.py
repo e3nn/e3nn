@@ -171,12 +171,12 @@ class KernelConvFn(torch.autograd.Function):
                         batch, a, b, mul_out, mul_in, -1
                     )  # [batch, a, b, mul_out, mul_in, l_filter]
                 if grad_R is not None:
-                    sub_grad_R = grad_R[:, :, :, begin_R: begin_R + n].reshape(
+                    sub_grad_R = grad_R[:, :, :, begin_R: begin_R + n].clone().reshape(
                         batch, a, b, mul_out, mul_in, -1
                     )  # [batch, a, b, mul_out, mul_in, l_filter]
 
                 if grad_F is not None:
-                    sub_grad_F = grad_F[:, :, s_in].reshape(
+                    sub_grad_F = grad_F[:, :, s_in].clone().reshape(
                         batch, b, mul_in, 2 * l_in + 1
                     )  # [batch, b, mul_in, 2 * l_in + 1]
                 if (grad_Y is not None) or (grad_R is not None):
