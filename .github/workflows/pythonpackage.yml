@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
     - master
-      
+
 jobs:
   build:
 
@@ -37,4 +37,4 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        pytest --ignore=tests/image/ --ignore=tests/point/periodic_convolution_test.py
+        pytest --ignore=tests/image/ --ignore=tests/point/periodic_convolution_test.py --durations=5
