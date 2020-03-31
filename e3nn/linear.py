@@ -81,13 +81,13 @@ class Linear(torch.nn.Module):
                 begin_in += mul_in * (2 * l_in + 1)
 
                 if (l_out, p_out) == (l_in, p_in):
-                    weight = self.weight[begin_w: begin_w + mul_out * mul_in].contiguous().view(mul_out, mul_in)  # [mul_out, mul_in]
+                    weight = self.weight[begin_w: begin_w + mul_out * mul_in].reshape(mul_out, mul_in)  # [mul_out, mul_in]
                     begin_w += mul_out * mul_in
 
                     f = features[:, s_in].view(-1, mul_in, 2 * l_in + 1)  # [batch, mul_in, m_in]
-                    out += torch.einsum('uv,zvi->zui', weight, f)
+                    out += torch.einsum('uv,zvi->zui', weight, f)  # [batch, mul_out, m_out]
                     n_path += mul_in
 
-            output[:, s_out] = out.view(-1, mul_out * (2 * l_out + 1)) / math.sqrt(n_path)
+            output[:, s_out] = out.reshape(-1, mul_out * (2 * l_out + 1)) / math.sqrt(n_path)
 
         return output.view(*size, -1)
