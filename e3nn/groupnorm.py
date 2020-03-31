@@ -37,7 +37,7 @@ class GroupNorm(nn.Module):
         for m, d in self.Rs:
             field = input[:, ix: ix + m * d]  # [batch, feature * repr, x, y, z]
             ix += m * d
-            field = field.contiguous().view(input.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
+            field = field.reshape(input.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
 
             if d == 1:  # scalars
                 field_mean = field.view(input.size(0), -1).mean(-1)  # [batch]

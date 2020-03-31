@@ -419,13 +419,11 @@ def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, dev
     the higher is lmax the better is the approximation
     """
     a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
+    onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
 
     if sph_last:
-        onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
-        rank = len(onehot.shape)
-        return onehot.permute(*range(1, rank), 0).contiguous()
-    else:
-        return torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
+        return onehot.permute(*range(1, len(onehot.shape)), 0).contiguous()
+    return onehot
 
 
 def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
@@ -456,7 +454,7 @@ def kron(x, y):
     """
     assert x.dim() == 2
     assert y.dim() == 2
-    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+    return torch.einsum("ij,kl->ikjl", (x, y)).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
 
 def direct_sum(*matrices):
@@ -496,6 +494,7 @@ def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None)
         else:
             device = 'cpu'
 
+    # return a clone to avoid that the user modifies the matrices in-place
     if cached:
         return _cached_clebsch_gordan(l1, l2, l3, dtype, device).clone()
     return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
@@ -517,15 +516,15 @@ def _clebsch_gordan(l1, l2, l3):
     if l1 <= l2 <= l3:
         return __clebsch_gordan(l1, l2, l3)
     if l1 <= l3 <= l2:
-        return __clebsch_gordan(l1, l3, l2).transpose(1, 2).contiguous()
+        return __clebsch_gordan(l1, l3, l2).transpose(1, 2)
     if l2 <= l1 <= l3:
-        return __clebsch_gordan(l2, l1, l3).transpose(0, 1).contiguous()
+        return __clebsch_gordan(l2, l1, l3).transpose(0, 1)
     if l3 <= l2 <= l1:
-        return __clebsch_gordan(l3, l2, l1).transpose(0, 2).contiguous()
+        return __clebsch_gordan(l3, l2, l1).transpose(0, 2)
     if l2 <= l3 <= l1:
-        return __clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2).contiguous()
+        return __clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2)
     if l3 <= l1 <= l2:
-        return __clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
+        return __clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1)
 
 
 @cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))

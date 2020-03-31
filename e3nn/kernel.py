@@ -155,7 +155,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_fi
 
             # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
             n = mul_out * mul_in * len(l_filters)
-            sub_R = R[:, begin_R: begin_R + n].contiguous().view(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
+            sub_R = R[:, begin_R: begin_R + n].reshape(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
             begin_R += n
 
             sub_norm_coef = norm_coef[i, j]  # [batch]
@@ -172,7 +172,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_fi
                 K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
 
             if not isinstance(K, int):
-                kernel[:, s_out, s_in] = K.contiguous().view_as(kernel[:, s_out, s_in])
+                kernel[:, s_out, s_in] = K.reshape_as(kernel[:, s_out, s_in])
     return kernel
 
 
