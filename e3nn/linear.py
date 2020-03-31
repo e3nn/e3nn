@@ -39,21 +39,11 @@ class Linear(torch.nn.Module):
 
     def check_input_output(self):
         for _, l_out, p_out in self.Rs_out:
-            has_path = False
-            for _, l_in, p_in in self.Rs_in:
-                if (l_in, p_in) == (l_out, p_out):
-                    has_path = True
-                    break
-            if not has_path:
+            if not any((l_in, p_in) == (l_out, p_out) for _, l_in, p_in in self.Rs_in):
                 raise ValueError("warning! the output (l={}, p={}) cannot be generated".format(l_out, p_out))
 
         for _, l_in, p_in in self.Rs_in:
-            has_path = False
-            for _, l_out, p_out in self.Rs_out:
-                if (l_in, p_in) == (l_out, p_out):
-                    has_path = True
-                    break
-            if not has_path:
+            if not any((l_in, p_in) == (l_out, p_out) for _, l_out, p_out in self.Rs_out):
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
 
     def forward(self, features):
