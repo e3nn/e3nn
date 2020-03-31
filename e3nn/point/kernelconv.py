@@ -38,17 +38,17 @@ class KernelConv(Kernel):
 
         if custom_backward:
             kernel_conv = KernelConvFn.apply(
-                features, y, r, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters
+                features, y, r, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters
             )
         else:
             kernel_conv = kernel_conv_fn_forward(
-                features, y, r, norm_coef, self.Rs_in, self.Rs_out, self.get_l_filters, self.set_of_l_filters
+                features, y, r, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters
             )
 
         return kernel_conv * mask.unsqueeze(-1)
 
 
-def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
     """
     :param F: tensor [batch, b, l_in * mul_in * m_in]
     :param Y: tensor [l_filter * m_filter, batch, a, b]
@@ -74,7 +74,7 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set
             s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
             begin_in += mul_in * (2 * l_in + 1)
 
-            l_filters = get_l_filters(l_in, p_in, l_out, p_out)
+            l_filters = selection_rule(l_in, p_in, l_out, p_out)
             if not l_filters:
                 continue
 
@@ -107,12 +107,12 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set
 
 class KernelConvFn(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, F, Y, R, norm_coef, Rs_in, Rs_out, get_l_filters, set_of_l_filters):
+    def forward(ctx, F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
         f"""{kernel_conv_fn_forward.__doc__}"""
         ctx.batch, ctx.a, ctx.b = Y.shape[1:]
         ctx.Rs_in = Rs_in
         ctx.Rs_out = Rs_out
-        ctx.get_l_filters = get_l_filters
+        ctx.selection_rule = selection_rule
         ctx.set_of_l_filters = set_of_l_filters
 
         # save necessary tensors for backward
@@ -132,7 +132,7 @@ class KernelConvFn(torch.autograd.Function):
         ctx.save_for_backward(saved_F, saved_Y, saved_R, norm_coef)
 
         return kernel_conv_fn_forward(
-            F, Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.get_l_filters, ctx.set_of_l_filters
+            F, Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.selection_rule, ctx.set_of_l_filters
         )
 
     @staticmethod
@@ -161,7 +161,7 @@ class KernelConvFn(torch.autograd.Function):
                 s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
                 begin_in += mul_in * (2 * l_in + 1)
 
-                l_filters = ctx.get_l_filters(l_in, p_in, l_out, p_out)
+                l_filters = ctx.selection_rule(l_in, p_in, l_out, p_out)
                 if not l_filters:
                     continue
 

@@ -24,7 +24,7 @@ def rep(Rs, alpha, beta, gamma, parity=None):
         return o3.direct_sum(*[(p ** parity) * o3.irr_repr(l, *abc) for mul, l, p in simplify(Rs) for _ in range(mul)])
 
 
-def haslinearpath(Rs_in, l_out, p_out, get_l_output=o3.selection_rule):
+def haslinearpath(Rs_in, l_out, p_out, selection_rule=o3.selection_rule):
     """
     :param Rs_in: list of triplet (multiplicity, representation order, parity)
     :return: if there is a linear operation between them
@@ -33,7 +33,7 @@ def haslinearpath(Rs_in, l_out, p_out, get_l_output=o3.selection_rule):
         if mul_in == 0:
             continue
 
-        for l in get_l_output(l_in, l_out):
+        for l in selection_rule(l_in, p_in, l_out, p_out):
             if p_out in (0, p_in * (-1) ** l):
                 return True
     return False
@@ -271,14 +271,45 @@ def sorted_truncated_tensor_product(Rs_1, Rs_2, lmax):
 
     example: sorted_truncated_tensor_product([(1, 1), (2, 2)], [(2, 2)], 1) = ([(4, 0, 0), (6, 1, 0)], matrix)
     """
-    Rs, Q = tensor_product_in_in(Rs_1, Rs_2, partial(o3.selection_rule, lmax=lmax))
+    Rs, Q = tensor_product(Rs_1, Rs_2, partial(o3.selection_rule, lmax=lmax))
     Rs, perm = sort(Rs)
     Rs = simplify(Rs)
     matrix = torch.einsum('ij,jkl->ikl', perm, Q)
     return Rs, matrix
 
 
-def tensor_product_in_in(Rs_in1, Rs_in2, get_l_output=o3.selection_rule, normalization='component'):
+def tensor_product(input1, input2, output, normalization='component'):
+    """
+    Compute the matrix Q
+    from Rs_out to Rs_in1 tensor product with Rs_in2
+
+    For normalization='component',
+    The set of "lines" { Q[i] }_i is orthonormal
+
+    :return: Rs_missing, Q
+
+    examples:
+    Rs_out, Q = tensor_product_in_in(Rs_in1, Rs_in2, selection_rule)
+    # Rs_in1 x Rs_in2 -> Rs_out
+    torch.einsum('kij,i,j->k', Q, A, B)
+
+    Rs_in2, Q = tensor_product_in_in(Rs_in1, selection_rule, Rs_out)
+    # Rs_in1 x Rs_in2 -> Rs_out
+    torch.einsum('kij,i,j->k', Q, A, B)
+    """
+    if isinstance(input1, list) and isinstance(input2, list):
+        return _tensor_product_in_in(input1, input2, output, normalization)
+
+    if isinstance(input1, list) and isinstance(output, list):
+        return _tensor_product_in_out(input1, input2, output, normalization)
+
+    if isinstance(input2, list) and isinstance(output, list):
+        Rs_in1, Q = _tensor_product_in_out(input2, input1, output, normalization)
+        Q = torch.einsum('kij->kji', Q)
+        return Rs_in1, Q
+
+
+def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization):
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -303,7 +334,7 @@ def tensor_product_in_in(Rs_in1, Rs_in2, get_l_output=o3.selection_rule, normali
 
     for mul_1, l_1, p_1 in Rs_in1:
         for mul_2, l_2, p_2 in Rs_in2:
-            for l_out in get_l_output(l_1, p_1, l_2, p_2):
+            for l_out in selection_rule(l_1, p_1, l_2, p_2):
                 Rs_out.append((mul_1 * mul_2, l_out, p_1 * p_2))
 
     Rs_out = simplify(Rs_out)
@@ -319,7 +350,7 @@ def tensor_product_in_in(Rs_in1, Rs_in2, get_l_output=o3.selection_rule, normali
         index_2 = 0
         for mul_2, l_2, p_2 in Rs_in2:
             dim_2 = mul_2 * (2 * l_2 + 1)
-            for l_out in get_l_output(l_1, p_1, l_2, p_2):
+            for l_out in selection_rule(l_1, p_1, l_2, p_2):
                 dim_out = mul_1 * mul_2 * (2 * l_out + 1)
                 C = o3.clebsch_gordan(l_out, l_1, l_2, cached=True)
                 if normalization == 'component':
@@ -337,7 +368,7 @@ def tensor_product_in_in(Rs_in1, Rs_in2, get_l_output=o3.selection_rule, normali
     return Rs_out, clebsch_gordan_tensor
 
 
-def tensor_product_in_out(Rs_in1, Rs_out, get_l_input2=o3.selection_rule, normalization='component'):
+def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization):
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -362,7 +393,7 @@ def tensor_product_in_out(Rs_in1, Rs_out, get_l_input2=o3.selection_rule, normal
 
     for mul_out, l_out, p_out in Rs_out:
         for mul_1, l_1, p_1 in Rs_in1:
-            for l_2 in get_l_input2(l_1, p_1, l_out, p_out):
+            for l_2 in selection_rule(l_1, p_1, l_out, p_out):
                 Rs_in2.append((mul_1 * mul_out, l_2, p_1 * p_out))
 
     Rs_in2 = simplify(Rs_in2)
@@ -377,13 +408,13 @@ def tensor_product_in_out(Rs_in1, Rs_out, get_l_input2=o3.selection_rule, normal
 
         n_path = 0
         for mul_1, l_1, p_1 in Rs_in1:
-            for l_2 in get_l_input2(l_1, p_1, l_out, p_out):
+            for l_2 in selection_rule(l_1, p_1, l_out, p_out):
                 n_path += mul_1
 
         index_1 = 0
         for mul_1, l_1, p_1 in Rs_in1:
             dim_1 = mul_1 * (2 * l_1 + 1)
-            for l_2 in get_l_input2(l_1, p_1, l_out, p_out):
+            for l_2 in selection_rule(l_1, p_1, l_out, p_out):
                 dim_2 = mul_1 * mul_out * (2 * l_2 + 1)
                 C = o3.clebsch_gordan(l_out, l_1, l_2, cached=True)
                 if normalization == 'component':
@@ -401,7 +432,7 @@ def tensor_product_in_out(Rs_in1, Rs_out, get_l_input2=o3.selection_rule, normal
     return Rs_in2, clebsch_gordan_tensor
 
 
-def elementwise_tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule):
+def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule):
     """
     :return: Rs_out, matrix
 
@@ -429,7 +460,7 @@ def elementwise_tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule):
     Rs_out = []
     for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
         assert mul == mul_2
-        for l in get_l_output(l_1, p_1, l_2, p_2):
+        for l in selection_rule(l_1, p_1, l_2, p_2):
             Rs_out.append((mul, l, p_1 * p_2))
 
     Rs_out = simplify(Rs_out)
@@ -444,7 +475,7 @@ def elementwise_tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule):
         dim_1 = mul * (2 * l_1 + 1)
         dim_2 = mul * (2 * l_2 + 1)
 
-        for l in get_l_output(l_1, p_1, l_2, p_2):
+        for l in selection_rule(l_1, p_1, l_2, p_2):
             dim_out = mul * (2 * l + 1)
             C = o3.clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))

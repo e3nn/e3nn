@@ -18,7 +18,7 @@ torch.set_default_dtype(torch.float64)
 class GatedConvNetwork(torch.nn.Module):
     def __init__(self, Rs_in, Rs_hidden, Rs_out, lmax, layers=3,
                  max_radius=1.0, number_of_basis=3, radial_layers=3,
-                 feature_product=False):
+                 feature_product=False, kernel=Kernel, convolution=Convolution):
         super().__init__()
 
         representations = [Rs_in]
@@ -29,16 +29,14 @@ class GatedConvNetwork(torch.nn.Module):
                               number_of_basis=number_of_basis, h=100,
                               L=radial_layers, act=swish)
 
-        K = partial(Kernel, RadialModel=RadialModel, get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=lmax))
+        K = partial(kernel, RadialModel=RadialModel, selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
 
         def make_layer(Rs_in, Rs_out):
             if feature_product:
-                tp = TensorProduct(Rs_in, Rs_in,
-                                   get_l_filters=partial(o3.selection_rule,
-                                                         lmax=lmax))
+                tp = TensorProduct(Rs_in, Rs_in, selection_rule=partial(o3.selection_rule, lmax=lmax))
                 lin = Linear(tp.Rs_out, Rs_in)
             act = GatedBlock(Rs_out, swish, sigmoid)
-            conv = Convolution(K, Rs_in, act.Rs_in)
+            conv = convolution(K, Rs_in, act.Rs_in)
             if feature_product:
                 return torch.nn.ModuleList([tp, lin, conv, act])
             return torch.nn.ModuleList([conv, act])

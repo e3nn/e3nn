@@ -33,7 +33,7 @@ class Tests(unittest.TestCase):
         Rs_1 = [(3, 0), (2, 1), (5, 2)]
         Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
 
-        Rs_out, m = rs.tensor_product_in_in(Rs_1, Rs_2)
+        Rs_out, m = rs.tensor_product(Rs_1, Rs_2, o3.selection_rule)
         mul = TensorProduct(Rs_1, Rs_2)
 
         x1 = torch.randn(1, rs.dim(Rs_1))
@@ -48,7 +48,7 @@ class Tests(unittest.TestCase):
     def test_tensor_product_norm(self):
         for Rs_in1, Rs_in2 in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
             with o3.torch_default_dtype(torch.float64):
-                Rs_out, Q = rs.tensor_product_in_in(Rs_in1, Rs_in2)
+                Rs_out, Q = rs.tensor_product(Rs_in1, Rs_in2, o3.selection_rule)
 
                 abc = torch.rand(3, dtype=torch.float64)
 
@@ -75,7 +75,7 @@ class Tests(unittest.TestCase):
     def test_tensor_product_in_out_norm(self):
         for Rs_in1, Rs_out in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
             with o3.torch_default_dtype(torch.float64):
-                Rs_in2, Q = rs.tensor_product_in_out(Rs_in1, Rs_out)
+                Rs_in2, Q = rs.tensor_product(Rs_in1, o3.selection_rule, Rs_out)
 
                 abc = torch.rand(3, dtype=torch.float64)
 
