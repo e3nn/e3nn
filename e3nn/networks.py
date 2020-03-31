@@ -29,13 +29,11 @@ class GatedConvNetwork(torch.nn.Module):
                               number_of_basis=number_of_basis, h=100,
                               L=radial_layers, act=swish)
 
-        K = partial(Kernel, RadialModel=RadialModel, get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=lmax))
+        K = partial(Kernel, RadialModel=RadialModel, selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
 
         def make_layer(Rs_in, Rs_out):
             if feature_product:
-                tp = TensorProduct(Rs_in, Rs_in,
-                                   get_l_filters=partial(o3.selection_rule,
-                                                         lmax=lmax))
+                tp = TensorProduct(Rs_in, Rs_in, selection_rule=partial(o3.selection_rule, lmax=lmax))
                 lin = Linear(tp.Rs_out, Rs_in)
             act = GatedBlock(Rs_out, swish, sigmoid)
             conv = Convolution(K, Rs_in, act.Rs_in)

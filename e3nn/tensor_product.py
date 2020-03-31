@@ -10,14 +10,13 @@ class TensorProduct(torch.nn.Module):
 
     [(2, 0), (1, 1)] x [(1, 1), (2, 0)] = [(2, 1), (5, 0), (1, 1), (1, 2), (2, 1)]
     """
-    def __init__(self, Rs_1, Rs_2, get_l_output=o3.selection_rule):
+    def __init__(self, Rs_1, Rs_2, selection_rule=o3.selection_rule):
         super().__init__()
 
-        self.get_ls = get_l_output
         self.Rs_1 = rs.simplify(Rs_1)
         self.Rs_2 = rs.simplify(Rs_2)
 
-        Rs_out, mixing_matrix = rs.tensor_product_in_in(Rs_1, Rs_2, get_l_output=get_l_output)
+        Rs_out, mixing_matrix = rs.tensor_product(Rs_1, Rs_2, selection_rule)
         self.Rs_out = rs.simplify(Rs_out)
         self.register_buffer('mixing_matrix', mixing_matrix)
 
@@ -39,14 +38,14 @@ class ElementwiseTensorProduct(torch.nn.Module):
     """
     [(2, 0), (1, 1)] x [(1, 1), (2, 0)] = [(1, 1), (1, 0), (1, 1)]
     """
-    def __init__(self, Rs_1, Rs_2, get_l_output=o3.selection_rule):
+    def __init__(self, Rs_1, Rs_2, selection_rule=o3.selection_rule):
         super().__init__()
 
         Rs_1 = rs.simplify(Rs_1)
         Rs_2 = rs.simplify(Rs_2)
         assert sum(mul for mul, _, _ in Rs_1) == sum(mul for mul, _, _ in Rs_2)
 
-        Rs_out, mixing_matrix = rs.elementwise_tensor_product(Rs_1, Rs_2, get_l_output)
+        Rs_out, mixing_matrix = rs.elementwise_tensor_product(Rs_1, Rs_2, selection_rule)
         self.register_buffer("mixing_matrix", mixing_matrix)
         self.Rs_out = rs.simplify(Rs_out)
 
@@ -65,10 +64,10 @@ class ElementwiseTensorProduct(torch.nn.Module):
 
 
 class LearnableTensorProduct(torch.nn.Module):
-    def __init__(self, Rs_mid_1, Rs_mid_2, mul_mid, Rs_out, get_l_mul=o3.selection_rule):
+    def __init__(self, Rs_mid_1, Rs_mid_2, mul_mid, Rs_out, selection_rule=o3.selection_rule):
         super().__init__()
         self.mul_mid = mul_mid
-        self.m = TensorProduct(Rs_mid_1, Rs_mid_2, get_l_mul)
+        self.m = TensorProduct(Rs_mid_1, Rs_mid_2, selection_rule)
         self.si = Linear(mul_mid * self.m.Rs_out, Rs_out)
 
     def forward(self, x1, x2):

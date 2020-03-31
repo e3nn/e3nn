@@ -32,7 +32,7 @@ class Kernel(torch.nn.Module):
         # (1) For the case r > 0
 
         # Compute Clebsh-Gordan coefficients
-        Rs_f, Q = rs.tensor_product_in_out(self.Rs_in, self.Rs_out, selection_rule, normalization)  # [out, in, Y]
+        Rs_f, Q = rs.tensor_product(self.Rs_in, selection_rule, self.Rs_out, normalization)  # [out, in, Y]
 
         # Sort filters representation
         Rs_f, perm = rs.sort(Rs_f)
@@ -70,7 +70,7 @@ class Kernel(torch.nn.Module):
         def selection_rule_linear(l_in, p_in, l_out, p_out):
             return [0] if 0 in selection_rule(l_in, p_in, l_out, p_out) else []
 
-        Rs_f, Q = rs.tensor_product_in_out(self.Rs_in, self.Rs_out, selection_rule_linear, normalization)  # [out, in, Y]
+        Rs_f, Q = rs.tensor_product(self.Rs_in, selection_rule_linear, self.Rs_out, normalization)  # [out, in, Y]
         Rs_f = rs.simplify(Rs_f)
         [(n_path, l, p)] = Rs_f
         assert l == 0 and p in [0, 1]
