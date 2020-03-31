@@ -1,6 +1,6 @@
 # pylint: disable=C,E1101,E1102
 import unittest
-
+import math
 import torch
 
 from e3nn.linear import Linear
@@ -10,15 +10,27 @@ from e3nn import rs
 class Tests(unittest.TestCase):
     def test1(self):
         torch.set_default_dtype(torch.float64)
-        Rs_in = [(50, 0), (150, 1), (50, 0), (100, 2)]
-        Rs_out = [(2, 0), (1, 1), (1, 2), (3, 0)]
+        Rs_in = [(5, 0), (20, 1), (15, 0), (20, 2)]
+        Rs_out = [(5, 0), (10, 1), (10, 2), (5, 0)]
 
-        torch.manual_seed(0)
-        lin = Linear(Rs_in, Rs_out)
-        features = torch.randn(100, rs.dim(Rs_in))
-        features = lin(features)
+        with torch.no_grad():
+            lin = Linear(Rs_in, Rs_out)
+            features = torch.randn(10000, rs.dim(Rs_in))
+            features = lin(features)
 
-        self.assertLess(features.pow(2).mean(0).sub(1).abs().max(), 0.4)
+        bins, left, right = 100, -4, 4
+        bin_width = (right - left) / (bins - 1)
+        x = torch.linspace(left, right, bins)
+        p = torch.histc(features, bins, left, right) / features.numel() / bin_width
+        q = x.pow(2).div(-2).exp().div(math.sqrt(2 * math.pi))  # Normal law
+
+        # import matplotlib.pyplot as plt
+        # plt.plot(x, p)
+        # plt.plot(x, q)
+        # plt.show()
+
+        Dkl = ((p + 1e-100) / q).log().mul(p).sum()  # Kullback-Leibler divergence of P || Q
+        self.assertLess(Dkl, 0.1)
 
     def test_equiv(self):
         torch.set_default_dtype(torch.float64)
