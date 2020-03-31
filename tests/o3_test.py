@@ -78,22 +78,21 @@ class Tests(unittest.TestCase):
         integral of 1 over the unit sphere = 4 pi
         """
         with o3.torch_default_dtype(torch.float64):
-            for l1 in range(0, 3 + 1):
-                for l2 in range(l1, 3 + 1):
-                    x = torch.randn(200000, 3)
-                    Y1 = o3.spherical_harmonics_xyz(l1, x)
-                    Y2 = o3.spherical_harmonics_xyz(l2, x)
-                    x = (Y1.view(2 * l1 + 1, 1, -1) * Y2.view(1, 2 * l2 + 1, -1)).mean(-1) * (4 * math.pi)
+            x = torch.randn(200000, 3)
+            Ys = [o3.spherical_harmonics_xyz(l, x) for l in range(0, 3 + 1)]
+            for l1, Y1 in enumerate(Ys):
+                for l2, Y2 in enumerate(Ys):
+                    m = (Y1.view(2 * l1 + 1, 1, -1) * Y2.view(1, 2 * l2 + 1, -1)).mean(-1) * (4 * math.pi)
                     if l1 == l2:
                         i = torch.eye(2 * l1 + 1)
-                        self.assertLess((x - i).pow(2).max(), 1e-4)
+                        self.assertLess((m - i).pow(2).max(), 1e-4)
                     else:
-                        self.assertLess(x.pow(2).max(), 1e-4)
+                        self.assertLess(m.pow(2).max(), 1e-4)
 
     def test_clebsch_gordan_orthogonal(self):
         with o3.torch_default_dtype(torch.float64):
-            for l_out in range(6):
-                for l_in in range(6):
+            for l_out in range(3 + 1):
+                for l_in in range(l_out, 4 + 1):
                     for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
                         Q = o3.clebsch_gordan(l_f, l_in, l_out).reshape(2 * l_f + 1, -1)
                         e = (2 * l_f + 1) * Q @ Q.t()
@@ -102,8 +101,8 @@ class Tests(unittest.TestCase):
 
     def test_clebsch_gordan_sh_norm(self):
         with o3.torch_default_dtype(torch.float64):
-            for l_out in range(6):
-                for l_in in range(6):
+            for l_out in range(3 + 1):
+                for l_in in range(l_out, 4 + 1):
                     for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
                         Q = o3.clebsch_gordan(l_out, l_in, l_f)
                         Y = o3.spherical_harmonics_xyz(l_f, torch.randn(1, 3)).view(2 * l_f + 1)
