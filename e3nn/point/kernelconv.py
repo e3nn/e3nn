@@ -7,19 +7,6 @@ from e3nn.kernel import Kernel
 
 
 class KernelConv(Kernel):
-    # def __init__(self, Rs_in, Rs_out, RadialModel, get_l_filters=o3.selection_rule, sh=o3.spherical_harmonics_xyz, normalization='norm'):
-    #     """
-    #     :param Rs_in: list of triplet (multiplicity, representation order, parity)
-    #     :param Rs_out: list of triplet (multiplicity, representation order, parity)
-    #     :param RadialModel: Class(d), trainable model: R -> R^d
-    #     :param get_l_filters: function of signature (l_in, l_out) -> [l_filter]
-    #     :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
-    #     :param normalization: either 'norm' or 'component'
-    #     representation order = nonnegative integer
-    #     parity = 0 (no parity), 1 (even), -1 (odd)
-    #     """
-    #     super(KernelConv, self).__init__(Rs_in, Rs_out, RadialModel, get_l_filters, sh, normalization)
-
     def forward(self, features, difference_geometry, mask, y=None, radii=None, custom_backward=True):
         """
         :param features: tensor [batch, b, l_in * mul_in * m_in]
@@ -44,9 +31,10 @@ class KernelConv(Kernel):
         r = self.R(radii.flatten()).view(
             *radii.shape, -1
         )  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
+        r = r.clone()
+        r[radii == 0] = self.weight
 
-        norm_coef = getattr(self, 'norm_coef')
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
+        norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
 
         if custom_backward:
             kernel_conv = KernelConvFn.apply(
