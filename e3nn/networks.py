@@ -29,7 +29,7 @@ class GatedConvNetwork(torch.nn.Module):
                               number_of_basis=number_of_basis, h=100,
                               L=radial_layers, act=swish)
 
-        K = partial(Kernel, RadialModel=RadialModel, get_l_filters=partial(o3.selection_rule, lmax=lmax))
+        K = partial(Kernel, RadialModel=RadialModel, get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=lmax))
 
         def make_layer(Rs_in, Rs_out, feature_product=feature_product):
             if feature_product:
