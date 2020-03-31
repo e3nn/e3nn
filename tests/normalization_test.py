@@ -1,8 +1,10 @@
 # pylint: disable=invalid-name, missing-docstring, no-member
 import unittest
+from functools import partial
 
 import torch
 
+from e3nn import o3
 from e3nn.kernel import Kernel
 from e3nn.radial import ConstantRadialModel
 from e3nn.util.default_dtype import torch_default_dtype
@@ -12,12 +14,13 @@ class Tests(unittest.TestCase):
     def test1(self):
         with torch_default_dtype(torch.float64):
             mul = 100000
-            for l_in in range(4):
+            for l_in in range(3 + 1):
                 Rs_in = [(mul, l_in)]
-                for l_out in range(4):
+                for l_out in range(2 + 1):
                     Rs_out = [(1, l_out)]
 
-                    k = Kernel(Rs_in, Rs_out, ConstantRadialModel, normalization='component')
+                    k = Kernel(Rs_in, Rs_out, ConstantRadialModel, normalization='component',
+                               get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=3))
                     k = k(torch.randn(1, 3))
 
                     self.assertLess(k.mean().item(), 1e-3)
@@ -26,12 +29,13 @@ class Tests(unittest.TestCase):
     def test2(self):
         with torch_default_dtype(torch.float64):
             mul = 100000
-            for l_in in range(4):
+            for l_in in range(3 + 1):
                 Rs_in = [(mul, l_in)]
-                for l_out in range(4):
+                for l_out in range(2 + 1):
                     Rs_out = [(1, l_out)]
 
-                    k = Kernel(Rs_in, Rs_out, ConstantRadialModel, normalization='norm')
+                    k = Kernel(Rs_in, Rs_out, ConstantRadialModel, normalization='norm',
+                               get_l_filters=partial(o3.selection_rule_in_out_sh, lmax=3))
                     k = k(torch.randn(1, 3))
 
                     self.assertLess(k.mean().item(), 1e-3)

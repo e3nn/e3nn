@@ -91,8 +91,8 @@ class Tests(unittest.TestCase):
 
     def test_clebsch_gordan_orthogonal(self):
         with o3.torch_default_dtype(torch.float64):
-            for l_out in range(6):
-                for l_in in range(6):
+            for l_out in range(3 + 1):
+                for l_in in range(l_out, 4 + 1):
                     for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
                         Q = o3.clebsch_gordan(l_f, l_in, l_out).reshape(2 * l_f + 1, -1)
                         e = (2 * l_f + 1) * Q @ Q.t()
