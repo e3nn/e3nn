@@ -31,7 +31,7 @@ class Dropout(torch.nn.Module):
             else:
                 noise.bernoulli_(1 - self.p).div_(1 - self.p)
 
-            noise = noise.unsqueeze(2).expand(-1, -1, dim).contiguous().view(x.size(0), mul * dim)
+            noise = noise.unsqueeze(2).expand(-1, -1, dim).reshape(x.size(0), mul * dim)
             noises.append(noise)
         noise = torch.cat(noises, dim=1)
         return x * noise.view(*noise.size(), *(1,) * (x.dim() - 2))

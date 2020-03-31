@@ -80,7 +80,7 @@ class BatchNorm(nn.Module):
             ix += m * d
 
             # [batch, sample, mul, repr]
-            field = field.contiguous().view(batch, -1, m, d)
+            field = field.reshape(batch, -1, m, d)
 
             if d == 1:  # scalars
                 if self.training:

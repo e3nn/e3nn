@@ -221,7 +221,7 @@ class PeriodicConvolution(torch.nn.Module):
                 k_b = features.new_zeros(points_num, out_channels, in_channels)                                      # [b, i, j]
                 k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
                 ks_start += bs.size(0)
-                k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)                  # [i, b*j]
+                k_b = k_b.transpose(0, 1).reshape(out_channels, points_num * in_channels)                  # [i, b*j]
 
                 out[z, a] = torch.mv(k_b, features[z])                                                               # [i, b*j] @ [b*j] -> [i]
 
@@ -266,7 +266,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
             k_b = features.new_zeros(points_num, out_channels, in_channels)                         # [b, i, j]
             k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
             ks_start += bs.size(0)
-            k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)     # [i, b*j]
+            k_b = k_b.transpose(0, 1).reshape(out_channels, points_num * in_channels)     # [i, b*j]
 
             out[a] = torch.mv(k_b, features)                                                        # [i, b*j] @ [b*j] -> [i]
 
@@ -291,7 +291,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
             k_b = features.new_zeros(points_num, out_channels, in_channels)
             k_b.index_add_(dim=0, index=bs, source=kernels[ks_start:ks_start + bs.size(0)])
             ks_start += bs.size(0)
-            k_b = k_b.transpose(0, 1).contiguous().view(out_channels, points_num * in_channels)     # [i, b*j]
+            k_b = k_b.transpose(0, 1).reshape(out_channels, points_num * in_channels)     # [i, b*j]
 
             features_grad += (k_b * grad_output[a].unsqueeze(1).expand_as(k_b)).sum(dim=0)          # sum(i){ [i, b*j] * ([i] -> [i, b*j]) } -> [b*j]
 
