@@ -7,10 +7,10 @@ import torch
 from e3nn.non_linearities.gated_block import GatedBlock
 from e3nn.non_linearities.gated_block_parity import GatedBlockParity
 from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
-from e3nn.kernel import Kernel
+from e3nn.kernel_mod import Kernel
 from e3nn.point.operations import Convolution
 from e3nn.radial import ConstantRadialModel
-from e3nn import o3
+from e3nn import o3, rs
 from e3nn.util.default_dtype import torch_default_dtype
 
 
@@ -49,8 +49,8 @@ class Tests(unittest.TestCase):
             r = torch.randn(3)
 
             abc = torch.randn(3)
-            D_in = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
-            D_out = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
+            D_in = rs.rep(Rs_in, *abc)
+            D_out = rs.rep(Rs_out, *abc)
 
             W1 = D_out @ k(r)  # [i, j]
             W2 = k(o3.rot(*abc) @ r) @ D_in  # [i, j]
@@ -69,8 +69,8 @@ class Tests(unittest.TestCase):
 
             abc = torch.randn(3)
             rot_geo = o3.rot(*abc)
-            D_in = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
-            D_out = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_out for _ in range(mul)])
+            D_in = rs.rep(Rs_in, *abc)
+            D_out = rs.rep(Rs_out, *abc)
 
             fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l in Rs_in))
             geo = torch.randn(1, 4, 3)
@@ -88,8 +88,8 @@ class Tests(unittest.TestCase):
             k = Kernel(Rs_in, Rs_out, ConstantRadialModel)
             r = torch.randn(3)
 
-            D_in = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_out for _ in range(mul)])
+            D_in = rs.rep(Rs_in, 0, 0, 0, 1)
+            D_out = rs.rep(Rs_out, 0, 0, 0, 1)
 
             W1 = D_out @ k(r)  # [i, j]
             W2 = k(-r) @ D_in  # [i, j]
@@ -99,7 +99,7 @@ class Tests(unittest.TestCase):
         """Test parity equivariance on GatedBlockParity and dependencies."""
         with torch_default_dtype(torch.float64):
             mul = 2
-            Rs_in = [(mul, l, p) for l in range(6) for p in [-1, 1]]
+            Rs_in = [(mul, l, p) for l in range(3 + 1) for p in [-1, 1]]
 
             K = partial(Kernel, RadialModel=ConstantRadialModel)
 
@@ -111,8 +111,8 @@ class Tests(unittest.TestCase):
             act = GatedBlockParity(*scalars, *gates, rs_nonscalars)
             conv = Convolution(K, Rs_in, act.Rs_in)
 
-            D_in = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = o3.direct_sum(*[p * torch.eye(2 * l + 1) for mul, l, p in act.Rs_out for _ in range(mul)])
+            D_in = rs.rep(Rs_in, 0, 0, 0, 1)
+            D_out = rs.rep(act.Rs_out, 0, 0, 0, 1)
 
             fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
             geo = torch.randn(1, 4, 3)
@@ -125,7 +125,7 @@ class Tests(unittest.TestCase):
         """Test parity and rotation equivariance on GatedBlockParity and dependencies."""
         with torch_default_dtype(torch.float64):
             mul = 2
-            Rs_in = [(mul, l, p) for l in range(6) for p in [-1, 1]]
+            Rs_in = [(mul, l, p) for l in range(3 + 1) for p in [-1, 1]]
 
             K = partial(Kernel, RadialModel=ConstantRadialModel)
 
@@ -139,8 +139,8 @@ class Tests(unittest.TestCase):
 
             abc = torch.randn(3)
             rot_geo = -o3.rot(*abc)
-            D_in = o3.direct_sum(*[p * o3.irr_repr(l, *abc) for mul, l, p in Rs_in for _ in range(mul)])
-            D_out = o3.direct_sum(*[p * o3.irr_repr(l, *abc) for mul, l, p in act.Rs_out for _ in range(mul)])
+            D_in = rs.rep(Rs_in, *abc, 1)
+            D_out = rs.rep(act.Rs_out, *abc, 1)
 
             fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
             geo = torch.randn(1, 4, 3)

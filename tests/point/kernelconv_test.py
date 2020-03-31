@@ -27,7 +27,7 @@ class TestKernelConvFn(unittest.TestCase):
         n_path = 0
         for mul_out, l_out, p_out in KC.Rs_out:
             for mul_in, l_in, p_in in KC.Rs_in:
-                l_filters = KC.get_l_filters(l_in, p_in, l_out, p_out)
+                l_filters = KC.selection_rule(l_in, p_in, l_out, p_out)
                 n_path += mul_out * mul_in * len(l_filters)
 
         batch = 1
@@ -46,7 +46,7 @@ class TestKernelConvFn(unittest.TestCase):
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)].to(device)  # [l_out, l_in, batch, a, b]
 
         inputs = (
-            F, Y, R, norm_coef, KC.Rs_in, KC.Rs_out, KC.get_l_filters, KC.set_of_l_filters
+            F, Y, R, norm_coef, KC.Rs_in, KC.Rs_out, KC.selection_rule, KC.set_of_l_filters
         )
         self.assertTrue(torch.autograd.gradcheck(KernelConvFn.apply, inputs))
 

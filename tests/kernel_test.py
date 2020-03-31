@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
         n_path = 0
         for mul_out, l_out, p_out in kernel.Rs_out:
             for mul_in, l_in, p_in in kernel.Rs_in:
-                l_filters = kernel.get_l_filters(l_in, p_in, l_out, p_out)
+                l_filters = kernel.selection_rule(l_in, p_in, l_out, p_out)
                 n_path += mul_out * mul_in * len(l_filters)
 
         r = torch.randn(2, 3)
@@ -32,7 +32,7 @@ class Tests(unittest.TestCase):
         norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
         inputs = (
-            Y, R, norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.get_l_filters, kernel.set_of_l_filters
+            Y, R, norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.selection_rule, kernel.set_of_l_filters
         )
         self.assertTrue(torch.autograd.gradcheck(KernelFn.apply, inputs))
 
