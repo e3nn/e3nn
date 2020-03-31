@@ -299,7 +299,7 @@ def tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule, paths=False):
         path_list = []
     for mul_1, l_1, p_1 in Rs_1:
         for mul_2, l_2, p_2 in Rs_2:
-            for l in get_l_output(l_1, l_2):
+            for l in get_l_output(l_1, p_1, l_2, p_2):
                 if paths:
                     path_list.extend([[l_1, l_2, l]] * (mul_1 * mul_2))
                 Rs_out.append((mul_1 * mul_2, l, p_1 * p_2))
@@ -311,13 +311,13 @@ def tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule, paths=False):
     index_out = 0
 
     index_1 = 0
-    for mul_1, l_1, _p_1 in Rs_1:
+    for mul_1, l_1, p_1 in Rs_1:
         dim_1 = mul_1 * (2 * l_1 + 1)
 
         index_2 = 0
-        for mul_2, l_2, _p_2 in Rs_2:
+        for mul_2, l_2, p_2 in Rs_2:
             dim_2 = mul_2 * (2 * l_2 + 1)
-            for l in get_l_output(l_1, l_2):
+            for l in get_l_output(l_1, p_1, l_2, p_2):
                 dim_out = mul_1 * mul_2 * (2 * l + 1)
                 C = o3.clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
@@ -361,7 +361,7 @@ def elementwise_tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule):
     Rs_out = []
     for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
         assert mul == mul_2
-        for l in get_l_output(l_1, l_2):
+        for l in get_l_output(l_1, p_1, l_2, p_2):
             Rs_out.append((mul, l, p_1 * p_2))
 
     Rs_out = simplify(Rs_out)
@@ -376,7 +376,7 @@ def elementwise_tensor_product(Rs_1, Rs_2, get_l_output=o3.selection_rule):
         dim_1 = mul * (2 * l_1 + 1)
         dim_2 = mul * (2 * l_2 + 1)
 
-        for l in get_l_output(l_1, l_2):
+        for l in get_l_output(l_1, p_1, l_2, p_2):
             dim_out = mul * (2 * l + 1)
             C = o3.clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
