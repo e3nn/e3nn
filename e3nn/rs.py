@@ -150,13 +150,12 @@ def convention(Rs):
             p = 0
         if len(r) == 3:
             mul, l, p = r
+            mul = round(mul)
+            assert mul >= 0
             if p > 0:
                 p = 1
             if p < 0:
                 p = -1
-
-        if mul == 0:
-            continue
 
         out.append((mul, l, p))
     return out
@@ -181,11 +180,10 @@ def simplify(Rs):
     """
     out = []
     Rs = convention(Rs)
-    for r in Rs:
-        mul, l, p = r
+    for mul, l, p in Rs:
         if out and out[-1][1:] == (l, p):
             out[-1] = (out[-1][0] + mul, l, p)
-        else:
+        elif mul > 0:
             out.append((mul, l, p))
     return out
 
