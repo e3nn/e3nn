@@ -53,14 +53,14 @@ class Kernel(torch.nn.Module):
         self.Rs_out = rs.convention(Rs_out)
         self.check_input_output(selection_rule)
 
-        Rs_f, Q = kernel_geometric(Rs_in, Rs_out, selection_rule, normalization)
+        Rs_f, Q = kernel_geometric(self.Rs_in, self.Rs_out, selection_rule, normalization)
         self.register_buffer('Q', Q)  # [out, in, Y, R]
 
         self.sh = sh
         self.Ls = [l for _, l, _ in Rs_f]
         self.R = RadialModel(rs.mul_dim(Rs_f))
 
-        self.linear = KernelLinear(Rs_in, Rs_out)
+        self.linear = KernelLinear(self.Rs_in, self.Rs_out)
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
