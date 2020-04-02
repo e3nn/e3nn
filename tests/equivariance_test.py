@@ -4,18 +4,22 @@ from functools import partial
 
 import torch
 
+from e3nn import o3, rs
+from e3nn.kernel import Kernel as Kernel1
+from e3nn.kernel_mod import Kernel as KernelMod
+from e3nn.linear import Linear as Linear1
+from e3nn.linear_mod import Linear as LinearMod
+from e3nn.networks import GatedConvNetwork
 from e3nn.non_linearities.gated_block import GatedBlock
 from e3nn.non_linearities.gated_block_parity import GatedBlockParity
 from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
-from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
 from e3nn.radial import ConstantRadialModel
-from e3nn import o3, rs
 from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):
-    def test1(self):
+    def test_irr_repr_clebsch_gordan(self):
         """Test irr_repr and clebsch_gordan equivariance."""
         with torch_default_dtype(torch.float64):
             l_in = 3
@@ -39,13 +43,13 @@ class Tests(unittest.TestCase):
 
                 self.assertLess((W1 - W2).norm(), 1e-5 * W.norm(), l_f)
 
-    def test2(self):
+    def rotation_kernel(self, K):
         """Test rotation equivariance on Kernel."""
         with torch_default_dtype(torch.float64):
             Rs_in = [(2, 0), (0, 1), (2, 2)]
             Rs_out = [(2, 0), (2, 1), (2, 2)]
 
-            k = Kernel(Rs_in, Rs_out, ConstantRadialModel)
+            k = K(Rs_in, Rs_out, ConstantRadialModel)
             r = torch.randn(3)
 
             abc = torch.randn(3)
@@ -56,13 +60,19 @@ class Tests(unittest.TestCase):
             W2 = k(o3.rot(*abc) @ r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
 
-    def test3(self):
+    def test_rotation_kernel(self):
+        self.rotation_kernel(Kernel1)
+
+    def test_rotation_kernel_mod(self):
+        self.rotation_kernel(KernelMod)
+
+    def rotation_gated_block(self, K):
         """Test rotation equivariance on GatedBlock and dependencies."""
         with torch_default_dtype(torch.float64):
             Rs_in = [(2, 0), (0, 1), (2, 2)]
             Rs_out = [(2, 0), (2, 1), (2, 2)]
 
-            K = partial(Kernel, RadialModel=ConstantRadialModel)
+            K = partial(K, RadialModel=ConstantRadialModel)
 
             act = GatedBlock(Rs_out, scalar_activation=sigmoid, gate_activation=sigmoid)
             conv = Convolution(K, Rs_in, act.Rs_in)
@@ -72,20 +82,26 @@ class Tests(unittest.TestCase):
             D_in = rs.rep(Rs_in, *abc)
             D_out = rs.rep(Rs_out, *abc)
 
-            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l in Rs_in))
+            fea = torch.randn(1, 4, rs.dim(Rs_in))
             geo = torch.randn(1, 4, 3)
 
             x1 = torch.einsum("ij,zaj->zai", (D_out, act(conv(fea, geo))))
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), torch.einsum("ij,zaj->zai", rot_geo, geo)))
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
-    def test4(self):
+    def test_rotation_gated_block(self):
+        self.rotation_gated_block(Kernel1)
+
+    def test_rotation_gated_block_mod(self):
+        self.rotation_gated_block(KernelMod)
+
+    def parity_kernel(self, K):
         """Test parity equivariance on Kernel."""
         with torch_default_dtype(torch.float64):
             Rs_in = [(2, 0, 1), (2, 1, 1), (2, 2, -1)]
             Rs_out = [(2, 0, -1), (2, 1, 1), (2, 2, 1)]
 
-            k = Kernel(Rs_in, Rs_out, ConstantRadialModel)
+            k = K(Rs_in, Rs_out, ConstantRadialModel)
             r = torch.randn(3)
 
             D_in = rs.rep(Rs_in, 0, 0, 0, 1)
@@ -95,13 +111,19 @@ class Tests(unittest.TestCase):
             W2 = k(-r) @ D_in  # [i, j]
             self.assertLess((W1 - W2).norm(), 10e-5 * W1.norm())
 
-    def test5(self):
+    def test_parity_kernel(self):
+        self.parity_kernel(Kernel1)
+
+    def test_parity_kernel_mod(self):
+        self.parity_kernel(KernelMod)
+
+    def parity_gated_block_parity(self, K):
         """Test parity equivariance on GatedBlockParity and dependencies."""
         with torch_default_dtype(torch.float64):
             mul = 2
             Rs_in = [(mul, l, p) for l in range(3 + 1) for p in [-1, 1]]
 
-            K = partial(Kernel, RadialModel=ConstantRadialModel)
+            K = partial(K, RadialModel=ConstantRadialModel)
 
             scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, absolute)]
             rs_nonscalars = [(mul, 1, +1), (mul, 1, -1), (mul, 2, +1), (mul, 2, -1), (mul, 3, +1), (mul, 3, -1)]
@@ -114,20 +136,26 @@ class Tests(unittest.TestCase):
             D_in = rs.rep(Rs_in, 0, 0, 0, 1)
             D_out = rs.rep(act.Rs_out, 0, 0, 0, 1)
 
-            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
+            fea = torch.randn(1, 4, rs.dim(Rs_in))
             geo = torch.randn(1, 4, 3)
 
             x1 = torch.einsum("ij,zaj->zai", (D_out, act(conv(fea, geo))))
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo))
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
-    def test6(self):
+    def test_parity_gated_block_parity(self):
+        self.parity_gated_block_parity(Kernel1)
+
+    def test_parity_gated_block_parity_mod(self):
+        self.parity_gated_block_parity(KernelMod)
+
+    def parity_rotation_gated_block_parity(self, K):
         """Test parity and rotation equivariance on GatedBlockParity and dependencies."""
         with torch_default_dtype(torch.float64):
             mul = 2
             Rs_in = [(mul, l, p) for l in range(3 + 1) for p in [-1, 1]]
 
-            K = partial(Kernel, RadialModel=ConstantRadialModel)
+            K = partial(K, RadialModel=ConstantRadialModel)
 
             scalars = [(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, absolute)]
             rs_nonscalars = [(mul, 1, +1), (mul, 1, -1), (mul, 2, +1), (mul, 2, -1), (mul, 3, +1), (mul, 3, -1)]
@@ -142,12 +170,62 @@ class Tests(unittest.TestCase):
             D_in = rs.rep(Rs_in, *abc, 1)
             D_out = rs.rep(act.Rs_out, *abc, 1)
 
-            fea = torch.randn(1, 4, sum(mul * (2 * l + 1) for mul, l, p in Rs_in))
+            fea = torch.randn(1, 4, rs.dim(Rs_in))
             geo = torch.randn(1, 4, 3)
 
             x1 = torch.einsum("ij,zaj->zai", (D_out, act(conv(fea, geo))))
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), torch.einsum("ij,zaj->zai", rot_geo, geo)))
             self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
+
+    def test_parity_rotation_gated_block_parity(self):
+        self.parity_rotation_gated_block_parity(Kernel1)
+
+    def test_parity_rotation_gated_block_parity_mod(self):
+        self.parity_rotation_gated_block_parity(KernelMod)
+
+    def parity_rotation_linear(self, L):
+        """Test parity and rotation equivariance on Linear."""
+        with torch_default_dtype(torch.float64):
+            mul = 2
+            Rs_in = [(mul, l, p) for l in range(3 + 1) for p in [-1, 1]]
+            Rs_out = [(mul, l, p) for l in range(3 + 1) for p in [-1, 1]]
+
+            lin = L(Rs_in, Rs_out)
+
+            abc = torch.randn(3)
+            D_in = rs.rep(lin.Rs_in, *abc, 1)
+            D_out = rs.rep(lin.Rs_out, *abc, 1)
+
+            fea = torch.randn(rs.dim(Rs_in))
+
+            x1 = torch.einsum("ij,j->i", D_out, lin(fea))
+            x2 = lin(torch.einsum("ij,j->i", D_in, fea))
+            self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
+
+    def test_parity_rotation_linear(self):
+        self.parity_rotation_linear(Linear1)
+
+    def test_parity_rotation_linear_mod(self):
+        self.parity_rotation_linear(LinearMod)
+
+    def test_equivariance_gatedconvnetwork(self):
+        mul = 3
+        Rs_in = [(mul, l) for l in range(3 + 1)]
+        Rs_out = [(mul, l) for l in range(3 + 1)]
+
+        net = GatedConvNetwork(Rs_in, [(10, 0), (1, 1), (1, 2), (1, 3)], Rs_out, lmax=3, feature_product=True)
+
+        abc = torch.randn(3)
+        rot_geo = o3.rot(*abc)
+        D_in = rs.rep(Rs_in, *abc)
+        D_out = rs.rep(Rs_out, *abc)
+
+        fea = torch.randn(1, 10, rs.dim(Rs_in))
+        geo = torch.randn(1, 10, 3)
+
+        x1 = torch.einsum("ij,zaj->zai", D_out, net(fea, geo))
+        x2 = net(torch.einsum("ij,zaj->zai", D_in, fea), torch.einsum("ij,zaj->zai", rot_geo, geo))
+        self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 
 if __name__ == '__main__':
