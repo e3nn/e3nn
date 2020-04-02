@@ -20,32 +20,35 @@ class KernelConv(Kernel):
         _batch, _a, _b, xyz = difference_geometry.size()
         assert xyz == 3
 
+        if radii is None:
+            radii = difference_geometry.norm(2, dim=-1)  # [batch, a, b]
+
         # precompute all needed spherical harmonics
         if y is None:
             y = self.sh(self.set_of_l_filters, difference_geometry)  # [l_filter * m_filter, batch, a, b]
 
+        y[:, radii == 0] = 0
+
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
-        if radii is None:
-            radii = difference_geometry.norm(2, dim=-1)  # [batch, a, b]
-        r = self.R(radii.flatten()).view(
-            *radii.shape, -1
-        )  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
+        r = self.R(radii.flatten()).view(*radii.shape, -1)  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
         r = r.clone()
-        r[radii == 0] = self.weight
-
-        norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch, a, b]
+        r[radii == 0] = 0
 
         if custom_backward:
-            kernel_conv = KernelConvFn.apply(
-                features, y, r, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters
+            output = KernelConvFn.apply(
+                features, y, r, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters
             )
         else:
-            kernel_conv = kernel_conv_fn_forward(
-                features, y, r, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters
+            output = kernel_conv_fn_forward(
+                features, y, r, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters
             )
 
-        return kernel_conv * mask.unsqueeze(-1)
+        # Case r > 0
+        if radii.shape[1] == radii.shape[2]:
+            output += torch.einsum('ij,zaj->zai', self.linear(), features)
+
+        return output * mask.unsqueeze(-1)
 
 
 def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
@@ -53,7 +56,7 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, se
     :param F: tensor [batch, b, l_in * mul_in * m_in]
     :param Y: tensor [l_filter * m_filter, batch, a, b]
     :param R: tensor [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
-    :param norm_coef: tensor [l_out, l_in, batch, a, b]
+    :param norm_coef: tensor [l_out, l_in]
     :return: tensor [batch, a, l_out * mul_out * m_out, l_in * mul_in * m_in]
     """
     batch, a, b = Y.shape[1:]
@@ -85,8 +88,6 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, se
             )  # [batch, a, b, mul_out, mul_in, l_filter]
             begin_R += n
 
-            sub_norm_coef = norm_coef[i, j]  # [batch]
-
             K = 0
             for k, l_filter in enumerate(l_filters):
                 offset = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
@@ -94,9 +95,9 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, se
 
                 C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
 
-                K += torch.einsum(
-                    "ijk,kzab,zabuv,zab,zbvj->zaui",
-                    C, sub_Y, sub_R[..., k], sub_norm_coef, F[..., s_in].view(batch, b, mul_in, -1)
+                K += norm_coef[i, j] * torch.einsum(
+                    "ijk,kzab,zabuv,zbvj->zaui",
+                    C, sub_Y, sub_R[..., k], F[..., s_in].view(batch, b, mul_in, -1)
                 )  # [batch, a, mul_out, m_out]
 
             if not isinstance(K, int):
@@ -186,8 +187,6 @@ class KernelConvFn(torch.autograd.Function):
                     batch, a, mul_out, 2 * l_out + 1
                 )
 
-                sub_norm_coef = norm_coef[i, j]  # [batch, a, b]
-
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
                     C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
@@ -196,19 +195,19 @@ class KernelConvFn(torch.autograd.Function):
                         sub_Y = Y[tmp: tmp + 2 * l_filter + 1, ...]  # [m, batch, a, b]
 
                     if grad_F is not None:
-                        sub_grad_F += torch.einsum(
-                            "zaui,ijk,kzab,zabuv,zab->zbvj",
-                            grad_K, C, sub_Y, sub_R[..., k], sub_norm_coef
+                        sub_grad_F += norm_coef[i, j] * torch.einsum(
+                            "zaui,ijk,kzab,zabuv->zbvj",
+                            grad_K, C, sub_Y, sub_R[..., k]
                         )  # [batch, b, mul_in, 2 * l_in + 1
                     if grad_Y is not None:
-                        grad_Y[tmp: tmp + 2 * l_filter + 1, ...] += torch.einsum(
-                            "zaui,ijk,zabuv,zab,zbvj->kzab",
-                            grad_K, C, sub_R[..., k], sub_norm_coef, sub_F
+                        grad_Y[tmp: tmp + 2 * l_filter + 1, ...] += norm_coef[i, j] * torch.einsum(
+                            "zaui,ijk,zabuv,zbvj->kzab",
+                            grad_K, C, sub_R[..., k], sub_F
                         )  # [m, batch, a, b]
                     if grad_R is not None:
-                        sub_grad_R[..., k] = torch.einsum(
-                            "zaui,ijk,kzab,zab,zbvj->zabuv",
-                            grad_K, C, sub_Y, sub_norm_coef, sub_F
+                        sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum(
+                            "zaui,ijk,kzab,zbvj->zabuv",
+                            grad_K, C, sub_Y, sub_F
                         )  # [batch, a, b, mul_out, mul_in]
                 if grad_F is not None:
                     grad_F[:, :, s_in] = sub_grad_F.view(batch, b, mul_in * (2 * l_in + 1))

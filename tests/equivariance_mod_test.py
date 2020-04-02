@@ -7,7 +7,7 @@ import torch
 from e3nn.non_linearities.gated_block import GatedBlock
 from e3nn.non_linearities.gated_block_parity import GatedBlockParity
 from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
-from e3nn.kernel import Kernel
+from e3nn.kernel_mod import Kernel
 from e3nn.point.operations import Convolution
 from e3nn.radial import ConstantRadialModel
 from e3nn import o3, rs
@@ -15,30 +15,6 @@ from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):
-    def test1(self):
-        """Test irr_repr and clebsch_gordan equivariance."""
-        with torch_default_dtype(torch.float64):
-            l_in = 3
-            l_out = 2
-
-            for l_f in range(abs(l_in - l_out), l_in + l_out + 1):
-                r = torch.randn(100, 3)
-                Q = o3.clebsch_gordan(l_out, l_in, l_f)
-
-                abc = torch.randn(3)
-                D_in = o3.irr_repr(l_in, *abc)
-                D_out = o3.irr_repr(l_out, *abc)
-
-                Y = o3.spherical_harmonics_xyz(l_f, r @ o3.rot(*abc).t())
-                W = torch.einsum("ijk,kz->zij", (Q, Y))
-                W1 = torch.einsum("zij,jk->zik", (W, D_in))
-
-                Y = o3.spherical_harmonics_xyz(l_f, r)
-                W = torch.einsum("ijk,kz->zij", (Q, Y))
-                W2 = torch.einsum("ij,zjk->zik", (D_out, W))
-
-                self.assertLess((W1 - W2).norm(), 1e-5 * W.norm(), l_f)
-
     def test2(self):
         """Test rotation equivariance on Kernel."""
         with torch_default_dtype(torch.float64):
