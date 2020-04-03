@@ -2,6 +2,7 @@
 import torch
 from e3nn.linear import Linear
 from e3nn import o3, rs
+from functools import partial
 
 
 class TensorProduct(torch.nn.Module):
