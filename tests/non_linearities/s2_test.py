@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
             a, b, c, p = *torch.rand(3), 1
             y1 = ac(x) @ rs.rep(ac.Rs_out, a, b, c, p).T
             y2 = ac(x @ rs.rep(Rs, a, b, c, p).T)
-            self.assertLess((y1 - y2).abs().max(), 1e-4 * y1.abs().max())
+            self.assertLess((y1 - y2).abs().max(), 3e-4 * y1.abs().max())
 
         lmax = 5
         Rss = [
