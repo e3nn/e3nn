@@ -109,6 +109,5 @@ class LearnableBispectrum(torch.nn.Module):
     def forward(self, input):
         output = input
         output = self.tp(output, output)
-        output = self.lin(output)
         output = self.dot(output)
         return self.lin_final(output)
