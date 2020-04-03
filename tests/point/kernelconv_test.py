@@ -36,17 +36,14 @@ class TestKernelConvFn(unittest.TestCase):
         F = torch.randn(batch, atoms, dim(Rs_in), requires_grad=True).to(device)
         geo = torch.randn(batch, atoms, 3)
         r = (geo.unsqueeze(1) - geo.unsqueeze(2)).to(device)
-        radii = r.norm(batch, dim=-1)  # [batch, a, b]
         Y = KC.sh(KC.set_of_l_filters, r)  # [l_filter * m_filter, batch, a, b]
         Y = Y.clone().detach().requires_grad_(True).to(device)
         R = torch.randn(
             batch, atoms, atoms, n_path, requires_grad=True
         ).to(device)  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
-        norm_coef = KC.norm_coef
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)].to(device)  # [l_out, l_in, batch, a, b]
 
         inputs = (
-            F, Y, R, norm_coef, KC.Rs_in, KC.Rs_out, KC.selection_rule, KC.set_of_l_filters
+            F, Y, R, KC.norm_coef, KC.Rs_in, KC.Rs_out, KC.selection_rule, KC.set_of_l_filters
         )
         self.assertTrue(torch.autograd.gradcheck(KernelConvFn.apply, inputs))
 
@@ -80,6 +77,8 @@ class TestKernelConv(unittest.TestCase):
         return C, KC
 
     def ensure_parameters_same(self, conv, kernel_conv):
+        print(list(conv.kernel.parameters()))
+        print(list(kernel_conv.parameters()))
         assert all(torch.all(a == b) for a, b in zip(conv.kernel.parameters(), kernel_conv.parameters())), self.msg
 
     def test_compare_forward(self):

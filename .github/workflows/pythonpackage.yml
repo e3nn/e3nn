@@ -36,5 +36,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=180 --statistics --exclude=src/lie-learn
     - name: Test with pytest
       run: |
-        pip install pytest
-        pytest --ignore=tests/image/ --ignore=tests/point/periodic_convolution_test.py --durations=5
+        pip install pytest pytest-cov
+        pip install codecov
+        pytest --cov=./ --ignore=tests/image/ --ignore=tests/point/periodic_convolution_test.py --durations=5
+        codecov --token=f390cbce-c251-45ad-bcd6-8d6f4c974b39

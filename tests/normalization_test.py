@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from e3nn import o3
+from e3nn import o3, rs
 from e3nn.kernel import Kernel
 from e3nn.radial import ConstantRadialModel
 from e3nn.util.default_dtype import torch_default_dtype
@@ -24,7 +24,7 @@ class Tests(unittest.TestCase):
                     k = k(torch.randn(1, 3))
 
                     self.assertLess(k.mean().item(), 1e-3)
-                    self.assertAlmostEqual(k.var().item() * mul * (2 * l_in + 1), 1, places=1)
+                    self.assertAlmostEqual(k.var().item() * rs.dim(Rs_in), 1, places=1)
 
     def test2(self):
         with torch_default_dtype(torch.float64):

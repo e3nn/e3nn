@@ -1,9 +1,22 @@
-# pylint: disable=arguments-differ, no-member, missing-docstring, invalid-name, line-too-long
-import math
-
+# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member, pointless-statement, unbalanced-tuple-unpacking
 import torch
 
 from e3nn import rs
+
+
+def kernel_linear(Rs_in, Rs_out):
+    # Compute Clebsh-Gordan coefficients
+    def selection_rule(l_in, p_in, l_out, p_out):
+        if l_in == l_out and p_out in [0, p_in]:
+            return [0]
+        return []
+
+    Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out)  # [out, in, w]
+    Rs_f = rs.simplify(Rs_f)
+    [(_n_path, l, p)] = Rs_f
+    assert l == 0 and p in [0, 1]
+
+    return Q
 
 
 class KernelLinear(torch.nn.Module):
@@ -15,50 +28,16 @@ class KernelLinear(torch.nn.Module):
         parity = 0 (no parity), 1 (even), -1 (odd)
         """
         super().__init__()
-        self.Rs_in = rs.simplify(Rs_in)
-        self.Rs_out = rs.simplify(Rs_out)
 
-        n_path = 0
-
-        for mul_out, l_out, p_out in self.Rs_out:
-            for mul_in, l_in, p_in in self.Rs_in:
-                if (l_out, p_out) == (l_in, p_in):
-                    # compute the number of degrees of freedom
-                    n_path += mul_out * mul_in
-
-        self.weight = torch.nn.Parameter(torch.randn(n_path))
+        Q = kernel_linear(Rs_in, Rs_out)  # [out, in, w]
+        self.register_buffer('Q', Q)
+        self.weight = torch.nn.Parameter(torch.randn(Q.shape[2]))
 
     def forward(self):
         """
         :return: tensor [l_out * mul_out * m_out, l_in * mul_in * m_in]
         """
-        kernel = self.weight.new_zeros(rs.dim(self.Rs_out), rs.dim(self.Rs_in))
-        begin_w = 0
-
-        begin_out = 0
-        for mul_out, l_out, p_out in self.Rs_out:
-            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-            begin_out += mul_out * (2 * l_out + 1)
-
-            n_path = 0
-
-            begin_in = 0
-            for mul_in, l_in, p_in in self.Rs_in:
-                s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                begin_in += mul_in * (2 * l_in + 1)
-
-                if (l_out, p_out) == (l_in, p_in):
-                    weight = self.weight[begin_w: begin_w + mul_out * mul_in].reshape(mul_out, mul_in)  # [mul_out, mul_in]
-                    begin_w += mul_out * mul_in
-
-                    eye = torch.eye(2 * l_in + 1, dtype=self.weight.dtype, device=self.weight.device)
-                    kernel[s_out, s_in] = torch.einsum('uv,ij->uivj', weight, eye).view(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1))
-                    n_path += mul_in
-
-            if n_path > 0:
-                kernel[s_out] /= math.sqrt(n_path)
-
-        return kernel
+        return torch.einsum('ijk,k', self.Q, self.weight)
 
 
 class Linear(torch.nn.Module):
