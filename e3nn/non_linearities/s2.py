@@ -1,13 +1,11 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
-import math
-
 import torch
 
-from e3nn import o3, rs
+from e3nn import rs, soft
 
 
 class S2Activation(torch.nn.Module):
-    def __init__(self, Rs, act, n):
+    def __init__(self, Rs, act, res):
         '''
         map to the sphere, apply the non linearity point wise and project back
         the signal on the sphere is a quasiregular representation of O3
@@ -15,14 +13,15 @@ class S2Activation(torch.nn.Module):
 
         :param Rs: input representation
         :param act: activation function
-        :param n: number of point on the sphere (the higher the more accurate)
+        :param res: resolution of the SOFT grid on the sphere (the higher the more accurate)
         '''
         super().__init__()
 
         Rs = rs.simplify(Rs)
-        mul0, _, p0 = Rs[0]
-        assert all(mul0 == mul for mul, _, _ in Rs)
-        assert [l for _, l, _ in Rs] == list(range(len(Rs)))
+        _, _, p0 = Rs[0]
+        mul, lmax, _ = Rs[-1]
+        assert all(mul == mulx for mulx, _, _ in Rs)
+        assert [l for _, l, _ in Rs] == [l for l in range(lmax + 1)]
         assert all(p == p0 for _, l, p in Rs) or all(p == p0 * (-1) ** l for _, l, p in Rs)
 
         if p0 == +1 or p0 == 0:
@@ -40,19 +39,15 @@ class S2Activation(torch.nn.Module):
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")
 
-        x = torch.randn(n, 3)
-        x = torch.cat([x, -x])
-        Y = o3.spherical_harmonics_xyz(list(range(len(Rs))), x)  # [lm, z]
-        self.register_buffer('Y', Y)
+        self.to_soft = soft.ToSOFT(mul, lmax, res)
+        self.from_soft = soft.FromSOFT(mul, res, lmax)
         self.act = act
 
-    def forward(self, features, dim=-1):
+    def forward(self, features):
         '''
-        :param features: [..., channels, ...]
+        :param features: [..., l * mul * m]
         '''
-        assert features.shape[dim] == self.Y.shape[0]  # assert mul == 1 for now
-        features = features.transpose(0, dim)
-        out_features = (4 * math.pi / self.Y.shape[1]) * self.Y @ self.act(self.Y.T @ features.flatten(1))
-        out_features = out_features.view(*features.shape)
-        out_features = out_features.transpose(0, dim)
-        return out_features
+        features = self.to_soft(features)  # [..., mul, beta, alpha]
+        features = self.act(features)
+        features = self.from_soft(features)  # [..., l * mul * m]
+        return features

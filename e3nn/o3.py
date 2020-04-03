@@ -316,12 +316,16 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             return out.to(dtype=dtype, device=device)
 
 
-def spherical_harmonics_expand_matrix(lmax):
-    m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
+def spherical_harmonics_expand_matrix(mul, lmax):
+    """
+    :return: tensor [mul, l, m, l * mul * m]
+    """
+    m = torch.zeros(mul, lmax + 1, 2 * lmax + 1, sum(mul * (2 * l + 1) for l in range(lmax + 1)))
     i = 0
     for l in range(lmax + 1):
-        m[l, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
-        i += 2 * l + 1
+        for u in range(mul):
+            m[u, l, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
+            i += 2 * l + 1
     return m
 
 

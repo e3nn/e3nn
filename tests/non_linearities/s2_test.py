@@ -14,19 +14,20 @@ class Tests(unittest.TestCase):
         torch.set_default_dtype(torch.float64)
 
         def test(Rs, act):
-            x = torch.randn(55, sum(2 * l + 1 for _, l, _ in Rs))
-            ac = S2Activation(Rs, act, 1000)
+            x = torch.randn(2, sum(2 * l + 1 for _, l, _ in Rs))
+            ac = S2Activation(Rs, act, 200)
 
-            y1 = ac(x, dim=-1) @ rs.rep(ac.Rs_out, 0, 0, 0, -1).T
-            y2 = ac(x @ rs.rep(Rs, 0, 0, 0, -1).T, dim=-1)
-            self.assertLess((y1 - y2).abs().max(), 1e-10)
+            a, b, c, p = *torch.rand(3), 1
+            y1 = ac(x) @ rs.rep(ac.Rs_out, a, b, c, p).T
+            y2 = ac(x @ rs.rep(Rs, a, b, c, p).T)
+            self.assertLess((y1 - y2).abs().max(), 1e-4 * y1.abs().max())
 
-        L = 5
+        lmax = 5
         Rss = [
-            [(1, l, -(-1) ** l) for l in range(L)],
-            [(1, l, (-1) ** l) for l in range(L)],
-            [(1, l, -1) for l in range(L)],
-            [(1, l, 1) for l in range(L)],
+            [(1, l, -(-1) ** l) for l in range(lmax + 1)],
+            [(1, l, (-1) ** l) for l in range(lmax + 1)],
+            [(1, l, -1) for l in range(lmax + 1)],
+            [(1, l, 1) for l in range(lmax + 1)],
         ]
 
         acts = [torch.tanh, torch.abs]
@@ -35,8 +36,8 @@ class Tests(unittest.TestCase):
             test(Rs, act)
 
         Rss = [
-            [(1, l, (-1) ** l) for l in range(L)],
-            [(1, l, 1) for l in range(L)],
+            [(1, l, (-1) ** l) for l in range(lmax + 1)],
+            [(1, l, 1) for l in range(lmax + 1)],
         ]
 
         acts = [torch.relu, torch.sigmoid]
