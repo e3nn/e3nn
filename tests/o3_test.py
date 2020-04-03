@@ -10,6 +10,14 @@ from e3nn import o3, rs
 
 class Tests(unittest.TestCase):
 
+    def test_sh_is_in_irrep(self):
+        with o3.torch_default_dtype(torch.float64):
+            for l in range(4 + 1):
+                a, b = 3.14 * torch.rand(2)  # works only for beta in [0, pi]
+                Y = o3.spherical_harmonics(l, a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1) * (-1) ** l
+                D = o3.irr_repr(l, a, b, 0)
+                self.assertLess((Y - D[:, l]).norm(), 1e-10)
+
     def test_sh_cuda_single(self):
         if torch.cuda.is_available():
             with o3.torch_default_dtype(torch.float64):
