@@ -120,7 +120,7 @@ class LearnableMultiplicityBispectrum(torch.nn.Module):
         self.tp = LearnableTensorProduct(single_mul_Rs_in, single_mul_Rs_in, mul_in, Rs_hidden,
                                          partial(o3.selection_rule, lmax=self.lmax))
         # Dot product
-        self.dot = LearnableTensorProduct(Rs_hidden, Rs_in, 1, 
+        self.dot = LearnableTensorProduct(Rs_hidden, single_mul_Rs_in * mul_in, 1, 
                                           [(mul_out, 0)], partial(o3.selection_rule, lmax=0))
 
     def forward(self, input):
