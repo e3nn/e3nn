@@ -109,3 +109,21 @@ class LearnableBispectrum(torch.nn.Module):
         output = input
         output = self.tp(output, output)
         return self.dot(output, input)
+
+
+class LearnableMultiplicityBispectrum(torch.nn.Module):
+    def __init__(self, mul_in, single_mul_Rs_in, mul_hidden, mul_out):
+        super().__init__()
+        self.lmax = max(l for mul, l in single_mul_Rs_in)
+        Rs_hidden = [(mul_hidden, l) for l in range(self.lmax + 1)]
+        # Learnable tensor product of signal with itself
+        self.tp = LearnableTensorProduct(single_mul_Rs_in, single_mul_Rs_in, mul_in, Rs_hidden,
+                                         partial(o3.selection_rule, lmax=self.lmax))
+        # Dot product
+        self.dot = LearnableTensorProduct(Rs_hidden, Rs_in, 1, 
+                                          [(mul_out, 0)], partial(o3.selection_rule, lmax=0))
+
+    def forward(self, input):
+        output = input
+        output = self.tp(output, output)
+        return self.dot(output, input)
