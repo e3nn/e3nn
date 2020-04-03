@@ -102,12 +102,10 @@ class LearnableBispectrum(torch.nn.Module):
         self.tp = LearnableTensorProduct(Rs_in, Rs_in, 1, Rs_hidden,
                                          partial(o3.selection_rule, lmax=self.lmax))
         # Dot product
-        self.dot = TensorProduct(Rs_hidden, Rs_in, partial(o3.selection_rule, lmax=0))
-        # Combine channels to get Rs_out
-        self.lin_final = Linear(self.dot.Rs_out, [(mul_out, 0)])
+        self.dot = LearnableTensorProduct(Rs_hidden, Rs_in, 1, 
+                                          [(mul_out, 0)], partial(o3.selection_rule, lmax=0))
 
     def forward(self, input):
         output = input
         output = self.tp(output, output)
-        output = self.dot(output, input)
-        return self.lin_final(output)
+        return self.dot(output, input)
