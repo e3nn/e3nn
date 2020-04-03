@@ -24,15 +24,12 @@ class Tests(unittest.TestCase):
                 n_path += mul_out * mul_in * len(l_filters)
 
         r = torch.randn(2, 3)
-        radii = r.norm(2, dim=1)  # [batch]
         Y = kernel.sh(kernel.set_of_l_filters, r)  # [l_filter * m_filter, batch]
         Y = Y.clone().detach().requires_grad_(True)
         R = torch.randn(2, n_path, requires_grad=True)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
-        norm_coef = kernel.norm_coef
-        norm_coef = norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
 
         inputs = (
-            Y, R, norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.selection_rule, kernel.set_of_l_filters
+            Y, R, kernel.norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.selection_rule, kernel.set_of_l_filters
         )
         self.assertTrue(torch.autograd.gradcheck(KernelFn.apply, inputs))
 
