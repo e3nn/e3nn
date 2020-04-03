@@ -4,6 +4,7 @@ import math
 import torch
 
 from e3nn import o3, rs
+from e3nn.linear import KernelLinear
 
 
 class Kernel(torch.nn.Module):
@@ -41,7 +42,7 @@ class Kernel(torch.nn.Module):
                 lm_norm = math.sqrt(2 * l_out + 1) * math.sqrt(4 * math.pi)
             return lm_norm
 
-        norm_coef = torch.zeros((len(self.Rs_out), len(self.Rs_in), 2))
+        norm_coef = torch.zeros((len(self.Rs_out), len(self.Rs_in)))
 
         n_path = 0
         set_of_l_filters = set()
@@ -56,8 +57,7 @@ class Kernel(torch.nn.Module):
 
             for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
                 # normalization assuming that each terms are of order 1 and uncorrelated
-                norm_coef[i, j, 0] = lm_normalization(l_out, l_in) / math.sqrt(num_summed_elements)
-                norm_coef[i, j, 1] = lm_normalization(l_out, l_in) / math.sqrt(mul_in)
+                norm_coef[i, j] = lm_normalization(l_out, l_in) / math.sqrt(num_summed_elements)
 
                 l_filters = self.selection_rule(l_in, p_in, l_out, p_out)
                 assert l_filters == sorted(set(l_filters)), "selection_rule must return a sorted list of unique values"
@@ -73,9 +73,10 @@ class Kernel(torch.nn.Module):
         # create the radial model: R+ -> R^n_path
         # it contains the learned parameters
         self.R = RadialModel(n_path)
-        self.weight = torch.nn.Parameter(torch.randn(n_path))
         self.set_of_l_filters = sorted(set_of_l_filters)
         self.register_buffer('norm_coef', norm_coef)
+
+        self.linear = KernelLinear(self.Rs_in, self.Rs_out)
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
@@ -93,7 +94,7 @@ class Kernel(torch.nn.Module):
             if not any(self.selection_rule(l_in, p_in, l_out, p_out) for _, l_out, p_out in self.Rs_out):
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
 
-    def forward(self, r, custom_backward=False):
+    def forward(self, r, r_eps=0, custom_backward=False):
         """
         :param r: tensor [..., 3]
         :param custom_backward: call KernelFn rather than using automatic differentiation
@@ -103,31 +104,38 @@ class Kernel(torch.nn.Module):
         assert xyz == 3
         r = r.reshape(-1, 3)
 
+        radii = r.norm(2, dim=1)  # [batch]
+
+        # (1) Case r > 0
+
         # precompute all needed spherical harmonics
-        Y = self.sh(self.set_of_l_filters, r)  # [l_filter * m_filter, batch]
+        Y = self.sh(self.set_of_l_filters, r[radii > r_eps])  # [l_filter * m_filter, batch]
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
-        radii = r.norm(2, dim=1)  # [batch]
-        R = self.R(radii)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
-        R = R.clone()
-        R[radii == 0] = self.weight
-
-        norm_coef = self.norm_coef[:, :, (radii == 0).type(torch.long)]  # [l_out, l_in, batch]
+        R = self.R(radii[radii > r_eps])  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
         if custom_backward:
-            kernel = KernelFn.apply(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
+            kernel1 = KernelFn.apply(Y, R, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
         else:
-            kernel = kernel_fn_forward(Y, R, norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
+            kernel1 = kernel_fn_forward(Y, R, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
 
-        return kernel.view(*size, kernel.shape[1], kernel.shape[2])
+        # (2) Case r = 0
+
+        kernel2 = self.linear()
+
+        kernel = r.new_zeros(len(r), *kernel2.shape)
+        kernel[radii > r_eps] = kernel1
+        kernel[radii <= r_eps] = kernel2
+
+        return kernel.view(*size, *kernel2.shape)
 
 
 def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
     """
     :param Y: tensor [l_filter * m_filter, batch]
     :param R: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
-    :param norm_coef: tensor [l_out, l_in, batch]
+    :param norm_coef: tensor [l_out, l_in]
     :return: tensor [batch, l_out * mul_out * m_out, l_in * mul_in * m_in]
     """
     batch = Y.shape[1]
@@ -158,8 +166,6 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_f
             sub_R = R[:, begin_R: begin_R + n].reshape(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
             begin_R += n
 
-            sub_norm_coef = norm_coef[i, j]  # [batch]
-
             # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
             K = 0
             for k, l_filter in enumerate(l_filters):
@@ -169,7 +175,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_f
                 C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
 
                 # note: The multiplication with `sub_R` could also be done outside of the for loop
-                K += torch.einsum("ijk,kz,zuv,z->zuivj", (C, sub_Y, sub_R[..., k], sub_norm_coef))  # [batch, mul_out, m_out, mul_in, m_in]
+                K += norm_coef[i, j] * torch.einsum("ijk,kz,zuv->zuivj", (C, sub_Y, sub_R[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
 
             if not isinstance(K, int):
                 kernel[:, s_out, s_in] = K.reshape_as(kernel[:, s_out, s_in])
@@ -237,23 +243,15 @@ class KernelFn(torch.autograd.Function):
 
                 grad_K = grad_kernel[:, s_out, s_in].view(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
 
-                sub_norm_coef = norm_coef[i, j]  # [batch]
-
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
                     C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
 
                     if grad_Y is not None:
-                        grad_Y[tmp: tmp + 2 * l_filter + 1] += torch.einsum(
-                            "zuivj,ijk,zuv,z->kz",
-                            grad_K, C, sub_R[..., k], sub_norm_coef
-                        )
+                        grad_Y[tmp: tmp + 2 * l_filter + 1] += norm_coef[i, j] * torch.einsum("zuivj,ijk,zuv->kz", grad_K, C, sub_R[..., k])
                     if grad_R is not None:
                         sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
-                        sub_grad_R[..., k] = torch.einsum(
-                            "zuivj,ijk,kz,z->zuv",
-                            grad_K, C, sub_Y, sub_norm_coef
-                        )
+                        sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum("zuivj,ijk,kz->zuv", grad_K, C, sub_Y)
 
         del ctx
         return grad_Y, grad_R, None, None, None, None, None
