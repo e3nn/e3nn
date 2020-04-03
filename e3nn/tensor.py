@@ -7,7 +7,6 @@ import e3nn
 import e3nn.o3 as o3
 import e3nn.rs as rs
 from e3nn.util.cache_file import cached_dirpklgz
-import e3nn.util.plot as plot
 from e3nn.spherical_harmonics import SphericalHarmonicsFindPeaks
 
 __authors__ = "Tess E. Smidt, Mario Geiger, Josh Rackers"
@@ -300,7 +299,7 @@ def spherical_harmonics_on_grid(L, n):
     x, y, z, alpha, beta = spherical_surface(n)
     print(x.shape, alpha.shape)
     return x, y, z, e3nn.o3.spherical_harmonics(L, alpha, beta)
- 
+
 
 @cached_dirpklgz("cache/wigner_D_grids")
 def wigner_D_on_grid(L, n):
