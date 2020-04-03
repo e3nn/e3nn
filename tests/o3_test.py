@@ -17,7 +17,7 @@ class Tests(unittest.TestCase):
             alpha = torch.linspace(0, 2 * math.pi, 100).view(-1, 1)
             Y1 = o3.spherical_harmonics_alpha_part(lmax, alpha) * o3.spherical_harmonics_beta_part(lmax, beta.cos())
             Y2 = o3.spherical_harmonics([l for l in range(lmax + 1)], alpha, beta)
-            Y2 = torch.einsum('lmi,iab->lmab', o3.spherical_harmonics_expand_matrix(lmax), Y2)
+            Y2 = torch.einsum('ulmi,iab->lmab', o3.spherical_harmonics_expand_matrix(1, lmax), Y2)
             self.assertLess((Y1 - Y2).abs().max(), 1e-10)
 
     def test_sh_is_in_irrep(self):
