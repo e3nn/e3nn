@@ -20,6 +20,14 @@ class TensorProduct(torch.nn.Module):
         self.Rs_out = rs.simplify(Rs_out)
         self.register_buffer('mixing_matrix', mixing_matrix)
 
+    def __repr__(self):
+        return "{name} ({Rs_1} x {Rs_2} -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_1=rs.format_Rs(self.Rs_1),
+            Rs_2=rs.format_Rs(self.Rs_2),
+            Rs_out=rs.format_Rs(self.Rs_out),
+        )
+
     def forward(self, features_1, features_2):
         '''
         :param features: [..., channels]
@@ -67,8 +75,8 @@ class LearnableTensorProduct(torch.nn.Module):
     def __init__(self, Rs_mid_1, Rs_mid_2, mul_mid, Rs_out, selection_rule=o3.selection_rule):
         super().__init__()
         self.mul_mid = mul_mid
-        self.m = TensorProduct(Rs_mid_1, Rs_mid_2, selection_rule)
-        self.si = Linear(mul_mid * self.m.Rs_out, Rs_out)
+        self.tp = TensorProduct(Rs_mid_1, Rs_mid_2, selection_rule)
+        self.lin = Linear(mul_mid * self.tp.Rs_out, Rs_out)
 
     def forward(self, x1, x2):
         """
@@ -79,6 +87,27 @@ class LearnableTensorProduct(torch.nn.Module):
         x1 = x1.view(*size, self.mul_mid, -1)
         x2 = x2.view(*size, self.mul_mid, -1)
 
-        x = self.m(x1, x2).view(*size, -1)
-        x = self.si(x)
+        x = self.tp(x1, x2).view(*size, -1)
+        x = self.lin(x)
         return x
+
+
+class LearnableBispectrum(torch.nn.Module):
+    def __init__(self, Rs_in, mul_hidden, mul_out):
+        super().__init__()
+        self.lmax = max(l for mul, l in Rs_in)
+        Rs_hidden = [(mul_hidden, l) for l in range(self.lmax + 1)]
+        # Learnable tensor product of signal with itself
+        self.tp = LearnableTensorProduct(Rs_in, Rs_in, 1, Rs_hidden,
+                                         partial(o3.selection_rule, lmax=self.lmax))
+        # Dot product
+        self.dot = TensorProduct(Rs_hidden, Rs_in, partial(o3.selection_rule, lmax=0))
+        # Combine channels to get Rs_out
+        self.lin_final = Linear(self.dot.Rs_out, [(mul_out, 0)])
+
+    def forward(self, input):
+        output = input
+        output = self.tp(output, output)
+        output = self.lin(output)
+        output = self.dot(output)
+        return self.lin_final(output)
