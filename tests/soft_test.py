@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn import o3, soft
+from e3nn import o3, rs, soft
 
 
 class Tests(unittest.TestCase):
@@ -27,10 +27,12 @@ class Tests(unittest.TestCase):
             lmax = 5
             res = 20
 
-            to = soft.ToSOFT(lmax, res)
+            for normalization in ['component', 'norm']:
+                to = soft.ToSOFT(lmax, res, normalization=normalization)
+                x = rs.randn(50, [(1, l) for l in range(lmax + 1)], normalization=normalization)
+                y = to(x)
 
-            sig = torch.randn(50, (lmax + 1) ** 2)
-            self.assertAlmostEqual(to(sig).var().item(), 1, delta=0.2)
+                self.assertAlmostEqual(y.var().item(), 1, delta=0.2)
 
 
 if __name__ == '__main__':
