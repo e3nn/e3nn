@@ -26,9 +26,8 @@ class ToSOFT(torch.nn.Module):
     Transform spherical tensor into signal on the sphere
     """
 
-    def __init__(self, mul, lmax, res=None):
+    def __init__(self, lmax, res=None):
         """
-        :param mul: multiplicity of the input signal
         :param lmax: lmax of the input signal
         """
         super().__init__()
@@ -41,23 +40,27 @@ class ToSOFT(torch.nn.Module):
         betas, alphas = soft_grid(res)
         sha = o3.spherical_harmonics_alpha_part(lmax, alphas)  # [m, a]
         shb = o3.spherical_harmonics_beta_part(lmax, betas.cos())  # [l, m, b]
-        m = o3.spherical_harmonics_expand_matrix(mul, lmax)  # [u, l, m, i]
-        shb = torch.einsum('lmb,ulmi->umbi', shb, m)  # [u, m, b, i]
-        shb *= math.sqrt(4 * math.pi) / (lmax + 1)
+
+        # normalize such that all l has the same variance on the sphere
+        n = math.sqrt(4 * math.pi) * torch.tensor([
+            1 / math.sqrt(2 * l + 1)
+            for l in range(lmax + 1)
+        ]) / math.sqrt(lmax + 1)
+        m = o3.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
+        shb = torch.einsum('lmb,lmi,l->mbi', shb, m, n)  # [m, b, i]
 
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
 
     def forward(self, x):
         """
-        :param x: tensor [..., i=l * mul * m]
-        :return: tensor [..., mul, beta, alpha]
+        :param x: tensor [..., i=l * m]
+        :return: tensor [..., beta, alpha]
         """
         size = x.shape[:-1]
-        mul = self.shb.shape[0]
-        lmax = round((x.shape[-1] // mul) ** 0.5) - 1
-        x = x.view(-1, mul * (lmax + 1) ** 2)
-        out = torch.einsum('ma,zumb->zuba', self.sha, torch.einsum('umbi,zi->zumb', self.shb, x))
+        lmax = round(x.shape[-1] ** 0.5) - 1
+        x = x.view(-1, (lmax + 1) ** 2)
+        out = torch.einsum('ma,zmb->zba', self.sha, torch.einsum('mbi,zi->zmb', self.shb, x))
         return out.view(*size, *out.shape[1:])
 
 
@@ -66,9 +69,8 @@ class FromSOFT(torch.nn.Module):
     Transform signal on the sphere into spherical tensor
     """
 
-    def __init__(self, mul, res, lmax=None):
+    def __init__(self, res, lmax=None):
         """
-        :param mul: multiplicity of the input signal
         :param res: resolution of the input signal
         """
         super().__init__()
@@ -81,22 +83,26 @@ class FromSOFT(torch.nn.Module):
         betas, alphas = soft_grid(res)
         sha = o3.spherical_harmonics_alpha_part(lmax, alphas)  # [m, a]
         shb = o3.spherical_harmonics_beta_part(lmax, betas.cos())  # [l, m, b]
-        m = o3.spherical_harmonics_expand_matrix(mul, lmax)  # [u, l, m, i]
+
+        # normalize such that it is the inverse of ToSOFT
+        n = math.sqrt(4 * math.pi) * torch.tensor([
+            math.sqrt(2 * l + 1)
+            for l in range(lmax + 1)
+        ]) * math.sqrt(lmax + 1)
+        m = o3.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         qw = torch.tensor(S3.quadrature_weights(res // 2)) * res  # [b]
-        shb = torch.einsum('lmb,ulmi,b->umbi', shb, m, qw)  # [m, b, i]
-        shb *= math.sqrt(4 * math.pi) * (lmax + 1)
+        shb = torch.einsum('lmb,lmi,l,b->mbi', shb, m, n, qw)  # [m, b, i]
 
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
 
     def forward(self, x):
         """
-        :param x: tensor [..., mul, beta, alpha]
-        :return: tensor [..., i=l * mul * m]
+        :param x: tensor [..., beta, alpha]
+        :return: tensor [..., i=l * m]
         """
-        size = x.shape[:-3]
-        mul = x.shape[-3]
+        size = x.shape[:-2]
         res = x.shape[-1]
-        x = x.view(-1, mul, res, res)
-        out = torch.einsum('umbi,zubm->zi', self.shb, torch.einsum('ma,zuba->zubm', self.sha, x))
+        x = x.view(-1, res, res)
+        out = torch.einsum('mbi,zbm->zi', self.shb, torch.einsum('ma,zba->zbm', self.sha, x))
         return out.view(*size, out.shape[1])

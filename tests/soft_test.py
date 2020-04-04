@@ -10,14 +10,13 @@ class Tests(unittest.TestCase):
 
     def test_inverse(self):
         with o3.torch_default_dtype(torch.float64):
-            mul = 2
             lmax = 5
             res = 50
 
-            to = soft.ToSOFT(mul, lmax, res)
-            fr = soft.FromSOFT(mul, res, lmax)
+            to = soft.ToSOFT(lmax, res)
+            fr = soft.FromSOFT(res, lmax)
 
-            sig = torch.randn(10, mul * (lmax + 1) ** 2)
+            sig = torch.randn(10, (lmax + 1) ** 2)
             self.assertLess((fr(to(sig)) - sig).abs().max(), 1e-5)
 
             s = to(sig)
@@ -28,7 +27,7 @@ class Tests(unittest.TestCase):
             lmax = 5
             res = 20
 
-            to = soft.ToSOFT(1, lmax, res)
+            to = soft.ToSOFT(lmax, res)
 
             sig = torch.randn(50, (lmax + 1) ** 2)
             self.assertAlmostEqual(to(sig).var().item(), 1, delta=0.2)

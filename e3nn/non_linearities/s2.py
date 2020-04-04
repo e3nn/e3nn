@@ -19,8 +19,8 @@ class S2Activation(torch.nn.Module):
 
         Rs = rs.simplify(Rs)
         _, _, p0 = Rs[0]
-        mul, lmax, _ = Rs[-1]
-        assert all(mul == mulx for mulx, _, _ in Rs)
+        _, lmax, _ = Rs[-1]
+        assert all(mul == 1 for mul, _, _ in Rs)
         assert [l for _, l, _ in Rs] == [l for l in range(lmax + 1)]
         assert all(p == p0 for _, l, p in Rs) or all(p == p0 * (-1) ** l for _, l, p in Rs)
 
@@ -39,15 +39,15 @@ class S2Activation(torch.nn.Module):
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")
 
-        self.to_soft = soft.ToSOFT(mul, lmax, res)
-        self.from_soft = soft.FromSOFT(mul, res, lmax)
+        self.to_soft = soft.ToSOFT(lmax, res)
+        self.from_soft = soft.FromSOFT(res, lmax)
         self.act = act
 
     def forward(self, features):
         '''
-        :param features: [..., l * mul * m]
+        :param features: [..., l * m]
         '''
-        features = self.to_soft(features)  # [..., mul, beta, alpha]
+        features = self.to_soft(features)  # [..., beta, alpha]
         features = self.act(features)
-        features = self.from_soft(features)  # [..., l * mul * m]
+        features = self.from_soft(features)  # [..., l * m]
         return features
