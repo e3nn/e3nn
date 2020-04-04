@@ -24,6 +24,26 @@ def rep(Rs, alpha, beta, gamma, parity=None):
         return o3.direct_sum(*[(p ** parity) * o3.irr_repr(l, *abc) for mul, l, p in simplify(Rs) for _ in range(mul)])
 
 
+def randn(*size, normalization='component'):
+    """
+    random tensor of representation Rs
+    """
+    *size, Rs = size
+    if normalization == 'component':
+        return torch.randn(*size, dim(Rs))
+    if normalization == 'norm':
+        Rs = convention(Rs)
+        x = torch.zeros(*size, dim(Rs))
+        i = 0
+        for mul, l, _p in Rs:
+            r = torch.randn(*size, mul, 2 * l + 1)
+            r.div_(r.norm(2, dim=-1, keepdim=True))
+            x[..., i: i + mul * (2 * l + 1)] = r.view(*size, -1)
+            i += mul * (2 * l + 1)
+        return x
+    assert False, "normalization needs to be 'norm' or 'component'"
+
+
 def haslinearpath(Rs_in, l_out, p_out, selection_rule=o3.selection_rule):
     """
     :param Rs_in: list of triplet (multiplicity, representation order, parity)

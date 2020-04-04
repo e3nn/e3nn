@@ -24,13 +24,18 @@ def soft_grid(res):
 class ToSOFT(torch.nn.Module):
     """
     Transform spherical tensor into signal on the sphere
+
+    The inverse transformation of FromSOFT
     """
 
-    def __init__(self, lmax, res=None):
+    def __init__(self, lmax, res=None, normalization='component'):
         """
         :param lmax: lmax of the input signal
+        :param normalization: either 'norm' or 'component'
         """
         super().__init__()
+
+        assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
         if res is None:
             res = 2 * (lmax + 1)
@@ -42,10 +47,13 @@ class ToSOFT(torch.nn.Module):
         shb = o3.spherical_harmonics_beta_part(lmax, betas.cos())  # [l, m, b]
 
         # normalize such that all l has the same variance on the sphere
-        n = math.sqrt(4 * math.pi) * torch.tensor([
-            1 / math.sqrt(2 * l + 1)
-            for l in range(lmax + 1)
-        ]) / math.sqrt(lmax + 1)
+        if normalization == 'component':
+            n = math.sqrt(4 * math.pi) * torch.tensor([
+                1 / math.sqrt(2 * l + 1)
+                for l in range(lmax + 1)
+            ]) / math.sqrt(lmax + 1)
+        if normalization == 'norm':
+            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
         m = o3.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         shb = torch.einsum('lmb,lmi,l->mbi', shb, m, n)  # [m, b, i]
 
@@ -67,13 +75,18 @@ class ToSOFT(torch.nn.Module):
 class FromSOFT(torch.nn.Module):
     """
     Transform signal on the sphere into spherical tensor
+
+    The inverse transformation of ToSOFT
     """
 
-    def __init__(self, res, lmax=None):
+    def __init__(self, res, lmax=None, normalization='component'):
         """
         :param res: resolution of the input signal
+        :param normalization: either 'norm' or 'component'
         """
         super().__init__()
+
+        assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
         if lmax is None:
             lmax = res // 2 - 1
@@ -85,10 +98,13 @@ class FromSOFT(torch.nn.Module):
         shb = o3.spherical_harmonics_beta_part(lmax, betas.cos())  # [l, m, b]
 
         # normalize such that it is the inverse of ToSOFT
-        n = math.sqrt(4 * math.pi) * torch.tensor([
-            math.sqrt(2 * l + 1)
-            for l in range(lmax + 1)
-        ]) * math.sqrt(lmax + 1)
+        if normalization == 'component':
+            n = math.sqrt(4 * math.pi) * torch.tensor([
+                math.sqrt(2 * l + 1)
+                for l in range(lmax + 1)
+            ]) * math.sqrt(lmax + 1)
+        if normalization == 'norm':
+            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax + 1)
         m = o3.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         qw = torch.tensor(S3.quadrature_weights(res // 2)) * res  # [b]
         shb = torch.einsum('lmb,lmi,l,b->mbi', shb, m, n, qw)  # [m, b, i]
