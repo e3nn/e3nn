@@ -13,14 +13,30 @@ class Tests(unittest.TestCase):
             lmax = 5
             res = 50
 
-            to = soft.ToSOFT(lmax, res)
-            fr = soft.FromSOFT(res, lmax)
+            for normalization in ['component', 'norm']:
+                to = soft.ToSOFT(lmax, res, normalization=normalization)
+                fr = soft.FromSOFT(res, lmax, normalization=normalization)
 
-            sig = torch.randn(10, (lmax + 1) ** 2)
-            self.assertLess((fr(to(sig)) - sig).abs().max(), 1e-5)
+                sig = rs.randn(10, [(1, l) for l in range(lmax + 1)])
+                self.assertLess((fr(to(sig)) - sig).abs().max(), 1e-5)
 
-            s = to(sig)
-            self.assertLess((to(fr(s)) - s).abs().max(), 1e-5)
+                s = to(sig)
+                self.assertLess((to(fr(s)) - s).abs().max(), 1e-5)
+
+    def test_inverse_different_ls(self):
+        with o3.torch_default_dtype(torch.float64):
+            lin = 5
+            lout = 7
+            res = 50
+
+            for normalization in ['component', 'norm']:
+                to = soft.ToSOFT(lin, res, normalization=normalization)
+                fr = soft.FromSOFT(res, lout, lmax_in=lin, normalization=normalization)
+
+                si = rs.randn(10, [(1, l) for l in range(lin + 1)])
+                so = fr(to(si))
+                so = so[:, :si.shape[1]]
+                self.assertLess((so - si).abs().max(), 1e-5)
 
     def test_normalization(self):
         with o3.torch_default_dtype(torch.float64):
