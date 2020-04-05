@@ -3,16 +3,15 @@ from functools import partial
 
 import torch
 
-import e3nn.o3 as o3
+from e3nn import o3, rs
 from e3nn.kernel import Kernel
+from e3nn.linear import Linear
 from e3nn.non_linearities import GatedBlock
 from e3nn.non_linearities.rescaled_act import sigmoid, swish
+from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
 from e3nn.tensor_product import TensorProduct
-from e3nn.linear import Linear
-
-torch.set_default_dtype(torch.float64)
 
 
 class GatedConvNetwork(torch.nn.Module):
@@ -68,3 +67,57 @@ class GatedConvNetwork(torch.nn.Module):
         output = layer(output, geometry, n_norm=N)
 
         return output
+
+
+class S2Network(torch.nn.Module):
+    def __init__(self, Rs_in, mul, lmax, Rs_out, layers=3):
+        super().__init__()
+
+        Rs = rs.simplify(Rs_in)
+        Rs_out = rs.simplify(Rs_out)
+
+        self.layers = []
+
+        for _ in range(layers):
+            # tensor product: nonlinear and mixes the l's
+            tp = TensorProduct(Rs, Rs, selection_rule=partial(o3.selection_rule, lmax=lmax))
+
+            # direct sum
+            Rs = Rs + tp.Rs_out
+
+            # linear: learned but don't mix l's
+            Rs_act = [(1, l) for l in range(lmax + 1)]
+            lin = Linear(Rs, mul * Rs_act)
+
+            # s2 nonlinearity
+            act = S2Activation(Rs_act, swish, res=20 * (lmax + 1))
+            Rs = mul * act.Rs_out
+
+            self.layers += [torch.nn.ModuleList([tp, lin, act])]
+
+        self.layers = torch.nn.ModuleList(self.layers)
+
+        def lfilter(l):
+            return l in [j for _, j, _ in Rs_out]
+
+        tp = TensorProduct(Rs, Rs, selection_rule=partial(o3.selection_rule, lfilter=lfilter))
+        Rs = Rs + tp.Rs_out
+        lin = Linear(Rs, Rs_out)
+        self.tail = torch.nn.ModuleList([tp, lin])
+
+    def forward(self, x):
+        for tp, lin, act in self.layers:
+            xx = tp(x, x)
+            x = torch.cat([x, xx], dim=-1)
+            x = lin(x)
+
+            x = x.view(*x.shape[:-1], -1, rs.dim(act.Rs_in))  # put multiplicity into batch
+            x = act(x)
+            x = x.view(*x.shape[:-2], -1)  # put back into representation
+
+        tp, lin = self.tail
+        xx = tp(x, x)
+        x = torch.cat([x, xx], dim=-1)
+        x = lin(x)
+
+        return x

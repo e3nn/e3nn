@@ -30,6 +30,7 @@ class S2Activation(torch.nn.Module):
             u = -1
         else:
             assert False, "the parity of the input is not well defined"
+        self.Rs_in = Rs
         # the input transforms as : A_l ---> p0 * u^l * A_l
         # the sphere signal transforms as : f(r) ---> p0 * f(u * r)
         if lmax_out is None:

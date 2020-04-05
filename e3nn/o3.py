@@ -183,7 +183,7 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return dDda, dDdb, dDdc
 
 
-def selection_rule(l1, _p1, l2, _p2, lmax=None):
+def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
     """
     selection rule
     :return: list from |l1-l2|... to l1+l2
@@ -192,7 +192,10 @@ def selection_rule(l1, _p1, l2, _p2, lmax=None):
         l_max = l1 + l2
     else:
         l_max = min(lmax, l1 + l2)
-    return list(range(abs(l1 - l2), l_max + 1))
+    ls = list(range(abs(l1 - l2), l_max + 1))
+    if lfilter is not None:
+        ls = list(filter(lfilter, ls))
+    return ls
 
 
 def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
