@@ -75,9 +75,16 @@ def rand_rot():
     """
     random rotation matrix
     """
+    return rot(*rand_angles())
+
+
+def rand_angles():
+    """
+    random rotation angles
+    """
     alpha, gamma = 2 * math.pi * torch.rand(2)
     beta = torch.rand(()).mul(2).sub(1).acos()
-    return rot(alpha, beta, gamma)
+    return alpha, beta, gamma
 
 
 def angles_to_xyz(alpha, beta):
