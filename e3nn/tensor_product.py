@@ -78,7 +78,7 @@ class LearnableTensorProduct(torch.nn.Module):
         super().__init__()
         self.groups = groups
         self.tp = TensorProduct(Rs_mid_1, Rs_mid_2, selection_rule)
-        self.lin = Linear(group * self.tp.Rs_out, Rs_out)
+        self.lin = Linear(groups * self.tp.Rs_out, Rs_out)
 
     def forward(self, x1, x2):
         """
@@ -106,7 +106,7 @@ class LearnableBispectrum(torch.nn.Module):
         # Learnable tensor product of signal with itself
         self.tp = LearnableTensorProduct(
             self.Rs_in, self.Rs_in, self.Rs_hidden,
-            partial(o3.selection_rule, lmax=self.lmax, groups=1)
+            partial(o3.selection_rule, lmax=self.lmax), groups=1)
         # Dot product
         self.dot = LearnableTensorProduct(
             self.Rs_hidden, self.Rs_in, [(mul_out, 0)],
@@ -133,7 +133,7 @@ class LearnableMultiplicityBispectrum(torch.nn.Module):
                                          groups=mul_in)
         # Dot product
         self.dot = LearnableTensorProduct(self.Rs_hidden, 
-                                          self.single_mul_Rs_in * groups,
+                                          self.single_mul_Rs_in * mul_in,
                                           [(mul_out, 0)],
                                           partial(o3.selection_rule, lmax=0),
                                           groups=1)
