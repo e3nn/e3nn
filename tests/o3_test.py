@@ -10,6 +10,24 @@ from e3nn import o3, rs
 
 class Tests(unittest.TestCase):
 
+    def test_decomposition_spherical_harmonics(self):
+        with o3.torch_default_dtype(torch.float64):
+            lmax = 4
+            beta = torch.linspace(1e-3, math.pi - 1e-3, 100).view(1, -1)
+            alpha = torch.linspace(0, 2 * math.pi, 100).view(-1, 1)
+            Y1 = o3.spherical_harmonics_alpha_part(lmax, alpha) * o3.spherical_harmonics_beta_part(lmax, beta.cos())
+            Y2 = o3.spherical_harmonics([l for l in range(lmax + 1)], alpha, beta)
+            Y2 = torch.einsum('lmi,iab->lmab', o3.spherical_harmonics_expand_matrix(lmax), Y2)
+            self.assertLess((Y1 - Y2).abs().max(), 1e-10)
+
+    def test_sh_is_in_irrep(self):
+        with o3.torch_default_dtype(torch.float64):
+            for l in range(4 + 1):
+                a, b = 3.14 * torch.rand(2)  # works only for beta in [0, pi]
+                Y = o3.spherical_harmonics(l, a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1) * (-1) ** l
+                D = o3.irr_repr(l, a, b, 0)
+                self.assertLess((Y - D[:, l]).norm(), 1e-10)
+
     def test_sh_cuda_single(self):
         if torch.cuda.is_available():
             with o3.torch_default_dtype(torch.float64):

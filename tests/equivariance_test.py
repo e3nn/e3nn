@@ -9,7 +9,7 @@ from e3nn.kernel import Kernel as Kernel1
 from e3nn.kernel_mod import Kernel as KernelMod
 from e3nn.linear import Linear as Linear1
 from e3nn.linear_mod import Linear as LinearMod
-from e3nn.networks import GatedConvNetwork
+from e3nn.networks import GatedConvNetwork, S2Network
 from e3nn.non_linearities.gated_block import GatedBlock
 from e3nn.non_linearities.gated_block_parity import GatedBlockParity
 from e3nn.non_linearities.rescaled_act import absolute, relu, sigmoid, tanh
@@ -209,23 +209,42 @@ class Tests(unittest.TestCase):
         self.parity_rotation_linear(LinearMod)
 
     def test_equivariance_gatedconvnetwork(self):
-        mul = 3
-        Rs_in = [(mul, l) for l in range(3 + 1)]
-        Rs_out = [(mul, l) for l in range(3 + 1)]
+        with torch_default_dtype(torch.float64):
+            mul = 3
+            Rs_in = [(mul, l) for l in range(3 + 1)]
+            Rs_out = [(mul, l) for l in range(3 + 1)]
 
-        net = GatedConvNetwork(Rs_in, [(10, 0), (1, 1), (1, 2), (1, 3)], Rs_out, lmax=3, feature_product=True)
+            net = GatedConvNetwork(Rs_in, [(10, 0), (1, 1), (1, 2), (1, 3)], Rs_out, lmax=3, feature_product=True)
 
-        abc = torch.randn(3)
-        rot_geo = o3.rot(*abc)
-        D_in = rs.rep(Rs_in, *abc)
-        D_out = rs.rep(Rs_out, *abc)
+            abc = torch.randn(3)
+            rot_geo = o3.rot(*abc)
+            D_in = rs.rep(Rs_in, *abc)
+            D_out = rs.rep(Rs_out, *abc)
 
-        fea = torch.randn(1, 10, rs.dim(Rs_in))
-        geo = torch.randn(1, 10, 3)
+            fea = torch.randn(1, 10, rs.dim(Rs_in))
+            geo = torch.randn(1, 10, 3)
 
-        x1 = torch.einsum("ij,zaj->zai", D_out, net(fea, geo))
-        x2 = net(torch.einsum("ij,zaj->zai", D_in, fea), torch.einsum("ij,zaj->zai", rot_geo, geo))
-        self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
+            x1 = torch.einsum("ij,zaj->zai", D_out, net(fea, geo))
+            x2 = net(torch.einsum("ij,zaj->zai", D_in, fea), torch.einsum("ij,zaj->zai", rot_geo, geo))
+            self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
+
+    def test_equivariance_s2network(self):
+        with torch_default_dtype(torch.float64):
+            mul = 3
+            Rs_in = [(mul, l) for l in range(3 + 1)]
+            Rs_out = [(mul, l) for l in range(3 + 1)]
+
+            net = S2Network(Rs_in, mul, lmax=4, Rs_out=Rs_out)
+
+            abc = o3.rand_angles()
+            D_in = rs.rep(Rs_in, *abc)
+            D_out = rs.rep(Rs_out, *abc)
+
+            fea = torch.randn(10, rs.dim(Rs_in))
+
+            x1 = torch.einsum("ij,zj->zi", D_out, net(fea))
+            x2 = net(torch.einsum("ij,zj->zi", D_in, fea))
+            self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
 
 
 if __name__ == '__main__':
