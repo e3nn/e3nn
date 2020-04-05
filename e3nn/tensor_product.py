@@ -73,11 +73,12 @@ class ElementwiseTensorProduct(torch.nn.Module):
 
 
 class LearnableTensorProduct(torch.nn.Module):
-    def __init__(self, Rs_mid_1, Rs_mid_2, mul_mid, Rs_out, selection_rule=o3.selection_rule):
+    def __init__(self, Rs_mid_1, Rs_mid_2, Rs_out,
+                 selection_rule=o3.selection_rule, groups=1):
         super().__init__()
-        self.mul_mid = mul_mid
+        self.groups = groups
         self.tp = TensorProduct(Rs_mid_1, Rs_mid_2, selection_rule)
-        self.lin = Linear(mul_mid * self.tp.Rs_out, Rs_out)
+        self.lin = Linear(group * self.tp.Rs_out, Rs_out)
 
     def forward(self, x1, x2):
         """
@@ -85,8 +86,8 @@ class LearnableTensorProduct(torch.nn.Module):
         """
         # split into mul x Rs
         *size, _ = x1.shape
-        x1 = x1.view(*size, self.mul_mid, -1)
-        x2 = x2.view(*size, self.mul_mid, -1)
+        x1 = x1.view(*size, self.groups, -1)
+        x2 = x2.view(*size, self.groups, -1)
 
         x = self.tp(x1, x2).view(*size, -1)
         x = self.lin(x)
@@ -94,10 +95,11 @@ class LearnableTensorProduct(torch.nn.Module):
 
 
 class LearnableBispectrum(torch.nn.Module):
-    def __init__(self, Rs_in, mul_hidden, mul_out):
+    def __init__(self, Rs_in, Rs_hidden, mul_out):
         super().__init__()
         self.lmax = max(l for mul, l in Rs_in)
-        Rs_hidden = [(mul_hidden, l) for l in range(self.lmax + 1)]
+        self.Rs_in = rs.simplify(Rs_in)
+        self.Rs_hidden = rs.simplify(Rs_hidden)
         # Learnable tensor product of signal with itself
         self.tp = LearnableTensorProduct(Rs_in, Rs_in, 1, Rs_hidden,
                                          partial(o3.selection_rule, lmax=self.lmax))
