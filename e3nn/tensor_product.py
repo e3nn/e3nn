@@ -126,13 +126,13 @@ class LearnableMultiplicityBispectrum(torch.nn.Module):
         else:
             self.lmax = lmax
         # Learnable tensor product of signal with itself
-        self.tp = LearnableTensorProduct(single_mul_Rs_in, 
+        self.tp = LearnableTensorProduct(single_mul_Rs_in,
                                          single_mul_Rs_in,
                                          self.Rs_hidden,
                                          partial(o3.selection_rule, lmax=self.lmax),
                                          groups=mul_in)
         # Dot product
-        self.dot = LearnableTensorProduct(self.Rs_hidden, 
+        self.dot = LearnableTensorProduct(self.Rs_hidden,
                                           self.single_mul_Rs_in * mul_in,
                                           [(mul_out, 0)],
                                           partial(o3.selection_rule, lmax=0),
