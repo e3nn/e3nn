@@ -87,7 +87,7 @@ class S2Network(torch.nn.Module):
 
             # linear: learned but don't mix l's
             Rs_act = [(1, l) for l in range(lmax + 1)]
-            lin = Linear(Rs, mul * Rs_act)
+            lin = Linear(Rs, mul * Rs_act, allow_unused_inputs=True)
 
             # s2 nonlinearity
             act = S2Activation(Rs_act, swish, res=20 * (lmax + 1))
@@ -102,7 +102,7 @@ class S2Network(torch.nn.Module):
 
         tp = TensorProduct(Rs, Rs, selection_rule=partial(o3.selection_rule, lfilter=lfilter))
         Rs = Rs + tp.Rs_out
-        lin = Linear(Rs, Rs_out)
+        lin = Linear(Rs, Rs_out, allow_unused_inputs=True)
         self.tail = torch.nn.ModuleList([tp, lin])
 
     def forward(self, x):
@@ -113,7 +113,7 @@ class S2Network(torch.nn.Module):
 
             x = x.view(*x.shape[:-1], -1, rs.dim(act.Rs_in))  # put multiplicity into batch
             x = act(x)
-            x = x.view(*x.shape[:-2], -1)  # put back into representation
+            x = x.reshape(*x.shape[:-2], -1)  # put back into representation
 
         tp, lin = self.tail
         xx = tp(x, x)

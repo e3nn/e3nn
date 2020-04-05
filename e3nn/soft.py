@@ -67,7 +67,7 @@ class ToSOFT(torch.nn.Module):
         """
         size = x.shape[:-1]
         lmax = round(x.shape[-1] ** 0.5) - 1
-        x = x.view(-1, (lmax + 1) ** 2)
+        x = x.reshape(-1, (lmax + 1) ** 2)
         out = torch.einsum('ma,zmb->zba', self.sha, torch.einsum('mbi,zi->zmb', self.shb, x))
         return out.view(*size, *out.shape[1:])
 
