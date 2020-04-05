@@ -95,35 +95,48 @@ class LearnableTensorProduct(torch.nn.Module):
 
 
 class LearnableBispectrum(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_hidden, mul_out):
+    def __init__(self, Rs_in, Rs_hidden, mul_out, lmax=None):
         super().__init__()
-        self.lmax = max(l for mul, l in Rs_in)
         self.Rs_in = rs.simplify(Rs_in)
         self.Rs_hidden = rs.simplify(Rs_hidden)
+        if lmax is None:
+            self.lmax = max(l for mul, l, _ in self.Rs_hidden)
+        else:
+            self.lmax = lmax
         # Learnable tensor product of signal with itself
-        self.tp = LearnableTensorProduct(Rs_in, Rs_in, 1, Rs_hidden,
-                                         partial(o3.selection_rule, lmax=self.lmax))
+        self.tp = LearnableTensorProduct(
+            self.Rs_in, self.Rs_in, self.Rs_hidden,
+            partial(o3.selection_rule, lmax=self.lmax, groups=1)
         # Dot product
-        self.dot = LearnableTensorProduct(Rs_hidden, Rs_in, 1, 
-                                          [(mul_out, 0)], partial(o3.selection_rule, lmax=0))
+        self.dot = LearnableTensorProduct(
+            self.Rs_hidden, self.Rs_in, [(mul_out, 0)],
+            partial(o3.selection_rule, lmax=0), groups=1)
 
     def forward(self, input):
-        output = input
-        output = self.tp(output, output)
-        return self.dot(output, input)
+        return self.dot(self.tp(input, input), input)
 
 
 class LearnableMultiplicityBispectrum(torch.nn.Module):
-    def __init__(self, mul_in, single_mul_Rs_in, mul_hidden, mul_out):
+    def __init__(self, mul_in, single_mul_Rs_in, Rs_hidden, mul_out, lmax=None):
         super().__init__()
-        self.lmax = max(l for mul, l in single_mul_Rs_in)
-        Rs_hidden = [(mul_hidden, l) for l in range(self.lmax + 1)]
+        self.single_mul_Rs_in = rs.simplify(single_mul_Rs_in)
+        self.Rs_hidden = rs.simplify(Rs_hidden)
+        if lmax is None:
+            self.lmax = max(l for mul, l, _ in self.Rs_hidden)
+        else:
+            self.lmax = lmax
         # Learnable tensor product of signal with itself
-        self.tp = LearnableTensorProduct(single_mul_Rs_in, single_mul_Rs_in, mul_in, Rs_hidden,
-                                         partial(o3.selection_rule, lmax=self.lmax))
+        self.tp = LearnableTensorProduct(single_mul_Rs_in, 
+                                         single_mul_Rs_in,
+                                         self.Rs_hidden,
+                                         partial(o3.selection_rule, lmax=self.lmax),
+                                         groups=mul_in)
         # Dot product
-        self.dot = LearnableTensorProduct(Rs_hidden, single_mul_Rs_in * mul_in, 1, 
-                                          [(mul_out, 0)], partial(o3.selection_rule, lmax=0))
+        self.dot = LearnableTensorProduct(self.Rs_hidden, 
+                                          self.single_mul_Rs_in * groups,
+                                          [(mul_out, 0)],
+                                          partial(o3.selection_rule, lmax=0),
+                                          groups=1)
 
     def forward(self, input):
         return self.dot(self.tp(input, input), input)
