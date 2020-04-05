@@ -316,6 +316,15 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             return out.to(dtype=dtype, device=device)
 
 
+def spherical_harmonics_expand_matrix(lmax):
+    m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
+    i = 0
+    for l in range(lmax + 1):
+        m[l, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
+        i += 2 * l + 1
+    return m
+
+
 def _legendre(order, z):
     """
     associated Legendre polynomials
@@ -352,6 +361,60 @@ def legendre(order, z):
     if not isinstance(order, list):
         order = [order]
     return torch.cat([_legendre(J, z) for J in order], dim=0)  # [l * m, A]
+
+
+def spherical_harmonics_beta_part(lmax, cosbeta):
+    """
+    the cosbeta componant of the spherical harmonics
+    (useful to perform fourier transform)
+
+    :param cosbeta: tensor of shape [...]
+    :return: tensor of shape [l, m, ...]
+    """
+    size = cosbeta.shape
+    cosbeta = cosbeta.view(-1)
+    out = []
+    for l in range(0, lmax + 1):
+        m = torch.arange(-l, l + 1).view(-1, 1)
+        quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in m]
+        quantum = torch.tensor(quantum).view(-1, 1)  # [m, 1]
+        o = quantum * legendre(l, cosbeta)  # [m, B]
+        if l == 1:
+            o = -o
+        pad = lmax - l
+        out.append(torch.cat([torch.zeros(pad, o.size(1)), o, torch.zeros(pad, o.size(1))]))
+    out = torch.stack(out)
+    return out.view(lmax + 1, 2 * lmax + 1, *size)
+
+
+def spherical_harmonics_alpha_part(lmax, alpha):
+    """
+    the alpha componant of the spherical harmonics
+    (useful to perform fourier transform)
+
+    :param alpha: tensor of shape [...]
+    :return: tensor of shape [m, ...]
+    """
+    size = alpha.shape
+    alpha = alpha.view(-1)
+
+    m = torch.arange(-lmax, lmax + 1).view(-1, 1)  # [m, 1]
+    sm = 1 - m % 2 * 2  # [m, 1]  = (-1) ** m
+
+    phi = alpha.unsqueeze(0)  # [1, A]
+    exr = torch.cos(m * phi)  # [m, A]
+    exi = torch.sin(-m * phi)  # [-m, A]
+
+    if lmax == 0:
+        out = torch.ones_like(phi)
+    else:
+        out = torch.cat([
+            2 ** 0.5 * sm[:lmax] * exi[:lmax],
+            torch.ones_like(phi),
+            2 ** 0.5 * exr[-lmax:],
+        ])
+
+    return out.view(-1, *size)  # [m, ...]
 
 
 def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
