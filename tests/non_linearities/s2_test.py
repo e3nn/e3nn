@@ -4,8 +4,9 @@ import unittest
 
 import torch
 
-from e3nn import rs
+from e3nn import o3, rs
 from e3nn.non_linearities.s2 import S2Activation
+from e3nn.non_linearities.rescaled_act import swish, tanh, sigmoid, softplus, identity, quadratic
 
 
 class Tests(unittest.TestCase):
@@ -13,18 +14,18 @@ class Tests(unittest.TestCase):
     def test_equivariance(self):
         torch.set_default_dtype(torch.float64)
 
-        Rs = [(1, l) for l in range(4 + 1)]
+        Rs = [(1, l, (-1) ** l) for l in range(4 + 1)]
 
         def test(act, normalization):
             x = rs.randn(2, Rs, normalization=normalization)
-            ac = S2Activation(Rs, act, 200, normalization=normalization, lmax_out=6)
+            ac = S2Activation(Rs, act, 120, normalization=normalization, lmax_out=6)
 
-            a, b, c = torch.rand(3)
-            y1 = ac(x) @ rs.rep(ac.Rs_out, a, b, c).T
-            y2 = ac(x @ rs.rep(Rs, a, b, c).T)
-            self.assertLess((y1 - y2).abs().max(), 3e-4 * y1.abs().max())
+            a, b, c = o3.rand_angles()
+            y1 = ac(x) @ rs.rep(ac.Rs_out, a, b, c, 1).T
+            y2 = ac(x @ rs.rep(Rs, a, b, c, 1).T)
+            self.assertLess((y1 - y2).abs().max(), 1e-10 * y1.abs().max())
 
-        acts = [torch.tanh, torch.abs, torch.relu, torch.sigmoid]
+        acts = [tanh, swish, sigmoid, softplus, identity, quadratic]
 
         for act, normalization in itertools.product(acts, ['norm', 'component']):
             test(act, normalization)
