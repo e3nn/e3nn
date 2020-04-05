@@ -126,6 +126,4 @@ class LearnableMultiplicityBispectrum(torch.nn.Module):
                                           [(mul_out, 0)], partial(o3.selection_rule, lmax=0))
 
     def forward(self, input):
-        output = input
-        output = self.tp(output, output)
-        return self.dot(output, input)
+        return self.dot(self.tp(input, input), input)
