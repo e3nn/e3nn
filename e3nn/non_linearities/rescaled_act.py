@@ -1,4 +1,11 @@
 # pylint: disable=no-member, missing-docstring, invalid-name, arguments-differ
+"""
+rescaled activation functions such that the second moment is equal to one
+
+int Dx f(x)^2 = 1
+
+where Dx is the gaussian measure
+"""
 import torch
 
 
@@ -12,6 +19,9 @@ class Softplus:
         return torch.nn.functional.softplus(x, self.beta).mul(self.factor)
 
 
+softplus = Softplus(1)
+
+
 class ShiftedSoftplus:
     def __init__(self, beta):
         x = torch.randn(100000, dtype=torch.float64)
@@ -22,6 +32,17 @@ class ShiftedSoftplus:
 
     def __call__(self, x):
         return torch.nn.functional.softplus(x, self.beta).sub(self.shift).mul(self.factor)
+
+
+shiftedsoftplus = ShiftedSoftplus(1)
+
+
+def identity(x):
+    return x
+
+
+def quadratic(x):
+    return x.pow(2)
 
 
 def sigmoid(x):

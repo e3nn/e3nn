@@ -75,9 +75,16 @@ def rand_rot():
     """
     random rotation matrix
     """
+    return rot(*rand_angles())
+
+
+def rand_angles():
+    """
+    random rotation angles
+    """
     alpha, gamma = 2 * math.pi * torch.rand(2)
     beta = torch.rand(()).mul(2).sub(1).acos()
-    return rot(alpha, beta, gamma)
+    return alpha, beta, gamma
 
 
 def angles_to_xyz(alpha, beta):
@@ -176,7 +183,7 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return dDda, dDdb, dDdc
 
 
-def selection_rule(l1, _p1, l2, _p2, lmax=None):
+def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
     """
     selection rule
     :return: list from |l1-l2|... to l1+l2
@@ -185,7 +192,10 @@ def selection_rule(l1, _p1, l2, _p2, lmax=None):
         l_max = l1 + l2
     else:
         l_max = min(lmax, l1 + l2)
-    return list(range(abs(l1 - l2), l_max + 1))
+    ls = list(range(abs(l1 - l2), l_max + 1))
+    if lfilter is not None:
+        ls = list(filter(lfilter, ls))
+    return ls
 
 
 def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
@@ -317,6 +327,9 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
 
 
 def spherical_harmonics_expand_matrix(lmax):
+    """
+    :return: tensor [l, m, l * m]
+    """
     m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
     i = 0
     for l in range(lmax + 1):
@@ -345,9 +358,12 @@ def _legendre(order, z):
 
     plm = [(1 - 2 * abs(order - 2 * order // 2)) * hsqz2 ** order / fac]
     plm.append(-plm[0] * order * ihsqz2)
-    for mr in range(1, 2 * order):
+    for mr in range(1, order):
         plm.append((mr - order) * ihsqz2 * plm[mr] - (2 * order - mr + 1) * mr * plm[mr - 1])
-    return torch.stack(plm)
+    plm = torch.stack(plm)
+    c = torch.tensor([(-1) ** m * (math.factorial(order + m) / math.factorial(order - m)) for m in range(1, order + 1)])
+    plm = torch.cat([plm, plm[:-1].flip(0) * c.view(-1, 1)])
+    return plm
 
 
 def legendre(order, z):
