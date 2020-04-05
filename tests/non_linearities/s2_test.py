@@ -18,7 +18,7 @@ class Tests(unittest.TestCase):
 
         def test(act, normalization):
             x = rs.randn(2, Rs, normalization=normalization)
-            ac = S2Activation(Rs, act, 120, normalization=normalization, lmax_out=6)
+            ac = S2Activation(Rs, act, 120, normalization=normalization, lmax_out=6, random_rot=True)
 
             a, b, c = o3.rand_angles()
             y1 = ac(x) @ rs.rep(ac.Rs_out, a, b, c, 1).T
@@ -37,7 +37,7 @@ class Tests(unittest.TestCase):
 
         def test(Rs, act):
             x = rs.randn(2, Rs)
-            ac = S2Activation(Rs, act, 200, lmax_out=lmax + 1)
+            ac = S2Activation(Rs, act, 200, lmax_out=lmax + 1, random_rot=True)
 
             a, b, c, p = *torch.rand(3), 1
             y1 = ac(x) @ rs.rep(ac.Rs_out, a, b, c, p).T

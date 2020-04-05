@@ -1,11 +1,11 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 
-from e3nn import rs, soft
+from e3nn import o3, rs, soft
 
 
 class S2Activation(torch.nn.Module):
-    def __init__(self, Rs, act, res, normalization='component', lmax_out=None):
+    def __init__(self, Rs, act, res, normalization='component', lmax_out=None, random_rot=False):
         '''
         map to the sphere, apply the non linearity point wise and project back
         the signal on the sphere is a quasiregular representation of O3
@@ -16,6 +16,7 @@ class S2Activation(torch.nn.Module):
         :param res: resolution of the SOFT grid on the sphere (the higher the more accurate)
         :param normalization: either 'norm' or 'component'
         :param lmax_out: maximum l of the output
+        :param random_rot: rotate randomly the grid
         '''
         super().__init__()
 
@@ -54,12 +55,20 @@ class S2Activation(torch.nn.Module):
         self.to_soft = soft.ToSOFT(lmax, res, normalization=normalization)
         self.from_soft = soft.FromSOFT(res, lmax_out, normalization=normalization, lmax_in=lmax)
         self.act = act
+        self.random_rot = random_rot
 
     def forward(self, features):
         '''
         :param features: [..., l * m]
         '''
+        if self.random_rot:
+            abc = o3.rand_angles()
+            features = torch.einsum('ij,...j->...i', rs.rep(self.Rs_in, *abc), features)
+
         features = self.to_soft(features)  # [..., beta, alpha]
         features = self.act(features)
-        features = self.from_soft(features)  # [..., l * m]
+        features = self.from_soft(features)
+
+        if self.random_rot:
+            features = torch.einsum('ij,...j->...i', rs.rep(self.Rs_out, *abc).T, features)
         return features
