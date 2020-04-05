@@ -5,7 +5,7 @@ from e3nn import rs, soft
 
 
 class S2Activation(torch.nn.Module):
-    def __init__(self, Rs, act, res):
+    def __init__(self, Rs, act, res, normalization='component'):
         '''
         map to the sphere, apply the non linearity point wise and project back
         the signal on the sphere is a quasiregular representation of O3
@@ -14,6 +14,7 @@ class S2Activation(torch.nn.Module):
         :param Rs: input representation
         :param act: activation function
         :param res: resolution of the SOFT grid on the sphere (the higher the more accurate)
+        :param normalization: either 'norm' or 'component'
         '''
         super().__init__()
 
@@ -39,8 +40,8 @@ class S2Activation(torch.nn.Module):
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")
 
-        self.to_soft = soft.ToSOFT(lmax, res)
-        self.from_soft = soft.FromSOFT(res, lmax)
+        self.to_soft = soft.ToSOFT(lmax, res, normalization=normalization)
+        self.from_soft = soft.FromSOFT(res, lmax, normalization=normalization)
         self.act = act
 
     def forward(self, features):

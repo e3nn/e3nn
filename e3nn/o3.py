@@ -348,9 +348,12 @@ def _legendre(order, z):
 
     plm = [(1 - 2 * abs(order - 2 * order // 2)) * hsqz2 ** order / fac]
     plm.append(-plm[0] * order * ihsqz2)
-    for mr in range(1, 2 * order):
+    for mr in range(1, order):
         plm.append((mr - order) * ihsqz2 * plm[mr] - (2 * order - mr + 1) * mr * plm[mr - 1])
-    return torch.stack(plm)
+    plm = torch.stack(plm)
+    c = torch.tensor([(-1) ** m * (math.factorial(order + m) / math.factorial(order - m)) for m in range(1, order + 1)])
+    plm = torch.cat([plm, plm[:-1].flip(0) * c.view(-1, 1)])
+    return plm
 
 
 def legendre(order, z):
