@@ -75,9 +75,16 @@ def rand_rot():
     """
     random rotation matrix
     """
+    return rot(*rand_angles())
+
+
+def rand_angles():
+    """
+    random rotation angles
+    """
     alpha, gamma = 2 * math.pi * torch.rand(2)
     beta = torch.rand(()).mul(2).sub(1).acos()
-    return rot(alpha, beta, gamma)
+    return alpha, beta, gamma
 
 
 def angles_to_xyz(alpha, beta):
@@ -176,7 +183,7 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return dDda, dDdb, dDdc
 
 
-def selection_rule(l1, l2, lmax=None):
+def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
     """
     selection rule
     :return: list from |l1-l2|... to l1+l2
@@ -185,8 +192,18 @@ def selection_rule(l1, l2, lmax=None):
         l_max = l1 + l2
     else:
         l_max = min(lmax, l1 + l2)
-    return list(range(abs(l1 - l2), l_max + 1))
+    ls = list(range(abs(l1 - l2), l_max + 1))
+    if lfilter is not None:
+        ls = list(filter(lfilter, ls))
+    return ls
 
+
+def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
+    """
+    all possible spherical harmonics such that
+    Input * SH = Output
+    """
+    return [l for l in selection_rule(l_in, p_in, l_out, p_out, lmax) if p_out in [0, p_in * (-1) ** l]]
 
 ################################################################################
 # Spherical harmonics
@@ -309,6 +326,18 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
             return out.to(dtype=dtype, device=device)
 
 
+def spherical_harmonics_expand_matrix(lmax):
+    """
+    :return: tensor [l, m, l * m]
+    """
+    m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
+    i = 0
+    for l in range(lmax + 1):
+        m[l, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
+        i += 2 * l + 1
+    return m
+
+
 def _legendre(order, z):
     """
     associated Legendre polynomials
@@ -329,9 +358,12 @@ def _legendre(order, z):
 
     plm = [(1 - 2 * abs(order - 2 * order // 2)) * hsqz2 ** order / fac]
     plm.append(-plm[0] * order * ihsqz2)
-    for mr in range(1, 2 * order):
+    for mr in range(1, order):
         plm.append((mr - order) * ihsqz2 * plm[mr] - (2 * order - mr + 1) * mr * plm[mr - 1])
-    return torch.stack(plm)
+    plm = torch.stack(plm)
+    c = torch.tensor([(-1) ** m * (math.factorial(order + m) / math.factorial(order - m)) for m in range(1, order + 1)])
+    plm = torch.cat([plm, plm[:-1].flip(0) * c.view(-1, 1)])
+    return plm
 
 
 def legendre(order, z):
@@ -345,6 +377,60 @@ def legendre(order, z):
     if not isinstance(order, list):
         order = [order]
     return torch.cat([_legendre(J, z) for J in order], dim=0)  # [l * m, A]
+
+
+def spherical_harmonics_beta_part(lmax, cosbeta):
+    """
+    the cosbeta componant of the spherical harmonics
+    (useful to perform fourier transform)
+
+    :param cosbeta: tensor of shape [...]
+    :return: tensor of shape [l, m, ...]
+    """
+    size = cosbeta.shape
+    cosbeta = cosbeta.view(-1)
+    out = []
+    for l in range(0, lmax + 1):
+        m = torch.arange(-l, l + 1).view(-1, 1)
+        quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in m]
+        quantum = torch.tensor(quantum).view(-1, 1)  # [m, 1]
+        o = quantum * legendre(l, cosbeta)  # [m, B]
+        if l == 1:
+            o = -o
+        pad = lmax - l
+        out.append(torch.cat([torch.zeros(pad, o.size(1)), o, torch.zeros(pad, o.size(1))]))
+    out = torch.stack(out)
+    return out.view(lmax + 1, 2 * lmax + 1, *size)
+
+
+def spherical_harmonics_alpha_part(lmax, alpha):
+    """
+    the alpha componant of the spherical harmonics
+    (useful to perform fourier transform)
+
+    :param alpha: tensor of shape [...]
+    :return: tensor of shape [m, ...]
+    """
+    size = alpha.shape
+    alpha = alpha.view(-1)
+
+    m = torch.arange(-lmax, lmax + 1).view(-1, 1)  # [m, 1]
+    sm = 1 - m % 2 * 2  # [m, 1]  = (-1) ** m
+
+    phi = alpha.unsqueeze(0)  # [1, A]
+    exr = torch.cos(m * phi)  # [m, A]
+    exi = torch.sin(-m * phi)  # [-m, A]
+
+    if lmax == 0:
+        out = torch.ones_like(phi)
+    else:
+        out = torch.cat([
+            2 ** 0.5 * sm[:lmax] * exi[:lmax],
+            torch.ones_like(phi),
+            2 ** 0.5 * exr[-lmax:],
+        ])
+
+    return out.view(-1, *size)  # [m, ...]
 
 
 def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
@@ -412,13 +498,11 @@ def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, dev
     the higher is lmax the better is the approximation
     """
     a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
+    onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
 
     if sph_last:
-        onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
-        rank = len(onehot.shape)
-        return onehot.permute(*range(1, rank), 0).contiguous()
-    else:
-        return torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
+        return onehot.permute(*range(1, len(onehot.shape)), 0).contiguous()
+    return onehot
 
 
 def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
@@ -449,7 +533,7 @@ def kron(x, y):
     """
     assert x.dim() == 2
     assert y.dim() == 2
-    return torch.einsum("ij,kl->ikjl", (x, y)).contiguous().view(x.size(0) * y.size(0), x.size(1) * y.size(1))
+    return torch.einsum("ij,kl->ikjl", (x, y)).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
 
 def direct_sum(*matrices):
@@ -489,8 +573,9 @@ def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None)
         else:
             device = 'cpu'
 
+    # return a clone to avoid that the user modifies the matrices in-place
     if cached:
-        return _cached_clebsch_gordan(l1, l2, l3, dtype, device)
+        return _cached_clebsch_gordan(l1, l2, l3, dtype, device).clone()
     return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
 
 
@@ -510,15 +595,15 @@ def _clebsch_gordan(l1, l2, l3):
     if l1 <= l2 <= l3:
         return __clebsch_gordan(l1, l2, l3)
     if l1 <= l3 <= l2:
-        return __clebsch_gordan(l1, l3, l2).transpose(1, 2).contiguous()
+        return __clebsch_gordan(l1, l3, l2).transpose(1, 2)
     if l2 <= l1 <= l3:
-        return __clebsch_gordan(l2, l1, l3).transpose(0, 1).contiguous()
+        return __clebsch_gordan(l2, l1, l3).transpose(0, 1)
     if l3 <= l2 <= l1:
-        return __clebsch_gordan(l3, l2, l1).transpose(0, 2).contiguous()
+        return __clebsch_gordan(l3, l2, l1).transpose(0, 2)
     if l2 <= l3 <= l1:
-        return __clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2).contiguous()
+        return __clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2)
     if l3 <= l1 <= l2:
-        return __clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1).contiguous()
+        return __clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1)
 
 
 @cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))

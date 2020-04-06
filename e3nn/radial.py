@@ -100,10 +100,10 @@ def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_rad
     """exp(-x^2 /spacing)"""
     spacing = (max_radius - min_radius) / (number_of_basis - 1)
     radii = torch.linspace(min_radius, max_radius, number_of_basis)
-    gamma = 1. / spacing
+    sigma = 0.8 * spacing
 
     def basis(x):
-        return torch.exp(-gamma * x ** 2)
+        return x.div(sigma).pow(2).neg().exp().div(1.423085244900308)
     return FiniteElementFCModel(out_dim, radii, basis, h, L, act)
 
 

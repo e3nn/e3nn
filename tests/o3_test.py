@@ -10,6 +10,24 @@ from e3nn import o3, rs
 
 class Tests(unittest.TestCase):
 
+    def test_decomposition_spherical_harmonics(self):
+        with o3.torch_default_dtype(torch.float64):
+            lmax = 4
+            beta = torch.linspace(1e-3, math.pi - 1e-3, 100).view(1, -1)
+            alpha = torch.linspace(0, 2 * math.pi, 100).view(-1, 1)
+            Y1 = o3.spherical_harmonics_alpha_part(lmax, alpha) * o3.spherical_harmonics_beta_part(lmax, beta.cos())
+            Y2 = o3.spherical_harmonics([l for l in range(lmax + 1)], alpha, beta)
+            Y2 = torch.einsum('lmi,iab->lmab', o3.spherical_harmonics_expand_matrix(lmax), Y2)
+            self.assertLess((Y1 - Y2).abs().max(), 1e-10)
+
+    def test_sh_is_in_irrep(self):
+        with o3.torch_default_dtype(torch.float64):
+            for l in range(4 + 1):
+                a, b = 3.14 * torch.rand(2)  # works only for beta in [0, pi]
+                Y = o3.spherical_harmonics(l, a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1) * (-1) ** l
+                D = o3.irr_repr(l, a, b, 0)
+                self.assertLess((Y - D[:, l]).norm(), 1e-10)
+
     def test_sh_cuda_single(self):
         if torch.cuda.is_available():
             with o3.torch_default_dtype(torch.float64):
@@ -78,32 +96,31 @@ class Tests(unittest.TestCase):
         integral of 1 over the unit sphere = 4 pi
         """
         with o3.torch_default_dtype(torch.float64):
-            for l1 in range(0, 3 + 1):
-                for l2 in range(l1, 3 + 1):
-                    x = torch.randn(200000, 3)
-                    Y1 = o3.spherical_harmonics_xyz(l1, x)
-                    Y2 = o3.spherical_harmonics_xyz(l2, x)
-                    x = (Y1.view(2 * l1 + 1, 1, -1) * Y2.view(1, 2 * l2 + 1, -1)).mean(-1) * (4 * math.pi)
+            x = torch.randn(200000, 3)
+            Ys = [o3.spherical_harmonics_xyz(l, x) for l in range(0, 3 + 1)]
+            for l1, Y1 in enumerate(Ys):
+                for l2, Y2 in enumerate(Ys):
+                    m = (Y1.view(2 * l1 + 1, 1, -1) * Y2.view(1, 2 * l2 + 1, -1)).mean(-1) * (4 * math.pi)
                     if l1 == l2:
                         i = torch.eye(2 * l1 + 1)
-                        self.assertLess((x - i).pow(2).max(), 1e-4)
+                        self.assertLess((m - i).pow(2).max(), 1e-4)
                     else:
-                        self.assertLess(x.pow(2).max(), 1e-4)
+                        self.assertLess(m.pow(2).max(), 1e-4)
 
     def test_clebsch_gordan_orthogonal(self):
         with o3.torch_default_dtype(torch.float64):
-            for l_out in range(6):
-                for l_in in range(6):
+            for l_out in range(3 + 1):
+                for l_in in range(l_out, 4 + 1):
                     for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
-                        Q = o3.clebsch_gordan(l_f, l_in, l_out).view(2 * l_f + 1, -1)
+                        Q = o3.clebsch_gordan(l_f, l_in, l_out).reshape(2 * l_f + 1, -1)
                         e = (2 * l_f + 1) * Q @ Q.t()
                         d = e - torch.eye(2 * l_f + 1)
                         self.assertLess(d.pow(2).mean().sqrt(), 1e-10)
 
     def test_clebsch_gordan_sh_norm(self):
         with o3.torch_default_dtype(torch.float64):
-            for l_out in range(6):
-                for l_in in range(6):
+            for l_out in range(3 + 1):
+                for l_in in range(l_out, 4 + 1):
                     for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
                         Q = o3.clebsch_gordan(l_out, l_in, l_f)
                         Y = o3.spherical_harmonics_xyz(l_f, torch.randn(1, 3)).view(2 * l_f + 1)
@@ -173,33 +190,6 @@ class Tests(unittest.TestCase):
             r2 = o3.rot(a, b, c)
 
             self.assertLess((r1 - r2).abs().max(), 1e-10)
-
-    def test_reduce_tensor_product(self):
-        for Rs_i, Rs_j in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
-            with o3.torch_default_dtype(torch.float64):
-                Rs, Q = rs.tensor_product(Rs_i, Rs_j)
-
-                abc = torch.rand(3, dtype=torch.float64)
-
-                D_i = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_i for _ in range(mul)])
-                D_j = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_j for _ in range(mul)])
-                D = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l, _ in Rs for _ in range(mul)])
-
-                Q1 = torch.einsum("ijk,il->ljk", (Q, D))
-                Q2 = torch.einsum("li,mj,kij->klm", (D_i, D_j, Q))
-
-                d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                n = Q.size(0)
-                M = Q.view(n, n)
-                I = torch.eye(n, dtype=M.dtype)
-
-                d = ((M @ M.t()) - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                d = ((M.t() @ M) - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
 
     def test_conventionRs(self):
         Rs = [(1, 0)]
