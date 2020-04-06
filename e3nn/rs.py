@@ -44,7 +44,7 @@ def randn(*size, normalization='component'):
         start = 0
         for mul, l, _p in Rs:
             r = torch.randn(*lsize, mul, 2 * l + 1, *rsize)
-            r.div_(r.norm(2, dim=di, keepdim=True))
+            r.div_(r.norm(2, dim=di + 1, keepdim=True))
             x.narrow(di, start, mul * (2 * l + 1)).copy_(r.view(*lsize, -1, *rsize))
             start += mul * (2 * l + 1)
         return x
