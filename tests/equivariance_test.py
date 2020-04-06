@@ -244,7 +244,7 @@ class Tests(unittest.TestCase):
 
             x1 = torch.einsum("ij,zj->zi", D_out, net(fea))
             x2 = net(torch.einsum("ij,zj->zi", D_in, fea))
-            self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
+            self.assertLess((x1 - x2).norm(), 1e-3 * x1.norm())
 
 
 if __name__ == '__main__':
