@@ -98,7 +98,7 @@ def CosineBasisModel(out_dim, max_radius, number_of_basis, h, L, act):
 
 def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_radius=0.):
     """exp(-x^2 /spacing)"""
-    spacing = (max_radius - min_radius) / number_of_basis
+    spacing = (max_radius - min_radius) / (number_of_basis - 1)
     radii = torch.linspace(min_radius, max_radius, number_of_basis)
     gamma = 1. / spacing
 
