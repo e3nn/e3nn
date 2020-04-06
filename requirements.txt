@@ -1,3 +1,4 @@
-scipy
+--index-url https://pypi.python.org/simple/
+
 git+https://github.com/AMLab-Amsterdam/lie_learn#egg=lie_learn
-appdirs
+.
