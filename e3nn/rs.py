@@ -28,18 +28,25 @@ def randn(*size, normalization='component'):
     """
     random tensor of representation Rs
     """
-    *size, Rs = size
+    di = 0
+    Rs = None
+    for di, Rs in enumerate(size):
+        if isinstance(Rs, list):
+            lsize = size[:di]
+            Rs = convention(Rs)
+            rsize = size[di + 1:]
+            break
+
     if normalization == 'component':
-        return torch.randn(*size, dim(Rs))
+        return torch.randn(*lsize, dim(Rs), *rsize)
     if normalization == 'norm':
-        Rs = convention(Rs)
-        x = torch.zeros(*size, dim(Rs))
-        i = 0
+        x = torch.zeros(*lsize, dim(Rs), *rsize)
+        start = 0
         for mul, l, _p in Rs:
-            r = torch.randn(*size, mul, 2 * l + 1)
-            r.div_(r.norm(2, dim=-1, keepdim=True))
-            x[..., i: i + mul * (2 * l + 1)] = r.view(*size, -1)
-            i += mul * (2 * l + 1)
+            r = torch.randn(*lsize, mul, 2 * l + 1, *rsize)
+            r.div_(r.norm(2, dim=di + 1, keepdim=True))
+            x.narrow(di, start, mul * (2 * l + 1)).copy_(r.view(*lsize, -1, *rsize))
+            start += mul * (2 * l + 1)
         return x
     assert False, "normalization needs to be 'norm' or 'component'"
 
