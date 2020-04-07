@@ -1,7 +1,7 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 
-from e3nn import o3, rs, soft
+from e3nn import o3, rs, s2grid
 
 
 class S2Activation(torch.nn.Module):
@@ -13,7 +13,7 @@ class S2Activation(torch.nn.Module):
 
         :param Rs: input representation of the form [(1, l, p0 * u^l) for l in [0, ..., lmax]]
         :param act: activation function
-        :param res: resolution of the SOFT grid on the sphere (the higher the more accurate)
+        :param res: resolution of the grid on the sphere (the higher the more accurate)
         :param normalization: either 'norm' or 'component'
         :param lmax_out: maximum l of the output
         :param random_rot: rotate randomly the grid
@@ -52,8 +52,8 @@ class S2Activation(torch.nn.Module):
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")
 
-        self.to_soft = soft.ToSOFT(lmax, res, normalization=normalization)
-        self.from_soft = soft.FromSOFT(res, lmax_out, normalization=normalization, lmax_in=lmax)
+        self.to_s2 = s2grid.ToS2Grid(lmax, res, normalization=normalization)
+        self.from_s2 = s2grid.FromS2Grid(res, lmax_out, normalization=normalization, lmax_in=lmax)
         self.act = act
         self.random_rot = random_rot
 
@@ -65,9 +65,9 @@ class S2Activation(torch.nn.Module):
             abc = o3.rand_angles()
             features = torch.einsum('ij,...j->...i', rs.rep(self.Rs_in, *abc), features)
 
-        features = self.to_soft(features)  # [..., beta, alpha]
+        features = self.to_s2(features)  # [..., beta, alpha]
         features = self.act(features)
-        features = self.from_soft(features)
+        features = self.from_s2(features)
 
         if self.random_rot:
             features = torch.einsum('ij,...j->...i', rs.rep(self.Rs_out, *abc).T, features)
