@@ -109,3 +109,83 @@ class Kernel(torch.nn.Module):
         kernel[radii <= r_eps] = kernel2
 
         return kernel.view(*size, *kernel2.shape)
+
+
+class FrozenKernel(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, RadialModel, r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+        """
+        :param Rs_in: list of triplet (multiplicity, representation order, parity)
+        :param Rs_out: list of triplet (multiplicity, representation order, parity)
+        :param RadialModel: Class(d), trainable model: R -> R^d
+        :param tensor r: [..., 3]
+        :param float r_eps: distance considered as zero
+        :param selection_rule: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
+        :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
+        :param normalization: either 'norm' or 'component'
+        representation order = nonnegative integer
+        parity = 0 (no parity), 1 (even), -1 (odd)
+        """
+        super().__init__()
+
+        self.Rs_in = rs.convention(Rs_in)
+        self.Rs_out = rs.convention(Rs_out)
+        self.check_input_output(selection_rule)
+
+        *self.size, xyz = r.size()
+        assert xyz == 3
+        r = r.reshape(-1, 3)  # [batch, space]
+        self.radii = r.norm(2, dim=1)  # [batch]
+        self.r_eps = r_eps
+
+        Rs_f, Q = kernel_geometric(self.Rs_in, self.Rs_out, selection_rule, normalization)
+        Y = sh([l for _, l, _ in Rs_f], r[self.radii > self.r_eps])  # [l_filter * m_filter, batch]
+        Q = torch.einsum('ijyw,yz->zijw', Q, Y)
+        self.register_buffer('Q', Q)  # [out, in, Y, R]
+
+        self.R = RadialModel(rs.mul_dim(Rs_f))
+
+        if (self.radii <= self.r_eps).any():
+            self.linear = KernelLinear(self.Rs_in, self.Rs_out)
+        else:
+            self.linear = None
+
+    def __repr__(self):
+        return "{name} ({Rs_in} -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in=rs.format_Rs(self.Rs_in),
+            Rs_out=rs.format_Rs(self.Rs_out),
+        )
+
+    def check_input_output(self, selection_rule):
+        for _, l_out, p_out in self.Rs_out:
+            if not any(selection_rule(l_in, p_in, l_out, p_out) for _, l_in, p_in in self.Rs_in):
+                raise ValueError("warning! the output (l={}, p={}) cannot be generated".format(l_out, p_out))
+
+        for _, l_in, p_in in self.Rs_in:
+            if not any(selection_rule(l_in, p_in, l_out, p_out) for _, l_out, p_out in self.Rs_out):
+                raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
+
+    def forward(self):
+        """
+        :return: tensor [..., l_out * mul_out * m_out, l_in * mul_in * m_in]
+        """
+        # (1) Case r > 0
+
+        # use the radial model to fix all the degrees of freedom
+        # note: for the normalization we assume that the variance of R[i] is one
+        R = self.R(self.radii[self.radii > self.r_eps])  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
+
+        kernel1 = torch.einsum('zijw,zw->zij', self.Q, R)
+
+        # (2) Case r = 0
+
+        if self.linear is not None:
+            kernel2 = self.linear()
+
+            kernel = kernel1.new_zeros(len(self.radii), *kernel2.shape)
+            kernel[self.radii > self.r_eps] = kernel1
+            kernel[self.radii <= self.r_eps] = kernel2
+        else:
+            kernel = kernel1
+
+        return kernel.view(*self.size, *kernel2.shape)
