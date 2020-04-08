@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
+# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, redefined-builtin
 from functools import partial
 
 import torch

@@ -43,7 +43,6 @@ class BatchNorm(nn.Module):
         assert reduce in ['mean', 'max'], "reduce needs to be 'mean' or 'max'"
         self.reduce = reduce
 
-        assert isinstance(normalization, str), "normalization should be passed as a string value"
         assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
 
