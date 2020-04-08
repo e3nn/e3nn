@@ -107,6 +107,10 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, se
 
 
 class KernelConvFn(torch.autograd.Function):
+    """
+    The math is presented here:
+    https://slides.com/bkmi/convolution-and-kernel/
+    """
     @staticmethod
     def forward(ctx, F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
         f"""{kernel_conv_fn_forward.__doc__}"""
