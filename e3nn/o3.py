@@ -363,7 +363,7 @@ def _legendre(order, z):
     plm = torch.stack(plm)
     c = torch.tensor([(-1) ** m * (math.factorial(order + m) / math.factorial(order - m)) for m in range(1, order + 1)])
     plm = torch.cat([plm, plm[:-1].flip(0) * c.view(-1, 1)])
-    return plm
+    return plm * (-1) ** order
 
 
 def legendre(order, z):
@@ -395,8 +395,7 @@ def spherical_harmonics_beta_part(lmax, cosbeta):
         quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in m]
         quantum = torch.tensor(quantum).view(-1, 1)  # [m, 1]
         o = quantum * legendre(l, cosbeta)  # [m, B]
-        if l == 1:
-            o = -o
+        o = o * (-1) ** l
         pad = lmax - l
         out.append(torch.cat([torch.zeros(pad, o.size(1)), o, torch.zeros(pad, o.size(1))]))
     out = torch.stack(out)
@@ -465,8 +464,7 @@ def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
             2 ** 0.5 * exr[-order:],
         ])
 
-    if order == 1:
-        prefactor *= -1
+    prefactor *= (-1) ** order
 
     quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
     quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
