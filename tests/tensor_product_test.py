@@ -4,7 +4,7 @@ import unittest
 import torch
 
 from e3nn import rs, o3
-from e3nn.tensor_product import ElementwiseTensorProduct, TensorProduct
+from e3nn.tensor_product import ElementwiseTensorProduct, TensorProduct, TensorSquare
 
 
 class Tests(unittest.TestCase):
@@ -70,6 +70,46 @@ class Tests(unittest.TestCase):
                 self.assertLess(d, 1e-10)
 
                 d = ((M.t() @ M) - I).pow(2).mean().sqrt()
+                self.assertLess(d, 1e-10)
+
+    def test_tensor_square_equivariance(self):
+        with o3.torch_default_dtype(torch.float64):
+            Rs_in = [(3, 0), (2, 1), (5, 2)]
+
+            sq = TensorSquare(Rs_in, o3.selection_rule)
+
+            x = rs.randn(Rs_in)
+
+            abc = o3.rand_angles()
+            D_in = rs.rep(Rs_in, *abc)
+            D_out = rs.rep(sq.Rs_out, *abc)
+
+            y1 = sq(D_in @ x)
+            y2 = D_out @ sq(x)
+
+            self.assertLess((y1 - y2).abs().max(), 1e-7 * y1.abs().max())
+
+    def test_tensor_square_norm(self):
+        for Rs_in in [[(1, 0), (2, 1), (4, 3)]]:
+            with o3.torch_default_dtype(torch.float64):
+                Rs_out, Q = rs.tensor_square(Rs_in, o3.selection_rule, normalization='component', sorted=True)
+
+                abc = o3.rand_angles()
+
+                D_in = rs.rep(Rs_in, *abc)
+                D_out = rs.rep(Rs_out, *abc)
+
+                Q1 = torch.einsum("ijk,il->ljk", (Q, D_out))
+                Q2 = torch.einsum("li,mj,kij->klm", (D_in, D_in, Q))
+
+                d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
+                self.assertLess(d, 1e-10)
+
+                n = Q.size(0)
+                M = Q.view(n, -1)
+                I = torch.eye(n)
+
+                d = ((M @ M.t()) - I).pow(2).mean().sqrt()
                 self.assertLess(d, 1e-10)
 
     def test_tensor_product_in_out_norm(self):

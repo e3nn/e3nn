@@ -1,8 +1,10 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
-import torch
-from e3nn.linear import Linear
-from e3nn import o3, rs
 from functools import partial
+
+import torch
+
+from e3nn import o3, rs
+from e3nn.linear import Linear
 
 
 class TensorProduct(torch.nn.Module):
@@ -41,6 +43,38 @@ class TensorProduct(torch.nn.Module):
 
         output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
         return output.view(*size_1, -1)
+
+
+class TensorSquare(torch.nn.Module):
+    """
+    (A x A)_k =  C_ijk A_i A_j
+
+    [(2, 0), (2, 1)] x [(2, 0), (2, 1)] = [(3, 0), (4, 1), (3, 0), (1, 1), (3, 2)]
+    """
+    def __init__(self, Rs_in, selection_rule=o3.selection_rule):
+        super().__init__()
+
+        self.Rs_in = rs.simplify(Rs_in)
+
+        self.Rs_out, mixing_matrix = rs.tensor_square(Rs_in, selection_rule, sorted=True)
+        self.register_buffer('mixing_matrix', mixing_matrix)
+
+    def __repr__(self):
+        return "{name} ({Rs_in} ^ 2 -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in=rs.format_Rs(self.Rs_in),
+            Rs_out=rs.format_Rs(self.Rs_out),
+        )
+
+    def forward(self, features):
+        '''
+        :param features: [..., channels]
+        '''
+        *size, n = features.size()
+        features = features.view(-1, n)
+
+        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features, features)
+        return output.view(*size, -1)
 
 
 class ElementwiseTensorProduct(torch.nn.Module):

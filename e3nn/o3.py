@@ -576,7 +576,7 @@ def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None)
     # return a clone to avoid that the user modifies the matrices in-place
     if cached:
         return _cached_clebsch_gordan(l1, l2, l3, dtype, device).clone()
-    return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
+    return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device).clone()
 
 
 @lru_cache(maxsize=None)
