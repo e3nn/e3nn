@@ -4,20 +4,19 @@ Some functions related to SO3 and his usual representations
 
 Using ZYZ Euler angles parametrisation
 """
+import gc
 import math
 from functools import lru_cache
 
+import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
+import scipy
+import scipy.linalg
 import torch
 from appdirs import user_cache_dir
+from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
 from e3nn.util.cache_file import cached_dirpklgz
 from e3nn.util.default_dtype import torch_default_dtype
-
-# if torch.cuda.is_available():
-#     try:
-#         from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module
-#     except ImportError:
-#         real_spherical_harmonics = None
 
 
 def rot_z(gamma):
@@ -148,7 +147,6 @@ def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     irreducible representation of SO3
     - compatible with compose and spherical_harmonics
     """
-    from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
     abc = [alpha, beta, gamma]
     for i, x in enumerate(abc):
         if torch.is_tensor(x):
@@ -167,7 +165,6 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     derivative of irreducible representation of SO3
     returns (dDda, dDdb, dDdc)
     """
-    import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
     abc = [alpha, beta, gamma]
     for i, x in enumerate(abc):
         if torch.is_tensor(x):
@@ -204,326 +201,6 @@ def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
     Input * SH = Output
     """
     return [l for l in selection_rule(l_in, p_in, l_out, p_out, lmax) if p_out in [0, p_in * (-1) ** l]]
-
-################################################################################
-# Spherical harmonics
-################################################################################
-
-
-def spherical_harmonics(order, alpha, beta, sph_last=False, dtype=None, device=None):
-    """
-    spherical harmonics
-
-    :param order: int or list
-    :param alpha: float or tensor of shape [...]
-    :param beta: float or tensor of shape [...]
-    :param sph_last: return the spherical harmonics in the last channel
-    :param dtype:
-    :param device:
-    :return: tensor of shape [m, ...] (or [..., m] if sph_last)
-
-    - compatible with irr_repr and compose
-    """
-    from lie_learn.representations.SO3.spherical_harmonics import sh  # real valued by default
-    import numpy as np
-
-    try:
-        order = list(order)
-    except TypeError:
-        order = [order]
-
-    if dtype is None and torch.is_tensor(alpha):
-        dtype = alpha.dtype
-    if dtype is None and torch.is_tensor(beta):
-        dtype = beta.dtype
-    if dtype is None:
-        dtype = torch.get_default_dtype()
-
-    if device is None and torch.is_tensor(alpha):
-        device = alpha.device
-    if device is None and torch.is_tensor(beta):
-        device = beta.device
-
-    if not torch.is_tensor(alpha):
-        alpha = torch.tensor(alpha, dtype=torch.float64)
-    if not torch.is_tensor(beta):
-        beta = torch.tensor(beta, dtype=torch.float64)
-
-    Js = np.concatenate([J * np.ones(2 * J + 1) for J in order], 0)
-    Ms = np.concatenate([np.arange(-J, J + 1, 1) for J in order], 0)
-    Js = Js.reshape(-1, *[1] * alpha.dim())
-    Ms = Ms.reshape(-1, *[1] * alpha.dim())
-    alpha = alpha.unsqueeze(0)
-    beta = beta.unsqueeze(0)
-    Y = sh(Js, Ms, math.pi - beta.cpu().numpy(), alpha.cpu().numpy())
-    if sph_last:
-        rank = len(Y.shape)
-        return torch.tensor(Y, dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
-    else:
-        return torch.tensor(Y, dtype=dtype, device=device)
-
-
-def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None):
-    """
-    spherical harmonics
-
-    :param order: int or list
-    :param xyz: tensor of shape [..., 3]
-    :param sph_last: return the spherical harmonics in the last channel
-    :param dtype:
-    :param device:
-    :return: tensor of shape [m, ...] (or [..., m] if sph_last)
-    """
-    if xyz.requires_grad:
-        return _spherical_harmonics_xyz_backwardable(order, xyz)
-
-    try:
-        order = list(order)
-    except TypeError:
-        order = [order]
-
-    if dtype is None and torch.is_tensor(xyz):
-        dtype = xyz.dtype
-    if dtype is None:
-        dtype = torch.get_default_dtype()
-
-    if device is None and torch.is_tensor(xyz):
-        device = xyz.device
-
-    if not torch.is_tensor(xyz):
-        xyz = torch.tensor(xyz, dtype=torch.float64)
-
-    with torch_default_dtype(torch.float64):
-        # if device.type == 'cuda' and max(order) <= 10 and real_spherical_harmonics is not None:
-        #     *size, _ = xyz.size()
-        #     xyz = xyz.view(-1, 3)
-        #     max_l = max(order)
-        #     out = xyz.new_empty(((max_l + 1) * (max_l + 1), xyz.size(0)))  # [ filters, batch_size]
-        #     xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
-        #     real_spherical_harmonics.rsh(out, xyz_unit)
-        #     # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
-        #     norm_coef = [elem for lh in range((max_l + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
-        #     if max_l % 2 == 0:
-        #         norm_coef.extend([1.] * (2 * max_l + 1))
-        #     norm_coef = torch.tensor(norm_coef, device=device).unsqueeze(1)
-        #     out.mul_(norm_coef)
-        #     if order != list(range(max_l + 1)):
-        #         keep_rows = torch.zeros(out.size(0), dtype=torch.bool)
-        #         for l in order:
-        #             keep_rows[(l * l):((l + 1) * (l + 1))].fill_(True)
-        #         out = out[keep_rows.to(device)]
-        #     out = out.view(-1, *size)
-        # else:
-        alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
-        out = spherical_harmonics(order, alpha, beta)  # [m, ...]
-
-        # fix values when xyz = 0
-        val = xyz.new_tensor([1 / math.sqrt(4 * math.pi)])
-        val = torch.cat([val if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
-        out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
-
-        if sph_last:
-            rank = len(out.shape)
-            return out.to(dtype=dtype, device=device).permute(*range(1, rank), 0).contiguous()
-        else:
-            return out.to(dtype=dtype, device=device)
-
-
-def spherical_harmonics_expand_matrix(lmax):
-    """
-    :return: tensor [l, m, l * m]
-    """
-    m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
-    i = 0
-    for l in range(lmax + 1):
-        m[l, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
-        i += 2 * l + 1
-    return m
-
-
-def _legendre(order, z):
-    """
-    associated Legendre polynomials
-
-    :param order: int
-    :param z: tensor of shape [A]
-    :return: tensor of shape [m, A]
-    """
-    if not z.requires_grad:
-        from scipy.special import lpmv
-        return torch.stack([(-1)**m * torch.tensor(lpmv(m, order, z.cpu().double().numpy())).to(z) for m in range(-order, order + 1)])
-
-    fac = math.factorial(order)
-    sqz2 = (1 - z ** 2) ** 0.5
-    hsqz2 = 0.5 * sqz2
-    ihsqz2 = z / hsqz2
-
-    if order == 0:
-        return z.new_ones(1, *z.size())
-    if order == 1:
-        return torch.stack([-0.5 * sqz2, z, sqz2])
-
-    plm = [(1 - 2 * abs(order - 2 * order // 2)) * hsqz2 ** order / fac]
-    plm.append(-plm[0] * order * ihsqz2)
-    for mr in range(1, order):
-        plm.append((mr - order) * ihsqz2 * plm[mr] - (2 * order - mr + 1) * mr * plm[mr - 1])
-    plm = torch.stack(plm)
-    c = torch.tensor([(-1) ** m * (math.factorial(order + m) / math.factorial(order - m)) for m in range(1, order + 1)])
-    plm = torch.cat([plm, plm[:-1].flip(0) * c.view(-1, 1)])
-    return plm * (-1) ** order
-
-
-def legendre(order, z):
-    """
-    associated Legendre polynomials
-
-    :param order: int
-    :param z: tensor of shape [A]
-    :return: tensor of shape [l * m, A]
-    """
-    if not isinstance(order, list):
-        order = [order]
-    return torch.cat([_legendre(J, z) for J in order], dim=0)  # [l * m, A]
-
-
-def spherical_harmonics_beta_part(lmax, cosbeta):
-    """
-    the cosbeta componant of the spherical harmonics
-    (useful to perform fourier transform)
-
-    :param cosbeta: tensor of shape [...]
-    :return: tensor of shape [l, m, ...]
-    """
-    size = cosbeta.shape
-    cosbeta = cosbeta.view(-1)
-    out = []
-    for l in range(0, lmax + 1):
-        quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in range(-l, l + 1)]
-        quantum = torch.tensor(quantum).view(-1, 1)  # [m, 1]
-        o = (-1) ** l * quantum * legendre(l, cosbeta)  # [m, B]
-        pad = lmax - l
-        out.append(torch.cat([torch.zeros(pad, o.size(1)), o, torch.zeros(pad, o.size(1))]))
-    out = torch.stack(out)
-    return out.view(lmax + 1, 2 * lmax + 1, *size)
-
-
-def spherical_harmonics_alpha_part(lmax, alpha):
-    """
-    the alpha componant of the spherical harmonics
-    (useful to perform fourier transform)
-
-    :param alpha: tensor of shape [...]
-    :return: tensor of shape [m, ...]
-    """
-    size = alpha.shape
-    alpha = alpha.view(-1)
-
-    m = torch.arange(-lmax, lmax + 1).view(-1, 1)  # [m, 1]
-    sm = 1 - m % 2 * 2  # [m, 1]  = (-1) ** m
-
-    phi = alpha.unsqueeze(0)  # [1, A]
-    exr = torch.cos(m * phi)  # [m, A]
-    exi = torch.sin(-m * phi)  # [-m, A]
-
-    if lmax == 0:
-        out = torch.ones_like(phi)
-    else:
-        out = torch.cat([
-            2 ** 0.5 * sm[:lmax] * exi[:lmax],
-            torch.ones_like(phi),
-            2 ** 0.5 * exr[-lmax:],
-        ])
-
-    return out.view(-1, *size)  # [m, ...]
-
-
-def __spherical_harmonics_xyz_backwardable(order, xyz, eps):
-    """
-    spherical harmonics
-
-    :param order: int
-    :param xyz: tensor of shape [A, 3]
-    :return: tensor of shape [m, A]
-    """
-    norm = torch.norm(xyz, 2, -1, keepdim=True)
-    # Using this eps and masking out spherical harmonics from radii < eps
-    # are both crucial to stability.
-    xyz = xyz / (norm + eps)
-
-    plm = legendre(order, xyz[..., 2])  # [m, A]
-
-    m = torch.arange(-order, order + 1, dtype=xyz.dtype, device=xyz.device)
-    m = m.view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
-    sm = 1 - m % 2 * 2  # [m, 1...]
-
-    phi = torch.atan2(xyz[..., 1], xyz[..., 0]).unsqueeze(0)  # [1, A]
-    exr = torch.cos(m * phi)  # [m, A]
-    exi = torch.sin(-m * phi)  # [-m, A]
-
-    if order == 0:
-        prefactor = 1.
-    else:
-        prefactor = torch.cat([
-            2 ** 0.5 * sm[:order] * exi[:order],
-            xyz.new_ones(1, *xyz.size()[:-1]),
-            2 ** 0.5 * exr[-order:],
-        ])
-
-    prefactor *= (-1) ** order
-
-    quantum = [((2 * order + 1) / (4 * math.pi) * math.factorial(order - m) / math.factorial(order + m)) ** 0.5 for m in m]
-    quantum = xyz.new_tensor(quantum).view(-1, *(1, ) * (xyz.dim() - 1))  # [m, 1...]
-
-    out = prefactor * quantum * plm  # [m, A]
-
-    # fix values when xyz = 0
-    out[:, norm.squeeze(-1) < eps] = 1 / math.sqrt(4 * math.pi) if order == 0 else 0.
-
-    return out
-
-
-def _spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
-    """
-    spherical harmonics
-
-    :param order: int
-    :param xyz: tensor of shape [A, 3]
-    :return: tensor of shape [l * m, A]
-    """
-    if not isinstance(order, list):
-        order = [order]
-    return torch.cat([__spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
-
-
-def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, device=None):
-    """
-    approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
-    the higher is lmax the better is the approximation
-    """
-    a = sum(2 * l + 1 for l in range(lmax + 1)) / (4 * math.pi)
-    onehot = torch.cat([spherical_harmonics(l, alpha, beta, dtype=dtype, device=device) for l in range(lmax + 1)]) / a
-
-    if sph_last:
-        return onehot.permute(*range(1, len(onehot.shape)), 0).contiguous()
-    return onehot
-
-
-def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
-    """
-    Evaluate the signal on the sphere
-    """
-    from itertools import count
-    s = 0
-    i = 0
-    for l in count():
-        d = 2 * l + 1
-        if len(coeff) < i + d:
-            break
-        c = coeff[i: i + d]
-        i += d
-
-        s += torch.einsum("i,i...->...", (c, spherical_harmonics(l, alpha, beta)))
-    return s
 
 
 ################################################################################
@@ -640,10 +317,6 @@ def __clebsch_gordan(l1, l2, l3, _version=4):
 
 
 def _get_d_null_space(l1, l2, l3, eps=1e-10):
-    import scipy
-    import scipy.linalg
-    import gc
-
     def _DxDxD(a, b, c):
         D1 = irr_repr(l1, a, b, c)
         D2 = irr_repr(l2, a, b, c)

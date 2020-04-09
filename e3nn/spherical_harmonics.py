@@ -4,13 +4,13 @@ import math
 import scipy.signal
 import torch
 
-from e3nn import o3
+from e3nn import o3, rsh
 
 
 class SphericalHarmonicsProject(torch.nn.Module):
     def __init__(self, alpha, beta, lmax):
         super().__init__()
-        sh = torch.cat([o3.spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)])
+        sh = torch.cat([rsh.spherical_harmonics(l, alpha, beta) for l in range(lmax + 1)])
         self.register_buffer("sh", sh)
 
     def forward(self, coeff):

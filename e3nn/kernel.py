@@ -3,18 +3,18 @@ import math
 
 import torch
 
-from e3nn import o3, rs
+from e3nn import o3, rs, rsh
 from e3nn.linear import KernelLinear
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=rsh.spherical_harmonics_xyz, normalization='norm'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
         :param selection_rule: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
-        :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[m, ...]
+        :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[..., m]
         :param normalization: either 'norm' or 'component'
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
@@ -109,7 +109,7 @@ class Kernel(torch.nn.Module):
         # (1) Case r > 0
 
         # precompute all needed spherical harmonics
-        Y = self.sh(self.set_of_l_filters, r[radii > r_eps])  # [l_filter * m_filter, batch]
+        Y = self.sh(self.set_of_l_filters, r[radii > r_eps])  # [batch, l_filter * m_filter]
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
@@ -133,12 +133,12 @@ class Kernel(torch.nn.Module):
 
 def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
     """
-    :param Y: tensor [l_filter * m_filter, batch]
+    :param Y: tensor [batch, l_filter * m_filter]
     :param R: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
     :param norm_coef: tensor [l_out, l_in]
     :return: tensor [batch, l_out * mul_out * m_out, l_in * mul_in * m_in]
     """
-    batch = Y.shape[1]
+    batch = Y.shape[0]
     n_in = rs.dim(Rs_in)
     n_out = rs.dim(Rs_out)
 
@@ -170,12 +170,12 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_f
             K = 0
             for k, l_filter in enumerate(l_filters):
                 tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
-                sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
+                sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
 
                 C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
 
                 # note: The multiplication with `sub_R` could also be done outside of the for loop
-                K += norm_coef[i, j] * torch.einsum("ijk,kz,zuv->zuivj", (C, sub_Y, sub_R[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
+                K += norm_coef[i, j] * torch.einsum("ijk,zk,zuv->zuivj", (C, sub_Y, sub_R[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
 
             if not isinstance(K, int):
                 kernel[:, s_out, s_in] = K.reshape_as(kernel[:, s_out, s_in])
@@ -214,7 +214,7 @@ class KernelFn(torch.autograd.Function):
         grad_Y = grad_R = None
 
         if ctx.needs_input_grad[0]:
-            grad_Y = grad_kernel.new_zeros(*ctx.Y_shape)  # [l_filter * m_filter, batch]
+            grad_Y = grad_kernel.new_zeros(*ctx.Y_shape)  # [batch, l_filter * m_filter]
         if ctx.needs_input_grad[1]:
             grad_R = grad_kernel.new_zeros(*ctx.R_shape)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
@@ -252,10 +252,10 @@ class KernelFn(torch.autograd.Function):
                     C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
 
                     if grad_Y is not None:
-                        grad_Y[tmp: tmp + 2 * l_filter + 1] += norm_coef[i, j] * torch.einsum("zuivj,ijk,zuv->kz", grad_K, C, sub_R[..., k])
+                        grad_Y[:, tmp: tmp + 2 * l_filter + 1] += norm_coef[i, j] * torch.einsum("zuivj,ijk,zuv->zk", grad_K, C, sub_R[..., k])
                     if grad_R is not None:
-                        sub_Y = Y[tmp: tmp + 2 * l_filter + 1]  # [m, batch]
-                        sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum("zuivj,ijk,kz->zuv", grad_K, C, sub_Y)
+                        sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
+                        sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum("zuivj,ijk,zk->zuv", grad_K, C, sub_Y)
 
         del ctx
         return grad_Y, grad_R, None, None, None, None, None

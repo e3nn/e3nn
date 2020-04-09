@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from e3nn import o3, rs
+from e3nn import o3, rs, rsh
 from e3nn.kernel import Kernel as Kernel1
 from e3nn.kernel_mod import Kernel as KernelMod
 from e3nn.linear import Linear as Linear1
@@ -33,12 +33,12 @@ class Tests(unittest.TestCase):
                 D_in = o3.irr_repr(l_in, *abc)
                 D_out = o3.irr_repr(l_out, *abc)
 
-                Y = o3.spherical_harmonics_xyz(l_f, r @ o3.rot(*abc).t())
-                W = torch.einsum("ijk,kz->zij", (Q, Y))
+                Y = rsh.spherical_harmonics_xyz([l_f], r @ o3.rot(*abc).t())
+                W = torch.einsum("ijk,zk->zij", (Q, Y))
                 W1 = torch.einsum("zij,jk->zik", (W, D_in))
 
-                Y = o3.spherical_harmonics_xyz(l_f, r)
-                W = torch.einsum("ijk,kz->zij", (Q, Y))
+                Y = rsh.spherical_harmonics_xyz([l_f], r)
+                W = torch.einsum("ijk,zk->zij", (Q, Y))
                 W2 = torch.einsum("ij,zjk->zik", (D_out, W))
 
                 self.assertLess((W1 - W2).norm(), 1e-5 * W.norm(), l_f)
