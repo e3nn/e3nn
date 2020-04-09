@@ -346,6 +346,10 @@ def _legendre(order, z):
     :param z: tensor of shape [A]
     :return: tensor of shape [m, A]
     """
+    if not z.requires_grad:
+        from scipy.special import lpmv
+        return torch.stack([(-1)**m * torch.tensor(lpmv(m, order, z.cpu().double().numpy())).to(z) for m in range(-order, order + 1)])
+
     fac = math.factorial(order)
     sqz2 = (1 - z ** 2) ** 0.5
     hsqz2 = 0.5 * sqz2
@@ -391,11 +395,9 @@ def spherical_harmonics_beta_part(lmax, cosbeta):
     cosbeta = cosbeta.view(-1)
     out = []
     for l in range(0, lmax + 1):
-        m = torch.arange(-l, l + 1).view(-1, 1)
-        quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in m]
+        quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in range(-l, l + 1)]
         quantum = torch.tensor(quantum).view(-1, 1)  # [m, 1]
-        o = quantum * legendre(l, cosbeta)  # [m, B]
-        o = o * (-1) ** l
+        o = (-1) ** l * quantum * legendre(l, cosbeta)  # [m, B]
         pad = lmax - l
         out.append(torch.cat([torch.zeros(pad, o.size(1)), o, torch.zeros(pad, o.size(1))]))
     out = torch.stack(out)
