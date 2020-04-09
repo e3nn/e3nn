@@ -13,11 +13,11 @@ from appdirs import user_cache_dir
 from e3nn.util.cache_file import cached_dirpklgz
 from e3nn.util.default_dtype import torch_default_dtype
 
-if torch.cuda.is_available():
-    try:
-        from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module
-    except ImportError:
-        real_spherical_harmonics = None
+# if torch.cuda.is_available():
+#     try:
+#         from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module
+#     except ImportError:
+#         real_spherical_harmonics = None
 
 
 def rot_z(gamma):
@@ -291,33 +291,33 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
         xyz = torch.tensor(xyz, dtype=torch.float64)
 
     with torch_default_dtype(torch.float64):
-        if device.type == 'cuda' and max(order) <= 10 and real_spherical_harmonics is not None:
-            *size, _ = xyz.size()
-            xyz = xyz.view(-1, 3)
-            max_l = max(order)
-            out = xyz.new_empty(((max_l + 1) * (max_l + 1), xyz.size(0)))  # [ filters, batch_size]
-            xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
-            real_spherical_harmonics.rsh(out, xyz_unit)
-            # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
-            norm_coef = [elem for lh in range((max_l + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
-            if max_l % 2 == 0:
-                norm_coef.extend([1.] * (2 * max_l + 1))
-            norm_coef = torch.tensor(norm_coef, device=device).unsqueeze(1)
-            out.mul_(norm_coef)
-            if order != list(range(max_l + 1)):
-                keep_rows = torch.zeros(out.size(0), dtype=torch.bool)
-                for l in order:
-                    keep_rows[(l * l):((l + 1) * (l + 1))].fill_(True)
-                out = out[keep_rows.to(device)]
-            out = out.view(-1, *size)
-        else:
-            alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
-            out = spherical_harmonics(order, alpha, beta)  # [m, ...]
+        # if device.type == 'cuda' and max(order) <= 10 and real_spherical_harmonics is not None:
+        #     *size, _ = xyz.size()
+        #     xyz = xyz.view(-1, 3)
+        #     max_l = max(order)
+        #     out = xyz.new_empty(((max_l + 1) * (max_l + 1), xyz.size(0)))  # [ filters, batch_size]
+        #     xyz_unit = torch.nn.functional.normalize(xyz, p=2, dim=-1)
+        #     real_spherical_harmonics.rsh(out, xyz_unit)
+        #     # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
+        #     norm_coef = [elem for lh in range((max_l + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
+        #     if max_l % 2 == 0:
+        #         norm_coef.extend([1.] * (2 * max_l + 1))
+        #     norm_coef = torch.tensor(norm_coef, device=device).unsqueeze(1)
+        #     out.mul_(norm_coef)
+        #     if order != list(range(max_l + 1)):
+        #         keep_rows = torch.zeros(out.size(0), dtype=torch.bool)
+        #         for l in order:
+        #             keep_rows[(l * l):((l + 1) * (l + 1))].fill_(True)
+        #         out = out[keep_rows.to(device)]
+        #     out = out.view(-1, *size)
+        # else:
+        alpha, beta = xyz_to_angles(xyz)  # two tensors of shape [...]
+        out = spherical_harmonics(order, alpha, beta)  # [m, ...]
 
-            # fix values when xyz = 0
-            val = xyz.new_tensor([1 / math.sqrt(4 * math.pi)])
-            val = torch.cat([val if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
-            out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
+        # fix values when xyz = 0
+        val = xyz.new_tensor([1 / math.sqrt(4 * math.pi)])
+        val = torch.cat([val if l == 0 else xyz.new_zeros(2 * l + 1) for l in order])  # [m]
+        out[:, xyz.norm(2, -1) == 0] = val.view(-1, 1)
 
         if sph_last:
             rank = len(out.shape)
