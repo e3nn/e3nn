@@ -1,11 +1,12 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin
 """
 Some functions related to SO3 and his usual representations
 
 Using ZYZ Euler angles parametrisation
 """
 
-from functools import partial
+from fractions import gcd
+from functools import reduce
 
 import torch
 
@@ -74,8 +75,6 @@ def split(Rs, cmul=-1):
     Rs = simplify(Rs)
     muls = {mul for mul, _, _ in Rs}
     if cmul == -1:
-        from fractions import gcd
-        from functools import reduce
         cmul = reduce(gcd, muls)
     assert all(mul % cmul == 0 for mul, _, _ in Rs)
 
@@ -287,23 +286,7 @@ def map_mul_to_Rs(Rs):
     return mapping_matrix  # [dim(Rs), mul_dim(Rs)]
 
 
-def sorted_truncated_tensor_product(Rs_1, Rs_2, lmax):
-    """
-    :param Rs_1: input representation
-    :param Rs_2: input representation
-    :param lmax: maximum l for the output
-    :return: Rs_out, change of basis
-
-    example: sorted_truncated_tensor_product([(1, 1), (2, 2)], [(2, 2)], 1) = ([(4, 0, 0), (6, 1, 0)], matrix)
-    """
-    Rs, Q = tensor_product(Rs_1, Rs_2, partial(o3.selection_rule, lmax=lmax))
-    Rs, perm = sort(Rs)
-    Rs = simplify(Rs)
-    matrix = torch.einsum('ij,jkl->ikl', perm, Q)
-    return Rs, matrix
-
-
-def tensor_product(input1, input2, output, normalization='component'):
+def tensor_product(input1, input2, output, normalization='component', sorted=False):
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -323,18 +306,18 @@ def tensor_product(input1, input2, output, normalization='component'):
     torch.einsum('kij,i,j->k', Q, A, B)
     """
     if isinstance(input1, list) and isinstance(input2, list):
-        return _tensor_product_in_in(input1, input2, output, normalization)
+        return _tensor_product_in_in(input1, input2, output, normalization, sorted)
 
     if isinstance(input1, list) and isinstance(output, list):
-        return _tensor_product_in_out(input1, input2, output, normalization)
+        return _tensor_product_in_out(input1, input2, output, normalization, sorted)
 
     if isinstance(input2, list) and isinstance(output, list):
-        Rs_in1, Q = _tensor_product_in_out(input2, input1, output, normalization)
+        Rs_in1, Q = _tensor_product_in_out(input2, input1, output, normalization, sorted)
         Q = torch.einsum('kij->kji', Q)
         return Rs_in1, Q
 
 
-def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization):
+def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted):
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -349,7 +332,6 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization):
     _, Q = tensor_product_in_in(Rs_in1, Rs_in2)
     torch.einsum('kij,i,j->k', Q, A, B)
     """
-    assert isinstance(normalization, str), "normalization should be passed as a string value"
     assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
     Rs_in1 = simplify(Rs_in1)
@@ -390,10 +372,15 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization):
             index_2 += dim_2
         index_1 += dim_1
 
+    if sorted:
+        Rs_out, perm = sort(Rs_out)
+        Rs_out = simplify(Rs_out)
+        clebsch_gordan_tensor = torch.einsum('ij,jkl->ikl', perm, clebsch_gordan_tensor)
+
     return Rs_out, clebsch_gordan_tensor
 
 
-def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization):
+def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted):
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -408,7 +395,6 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization):
     _, Q = tensor_product_in_out(Rs_in1, Rs_out)
     torch.einsum('kij,i,j->k', Q, A, B)
     """
-    assert isinstance(normalization, str), "normalization should be passed as a string value"
     assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
     Rs_in1 = simplify(Rs_in1)
@@ -454,15 +440,112 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization):
             index_1 += dim_1
         index_out += dim_out
 
+    if sorted:
+        Rs_in2, perm = sort(Rs_in2)
+        Rs_in2 = simplify(Rs_in2)
+        clebsch_gordan_tensor = torch.einsum('jl,kil->kij', perm, clebsch_gordan_tensor)
+
     return Rs_in2, clebsch_gordan_tensor
 
 
-def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule):
+def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='component', sorted=False):
+    """
+    Compute the matrix Q
+    from Rs_out to Rs_in tensor product with Rs_in
+    where Rs_out is a direct sum of irreducible representations
+
+    For normalization='component',
+    The set of "lines" { Q[i] }_i is orthonormal
+
+    :return: Rs_out, Q
+
+    example:
+    _, Q = tensor_square(Rs_in)
+    torch.einsum('kij,i,j->k', Q, A, A)
+    """
+    assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+
+    Rs_in = simplify(Rs_in)
+
+    Rs_out = []
+
+    for i, (mul_1, l_1, p_1) in enumerate(Rs_in):
+        for l_out in selection_rule(l_1, p_1, l_1, p_1):
+            if l_out % 2 == 0:
+                Rs_out.append((mul_1 * (mul_1 + 1) // 2, l_out, p_1**2))
+            else:
+                Rs_out.append((mul_1 * (mul_1 - 1) // 2, l_out, p_1**2))
+
+        for mul_2, l_2, p_2 in Rs_in[i + 1:]:
+            for l_out in selection_rule(l_1, p_1, l_2, p_2):
+                Rs_out.append((mul_1 * mul_2, l_out, p_1 * p_2))
+
+    Rs_out = simplify(Rs_out)
+
+    clebsch_gordan_tensor = torch.zeros(dim(Rs_out), dim(Rs_in), dim(Rs_in))
+
+    index_out = 0
+
+    index_1 = 0
+    for i, (mul_1, l_1, p_1) in enumerate(Rs_in):
+        dim_1 = mul_1 * (2 * l_1 + 1)
+
+        for l_out in selection_rule(l_1, p_1, l_1, p_1):
+            I = torch.eye(mul_1**2).view(mul_1**2, mul_1, mul_1)
+            uv = I.nonzero()[:, 1:]
+            if l_out % 2 == 0:
+                I = I[uv[:, 0] <= uv[:, 1]]
+            else:
+                I = I[uv[:, 0] < uv[:, 1]]
+
+            if I.shape[0] == 0:
+                continue
+
+            C = o3.clebsch_gordan(l_out, l_1, l_1)
+            if normalization == 'component':
+                C *= (2 * l_out + 1) ** 0.5
+            if normalization == 'norm':
+                C *= (2 * l_1 + 1) ** 0.5 * (2 * l_1 + 1) ** 0.5
+            dim_out = I.shape[0] * (2 * l_out + 1)
+            m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_1)
+            clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_1:index_1 + dim_1] = m
+
+            index_out += dim_out
+
+        index_2 = index_1 + dim_1
+        for mul_2, l_2, p_2 in Rs_in[i + 1:]:
+            dim_2 = mul_2 * (2 * l_2 + 1)
+            for l_out in selection_rule(l_1, p_1, l_2, p_2):
+                I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
+
+                C = o3.clebsch_gordan(l_out, l_1, l_2)
+                if normalization == 'component':
+                    C *= (2 * l_out + 1) ** 0.5
+                if normalization == 'norm':
+                    C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
+                dim_out = I.shape[0] * (2 * l_out + 1)
+                m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
+                clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+
+                index_out += dim_out
+            index_2 += dim_2
+        index_1 += dim_1
+
+    if sorted:
+        Rs_out, perm = sort(Rs_out)
+        Rs_out = simplify(Rs_out)
+        clebsch_gordan_tensor = torch.einsum('ij,jkl->ikl', perm, clebsch_gordan_tensor)
+    return Rs_out, clebsch_gordan_tensor
+
+
+def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, normalization='component'):
     """
     :return: Rs_out, matrix
 
     m_kij A_i B_j
     """
+    assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+
     Rs_1 = simplify(Rs_1)
     Rs_2 = simplify(Rs_2)
 
@@ -500,9 +583,13 @@ def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule):
         dim_1 = mul * (2 * l_1 + 1)
         dim_2 = mul * (2 * l_2 + 1)
 
-        for l in selection_rule(l_1, p_1, l_2, p_2):
-            dim_out = mul * (2 * l + 1)
-            C = o3.clebsch_gordan(l, l_1, l_2, cached=True) * (2 * l + 1) ** 0.5
+        for l_out in selection_rule(l_1, p_1, l_2, p_2):
+            dim_out = mul * (2 * l_out + 1)
+            C = o3.clebsch_gordan(l_out, l_1, l_2, cached=True)
+            if normalization == 'component':
+                C *= (2 * l_out + 1) ** 0.5
+            if normalization == 'norm':
+                C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
             clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
