@@ -274,6 +274,9 @@ def spherical_harmonics_xyz(order, xyz, sph_last=False, dtype=None, device=None)
     :param device:
     :return: tensor of shape [m, ...] (or [..., m] if sph_last)
     """
+    if xyz.requires_grad:
+        return _spherical_harmonics_xyz_backwardable(order, xyz)
+
     try:
         order = list(order)
     except TypeError:
@@ -434,7 +437,7 @@ def spherical_harmonics_alpha_part(lmax, alpha):
     return out.view(-1, *size)  # [m, ...]
 
 
-def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
+def __spherical_harmonics_xyz_backwardable(order, xyz, eps):
     """
     spherical harmonics
 
@@ -479,7 +482,7 @@ def _spherical_harmonics_xyz_backwardable(order, xyz, eps):
     return out
 
 
-def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
+def _spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     """
     spherical harmonics
 
@@ -489,7 +492,7 @@ def spherical_harmonics_xyz_backwardable(order, xyz, eps=1e-8):
     """
     if not isinstance(order, list):
         order = [order]
-    return torch.cat([_spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
+    return torch.cat([__spherical_harmonics_xyz_backwardable(J, xyz, eps) for J in order], dim=0)  # [m, A]
 
 
 def spherical_harmonics_dirac(lmax, alpha, beta, sph_last=False, dtype=None, device=None):

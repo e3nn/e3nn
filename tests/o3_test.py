@@ -12,13 +12,14 @@ class Tests(unittest.TestCase):
 
     def test_decomposition_spherical_harmonics(self):
         with o3.torch_default_dtype(torch.float64):
-            lmax = 4
-            beta = torch.linspace(1e-3, math.pi - 1e-3, 100).view(1, -1)
-            alpha = torch.linspace(0, 2 * math.pi, 100).view(-1, 1)
-            Y1 = o3.spherical_harmonics_alpha_part(lmax, alpha) * o3.spherical_harmonics_beta_part(lmax, beta.cos())
-            Y2 = o3.spherical_harmonics([l for l in range(lmax + 1)], alpha, beta)
-            Y2 = torch.einsum('lmi,iab->lmab', o3.spherical_harmonics_expand_matrix(lmax), Y2)
-            self.assertLess((Y1 - Y2).abs().max(), 1e-10)
+            for rg in [True, False]:
+                lmax = 4
+                beta = torch.linspace(1e-3, math.pi - 1e-3, 100, requires_grad=rg).view(1, -1)
+                alpha = torch.linspace(0, 2 * math.pi, 100, requires_grad=rg).view(-1, 1)
+                Y1 = o3.spherical_harmonics_alpha_part(lmax, alpha) * o3.spherical_harmonics_beta_part(lmax, beta.cos())
+                Y2 = o3.spherical_harmonics([l for l in range(lmax + 1)], alpha.detach(), beta.detach())
+                Y2 = torch.einsum('lmi,iab->lmab', o3.spherical_harmonics_expand_matrix(lmax), Y2)
+                self.assertLess((Y1 - Y2).abs().max(), 1e-10)
 
     def test_sh_is_in_irrep(self):
         with o3.torch_default_dtype(torch.float64):
