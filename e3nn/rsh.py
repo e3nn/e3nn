@@ -85,7 +85,7 @@ def spherical_harmonics_beta(ls, cosbeta):
     for l in ls:
         quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in range(-l, l + 1)]
         quantum = torch.tensor(quantum)  # [m]
-        out = (-1) ** l * quantum * legendre(l, cosbeta)  # [batch, m]
+        out = (-1) ** l * quantum * legendre([l], cosbeta)  # [batch, m]
         output += [out]
     output = torch.cat(output, dim=-1)
     return output.view(*size, -1)  # [..., l * m]
