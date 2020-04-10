@@ -606,7 +606,7 @@ def _wigner_3j(l1, l2, l3):
         return __wigner_3j(l3, l1, l2).transpose(0, 2).transpose(0, 1)
 
 
-@cached_dirpklgz(user_cache_dir("e3nn/3jsymbol"))
+@cached_dirpklgz(user_cache_dir("e3nn/wigner_3j"))
 def __wigner_3j(l1, l2, l3, _version=0):
     """
     Computes the 3-j symbol
