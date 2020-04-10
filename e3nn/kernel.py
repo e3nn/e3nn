@@ -27,7 +27,6 @@ class Kernel(torch.nn.Module):
         self.check_input_output()
         self.sh = sh
 
-        assert isinstance(normalization, str), "normalization should be passed as a string value"
         assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
 
