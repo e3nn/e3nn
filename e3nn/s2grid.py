@@ -32,6 +32,7 @@ class ToS2Grid(torch.nn.Module):
     def __init__(self, lmax, res=None, normalization='component'):
         """
         :param lmax: lmax of the input signal
+        :param res: resolution of the output as a tuple (beta resolution, alpha resolution)
         :param normalization: either 'norm' or 'component'
         """
         super().__init__()
@@ -75,8 +76,10 @@ class ToS2Grid(torch.nn.Module):
         size = x.shape[:-1]
         lmax = round(x.shape[-1] ** 0.5) - 1
         x = x.reshape(-1, (lmax + 1) ** 2)
-        out = torch.einsum('am,zmb->zba', self.sha, torch.einsum('mbi,zi->zmb', self.shb, x))
-        return out.view(*size, *out.shape[1:])
+
+        x = torch.einsum('mbi,zi->zmb', self.shb, x)
+        x = torch.einsum('am,zmb->zba', self.sha, x)
+        return x.view(*size, *x.shape[1:])
 
 
 class FromS2Grid(torch.nn.Module):
@@ -88,7 +91,7 @@ class FromS2Grid(torch.nn.Module):
 
     def __init__(self, res, lmax=None, normalization='component', lmax_in=None):
         """
-        :param res: resolution of the input
+        :param res: resolution of the input as a tuple (beta resolution, alpha resolution)
         :param lmax: maximum l of the output
         :param normalization: either 'norm' or 'component'
         :param lmax_in: maximum l of the input of ToS2Grid in order to be the inverse
@@ -136,5 +139,7 @@ class FromS2Grid(torch.nn.Module):
         size = x.shape[:-2]
         res_beta, res_alpha = x.shape[-2:]
         x = x.view(-1, res_beta, res_alpha)
-        out = torch.einsum('mbi,zbm->zi', self.shb, torch.einsum('am,zba->zbm', self.sha, x))
-        return out.view(*size, out.shape[1])
+
+        x = torch.einsum('am,zba->zbm', self.sha, x)
+        x = torch.einsum('mbi,zbm->zi', self.shb, x)
+        return x.view(*size, x.shape[1])

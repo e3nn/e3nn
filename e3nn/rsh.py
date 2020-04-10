@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long
 """
 Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
@@ -7,11 +7,17 @@ import math
 import torch
 from scipy import special
 
-from e3nn.util.default_dtype import torch_default_dtype
-
 
 def spherical_harmonics_expand_matrix(lmax):
     """
+    convertion matrix between a flatten vector (L, m) like that
+    (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
+
+    and a bidimensional matrix representation like that
+                    (0, 0)
+            (1, -1) (1, 0) (1, 1)
+    (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
+
     :return: tensor [l, m, l * m]
     """
     m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
@@ -57,12 +63,10 @@ def legendre(ls, z):
     """
     associated Legendre polynomials
 
-    :param ls: int or list
+    :param ls: list
     :param z: tensor of shape [...]
     :return: tensor of shape [..., l * m]
     """
-    if not isinstance(ls, list):
-        ls = [ls]
     return torch.cat([_legendre(l, z) for l in ls], dim=-1)  # [..., l * m]
 
 
@@ -120,7 +124,7 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
     """
     spherical harmonics
 
-    :param ls: list
+    :param ls: list of int
     :param alpha: float or tensor of shape [...]
     :param beta: float or tensor of shape [...]
     :return: tensor of shape [..., m]
@@ -137,14 +141,12 @@ def spherical_harmonics_xyz(ls, xyz):
     :param xyz: tensor of shape [..., 3]
     :return: tensor of shape [..., m]
     """
-
-    with torch_default_dtype(torch.float64):
-        norm = torch.norm(xyz, 2, -1, keepdim=True)
-        xyz = xyz / norm
-        alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
-        cosbeta = xyz[..., 2]  # [...]
-        output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta) for l in ls]
-        return torch.cat(output, dim=-1)
+    norm = torch.norm(xyz, 2, -1, keepdim=True)
+    xyz = xyz / norm
+    alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
+    cosbeta = xyz[..., 2]  # [...]
+    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta) for l in ls]
+    return torch.cat(output, dim=-1)
 
 
 def spherical_harmonics_dirac(lmax, alpha, beta):
