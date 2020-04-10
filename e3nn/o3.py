@@ -556,12 +556,19 @@ def direct_sum(*matrices):
 # Clebsch Gordan
 ################################################################################
 
-def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None):
+def wigner_3j(l1, l2, l3, cached=False, dtype=None, device=None, like=None):
     """
     Computes the Clebsch–Gordan coefficients
 
     D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
     """
+    if torch.is_tensor(l1):
+        l1 = l1.item()
+    if torch.is_tensor(l2):
+        l2 = l2.item()
+    if torch.is_tensor(l3):
+        l3 = l3.item()
+
     if dtype is None:
         if like is not None:
             dtype = like.dtype
@@ -575,41 +582,37 @@ def clebsch_gordan(l1, l2, l3, cached=False, dtype=None, device=None, like=None)
 
     # return a clone to avoid that the user modifies the matrices in-place
     if cached:
-        return _cached_clebsch_gordan(l1, l2, l3, dtype, device).clone()
-    return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device).clone()
+        return _cached_wigner_3j(l1, l2, l3, dtype, device).clone()
+    return _wigner_3j(l1, l2, l3).to(dtype=dtype, device=device).clone()
 
 
 @lru_cache(maxsize=None)
-def _cached_clebsch_gordan(l1, l2, l3, dtype, device):
-    return _clebsch_gordan(l1, l2, l3).to(dtype=dtype, device=device)
+def _cached_wigner_3j(l1, l2, l3, dtype, device):
+    return _wigner_3j(l1, l2, l3).to(dtype=dtype, device=device)
 
 
-def _clebsch_gordan(l1, l2, l3):
-    if torch.is_tensor(l1):
-        l1 = l1.item()
-    if torch.is_tensor(l2):
-        l2 = l2.item()
-    if torch.is_tensor(l3):
-        l3 = l3.item()
-
+def _wigner_3j(l1, l2, l3):
     if l1 <= l2 <= l3:
-        return __clebsch_gordan(l1, l2, l3)
+        return __wigner_3j(l1, l2, l3)
     if l1 <= l3 <= l2:
-        return __clebsch_gordan(l1, l3, l2).transpose(1, 2)
+        return __wigner_3j(l1, l3, l2).transpose(1, 2) * (-1) ** (l1 + l2 + l3)
     if l2 <= l1 <= l3:
-        return __clebsch_gordan(l2, l1, l3).transpose(0, 1)
+        return __wigner_3j(l2, l1, l3).transpose(0, 1) * (-1) ** (l1 + l2 + l3)
     if l3 <= l2 <= l1:
-        return __clebsch_gordan(l3, l2, l1).transpose(0, 2)
+        return __wigner_3j(l3, l2, l1).transpose(0, 2) * (-1) ** (l1 + l2 + l3)
     if l2 <= l3 <= l1:
-        return __clebsch_gordan(l2, l3, l1).transpose(0, 2).transpose(1, 2)
+        return __wigner_3j(l2, l3, l1).transpose(0, 2).transpose(1, 2)
     if l3 <= l1 <= l2:
-        return __clebsch_gordan(l3, l1, l2).transpose(0, 2).transpose(0, 1)
+        return __wigner_3j(l3, l1, l2).transpose(0, 2).transpose(0, 1)
 
 
-@cached_dirpklgz(user_cache_dir("e3nn/clebsch_gordan"))
-def __clebsch_gordan(l1, l2, l3, _version=4):
+@cached_dirpklgz(user_cache_dir("e3nn/3jsymbol"))
+def __wigner_3j(l1, l2, l3, _version=0):
     """
-    Computes the Clebsch–Gordan coefficients
+    Computes the 3-j symbol
+    https://en.wikipedia.org/wiki/3-j_symbol
+
+    Closely related to the Clebsch–Gordan coefficients
 
     D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
     """
@@ -628,7 +631,7 @@ def __clebsch_gordan(l1, l2, l3, _version=4):
         if next(x for x in Q.flatten() if x.abs() > 1e-10 * Q.abs().max()) < 0:
             Q.neg_()
 
-        abc = torch.rand(3)
+        abc = rand_angles()
         _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
         assert torch.allclose(Q, _Q)
 
