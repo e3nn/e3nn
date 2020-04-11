@@ -553,12 +553,13 @@ def direct_sum(*matrices):
 
 
 ################################################################################
-# Clebsch Gordan
+# 3j symbol
 ################################################################################
 
 def wigner_3j(l1, l2, l3, cached=False, dtype=None, device=None, like=None):
     """
-    Computes the Clebsch–Gordan coefficients
+    Computes the 3-j symbol
+    https://en.wikipedia.org/wiki/3-j_symbol
 
     D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
     """
