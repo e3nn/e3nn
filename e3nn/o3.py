@@ -607,7 +607,7 @@ def _wigner_3j(l1, l2, l3):
 
 
 @cached_dirpklgz(user_cache_dir("e3nn/wigner_3j"))
-def __wigner_3j(l1, l2, l3, _version=0):
+def __wigner_3j(l1, l2, l3, _version=1):
     """
     Computes the 3-j symbol
     https://en.wikipedia.org/wiki/3-j_symbol
@@ -621,25 +621,6 @@ def __wigner_3j(l1, l2, l3, _version=0):
     assert abs(l3 - l1) <= l2 <= l3 + l1
     assert abs(l1 - l2) <= l3 <= l1 + l2
 
-    with torch_default_dtype(torch.float64):
-        null_space = _get_d_null_space(l1, l2, l3)
-
-        assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
-        Q = null_space[0]
-        Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
-
-        if next(x for x in Q.flatten() if x.abs() > 1e-10 * Q.abs().max()) < 0:
-            Q.neg_()
-
-        abc = rand_angles()
-        _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
-        assert torch.allclose(Q, _Q)
-
-    assert Q.dtype == torch.float64
-    return Q  # [m1, m2, m3]
-
-
-def _get_d_null_space(l1, l2, l3, eps=1e-10):
     import scipy
     import scipy.linalg
     import gc
@@ -659,20 +640,35 @@ def _get_d_null_space(l1, l2, l3, eps=1e-10):
         [2.52385107, 0.29089583, 3.90040975],
     ]
 
-    B = torch.zeros((n, n))                                                                             # preallocate memory
-    for abc in random_angles:                                                                           # expand block matrix multiplication with its transpose
-        D = _DxDxD(*abc) - torch.eye(n)
-        B += torch.matmul(D.t(), D)                                                                     # B = sum_i { D^T_i @ D_i }
-        del D
-        gc.collect()
+    with torch_default_dtype(torch.float64):
+        B = torch.zeros((n, n))
+        for abc in random_angles:
+            D = _DxDxD(*abc) - torch.eye(n)
+            B += D.T @ D
+            del D
+            gc.collect()
 
     # ask for one (smallest) eigenvalue/eigenvector pair if there is only one exists, otherwise ask for two
     s, v = scipy.linalg.eigh(B.numpy(), eigvals=(0, min(1, n - 1)), overwrite_a=True)
     del B
     gc.collect()
 
-    kernel = v.T[s < eps]
-    return torch.from_numpy(kernel)
+    kernel = v.T[s < 1e-10]
+    null_space = torch.from_numpy(kernel)
+
+    assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
+    Q = null_space[0]
+    Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+
+    if next(x for x in Q.flatten() if x.abs() > 1e-10 * Q.abs().max()) < 0:
+        Q.neg_()
+
+    abc = rand_angles()
+    _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
+    assert torch.allclose(Q, _Q)
+
+    assert Q.dtype == torch.float64
+    return Q  # [m1, m2, m3]
 
 
 ################################################################################
