@@ -93,7 +93,7 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, se
                 offset = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
                 sub_Y = Y[offset: offset + 2 * l_filter + 1, ...]  # [m, batch, a, b]
 
-                C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
+                C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=kernel_conv)  # [m_out, m_in, m]
 
                 K += norm_coef[i, j] * torch.einsum(
                     "ijk,kzab,zabuv,zbvj->zaui",
@@ -193,7 +193,7 @@ class KernelConvFn(torch.autograd.Function):
 
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
-                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
+                    C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
 
                     if (grad_F is not None) or (grad_R is not None):
                         sub_Y = Y[tmp: tmp + 2 * l_filter + 1, ...]  # [m, batch, a, b]
