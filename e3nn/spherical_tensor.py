@@ -70,3 +70,23 @@ class SphericalHarmonicsFindPeaks(torch.nn.Module):
         radius = torch.cat([radius1[mask.sum(1) == 0], radius2])
 
         return peaks, radius
+
+
+def spherical_harmonics_dirac(lmax, alpha, beta):
+    """
+    approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
+    the higher is lmax the better is the approximation
+    """
+    ls = list(range(lmax + 1))
+    a = sum(2 * l + 1 for l in ls) / (4 * math.pi)
+    return rsh.spherical_harmonics_alpha_beta(ls, torch.tensor(alpha), torch.tensor(beta)) / a
+
+
+def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
+    """
+    Evaluate the signal on the sphere
+    """
+    lmax = round(coeff.shape[-1] ** 0.5) - 1
+    ls = list(range(lmax + 1))
+    sh = rsh.spherical_harmonics_alpha_beta(ls, alpha, beta)
+    return torch.einsum('...i,i->...', sh, coeff)

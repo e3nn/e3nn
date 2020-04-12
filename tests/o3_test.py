@@ -74,13 +74,6 @@ class Tests(unittest.TestCase):
                 Y2 = rsh.spherical_harmonics_xyz([l], -x)
                 self.assertLess((Y1 - Y2).abs().max(), 1e-10 * Y1.abs().max())
 
-    def test_sh_dirac(self):
-        with o3.torch_default_dtype(torch.float64):
-            for l in range(5):
-                a = rsh.spherical_harmonics_dirac(l, 1.2, 2.1)
-                a = rsh.spherical_harmonics_coeff_to_sphere(a, torch.tensor(1.2), torch.tensor(2.1))
-                self.assertAlmostEqual(a.item(), 1)
-
     def test_sh_norm(self):
         with o3.torch_default_dtype(torch.float64):
             l_filter = list(range(15))

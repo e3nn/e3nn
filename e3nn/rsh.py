@@ -102,19 +102,19 @@ def spherical_harmonics_alpha(l, alpha):
     size = alpha.shape
     alpha = alpha.view(-1, 1)  # [batch, 1]
 
-    m = torch.arange(-l, l + 1)  # [m]
-    sm = 1 - m % 2 * 2  # [m]  = (-1)**m
-
-    exr = torch.cos(m * alpha)  # [batch, m]
-    exi = torch.sin(-m * alpha)  # [batch, -m]
-
     if l == 0:
         out = torch.ones_like(alpha)
     else:
+        m = torch.arange(1, l + 1).flip(0)  # [l, l-1, l-2, ..., 1]
+        sin = torch.sin(((-1)**m * m) * alpha)  # [batch, m]
+
+        m = torch.arange(1, l + 1)  # [1, 2, 3, ..., l]
+        cos = torch.cos(m * alpha)  # [batch, m]
+
         out = torch.cat([
-            2 ** 0.5 * sm[:l] * exi[:, :l],
+            math.sqrt(2) * sin,
             torch.ones_like(alpha),
-            2 ** 0.5 * exr[:, -l:],
+            math.sqrt(2) * cos,
         ], dim=-1)
 
     return out.view(*size, -1)  # [..., m]
@@ -147,23 +147,3 @@ def spherical_harmonics_xyz(ls, xyz):
     cosbeta = xyz[..., 2]  # [...]
     output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta) for l in ls]
     return torch.cat(output, dim=-1)
-
-
-def spherical_harmonics_dirac(lmax, alpha, beta):
-    """
-    approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
-    the higher is lmax the better is the approximation
-    """
-    ls = list(range(lmax + 1))
-    a = sum(2 * l + 1 for l in ls) / (4 * math.pi)
-    return spherical_harmonics_alpha_beta(ls, torch.tensor(alpha), torch.tensor(beta)) / a
-
-
-def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
-    """
-    Evaluate the signal on the sphere
-    """
-    lmax = round(coeff.shape[-1] ** 0.5) - 1
-    ls = list(range(lmax + 1))
-    sh = spherical_harmonics_alpha_beta(ls, alpha, beta)
-    return torch.einsum('...i,i->...', sh, coeff)
