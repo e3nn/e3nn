@@ -171,7 +171,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_f
                 tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
                 sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
 
-                C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
+                C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
 
                 # note: The multiplication with `sub_R` could also be done outside of the for loop
                 K += norm_coef[i, j] * torch.einsum("ijk,zk,zuv->zuivj", (C, sub_Y, sub_R[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
@@ -248,7 +248,7 @@ class KernelFn(torch.autograd.Function):
 
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
-                    C = o3.clebsch_gordan(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
+                    C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
 
                     if grad_Y is not None:
                         grad_Y[:, tmp: tmp + 2 * l_filter + 1] += norm_coef[i, j] * torch.einsum("zuivj,ijk,zuv->zk", grad_K, C, sub_R[..., k])

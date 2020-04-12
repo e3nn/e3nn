@@ -24,7 +24,7 @@ def main():
 
     out = []
     for l in range(abs(args.l_out - args.l_in), args.l_out + args.l_in + 1):
-        C = o3.clebsch_gordan(args.l_out, args.l_in, l)
+        C = o3.wigner_3j(args.l_out, args.l_in, l)
         Y = rsh.spherical_harmonics(l, alpha, beta)
         out.append(torch.einsum("ijk,k...->ij...", (C, Y)))
     f = torch.stack(out)
