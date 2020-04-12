@@ -19,15 +19,15 @@ from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):
-    def test_irr_repr_clebsch_gordan(self):
-        """Test irr_repr and clebsch_gordan equivariance."""
+    def test_irr_repr_wigner_3j(self):
+        """Test irr_repr and wigner_3j equivariance."""
         with torch_default_dtype(torch.float64):
             l_in = 3
             l_out = 2
 
             for l_f in range(abs(l_in - l_out), l_in + l_out + 1):
                 r = torch.randn(100, 3)
-                Q = o3.clebsch_gordan(l_out, l_in, l_f)
+                Q = o3.wigner_3j(l_out, l_in, l_f)
 
                 abc = torch.randn(3)
                 D_in = o3.irr_repr(l_in, *abc)

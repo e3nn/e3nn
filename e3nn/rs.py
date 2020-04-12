@@ -346,7 +346,7 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
 
     Rs_out = simplify(Rs_out)
 
-    clebsch_gordan_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
+    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
 
     index_out = 0
 
@@ -359,14 +359,14 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
             dim_2 = mul_2 * (2 * l_2 + 1)
             for l_out in selection_rule(l_1, p_1, l_2, p_2):
                 dim_out = mul_1 * mul_2 * (2 * l_out + 1)
-                C = o3.clebsch_gordan(l_out, l_1, l_2, cached=True)
+                C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
                 if normalization == 'component':
                     C *= (2 * l_out + 1) ** 0.5
                 if normalization == 'norm':
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-                clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
 
                 index_out += dim_out
             index_2 += dim_2
@@ -375,9 +375,9 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
     if sorted:
         Rs_out, perm = sort(Rs_out)
         Rs_out = simplify(Rs_out)
-        clebsch_gordan_tensor = torch.einsum('ij,jkl->ikl', perm, clebsch_gordan_tensor)
+        wigner_3j_tensor = torch.einsum('ij,jkl->ikl', perm, wigner_3j_tensor)
 
-    return Rs_out, clebsch_gordan_tensor
+    return Rs_out, wigner_3j_tensor
 
 
 def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted):
@@ -409,7 +409,7 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
 
     Rs_in2 = simplify(Rs_in2)
 
-    clebsch_gordan_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
+    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
 
     index_2 = 0
 
@@ -427,14 +427,14 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
             dim_1 = mul_1 * (2 * l_1 + 1)
             for l_2 in selection_rule(l_1, p_1, l_out, p_out):
                 dim_2 = mul_1 * mul_out * (2 * l_2 + 1)
-                C = o3.clebsch_gordan(l_out, l_1, l_2, cached=True)
+                C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
                 if normalization == 'component':
                     C *= (2 * l_out + 1) ** 0.5
                 if normalization == 'norm':
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_out * mul_1).view(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
 
                 index_2 += dim_2
             index_1 += dim_1
@@ -443,9 +443,9 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
     if sorted:
         Rs_in2, perm = sort(Rs_in2)
         Rs_in2 = simplify(Rs_in2)
-        clebsch_gordan_tensor = torch.einsum('jl,kil->kij', perm, clebsch_gordan_tensor)
+        wigner_3j_tensor = torch.einsum('jl,kil->kij', perm, wigner_3j_tensor)
 
-    return Rs_in2, clebsch_gordan_tensor
+    return Rs_in2, wigner_3j_tensor
 
 
 def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='component', sorted=False):
@@ -482,7 +482,7 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
 
     Rs_out = simplify(Rs_out)
 
-    clebsch_gordan_tensor = torch.zeros(dim(Rs_out), dim(Rs_in), dim(Rs_in))
+    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in), dim(Rs_in))
 
     index_out = 0
 
@@ -501,14 +501,14 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
             if I.shape[0] == 0:
                 continue
 
-            C = o3.clebsch_gordan(l_out, l_1, l_1)
+            C = o3.wigner_3j(l_out, l_1, l_1)
             if normalization == 'component':
                 C *= (2 * l_out + 1) ** 0.5
             if normalization == 'norm':
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_1 + 1) ** 0.5
             dim_out = I.shape[0] * (2 * l_out + 1)
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_1)
-            clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_1:index_1 + dim_1] = m
+            wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_1:index_1 + dim_1] = m
 
             index_out += dim_out
 
@@ -518,14 +518,14 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
             for l_out in selection_rule(l_1, p_1, l_2, p_2):
                 I = torch.eye(mul_1 * mul_2).view(mul_1 * mul_2, mul_1, mul_2)
 
-                C = o3.clebsch_gordan(l_out, l_1, l_2)
+                C = o3.wigner_3j(l_out, l_1, l_2)
                 if normalization == 'component':
                     C *= (2 * l_out + 1) ** 0.5
                 if normalization == 'norm':
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 dim_out = I.shape[0] * (2 * l_out + 1)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
 
                 index_out += dim_out
             index_2 += dim_2
@@ -534,8 +534,8 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
     if sorted:
         Rs_out, perm = sort(Rs_out)
         Rs_out = simplify(Rs_out)
-        clebsch_gordan_tensor = torch.einsum('ij,jkl->ikl', perm, clebsch_gordan_tensor)
-    return Rs_out, clebsch_gordan_tensor
+        wigner_3j_tensor = torch.einsum('ij,jkl->ikl', perm, wigner_3j_tensor)
+    return Rs_out, wigner_3j_tensor
 
 
 def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, normalization='component'):
@@ -573,7 +573,7 @@ def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, nor
 
     Rs_out = simplify(Rs_out)
 
-    clebsch_gordan_tensor = torch.zeros(dim(Rs_out), dim(Rs_1), dim(Rs_2))
+    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_1), dim(Rs_2))
 
     index_out = 0
     index_1 = 0
@@ -585,17 +585,17 @@ def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, nor
 
         for l_out in selection_rule(l_1, p_1, l_2, p_2):
             dim_out = mul * (2 * l_out + 1)
-            C = o3.clebsch_gordan(l_out, l_1, l_2, cached=True)
+            C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
             if normalization == 'component':
                 C *= (2 * l_out + 1) ** 0.5
             if normalization == 'norm':
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).view(dim_out, dim_1, dim_2)
-            clebsch_gordan_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+            wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
             index_out += dim_out
 
         index_1 += dim_1
         index_2 += dim_2
 
-    return Rs_out, clebsch_gordan_tensor
+    return Rs_out, wigner_3j_tensor
