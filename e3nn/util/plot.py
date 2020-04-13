@@ -3,7 +3,7 @@ import math
 
 import torch
 
-from e3nn import o3
+from e3nn import o3, rsh
 
 
 def spherical_surface(n):
@@ -21,7 +21,7 @@ def spherical_surface(n):
 def plot_sh_signal(coeff, n=20):
     from functools import partial
 
-    fun = partial(o3.spherical_harmonics_coeff_to_sphere, coeff)
+    fun = partial(rsh.spherical_harmonics_coeff_to_sphere, coeff)
     plot_sphere(fun, n)
 
 

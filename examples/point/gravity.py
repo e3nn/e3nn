@@ -23,7 +23,7 @@ class GravityNet(torch.nn.Module):
         sp = rescaled_act.Softplus(beta=5)
         RadialModel = partial(CosineBasisModel, max_radius=max_radius, number_of_basis=num_radial, h=100, L=2, act=sp)
 
-        K = partial(Kernel, RadialModel=RadialModel, sh=o3.spherical_harmonics_xyz_backwardable)
+        K = partial(Kernel, RadialModel=RadialModel)
         self.conv = Convolution(K, [(1, 0)], [(1, 1)])
 
     def forward(self, features, geometry):

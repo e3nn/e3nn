@@ -7,7 +7,7 @@ import math
 import lie_learn.spaces.S3 as S3
 import torch
 
-from e3nn import o3
+from e3nn import rsh
 
 
 def s2_grid(res_beta, res_alpha):
@@ -32,6 +32,7 @@ class ToS2Grid(torch.nn.Module):
     def __init__(self, lmax, res=None, normalization='component'):
         """
         :param lmax: lmax of the input signal
+        :param res: resolution of the output as a tuple (beta resolution, alpha resolution)
         :param normalization: either 'norm' or 'component'
         """
         super().__init__()
@@ -50,8 +51,8 @@ class ToS2Grid(torch.nn.Module):
         assert res_beta >= 2 * (lmax + 1)
 
         betas, alphas = s2_grid(res_beta, res_alpha)
-        sha = o3.spherical_harmonics_alpha_part(lmax, alphas)  # [m, a]
-        shb = o3.spherical_harmonics_beta_part(lmax, betas.cos())  # [l, m, b]
+        sha = rsh.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
+        shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos())  # [b, l * m]
 
         # normalize such that all l has the same variance on the sphere
         if normalization == 'component':
@@ -61,8 +62,8 @@ class ToS2Grid(torch.nn.Module):
             ]) / math.sqrt(lmax + 1)
         if normalization == 'norm':
             n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
-        m = o3.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
-        shb = torch.einsum('lmb,lmi,l->mbi', shb, m, n)  # [m, b, i]
+        m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
+        shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
@@ -75,8 +76,10 @@ class ToS2Grid(torch.nn.Module):
         size = x.shape[:-1]
         lmax = round(x.shape[-1] ** 0.5) - 1
         x = x.reshape(-1, (lmax + 1) ** 2)
-        out = torch.einsum('ma,zmb->zba', self.sha, torch.einsum('mbi,zi->zmb', self.shb, x))
-        return out.view(*size, *out.shape[1:])
+
+        x = torch.einsum('mbi,zi->zmb', self.shb, x)
+        x = torch.einsum('am,zmb->zba', self.sha, x)
+        return x.view(*size, *x.shape[1:])
 
 
 class FromS2Grid(torch.nn.Module):
@@ -88,7 +91,7 @@ class FromS2Grid(torch.nn.Module):
 
     def __init__(self, res, lmax=None, normalization='component', lmax_in=None):
         """
-        :param res: resolution of the input
+        :param res: resolution of the input as a tuple (beta resolution, alpha resolution)
         :param lmax: maximum l of the output
         :param normalization: either 'norm' or 'component'
         :param lmax_in: maximum l of the input of ToS2Grid in order to be the inverse
@@ -110,8 +113,8 @@ class FromS2Grid(torch.nn.Module):
             lmax_in = lmax
 
         betas, alphas = s2_grid(res_beta, res_alpha)
-        sha = o3.spherical_harmonics_alpha_part(lmax, alphas)  # [m, a]
-        shb = o3.spherical_harmonics_beta_part(lmax, betas.cos())  # [l, m, b]
+        sha = rsh.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
+        shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos())  # [b, l * m]
 
         # normalize such that it is the inverse of ToS2Grid
         if normalization == 'component':
@@ -121,9 +124,9 @@ class FromS2Grid(torch.nn.Module):
             ]) * math.sqrt(lmax_in + 1)
         if normalization == 'norm':
             n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
-        m = o3.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
+        m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         qw = torch.tensor(S3.quadrature_weights(res_beta // 2)) * res_beta**2 / res_alpha  # [b]
-        shb = torch.einsum('lmb,lmi,l,b->mbi', shb, m, n, qw)  # [m, b, i]
+        shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
 
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
@@ -136,5 +139,7 @@ class FromS2Grid(torch.nn.Module):
         size = x.shape[:-2]
         res_beta, res_alpha = x.shape[-2:]
         x = x.view(-1, res_beta, res_alpha)
-        out = torch.einsum('mbi,zbm->zi', self.shb, torch.einsum('ma,zba->zbm', self.sha, x))
-        return out.view(*size, out.shape[1])
+
+        x = torch.einsum('am,zba->zbm', self.sha, x)
+        x = torch.einsum('mbi,zbm->zi', self.shb, x)
+        return x.view(*size, x.shape[1])
