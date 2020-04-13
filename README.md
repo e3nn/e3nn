@@ -1,4 +1,4 @@
-# E3NN
+# e3nn
 The group E(3) is the group of 3 dimensional rotations, translations and mirror.
 This library aims to create E(3) equivariant convolutional neural networks.
 
@@ -7,39 +7,55 @@ This library aims to create E(3) equivariant convolutional neural networks.
 ## Example
 ```python
 from functools import partial
+
 import torch
-from e3nn.radial import CosineBasisModel
+
+from e3nn.non_linearities.rescaled_act import swish
+from e3nn.radial import GaussianRadialModel
 from e3nn.kernel import Kernel
 from e3nn.point.operations import Convolution
-from e3nn.util.plot import plot_sh_signal
-import matplotlib.pyplot as plt
+from e3nn.non_linearities.norm import Norm
+from e3nn import rs
 
-# Radial model:  R -> R^d
-# Projection on cos^2 basis functions followed by a fully connected network
-RadialModel = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=1, act=torch.relu)
+# Define the input and output representations
+Rs_in = [(1, 0), (2, 1)]  # Input = One scalar plus two vectors
+Rs_out = [(1, 1)]  # Output = One single vector
+
+# Radial model:  R+ -> R^d
+RadialModel = partial(GaussianRadialModel, max_radius=3.0, number_of_basis=3, h=100, L=1, act=swish)
 
 # kernel: composed on a radial part that contains the learned parameters
 #  and an angular part given by the spherical hamonics and the Clebsch-Gordan coefficients
-K = partial(Kernel, RadialModel=RadialModel)
-
-# Define input and output representations
-Rs_in = [(1, 0)]  # one scalar
-Rs_out = [(1, l) for l in range(10)]
+K = partial(Kernel, RadialModel=RadialModel, normalization='norm')
 
 # Use the kernel to define a convolution operation
-conv = Convolution(K, Rs_in, Rs_out)
+C = partial(Convolution, K)
 
-n = 3  # number of points
-features = torch.ones(1, n, 1)
-geometry = torch.randn(1, n, 3)
+# Create the convolution module
+conv = C(Rs_in, Rs_out)
 
-features = conv(features, geometry)
+# Module to compute the norm of each irreducible component
+norm = Norm(Rs_out, normalization='norm')
+
+
+n = 5  # number of input points
+features = rs.randn(1, n, Rs_in, normalization='norm', requires_grad=True)
+in_geometry = torch.randn(1, n, 3)
+out_geometry = torch.zeros(1, 1, 3)  # One point at the origin
+
+
+norm(conv(features, in_geometry, out_geometry)).backward()
+
+print(features)
+print(features.grad)
 ```
 
 ## Hierarchy
 
 - `e3nn` contains the library
-  - `e3nn/o3.py` defines all the needed mathematical functions
+  - `e3nn/o3.py` O(3) irreducible representations
+  - `e3nn/rsh.py` real spherical harmonics
+  - `e3nn/rs.py` geometrical tensor representations
   - `e3nn/image` contains voxels linear operations
   - `e3nn/point` contains points linear operations
   - `e3nn/non_linearities` non linearities operations

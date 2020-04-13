@@ -99,6 +99,24 @@ class Tests(unittest.TestCase):
                     else:
                         self.assertLess(m.pow(2).max(), 1e-4)
 
+    def test_irrep_closure_1(self):
+        rots = [o3.rand_angles() for _ in range(10000)]
+        Us = [torch.stack([o3.irr_repr(l, *abc) for abc in rots]) for l in range(3 + 1)]
+        for l1, U1 in enumerate(Us):
+            for l2, U2 in enumerate(Us):
+                m = torch.einsum('zij,zkl->zijkl', U1, U2).mean(0).view((2 * l1 + 1)**2, (2 * l2 + 1)**2)
+                if l1 == l2:
+                    i = torch.eye((2 * l1 + 1)**2)
+                    self.assertLess((m.mul(2 * l1 + 1) - i).abs().max(), 0.1)
+                else:
+                    self.assertLess(m.abs().max(), 0.1)
+
+    def test_irrep_closure_2(self):
+        r1, r2 = o3.rand_angles(), o3.rand_angles()
+        a = sum((o3.irr_repr(l, *r1) * o3.irr_repr(l, *r2)).sum() for l in range(20 + 1))
+        b = sum((o3.irr_repr(l, *r1) * o3.irr_repr(l, *r1)).sum() for l in range(20 + 1))
+        self.assertLess(a, 1e-3 * b)
+
     def test_wigner_3j_orthogonal(self):
         with o3.torch_default_dtype(torch.float64):
             for l_out in range(3 + 1):

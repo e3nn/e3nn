@@ -340,9 +340,10 @@ def __wigner_3j(l1, l2, l3, _version=1):
     if next(x for x in Q.flatten() if x.abs() > 1e-10 * Q.abs().max()) < 0:
         Q.neg_()
 
-    abc = rand_angles()
-    _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
-    assert torch.allclose(Q, _Q)
+    with torch_default_dtype(torch.float64):
+        abc = rand_angles()
+        _Q = torch.einsum("il,jm,kn,lmn", (irr_repr(l1, *abc), irr_repr(l2, *abc), irr_repr(l3, *abc), Q))
+        assert torch.allclose(Q, _Q)
 
     assert Q.dtype == torch.float64
     return Q  # [m1, m2, m3]
