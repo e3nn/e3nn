@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 class BatchNorm(nn.Module):
-    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean', normalization='norm'):
+    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean', normalization='component'):
         '''
         Batch normalization layer for orthonormal representations
         It normalizes by the norm of the representations.

@@ -7,7 +7,7 @@ from e3nn import o3, rs
 from e3nn.linear_mod import KernelLinear
 
 
-def kernel_geometric(Rs_in, Rs_out, selection_rule=o3.selection_rule_in_out_sh, normalization='norm'):
+def kernel_geometric(Rs_in, Rs_out, selection_rule=o3.selection_rule_in_out_sh, normalization='component'):
     # Compute Clebsh-Gordan coefficients
     Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out, normalization)  # [out, in, Y]
 
@@ -36,7 +36,7 @@ def kernel_geometric(Rs_in, Rs_out, selection_rule=o3.selection_rule_in_out_sh, 
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='component'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -112,7 +112,7 @@ class Kernel(torch.nn.Module):
 
 
 class FrozenKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='norm'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='component'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
