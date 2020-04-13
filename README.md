@@ -1,4 +1,4 @@
-# E3NN
+# e3nn
 The group E(3) is the group of 3 dimensional rotations, translations and mirror.
 This library aims to create E(3) equivariant convolutional neural networks.
 
@@ -39,7 +39,9 @@ features = conv(features, geometry)
 ## Hierarchy
 
 - `e3nn` contains the library
-  - `e3nn/o3.py` defines all the needed mathematical functions
+  - `e3nn/o3.py` O(3) irreducible representations
+  - `e3nn/rsh.py` real spherical harmonics
+  - `e3nn/rs.py` geometrical tensor representations
   - `e3nn/image` contains voxels linear operations
   - `e3nn/point` contains points linear operations
   - `e3nn/non_linearities` non linearities operations
