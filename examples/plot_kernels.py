@@ -4,7 +4,7 @@ import argparse
 import matplotlib.pyplot as plt
 import torch
 
-from e3nn import o3
+from e3nn import o3, rsh
 from e3nn.util.plot import spherical_surface
 
 
@@ -25,7 +25,7 @@ def main():
     out = []
     for l in range(abs(args.l_out - args.l_in), args.l_out + args.l_in + 1):
         C = o3.wigner_3j(args.l_out, args.l_in, l)
-        Y = o3.spherical_harmonics(l, alpha, beta)
+        Y = rsh.spherical_harmonics(l, alpha, beta)
         out.append(torch.einsum("ijk,k...->ij...", (C, Y)))
     f = torch.stack(out)
 

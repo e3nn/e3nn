@@ -3,7 +3,7 @@ import math
 
 import torch
 
-from e3nn import o3, rs
+from e3nn import o3, rs, rsh
 from e3nn.linear_mod import KernelLinear
 
 
@@ -36,7 +36,7 @@ def kernel_geometric(Rs_in, Rs_out, selection_rule=o3.selection_rule_in_out_sh, 
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='component'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=rsh.spherical_harmonics_xyz, normalization='component'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -92,13 +92,13 @@ class Kernel(torch.nn.Module):
         # (1) Case r > 0
 
         # precompute all needed spherical harmonics
-        Y = self.sh(self.Ls, r[radii > r_eps])  # [l_filter * m_filter, batch]
+        Y = self.sh(self.Ls, r[radii > r_eps])  # [batch, l_filter * m_filter]
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
         R = self.R(radii[radii > r_eps])  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
-        kernel1 = torch.einsum('ijyw,yz,zw->zij', self.Q, Y, R)
+        kernel1 = torch.einsum('ijyw,zy,zw->zij', self.Q, Y, R)
 
         # (2) Case r = 0
 
@@ -112,7 +112,7 @@ class Kernel(torch.nn.Module):
 
 
 class FrozenKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, sh=o3.spherical_harmonics_xyz, normalization='component'):
+    def __init__(self, Rs_in, Rs_out, RadialModel, r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, sh=rsh.spherical_harmonics_xyz, normalization='component'):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -138,8 +138,8 @@ class FrozenKernel(torch.nn.Module):
         self.r_eps = r_eps
 
         Rs_f, Q = kernel_geometric(self.Rs_in, self.Rs_out, selection_rule, normalization)
-        Y = sh([l for _, l, _ in Rs_f], r[self.radii > self.r_eps])  # [l_filter * m_filter, batch]
-        Q = torch.einsum('ijyw,yz->zijw', Q, Y)
+        Y = sh([l for _, l, _ in Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
+        Q = torch.einsum('ijyw,zy->zijw', Q, Y)
         self.register_buffer('Q', Q)  # [out, in, Y, R]
 
         self.R = RadialModel(rs.mul_dim(Rs_f))
