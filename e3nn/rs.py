@@ -25,7 +25,7 @@ def rep(Rs, alpha, beta, gamma, parity=None):
         return o3.direct_sum(*[(p ** parity) * o3.irr_repr(l, *abc) for mul, l, p in simplify(Rs) for _ in range(mul)])
 
 
-def randn(*size, normalization='component'):
+def randn(*size, normalization='component', dtype=None, device=None, requires_grad=False):
     """
     random tensor of representation Rs
     """
@@ -39,15 +39,16 @@ def randn(*size, normalization='component'):
             break
 
     if normalization == 'component':
-        return torch.randn(*lsize, dim(Rs), *rsize)
+        return torch.randn(*lsize, dim(Rs), *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
     if normalization == 'norm':
-        x = torch.zeros(*lsize, dim(Rs), *rsize)
-        start = 0
-        for mul, l, _p in Rs:
-            r = torch.randn(*lsize, mul, 2 * l + 1, *rsize)
-            r.div_(r.norm(2, dim=di + 1, keepdim=True))
-            x.narrow(di, start, mul * (2 * l + 1)).copy_(r.view(*lsize, -1, *rsize))
-            start += mul * (2 * l + 1)
+        x = torch.zeros(*lsize, dim(Rs), *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
+        with torch.no_grad():
+            start = 0
+            for mul, l, _p in Rs:
+                r = torch.randn(*lsize, mul, 2 * l + 1, *rsize)
+                r.div_(r.norm(2, dim=di + 1, keepdim=True))
+                x.narrow(di, start, mul * (2 * l + 1)).copy_(r.view(*lsize, -1, *rsize))
+                start += mul * (2 * l + 1)
         return x
     assert False, "normalization needs to be 'norm' or 'component'"
 
