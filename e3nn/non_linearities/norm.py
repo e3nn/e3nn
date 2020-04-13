@@ -5,7 +5,7 @@ from e3nn import rs
 
 
 class Norm(torch.nn.Module):
-    def __init__(self, Rs, normalization='norm'):
+    def __init__(self, Rs, normalization='component'):
         super().__init__()
 
         Rs = rs.simplify(Rs)
