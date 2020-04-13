@@ -39,4 +39,4 @@ jobs:
         pip install pytest pytest-cov
         pip install codecov
         pytest --cov=./ --ignore=tests/point/periodic_convolution_test.py --durations=5
-        codecov --token=f390cbce-c251-45ad-bcd6-8d6f4c974b39
+        codecov --token=${{ secrets.CODECOV_TOKEN }}
