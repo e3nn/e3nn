@@ -6,16 +6,16 @@ Using ZYZ Euler angles parametrisation
 """
 import gc
 import math
+import os
 from functools import lru_cache
 
 import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
 import scipy
 import scipy.linalg
 import torch
-from appdirs import user_cache_dir
 from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
-from e3nn.util.cache_file import cached_dirpklgz
+from e3nn.util.cache_file import cached_picklesjar
 from e3nn.util.default_dtype import torch_default_dtype
 
 
@@ -287,8 +287,8 @@ def _wigner_3j(l1, l2, l3):
         return __wigner_3j(l3, l1, l2).transpose(0, 2).transpose(0, 1)
 
 
-@cached_dirpklgz(user_cache_dir("e3nn/wigner_3j"))
-def __wigner_3j(l1, l2, l3, _version=1):
+@cached_picklesjar(os.path.join(os.path.dirname(__file__), 'wigner_3j'))
+def __wigner_3j(l1, l2, l3, _version=0):
     """
     Computes the 3-j symbol
     https://en.wikipedia.org/wiki/3-j_symbol

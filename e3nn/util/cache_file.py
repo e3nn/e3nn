@@ -3,7 +3,6 @@ Cache in files
 '''
 import fcntl
 import glob
-import gzip
 import os
 import pickle
 import sys
@@ -47,7 +46,7 @@ class FileSystemMutex:
         self.release()
 
 
-def cached_dirpklgz(dirname, maxsize=128):
+def cached_picklesjar(dirname, maxsize=128, open_jar=open):
     '''
     Cache a function with a directory
 
@@ -82,7 +81,7 @@ def cached_dirpklgz(dirname, maxsize=128):
 
             with FileSystemMutex(mutexfile):
                 for file in glob.glob(os.path.join(dirname, "*.cache")):
-                    with gzip.open(file, "rb") as file:
+                    with open_jar(file, "rb") as file:
                         loadedkey = pickle.load(file)
                         if key == loadedkey:
                             return pickle.load(file)
@@ -100,7 +99,7 @@ def cached_dirpklgz(dirname, maxsize=128):
                         break
 
                 try:
-                    with gzip.open(file, "wb") as file:
+                    with open_jar(file, "wb") as file:
                         pickle.dump(key, file)
                         pickle.dump(result, file)
                     print("done")
