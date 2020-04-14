@@ -1,6 +1,6 @@
 # e3nn
-The group E(3) is the group of 3 dimensional rotations, translations and mirror.
-This library aims to create E(3) equivariant convolutional neural networks.
+E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in dimension 3. That is the group of rotations, translations and mirror.
+`e3nn` is a [pytorch](https://pytorch.org) library that aims to create **E**(**3**) equivariant **n**eural **n**etworks.
 
 ![](https://user-images.githubusercontent.com/333780/73550102-425bd180-4444-11ea-8b69-8a4241ffa9c9.gif)
 
@@ -63,9 +63,7 @@ print(features.grad)
 
 ## Installation
 
-1. install [pytorch](https://pytorch.org)
-2. `pip install git+https://github.com/AMLab-Amsterdam/lie_learn`
-3. `pip install git+https://github.com/e3nn/e3nn`
+`pip install git+https://github.com/e3nn/e3nn`
 
 ## Citing
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
