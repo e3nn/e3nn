@@ -100,7 +100,7 @@ def spherical_harmonics_alpha(l, alpha):
     :return: tensor of shape [..., m]
     """
     size = alpha.shape
-    alpha = alpha.view(-1, 1)  # [batch, 1]
+    alpha = alpha.reshape(-1, 1)  # [batch, 1]
 
     if l == 0:
         out = torch.ones_like(alpha)
