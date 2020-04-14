@@ -84,7 +84,7 @@ def spherical_harmonics_beta(ls, cosbeta):
     output = []
     for l in ls:
         quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in range(-l, l + 1)]
-        quantum = torch.tensor(quantum)  # [m]
+        quantum = torch.tensor(quantum).to(cosbeta)  # [m]
         out = (-1) ** l * quantum * legendre([l], cosbeta)  # [batch, m]
         output += [out]
     output = torch.cat(output, dim=-1)
@@ -105,10 +105,10 @@ def spherical_harmonics_alpha(l, alpha):
     if l == 0:
         out = torch.ones_like(alpha)
     else:
-        m = torch.arange(1, l + 1).flip(0)  # [l, l-1, l-2, ..., 1]
+        m = torch.arange(1, l + 1).flip(0).to(alpha)  # [l, l-1, l-2, ..., 1]
         sin = torch.sin(((-1)**m * m) * alpha)  # [batch, m]
 
-        m = torch.arange(1, l + 1)  # [1, 2, 3, ..., l]
+        m = torch.arange(1, l + 1).to(alpha)  # [1, 2, 3, ..., l]
         cos = torch.cos(m * alpha)  # [batch, m]
 
         out = torch.cat([
@@ -129,6 +129,13 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
     :param beta: float or tensor of shape [...]
     :return: tensor of shape [..., m]
     """
+    if alpha.device.type == 'cuda' and max(ls) <= 10:
+        xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
+        try:
+            return spherical_harmonics_xyz_cuda(ls, xyz)
+        except ImportError:
+            pass
+
     output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], beta.cos()) for l in ls]
     return torch.cat(output, dim=-1)
 
@@ -143,7 +150,38 @@ def spherical_harmonics_xyz(ls, xyz):
     """
     norm = torch.norm(xyz, 2, -1, keepdim=True)
     xyz = xyz / norm
+
+    if xyz.device.type == 'cuda' and max(ls) <= 10:
+        try:
+            return spherical_harmonics_xyz_cuda(ls, xyz)
+        except ImportError:
+            pass
+
     alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
     cosbeta = xyz[..., 2]  # [...]
     output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta) for l in ls]
     return torch.cat(output, dim=-1)
+
+
+def spherical_harmonics_xyz_cuda(ls, xyz):
+    """
+    cuda version of spherical_harmonics_xyz
+    """
+    from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module, import-outside-toplevel
+
+    *size, _ = xyz.size()
+    xyz = xyz.view(-1, 3)
+    lmax = max(ls)
+    out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
+    real_spherical_harmonics.rsh(out, xyz)
+
+    # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
+    norm_coef = [elem for lh in range((lmax + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
+    if lmax % 2 == 0:
+        norm_coef.extend([1.] * (2 * lmax + 1))
+    norm_coef = torch.tensor(norm_coef).to(out).unsqueeze(1)
+    out.mul_(norm_coef)
+
+    if ls != list(range(lmax + 1)):
+        out = torch.cat([out[l**2: (l + 1)**2] for l in ls])
+    return out.T.reshape(*size, -1)
