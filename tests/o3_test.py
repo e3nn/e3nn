@@ -112,10 +112,10 @@ class Tests(unittest.TestCase):
                     self.assertLess(m.abs().max(), 0.1)
 
     def test_irrep_closure_2(self):
-        r1, r2 = o3.rand_angles(), o3.rand_angles()
-        a = sum((o3.irr_repr(l, *r1) * o3.irr_repr(l, *r2)).sum() for l in range(20 + 1))
-        b = sum((o3.irr_repr(l, *r1) * o3.irr_repr(l, *r1)).sum() for l in range(20 + 1))
-        self.assertLess(a, 1e-3 * b)
+        r1, r2 = (0, 0.2, 0), (0.1, 0.4, 1.5)  # two random rotations
+        a = sum((o3.irr_repr(l, *r1) * o3.irr_repr(l, *r2)).sum() for l in range(12 + 1))
+        b = sum((o3.irr_repr(l, *r1) * o3.irr_repr(l, *r1)).sum() for l in range(12 + 1))
+        self.assertLess(a, b / 100)
 
     def test_wigner_3j_orthogonal(self):
         with o3.torch_default_dtype(torch.float64):

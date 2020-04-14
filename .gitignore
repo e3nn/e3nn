@@ -21,3 +21,5 @@ checkpoints
 **/*.log
 **/*.ckpt
 *.pkl
+*.cache
+mutex
