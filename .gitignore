@@ -15,6 +15,7 @@ dist
 tmp.*
 .*
 *.png
+*.gif
 logs
 tf_logs
 checkpoints
