@@ -2,7 +2,7 @@
 E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in dimension 3. That is the group of rotations, translations and mirror.
 `e3nn` is a [pytorch](https://pytorch.org) library that aims to create **E**(**3**) equivariant **n**eural **n**etworks.
 
-![](https://user-images.githubusercontent.com/333780/73550102-425bd180-4444-11ea-8b69-8a4241ffa9c9.gif)
+![](https://user-images.githubusercontent.com/333780/79217533-4eeea400-7e4f-11ea-8b55-c096d5495da8.gif)
 
 ## Example
 ```python
