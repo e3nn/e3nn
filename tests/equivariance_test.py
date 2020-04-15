@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from e3nn import o3, rs
+from e3nn import o3, rs, rsh
 from e3nn.kernel import Kernel as Kernel1
 from e3nn.kernel_mod import Kernel as KernelMod
 from e3nn.linear import Linear as Linear1
@@ -19,26 +19,26 @@ from e3nn.util.default_dtype import torch_default_dtype
 
 
 class Tests(unittest.TestCase):
-    def test_irr_repr_clebsch_gordan(self):
-        """Test irr_repr and clebsch_gordan equivariance."""
+    def test_irr_repr_wigner_3j(self):
+        """Test irr_repr and wigner_3j equivariance."""
         with torch_default_dtype(torch.float64):
             l_in = 3
             l_out = 2
 
             for l_f in range(abs(l_in - l_out), l_in + l_out + 1):
                 r = torch.randn(100, 3)
-                Q = o3.clebsch_gordan(l_out, l_in, l_f)
+                Q = o3.wigner_3j(l_out, l_in, l_f)
 
                 abc = torch.randn(3)
                 D_in = o3.irr_repr(l_in, *abc)
                 D_out = o3.irr_repr(l_out, *abc)
 
-                Y = o3.spherical_harmonics_xyz(l_f, r @ o3.rot(*abc).t())
-                W = torch.einsum("ijk,kz->zij", (Q, Y))
+                Y = rsh.spherical_harmonics_xyz([l_f], r @ o3.rot(*abc).t())
+                W = torch.einsum("ijk,zk->zij", (Q, Y))
                 W1 = torch.einsum("zij,jk->zik", (W, D_in))
 
-                Y = o3.spherical_harmonics_xyz(l_f, r)
-                W = torch.einsum("ijk,kz->zij", (Q, Y))
+                Y = rsh.spherical_harmonics_xyz([l_f], r)
+                W = torch.einsum("ijk,zk->zij", (Q, Y))
                 W2 = torch.einsum("ij,zjk->zik", (D_out, W))
 
                 self.assertLess((W1 - W2).norm(), 1e-5 * W.norm(), l_f)
@@ -244,7 +244,7 @@ class Tests(unittest.TestCase):
 
             x1 = torch.einsum("ij,zj->zi", D_out, net(fea))
             x2 = net(torch.einsum("ij,zj->zi", D_in, fea))
-            self.assertLess((x1 - x2).norm(), 10e-5 * x1.norm())
+            self.assertLess((x1 - x2).norm(), 1e-3 * x1.norm())
 
 
 if __name__ == '__main__':

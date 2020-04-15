@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn import o3, rs, soft
+from e3nn import o3, rs, s2grid
 
 
 class Tests(unittest.TestCase):
@@ -11,11 +11,11 @@ class Tests(unittest.TestCase):
     def test_inverse(self):
         with o3.torch_default_dtype(torch.float64):
             lmax = 5
-            res = 50
+            res = (50, 75)
 
             for normalization in ['component', 'norm']:
-                to = soft.ToSOFT(lmax, res, normalization=normalization)
-                fr = soft.FromSOFT(res, lmax, normalization=normalization)
+                to = s2grid.ToS2Grid(lmax, res, normalization=normalization)
+                fr = s2grid.FromS2Grid(res, lmax, normalization=normalization)
 
                 sig = rs.randn(10, [(1, l) for l in range(lmax + 1)])
                 self.assertLess((fr(to(sig)) - sig).abs().max(), 1e-5)
@@ -27,11 +27,11 @@ class Tests(unittest.TestCase):
         with o3.torch_default_dtype(torch.float64):
             lin = 5
             lout = 7
-            res = 50
+            res = (50, 60)
 
             for normalization in ['component', 'norm']:
-                to = soft.ToSOFT(lin, res, normalization=normalization)
-                fr = soft.FromSOFT(res, lout, lmax_in=lin, normalization=normalization)
+                to = s2grid.ToS2Grid(lin, res, normalization=normalization)
+                fr = s2grid.FromS2Grid(res, lout, lmax_in=lin, normalization=normalization)
 
                 si = rs.randn(10, [(1, l) for l in range(lin + 1)])
                 so = fr(to(si))
@@ -41,10 +41,10 @@ class Tests(unittest.TestCase):
     def test_normalization(self):
         with o3.torch_default_dtype(torch.float64):
             lmax = 5
-            res = 20
+            res = (20, 30)
 
             for normalization in ['component', 'norm']:
-                to = soft.ToSOFT(lmax, res, normalization=normalization)
+                to = s2grid.ToS2Grid(lmax, res, normalization=normalization)
                 x = rs.randn(50, [(1, l) for l in range(lmax + 1)], normalization=normalization)
                 y = to(x)
 

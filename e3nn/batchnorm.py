@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 class BatchNorm(nn.Module):
-    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean', normalization='norm'):
+    def __init__(self, Rs, eps=1e-5, momentum=0.1, affine=True, reduce='mean', normalization='component'):
         '''
         Batch normalization layer for orthonormal representations
         It normalizes by the norm of the representations.
@@ -43,7 +43,6 @@ class BatchNorm(nn.Module):
         assert reduce in ['mean', 'max'], "reduce needs to be 'mean' or 'max'"
         self.reduce = reduce
 
-        assert isinstance(normalization, str), "normalization should be passed as a string value"
         assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
 

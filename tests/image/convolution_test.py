@@ -11,7 +11,7 @@ class Tests(unittest.TestCase):
     def _test_equivariance(self, f):
         def rotate(t):
             # rotate 90 degrees in plane of axes 2 and 3
-            return torch.flip(t, (2, )).transpose(2, 3)
+            return t.flip(2).transpose(2, 3)
 
         def unrotate(t):
             # undo the rotation by 3 more rotations
@@ -33,9 +33,9 @@ class Tests(unittest.TestCase):
         torch.set_default_dtype(torch.float64)
 
         f = torch.nn.Sequential(
-            Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5),
+            Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5, steps=(0.5, 0.5, 0.9)),
             Convolution([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
-        ).to(torch.float64)
+        )
 
         self._test_equivariance(f)
 
@@ -43,18 +43,15 @@ class Tests(unittest.TestCase):
         batch = 3
         size = 5
         input_size = 15
-        Rs_in = [(10, 0), (10, 1), (10, 2)]
+        Rs_in = [(20, 0), (20, 1), (10, 2)]
         Rs_out = [(2, 0), (2, 1), (2, 2)]
 
         conv = f(Rs_in, Rs_out, size)
 
-        n_in = rs.dim(Rs_in)
-        n_out = rs.dim(Rs_out)
-
-        x = torch.randn(batch, n_in, input_size, input_size, input_size)
+        x = rs.randn(batch, Rs_in, input_size, input_size, input_size)
         y = conv(x)
 
-        self.assertEqual(y.size(1), n_out)
+        self.assertEqual(y.size(1), rs.dim(Rs_out))
 
         y_mean, y_std = y.mean().item(), y.std().item()
 
