@@ -5,8 +5,8 @@ from pack import KWARGS
 
 ext_modules = [
     CUDAExtension('e3nn.rsh',
-                  sources=['src/rsh/rsh_bind.cpp',
-                           'src/rsh/rsh_cuda.cu'],
+                  sources=['src/real_spherical_harmonics/rsh_bind.cpp',
+                           'src/real_spherical_harmonics/rsh_cuda.cu'],
                   extra_compile_args={'cxx': ['-std=c++14'],
                                       'nvcc': ['-std=c++14']})
 ]
