@@ -23,5 +23,5 @@ void real_spherical_harmonics(
 
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("rsh", &real_spherical_harmonics, "Real Spherical Harmonics (CUDA)");
+  m.def("real_spherical_harmonics", &real_spherical_harmonics, "Real Spherical Harmonics (CUDA)");
 }

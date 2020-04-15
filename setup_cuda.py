@@ -4,9 +4,9 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 from pack import KWARGS
 
 ext_modules = [
-    CUDAExtension('e3nn.rsh',
-                  sources=['src/real_spherical_harmonics/rsh_bind.cpp',
-                           'src/real_spherical_harmonics/rsh_cuda.cu'],
+    CUDAExtension('e3nn.cuda_rsh',
+                  sources=['src/cuda_rsh/rsh_bind.cpp',
+                           'src/cuda_rsh/rsh_cuda.cu'],
                   extra_compile_args={'cxx': ['-std=c++14'],
                                       'nvcc': ['-std=c++14']})
 ]
