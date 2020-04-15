@@ -22,11 +22,7 @@ def find_version(*file_paths):
     raise RuntimeError("Unable to find version string.")
 
 
-def setup_kwargs(**kwargs):
-    return kwargs
-
-
-KWARGS = setup_kwargs(
+KWARGS = dict(
     name='e3nn',
     version=find_version("e3nn", "__init__.py"),
     description='Equivariant convolutional neural networks '
