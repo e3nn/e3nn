@@ -248,7 +248,7 @@ class SphericalTensor():
         except:
             blocks = [wigner_D_on_grid(L, n)
                       for mul, L in self.Rs for m in range(mul)]
-            wigner_D = direct_sum(*blocks)
+            wigner_D = o3.direct_sum(*blocks)
             setattr(self, "wigner_D_grid_{}".format(n), wigner_D)
             return getattr(self, "wigner_D_grid_{}".format(n))
 
@@ -362,7 +362,7 @@ def spherical_harmonics_on_grid(L, n):
     x, y, z, alpha, beta = spherical_surface(n)
     print(x.shape, alpha.shape)
     return x, y, z, rsh.spherical_harmonics(L, alpha, beta)
- 
+
 
 @cached_picklesjar("cache/wigner_D_grids")
 def wigner_D_on_grid(L, n):
