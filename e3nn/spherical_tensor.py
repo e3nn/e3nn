@@ -191,7 +191,7 @@ class SphericalTensor():
         Ys = []
         for mul, L in self.Rs:
             # Using cache-able function
-            x, y, z, Y = utils.spherical_harmonics_on_grid(L, n)
+            x, y, z, Y = spherical_harmonics_on_grid(L, n)
             Ys += [Y] * mul
 
         f = self.signal.unsqueeze(1).unsqueeze(2) * torch.cat(Ys, dim=0)
@@ -248,7 +248,7 @@ class SphericalTensor():
         try:
             return getattr(self, "wigner_D_grid_{}".format(n))
         except:
-            blocks = [utils.wigner_D_on_grid(L, n)
+            blocks = [wigner_D_on_grid(L, n)
                       for mul, L in self.Rs for m in range(mul)]
             wigner_D = direct_sum(*blocks)
             setattr(self, "wigner_D_grid_{}".format(n), wigner_D)
