@@ -7,7 +7,6 @@ import torch
 
 from e3nn import o3, rsh, rs
 from e3nn.util.cache_file import cached_picklesjar
-import e3nn.util.plot as plot
 
 class SphericalHarmonicsProject(torch.nn.Module):
     def __init__(self, alpha, beta, lmax):

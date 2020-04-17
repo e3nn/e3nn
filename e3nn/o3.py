@@ -228,7 +228,7 @@ def direct_sum(*matrices):
     i, j = 0, 0
     for x in matrices:
         m, n = x.shape[-2:]
-        out[..., i: i + m, j: j + n] = x 
+        out[..., i: i + m, j: j + n] = x
         i += m
         j += n
     return out
