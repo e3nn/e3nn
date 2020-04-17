@@ -86,7 +86,6 @@ def spherical_harmonics_dirac(lmax, alpha, beta):
     if "torch" not in str(type(beta)):
         beta = torch.tensor(beta)
     return rsh.spherical_harmonics_alpha_beta(ls, alpha, beta) / a
-    #return rsh.spherical_harmonics_alpha_beta(ls, torch.tensor(alpha), torch.tensor(beta)) / a
 
 
 def spherical_harmonics_coeff_to_sphere(coeff, alpha, beta):
