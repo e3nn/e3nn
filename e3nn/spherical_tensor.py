@@ -282,7 +282,7 @@ class SphericalTensor():
 
     def dot(self, other):
         scalars = self.__mul__(other)
-        dot = scalars.sum(-1)
+        dot = scalars.signal.sum(-1)
         dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
         return dot
 

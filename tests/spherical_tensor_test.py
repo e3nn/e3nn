@@ -107,19 +107,34 @@ class SphericalTensorTests(unittest.TestCase):
         sph_new = sph.change_lmax(lmax_new)
         assert sph_new.signal.shape[0] == rs.dim(sph_new.Rs)
 
-    def test_SphericalTensor_add(self):
+    def test_add(self):
         lmax = 4
         mul = 1
         signal1 = torch.zeros((lmax + 1) ** 2)
         signal2 = signal1.clone()
         signal1[0] = 1.
         signal2[3] = 1.
-        sphten1 = sphten.SphericalTensor(signal1, mul, lmax)
-        sphten2 = sphten.SphericalTensor(signal2, mul, lmax)
+        sph1 = sphten.SphericalTensor(signal1, mul, lmax)
+        sph2 = sphten.SphericalTensor(signal2, mul, lmax)
 
-        new_sphten = sphten1 + sphten2
-        assert new_sphten.mul == mul
-        assert new_sphten.lmax == max(sphten1.lmax, sphten2.lmax)
+        new_sph = sph1 + sph2
+        assert new_sph.mul == mul
+        assert new_sph.lmax == max(sph1.lmax, sph2.lmax)
+
+    def test_mul_and_dot(self):
+        lmax = 4
+        mul = 1
+        signal1 = torch.zeros((lmax + 1) ** 2)
+        signal2 = signal1.clone()
+        signal1[0] = 1.
+        signal2[3] = 1.
+        sph1 = sphten.SphericalTensor(signal1, mul, lmax)
+        sph2 = sphten.SphericalTensor(signal2, mul, lmax)
+        
+        new_sph = sph1 * sph2
+        assert new_sph.Rs == [(rs.mul_dim(sph1.Rs), 0, 0)]
+
+        dot_product = sph1.dot(sph2)
 
 if __name__ == '__main__':
     unittest.main()
