@@ -6,9 +6,9 @@ import scipy.signal
 import torch
 
 from e3nn import o3, rsh, rs
+from e3nn.irrep_tensor import IrrepTensor
 from e3nn.s2grid import ToS2Grid, s2_grid
 from e3nn.kernel_mod import FrozenKernel
-
 
 class SphericalHarmonicsProject(torch.nn.Module):
     def __init__(self, alpha, beta, lmax):
@@ -129,7 +129,7 @@ class SphericalTensor():
         self.signal = signal
         self.lmax = lmax
         self.mul = mul
-        self.Rs = [(mul, l) for l in range(lmax + 1)]
+        self.Rs = rs.convention([(mul, l) for l in range(lmax + 1)])
 
     @classmethod
     def from_geometry(cls, vectors, lmax, sum_points=True, radius=True):
@@ -162,20 +162,19 @@ class SphericalTensor():
     def sph_norm(self):
         Rs = self.Rs
         signal = self.signal
-        n_mul = sum([mul for mul, L in Rs])
+        n_mul = sum([mul for mul, l, p in Rs])
         # Keep shape after Rs the same
         norms = torch.zeros(n_mul, *signal.shape[1:])
         sig_index = 0
         norm_index = 0
-        for mul, L in Rs:
+        for mul, l, p in Rs:
             for _ in range(mul):
-                norms[norm_index] = signal[sig_index: sig_index + (2 * L + 1)].norm(2, 0)
+                norms[norm_index] = signal[sig_index: sig_index + (2 * l + 1)].norm(2, 0)
                 norm_index += 1
-                sig_index += 2 * L + 1
+                sig_index += 2 * l + 1
         return norms
 
     def signal_on_sphere(self, n=100):
-        n_mul = sum([mul for mul, L in self.Rs])
         # May want to consider caching this object in SphericalTensor
         grid = ToS2Grid(self.lmax, res=n)
         res_beta, res_alpha = grid.res_alpha, grid.res_beta
@@ -208,7 +207,7 @@ class SphericalTensor():
     def plot_with_radial(self, box_length, center=None,
                          sh=rsh.spherical_harmonics_xyz, n=30,
                          radial_model=None, relu=True):
-        muls, _Ls = zip(*self.Rs)
+        muls, _ls, _ps = zip(*self.Rs)
         # We assume radial functions are repeated across L's
         assert len(set(muls)) == 1
         num_L = len(self.Rs)
@@ -227,10 +226,10 @@ class SphericalTensor():
 
         return r, f
 
-    def find_peaks(self, which_mul=None, n=100, min_radius=0.1,
+    def find_peaks(self, n=100, min_radius=0.1,
                    percentage=False, absolute_min=0.1, radius=True):
         if not hasattr(self, 'peak_finder') or self.peak_finder.n != n:
-            lmax = max(L for mult, L in self.Rs)
+            lmax = max(L for mul, L, p in self.Rs)
             self.peak_finder = SphericalHarmonicsFindPeaks(n, lmax)
 
         peaks, radius = self.peak_finder.forward(self.signal)
@@ -245,29 +244,57 @@ class SphericalTensor():
             keep_indices = (radius > min_radius)
         return peaks[keep_indices] * radius[keep_indices].unsqueeze(-1)
 
+    def change_lmax(self, lmax):
+        new_Rs = [(self.mul, l) for l in range(lmax + 1)]
+        if rs.check_equal(self.Rs, new_Rs):
+            return self
+        elif self.lmax < lmax:
+            new_signal = self.signal[:rs.dim(new_Rs)]
+            return SphericalTensor(new_signal, mul, lmax)
+        elif self.lmax > lmax:
+            new_signal = torch.zeros(rs.dim(new_Rs))
+            new_signal[:rs.dim(self.Rs)] = self.signal
+            return SphericalTensor(new_signal, self.mul, lmax)
+
     def __add__(self, other):
-        if self.Rs == other.Rs:
-            from copy import deepcopy
-            return SphericalTensor(self.signal + other.signal,
-                                   deepcopy(self.Rs))
+        if self.mul != other.mul:
+            raise ValueError("Multiplicities do not match.")
+        if rs.check_equal(self.Rs, other.Rs):
+            return SphericalTensor(self.signal + other.signal, self.mul, self.lmax)
+        if self.lmax != other.lmax:
+            lmax = max(self.lmax, other.lmax)
+            new_self = self.change_lmax(lmax)
+            new_other = other.change_lmax(lmax)
+            return SphericalTensor(new_self.signal + new_other.signal, self.mul, self.lmax)
 
     def __mul__(self, other):
         # Dot product if Rs of both objects match
-        # Add check for feature_Rs.
-        if self.Rs == other.Rs:
-            dot = (self.signal * other.signal).sum(-1)
-            dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
-            return dot
+        if self.mul != other.mul:
+            raise ValueError("Multiplicities do not match.")
+        lmax = max(self.lmax, other.lmax)
+        new_self = self.change_lmax(lmax)
+        new_other = other.change_lmax(lmax)
+
+        mult = (new_self.signal * new_other.signal)
+        mapping_matrix = rs.map_mul_to_Rs(new_self.Rs)
+        scalars = torch.einsum('rm,r->m', mapping_matrix, mult)
+        return SphericalTensor(scalars, mul=new_self.mul * (new_self.lmax + 1), lmax=0)
+
+    def dot(self, other):
+        scalars = self.__mul__(other)
+        dot = scalars.sum(-1)
+        dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
+        return dot
 
     def __matmul__(self, other):
         # Tensor product
         # Assume first index is Rs
         # Better handle mismatch of features indices
-        Rs_out, C = rs.tensor_product(self.Rs, other.Rs)
-        Rs_out = [(mult, L) for mult, L, parity in Rs_out]
-        new_signal = torch.einsum('kij,i...,j...->k...',
+        Rs_out, C = rs.tensor_product(self.Rs, other.Rs, o3.selection_rule)
+        Rs_out = [(mul, l, p) for mult, l, parity in Rs_out]
+        new_signal = torch.einsum('kij,...i,...j->...k',
                                   (C, self.signal, other.signal))
-        return SphericalTensor(new_signal, Rs_out)
+        return IrrepTensor(new_signal, Rs_out)
 
     def __rmatmul__(self, other):
         # Tensor product
@@ -275,12 +302,12 @@ class SphericalTensor():
 
 
 def plot_on_grid(box_length, radial_model, Rs, sh=rsh.spherical_harmonics_xyz, n=30):
-    L_to_index = {}
-    set_of_L = set([L for mul, L in Rs])
+    l_to_index = {}
+    set_of_l = set([l for mul, l, p in Rs])
     start = 0
-    for L in set_of_L:
-        L_to_index[L] = [start, start + 2 * L + 1]
-        start += 2 * L + 1
+    for l in set_of_l:
+        l_to_index[l] = [start, start + 2 * l + 1]
+        start += 2 * l + 1
 
     r = np.mgrid[-1:1:n * 1j, -1:1:n * 1j, -1:1:n * 1j].reshape(3, -1)
     r = r.transpose(1, 0)

@@ -215,6 +215,30 @@ def simplify(Rs):
     return out
 
 
+def check_equal(Rs1, Rs2):
+    """
+    :param Rs1: first list of triplet (multiplicity, representation order, [parity])
+    :param Rs2: second list of triplet (multiplicity, representation order, [parity])
+
+    examples:
+    Rs1 = [(1, 0), (1, 0), (1, 0)]
+    Rs2 = [(3, 0)]
+    format_Rs(Rs1, Rs)
+    >> True
+
+    Rs1 = [(1, 0), (1, 1), (1, 0)]
+    Rs2 = [(2, 0), (1, 1)]
+    format_Rs(Rs1, Rs)
+    >> False
+    Irreps are not in the same order
+    """
+    Rs1, Rs2 = simplify(Rs1), simplify(Rs2)
+    for (mul1, l1, p1), (mul2, l2, p2) in zip(Rs1, Rs2):
+        if mul1 != mul2 or l1 != l2 or p1 != p2:
+            return False
+    return True
+
+
 def format_Rs(Rs):
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])

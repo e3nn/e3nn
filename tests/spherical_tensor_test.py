@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn import o3
+from e3nn import o3, rs
 import e3nn.spherical_tensor as sphten
 
 
@@ -42,7 +42,7 @@ class SphericalTensorTests(unittest.TestCase):
         mul = 3
         sphten.SphericalTensor(torch.randn((lmax + 1) ** 2), mul, lmax)
 
-    def test_SphericalTensor_from_geometry(self):
+    def test_from_geometry(self):
         torch.set_default_dtype(torch.float64)
         N = 4
         lmax = 6
@@ -50,7 +50,7 @@ class SphericalTensorTests(unittest.TestCase):
         coords = coords[coords.norm(2, -1) > 0]
         sphten.SphericalTensor.from_geometry(coords, lmax)
 
-    def test_SphericalTensor_from_geometry_with_radial(self):
+    def test_from_geometry_with_radial(self):
         torch.set_default_dtype(torch.float64)
         N = 4
         lmax = 6
@@ -59,7 +59,7 @@ class SphericalTensorTests(unittest.TestCase):
         radial_model = lambda x: torch.ones_like(x).unsqueeze(-1)
         sphten.SphericalTensor.from_geometry_with_radial(coords, radial_model, lmax)
 
-    def test_SphericalTensor_sph_norm(self):
+    def test_sph_norm(self):
         torch.set_default_dtype(torch.float64)
         lmax = 6
         mul = 1
@@ -70,7 +70,7 @@ class SphericalTensorTests(unittest.TestCase):
         sph = sphten.SphericalTensor(torch.randn((lmax + 1) ** 2), mul, lmax)
         sph.sph_norm()
 
-    def test_SphericalTensor_plot(self):
+    def test_plot(self):
         torch.set_default_dtype(torch.float64)
         N = 4
         lmax = 6
@@ -83,7 +83,7 @@ class SphericalTensorTests(unittest.TestCase):
         assert list(r.shape) == [n, n + 1, 3]
         assert list(f.shape) == [n, n + 1]
 
-    def test_SphericalTensor_plot_with_radial(self):
+    def test_plot_with_radial(self):
         torch.set_default_dtype(torch.float64)
         N = 4
         lmax = 6
@@ -96,6 +96,30 @@ class SphericalTensorTests(unittest.TestCase):
         r, f = sph.plot_with_radial(box_length=3.0, n=n)
         assert list(r.shape) == [n ** 3, 3]
         assert list(f.shape) == [n ** 3]
+
+    def test_change_lmax(self):
+        pass
+        lmax = 0
+        mul = 1
+        signal = torch.zeros(rs.dim([(mul, lmax)]))
+        sph = sphten.SphericalTensor(signal, mul, lmax)
+        lmax_new = 5
+        sph_new = sph.change_lmax(lmax_new)
+        assert sph_new.signal.shape[0] == rs.dim(sph_new.Rs)
+
+    def test_SphericalTensor_add(self):
+        lmax = 4
+        mul = 1
+        signal1 = torch.zeros((lmax + 1) ** 2)
+        signal2 = signal1.clone()
+        signal1[0] = 1.
+        signal2[3] = 1.
+        sphten1 = sphten.SphericalTensor(signal1, mul, lmax)
+        sphten2 = sphten.SphericalTensor(signal2, mul, lmax)
+
+        new_sphten = sphten1 + sphten2
+        assert new_sphten.mul == mul
+        assert new_sphten.lmax == max(sphten1.lmax, sphten2.lmax)
 
 if __name__ == '__main__':
     unittest.main()
