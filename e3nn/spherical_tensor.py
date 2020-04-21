@@ -179,8 +179,9 @@ class SphericalTensor():
         n_mul = sum([mul for mul, L in self.Rs])
         # May want to consider caching this object in SphericalTensor
         grid = ToS2Grid(self.lmax, res=n)
-        r = o3.angles_to_xyz(grid.alphas.unsqueeze(-1), grid.betas.unsqueeze(0))
-        r = torch.stack([r[0], r[1], r[2].repeat(n, 1)], dim=-1)
+        beta, alpha = torch.meshgrid(grid.betas, grid.alphas)
+        x, y, z = o3.angles_to_xyz(alpha, beta)
+        r = torch.stack([x, y, z], dim=-1)
         return r, grid(self.signal)
 
     def plot(self, n=100, radius=True, center=None, relu=True):
@@ -189,12 +190,11 @@ class SphericalTensor():
         fig = go.Figure(data=[surface])
         fig.show()
         """
-        import plotly.graph_objs as go
-
         r, f = self.signal_on_sphere(n)
         f = f.relu() if relu else f
-        r = r.reshape(-1, 3)
-        f = f.reshape(-1)
+
+        r = torch.cat([r, r[:, 0].unsqueeze(1)], dim=1)
+        f = torch.cat([f, f[:, 0].unsqueeze(1)], dim=1)
 
         if radius:
             r *= f.abs().unsqueeze(-1)
@@ -216,7 +216,7 @@ class SphericalTensor():
 
         def new_radial(x):
             return radial_model(x).repeat(1, num_L)  # Repeat along filter dim
-        r, f = plot_data_on_grid(box_length, new_radial, self.Rs, sh=sh, n=n)
+        r, f = plot_on_grid(box_length, new_radial, self.Rs, sh=sh, n=n)
         # Multiply coefficients
         f = torch.einsum('xd,d->x', f, self.signal)
         f = f.relu() if relu else f
@@ -288,39 +288,10 @@ def plot_on_grid(box_length, radial_model, Rs, sh=rsh.spherical_harmonics_xyz, n
 
     Rs_in = [(1, 0)]
     Rs_out = Rs
-    grid = FrozenKernel(Rs_in, Rs_out, radial_model, sh=sh)
+    radial_lambda = lambda x: radial_model
+    grid = FrozenKernel(Rs_in, Rs_out, radial_lambda, r, sh=sh)
     R = grid.R(grid.radii)
     # j is just 1 because Rs_in is 1d
-    f = torch.einsum('ijw,w->i', grid.Q, R)
+    print(grid.Q.shape, R.shape)
+    f = torch.einsum('xjmw,xw->xj', grid.Q, R)
     return r, f
-
-
-def plot_data_on_grid(box_length, radial, Rs, sh=rsh.spherical_harmonics_xyz,
-                      n=30):
-    L_to_index = {}
-    set_of_L = set([L for mul, L in Rs])
-    start = 0
-    for L in set_of_L:
-        L_to_index[L] = [start, start + 2 * L + 1]
-        start += 2 * L + 1
-
-    r = np.mgrid[-1:1:n * 1j, -1:1:n * 1j, -1:1:n * 1j].reshape(3, -1)
-    r = r.transpose(1, 0)
-    r *= box_length / 2.
-    r = torch.from_numpy(r)
-    Ys = sh(set_of_L, r)
-    R = radial(r.norm(2, -1)).detach()  # [r_values, n_r_filters]
-    assert R.shape[-1] == rs.mul_dim(Rs)
-
-    R_helper = torch.zeros(R.shape[-1], rs.dim(Rs))
-    Ys_indices = []
-    for mul, L in Rs:
-        Ys_indices += list(range(L_to_index[L][0], L_to_index[L][1])) * mul
-
-    R_helper = rs.map_mul_to_Rs(Rs)
-
-    full_Ys = Ys[:, Ys_indices]  # [values, rs.dim(Rs)]]
-    full_Ys = full_Ys.reshape(full_Ys.shape[0], -1)
-
-    all_f = torch.einsum('xn,dn,xd->xd', R, R_helper, full_Ys)
-    return r, all_f
