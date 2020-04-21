@@ -25,7 +25,7 @@ def s2_grid(res_beta, res_alpha):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'spherical_harmonics_s2_grid'))
-def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta):
+def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta, _version=0):
     """
     computes the spherical harmonics on the grid on the sphere
     """

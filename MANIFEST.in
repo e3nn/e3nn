@@ -1,1 +1,1 @@
-recursive-include e3nn *.cache
+recursive-include e3nn *.torch

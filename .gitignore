@@ -1,26 +1,16 @@
-*.xyz*
-*.ipynb
-.ipynb_checkpoints
-*.nb
+# directories
 __pycache__
-*.pkl.gz
-*cache
-*.egg-info
 build
 dist
-*.c
-*.so
-*.zip
-*.7z
-tmp.*
-.*
+.vscode
+notebook
+
+*.egg-info
+
+
+# files
+mutex
+
+*.torch
 *.png
 *.gif
-logs
-tf_logs
-checkpoints
-**/*.log
-**/*.ckpt
-*.pkl
-*.cache
-mutex
