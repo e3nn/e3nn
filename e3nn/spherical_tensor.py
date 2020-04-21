@@ -167,7 +167,7 @@ class SphericalTensor():
         norms = torch.zeros(n_mul, *signal.shape[1:])
         sig_index = 0
         norm_index = 0
-        for mul, l, p in Rs:
+        for mul, l, _p in Rs:
             for _ in range(mul):
                 norms[norm_index] = signal[sig_index: sig_index + (2 * l + 1)].norm(2, 0)
                 norm_index += 1
@@ -228,7 +228,7 @@ class SphericalTensor():
 
     def find_peaks(self, n=100, min_radius=0.1,
                    percentage=False, absolute_min=0.1, radius=True):
-        if not hasattr(self, 'peak_finder') or self.peak_finder.n != n:
+        if not hasattr(self, 'peak_finder') or (self.peak_finder.n != n):
             lmax = max(L for mul, L, p in self.Rs)
             self.peak_finder = SphericalHarmonicsFindPeaks(n, lmax)
 
@@ -246,12 +246,12 @@ class SphericalTensor():
 
     def change_lmax(self, lmax):
         new_Rs = [(self.mul, l) for l in range(lmax + 1)]
-        if rs.check_equal(self.Rs, new_Rs):
+        if self.lmax == lmax:
             return self
-        elif self.lmax < lmax:
+        elif self.lmax > lmax:
             new_signal = self.signal[:rs.dim(new_Rs)]
             return SphericalTensor(new_signal, self.mul, lmax)
-        elif self.lmax > lmax:
+        elif self.lmax < lmax:
             new_signal = torch.zeros(rs.dim(new_Rs))
             new_signal[:rs.dim(self.Rs)] = self.signal
             return SphericalTensor(new_signal, self.mul, lmax)
@@ -259,7 +259,7 @@ class SphericalTensor():
     def __add__(self, other):
         if self.mul != other.mul:
             raise ValueError("Multiplicities do not match.")
-        if rs.check_equal(self.Rs, other.Rs):
+        if rs.are_equal(self.Rs, other.Rs):
             return SphericalTensor(self.signal + other.signal, self.mul, self.lmax)
         if self.lmax != other.lmax:
             lmax = max(self.lmax, other.lmax)

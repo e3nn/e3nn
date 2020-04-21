@@ -132,7 +132,7 @@ class SphericalTensorTests(unittest.TestCase):
         sph2 = sphten.SphericalTensor(signal2, mul, lmax)
 
         new_sph = sph1 * sph2
-        assert new_sph.Rs == [(rs.mul_dim(sph1.Rs), 0, 0)]
+        assert rs.are_equal(new_sph.Rs, [(rs.mul_dim(sph1.Rs), 0, 0)])
 
         sph1.dot(sph2)
 
