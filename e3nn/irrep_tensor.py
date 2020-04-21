@@ -1,5 +1,4 @@
-import e3nn
-from e3nn import rs, o3
+from e3nn import rs
 
 
 class IrrepTensor():
