@@ -215,7 +215,7 @@ def simplify(Rs):
     return out
 
 
-def check_equal(Rs1, Rs2):
+def are_equal(Rs1, Rs2):
     """
     :param Rs1: first list of triplet (multiplicity, representation order, [parity])
     :param Rs2: second list of triplet (multiplicity, representation order, [parity])
