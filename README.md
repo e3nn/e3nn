@@ -65,6 +65,8 @@ print(features.grad)
 
 `pip install git+https://github.com/e3nn/e3nn`
 
+To get the CUDA kernels read the instructions in `INSTALL.md`.
+
 ## Citing
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
 
