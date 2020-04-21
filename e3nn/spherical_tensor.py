@@ -6,9 +6,8 @@ import scipy.signal
 import torch
 
 from e3nn import o3, rsh, rs
-from e3nn.s2grid import ToS2Grid
+from e3nn.s2grid import ToS2Grid, s2_grid
 from e3nn.kernel_mod import FrozenKernel
-from e3nn.util.cache_file import cached_picklesjar
 
 
 class SphericalHarmonicsProject(torch.nn.Module):
@@ -179,7 +178,9 @@ class SphericalTensor():
         n_mul = sum([mul for mul, L in self.Rs])
         # May want to consider caching this object in SphericalTensor
         grid = ToS2Grid(self.lmax, res=n)
-        beta, alpha = torch.meshgrid(grid.betas, grid.alphas)
+        res_beta, res_alpha = grid.res_alpha, grid.res_beta
+        betas, alphas = s2_grid(res_beta, res_alpha)
+        beta, alpha = torch.meshgrid(betas, alphas)
         x, y, z = o3.angles_to_xyz(alpha, beta)
         r = torch.stack([x, y, z], dim=-1)
         return r, grid(self.signal)

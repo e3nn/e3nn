@@ -32,6 +32,7 @@ class Tests(unittest.TestCase):
     def test_plot_on_grid(self):
         pass
 
+
 class SphericalTensorTests(unittest.TestCase):
     def test_SphericalTensor(self):
         torch.set_default_dtype(torch.float64)
@@ -94,7 +95,6 @@ class SphericalTensorTests(unittest.TestCase):
         n = 16
         r, f = sph.plot_with_radial(box_length=3.0, n=n)
         assert list(r.shape) == [n ** 3, 3]
-        print(n, f.shape)
         assert list(f.shape) == [n ** 3]
 
 if __name__ == '__main__':

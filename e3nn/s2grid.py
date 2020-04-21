@@ -64,6 +64,9 @@ class ToS2Grid(torch.nn.Module):
         assert res_beta % 2 == 0
         assert res_beta >= 2 * (lmax + 1)
 
+        self.res_alpha = res_alpha
+        self.res_beta = res_beta
+
         sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
 
         # normalize such that all l has the same variance on the sphere
@@ -77,8 +80,6 @@ class ToS2Grid(torch.nn.Module):
         m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
         
-        self.register_buffer('alphas', alphas.to(dtype=torch.get_default_dtype()))
-        self.register_buffer('betas', betas.to(dtype=torch.get_default_dtype()))
         self.register_buffer('sha', sha.to(dtype=torch.get_default_dtype()))
         self.register_buffer('shb', shb.to(dtype=torch.get_default_dtype()))
 
