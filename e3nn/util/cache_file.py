@@ -4,10 +4,11 @@ Cache in files
 import fcntl
 import glob
 import os
-import pickle
 import sys
 from functools import lru_cache, wraps
 from itertools import count
+
+import torch
 
 
 class FileSystemMutex:
@@ -46,7 +47,7 @@ class FileSystemMutex:
         self.release()
 
 
-def cached_picklesjar(dirname, maxsize=128, open_jar=open):
+def cached_picklesjar(dirname, maxsize=128, open_jar=open, load=torch.load, save=torch.save, ext='torch'):
     '''
     Cache a function with a directory
 
@@ -80,11 +81,11 @@ def cached_picklesjar(dirname, maxsize=128, open_jar=open):
             key = (args, frozenset(kwargs.items()), func.__defaults__)
 
             with FileSystemMutex(mutexfile):
-                for file in glob.glob(os.path.join(dirname, "*.cache")):
+                for file in glob.glob(os.path.join(dirname, "*.{}".format(ext))):
                     with open_jar(file, "rb") as file:
-                        loadedkey = pickle.load(file)
+                        loadedkey = load(file)
                         if key == loadedkey:
-                            return pickle.load(file)
+                            return load(file)
 
             print("compute... ", end="")
             sys.stdout.flush()
@@ -94,14 +95,14 @@ def cached_picklesjar(dirname, maxsize=128, open_jar=open):
 
             with FileSystemMutex(mutexfile):
                 for i in count():
-                    file = os.path.join(dirname, "{}.cache".format(i))
+                    file = os.path.join(dirname, "{}.{}".format(i, ext))
                     if not os.path.isfile(file):
                         break
 
                 try:
                     with open_jar(file, "wb") as file:
-                        pickle.dump(key, file)
-                        pickle.dump(result, file)
+                        save(key, file)
+                        save(result, file)
                     print("done")
                 except PermissionError:
                     pass
