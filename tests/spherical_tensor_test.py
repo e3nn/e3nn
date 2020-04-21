@@ -14,7 +14,7 @@ class Tests(unittest.TestCase):
                 a = sphten.spherical_harmonics_dirac(l, torch.tensor(1.2), torch.tensor(2.1))
                 a = sphten.spherical_harmonics_coeff_to_sphere(a, torch.tensor(1.2), torch.tensor(2.1))
                 self.assertAlmostEqual(a.item(), 1)
-    
+
     def test_projection(self):
         N = 4
         lmax = 6
@@ -91,7 +91,7 @@ class SphericalTensorTests(unittest.TestCase):
         coords = coords[coords.norm(2, -1) > 0]
         radial_model = lambda x: torch.ones_like(x).unsqueeze(-1)
         sph = sphten.SphericalTensor.from_geometry_with_radial(coords, radial_model, lmax)
-        
+
         n = 16
         r, f = sph.plot_with_radial(box_length=3.0, n=n)
         assert list(r.shape) == [n ** 3, 3]
@@ -130,11 +130,12 @@ class SphericalTensorTests(unittest.TestCase):
         signal2[3] = 1.
         sph1 = sphten.SphericalTensor(signal1, mul, lmax)
         sph2 = sphten.SphericalTensor(signal2, mul, lmax)
-        
+
         new_sph = sph1 * sph2
         assert new_sph.Rs == [(rs.mul_dim(sph1.Rs), 0, 0)]
 
-        dot_product = sph1.dot(sph2)
+        sph1.dot(sph2)
+
 
 if __name__ == '__main__':
     unittest.main()

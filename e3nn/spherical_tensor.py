@@ -250,7 +250,7 @@ class SphericalTensor():
             return self
         elif self.lmax < lmax:
             new_signal = self.signal[:rs.dim(new_Rs)]
-            return SphericalTensor(new_signal, mul, lmax)
+            return SphericalTensor(new_signal, self.mul, lmax)
         elif self.lmax > lmax:
             new_signal = torch.zeros(rs.dim(new_Rs))
             new_signal[:rs.dim(self.Rs)] = self.signal
@@ -291,7 +291,6 @@ class SphericalTensor():
         # Assume first index is Rs
         # Better handle mismatch of features indices
         Rs_out, C = rs.tensor_product(self.Rs, other.Rs, o3.selection_rule)
-        Rs_out = [(mul, l, p) for mult, l, parity in Rs_out]
         new_signal = torch.einsum('kij,...i,...j->...k',
                                   (C, self.signal, other.signal))
         return IrrepTensor(new_signal, Rs_out)
