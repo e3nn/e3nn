@@ -292,6 +292,5 @@ def plot_on_grid(box_length, radial_model, Rs, sh=rsh.spherical_harmonics_xyz, n
     grid = FrozenKernel(Rs_in, Rs_out, radial_lambda, r, sh=sh)
     R = grid.R(grid.radii)
     # j is just 1 because Rs_in is 1d
-    print(grid.Q.shape, R.shape)
     f = torch.einsum('xjmw,xw->xj', grid.Q, R)
     return r, f
