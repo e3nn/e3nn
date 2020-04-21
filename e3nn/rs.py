@@ -232,11 +232,7 @@ def are_equal(Rs1, Rs2):
     >> False
     Irreps are not in the same order
     """
-    Rs1, Rs2 = simplify(Rs1), simplify(Rs2)
-    for (mul1, l1, p1), (mul2, l2, p2) in zip(Rs1, Rs2):
-        if mul1 != mul2 or l1 != l2 or p1 != p2:
-            return False
-    return True
+    return simplify(Rs1) == simplify(Rs2)
 
 
 def format_Rs(Rs):
