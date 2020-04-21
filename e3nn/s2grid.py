@@ -65,6 +65,8 @@ class ToS2Grid(torch.nn.Module):
         m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
 
