@@ -10,6 +10,7 @@ from e3nn.irrep_tensor import IrrepTensor
 from e3nn.s2grid import ToS2Grid, s2_grid
 from e3nn.kernel_mod import FrozenKernel
 
+
 class SphericalHarmonicsProject(torch.nn.Module):
     def __init__(self, alpha, beta, lmax):
         super().__init__()
