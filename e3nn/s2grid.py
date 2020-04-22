@@ -25,7 +25,7 @@ def s2_grid(res_beta, res_alpha):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'spherical_harmonics_s2_grid'))
-def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta):
+def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta, _version=0):
     """
     computes the spherical harmonics on the grid on the sphere
     """
@@ -33,7 +33,7 @@ def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta):
         betas, alphas = s2_grid(res_beta, res_alpha)
         sha = rsh.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
         shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos())  # [b, l * m]
-        return sha, shb
+        return alphas, betas, sha, shb
 
 
 class ToS2Grid(torch.nn.Module):
@@ -64,24 +64,25 @@ class ToS2Grid(torch.nn.Module):
         assert res_beta % 2 == 0
         assert res_beta >= 2 * (lmax + 1)
 
-        self.res_alpha = res_alpha
-        self.res_beta = res_beta
+        alphas, betas, sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
 
-        sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
-
-        # normalize such that all l has the same variance on the sphere
-        if normalization == 'component':
-            n = math.sqrt(4 * math.pi) * torch.tensor([
-                1 / math.sqrt(2 * l + 1)
-                for l in range(lmax + 1)
-            ]) / math.sqrt(lmax + 1)
-        if normalization == 'norm':
-            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
-        m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
+        with torch_default_dtype(torch.float64):
+            # normalize such that all l has the same variance on the sphere
+            if normalization == 'component':
+                n = math.sqrt(4 * math.pi) * torch.tensor([
+                    1 / math.sqrt(2 * l + 1)
+                    for l in range(lmax + 1)
+                ]) / math.sqrt(lmax + 1)
+            if normalization == 'norm':
+                n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
+            m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
-        self.register_buffer('sha', sha.to(dtype=torch.get_default_dtype()))
-        self.register_buffer('shb', shb.to(dtype=torch.get_default_dtype()))
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('betas', betas)
+        self.register_buffer('sha', sha)
+        self.register_buffer('shb', shb)
+        self.to(torch.get_default_dtype())
 
     def forward(self, x):
         """
@@ -127,22 +128,26 @@ class FromS2Grid(torch.nn.Module):
         if lmax_in is None:
             lmax_in = lmax
 
-        sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
+        alphas, betas, sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
 
-        # normalize such that it is the inverse of ToS2Grid
-        if normalization == 'component':
-            n = math.sqrt(4 * math.pi) * torch.tensor([
-                math.sqrt(2 * l + 1)
-                for l in range(lmax + 1)
-            ]) * math.sqrt(lmax_in + 1)
-        if normalization == 'norm':
-            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
-        m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
-        qw = torch.tensor(S3.quadrature_weights(res_beta // 2)) * res_beta**2 / res_alpha  # [b]
+        with torch_default_dtype(torch.float64):
+            # normalize such that it is the inverse of ToS2Grid
+            if normalization == 'component':
+                n = math.sqrt(4 * math.pi) * torch.tensor([
+                    math.sqrt(2 * l + 1)
+                    for l in range(lmax + 1)
+                ]) * math.sqrt(lmax_in + 1)
+            if normalization == 'norm':
+                n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
+            m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
+            qw = torch.tensor(S3.quadrature_weights(res_beta // 2)) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
 
-        self.register_buffer('sha', sha.to(dtype=torch.get_default_dtype()))
-        self.register_buffer('shb', shb.to(dtype=torch.get_default_dtype()))
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('betas', betas)
+        self.register_buffer('sha', sha)
+        self.register_buffer('shb', shb)
+        self.to(torch.get_default_dtype())
 
     def forward(self, x):
         """
