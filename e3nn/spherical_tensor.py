@@ -178,9 +178,7 @@ class SphericalTensor():
     def signal_on_sphere(self, n=100):
         # May want to consider caching this object in SphericalTensor
         grid = ToS2Grid(self.lmax, res=n)
-        res_beta, res_alpha = grid.res_alpha, grid.res_beta
-        betas, alphas = s2_grid(res_beta, res_alpha)
-        beta, alpha = torch.meshgrid(betas, alphas)
+        beta, alpha = torch.meshgrid(grid.betas, grid.alphas)
         x, y, z = o3.angles_to_xyz(alpha, beta)
         r = torch.stack([x, y, z], dim=-1)
         return r, grid(self.signal)
