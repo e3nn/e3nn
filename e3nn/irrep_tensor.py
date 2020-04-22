@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, redefined-builtin
 from e3nn import rs
 
 

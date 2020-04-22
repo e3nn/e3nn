@@ -11,9 +11,10 @@ class Tests(unittest.TestCase):
     def test_sh_dirac(self):
         with o3.torch_default_dtype(torch.float64):
             for l in range(5):
-                a = sphten.spherical_harmonics_dirac(l, torch.tensor(1.2), torch.tensor(2.1))
-                a = sphten.spherical_harmonics_coeff_to_sphere(a, torch.tensor(1.2), torch.tensor(2.1))
-                self.assertAlmostEqual(a.item(), 1)
+                angles = torch.tensor(1.2), torch.tensor(2.1)
+                a = sphten.spherical_harmonics_dirac(torch.stack(o3.angles_to_xyz(*angles), dim=-1), l)
+                v = sphten.SphericalTensor(a, 1, l).value(*angles)
+                self.assertAlmostEqual(v.item(), 1)
 
     def test_projection(self):
         N = 4
@@ -38,9 +39,9 @@ class SphericalTensorTests(unittest.TestCase):
         torch.set_default_dtype(torch.float64)
         lmax = 6
         mul = 1
-        sphten.SphericalTensor(torch.randn((lmax + 1) ** 2), mul, lmax)
+        sphten.SphericalTensor(torch.randn(mul * (lmax + 1) ** 2), mul, lmax)
         mul = 3
-        sphten.SphericalTensor(torch.randn((lmax + 1) ** 2), mul, lmax)
+        sphten.SphericalTensor(torch.randn(mul * (lmax + 1) ** 2), mul, lmax)
 
     def test_from_geometry(self):
         torch.set_default_dtype(torch.float64)
@@ -56,18 +57,21 @@ class SphericalTensorTests(unittest.TestCase):
         lmax = 6
         coords = torch.randn(N, 3)
         coords = coords[coords.norm(2, -1) > 0]
-        radial_model = lambda x: torch.ones_like(x).unsqueeze(-1)
+
+        def radial_model(x):
+            return torch.ones_like(x).unsqueeze(-1)
+
         sphten.SphericalTensor.from_geometry_with_radial(coords, radial_model, lmax)
 
     def test_sph_norm(self):
         torch.set_default_dtype(torch.float64)
         lmax = 6
         mul = 1
-        sph = sphten.SphericalTensor(torch.randn((lmax + 1) ** 2), mul, lmax)
+        sph = sphten.SphericalTensor(torch.randn(mul * (lmax + 1) ** 2), mul, lmax)
         sph.sph_norm()
 
         mul = 3
-        sph = sphten.SphericalTensor(torch.randn((lmax + 1) ** 2), mul, lmax)
+        sph = sphten.SphericalTensor(torch.randn(mul * (lmax + 1) ** 2), mul, lmax)
         sph.sph_norm()
 
     def test_plot(self):
@@ -89,7 +93,10 @@ class SphericalTensorTests(unittest.TestCase):
         lmax = 6
         coords = torch.randn(N, 3)
         coords = coords[coords.norm(2, -1) > 0]
-        radial_model = lambda x: torch.ones_like(x).unsqueeze(-1)
+
+        def radial_model(x):
+            return torch.ones_like(x).unsqueeze(-1)
+
         sph = sphten.SphericalTensor.from_geometry_with_radial(coords, radial_model, lmax)
 
         n = 16
@@ -98,7 +105,6 @@ class SphericalTensorTests(unittest.TestCase):
         assert list(f.shape) == [n ** 3]
 
     def test_change_lmax(self):
-        pass
         lmax = 0
         mul = 1
         signal = torch.zeros(rs.dim([(mul, lmax)]))
