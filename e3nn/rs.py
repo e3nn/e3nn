@@ -223,12 +223,12 @@ def are_equal(Rs1, Rs2):
     examples:
     Rs1 = [(1, 0), (1, 0), (1, 0)]
     Rs2 = [(3, 0)]
-    format_Rs(Rs1, Rs)
+    are_equal(Rs1, Rs2)
     >> True
 
     Rs1 = [(1, 0), (1, 1), (1, 0)]
     Rs2 = [(2, 0), (1, 1)]
-    format_Rs(Rs1, Rs)
+    are_equal(Rs1, Rs2)
     >> False
     Irreps are not in the same order
     """
