@@ -52,7 +52,7 @@ class KernelLinear(torch.nn.Module):
                     begin_w += mul_out * mul_in
 
                     eye = torch.eye(2 * l_in + 1, dtype=self.weight.dtype, device=self.weight.device)
-                    kernel[s_out, s_in] = torch.einsum('uv,ij->uivj', weight, eye).view(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1))
+                    kernel[s_out, s_in] = torch.einsum('uv,ij->uivj', weight, eye).reshape(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1))
                     n_path += mul_in
 
             if n_path > 0:
@@ -101,8 +101,8 @@ class Linear(torch.nn.Module):
         :return:         tensor [..., channel]
         """
         *size, dim_in = features.shape
-        features = features.view(-1, dim_in)
+        features = features.reshape(-1, dim_in)
 
         output = torch.einsum('ij,zj->zi', self.kernel(), features)
 
-        return output.view(*size, -1)
+        return output.reshape(*size, -1)
