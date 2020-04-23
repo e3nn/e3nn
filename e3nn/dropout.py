@@ -34,4 +34,4 @@ class Dropout(torch.nn.Module):
             noise = noise.unsqueeze(2).expand(-1, -1, dim).reshape(x.size(0), mul * dim)
             noises.append(noise)
         noise = torch.cat(noises, dim=1)
-        return x * noise.view(*noise.size(), *(1,) * (x.dim() - 2))
+        return x * noise.reshape(*noise.size(), *(1,) * (x.dim() - 2))

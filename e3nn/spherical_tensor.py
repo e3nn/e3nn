@@ -41,7 +41,7 @@ def adjusted_projection(vectors, lmax):
 
     coeff = projection(vectors, lmax)  # [batch, l * m]
     A = torch.einsum("ai,bi->ab", rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors), coeff)
-    coeff *= torch.lstsq(radii, A).solution.view(-1).unsqueeze(-1)
+    coeff *= torch.lstsq(radii, A).solution.reshape(-1).unsqueeze(-1)
     return coeff.sum(0)
 
 

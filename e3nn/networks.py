@@ -111,7 +111,7 @@ class S2Network(torch.nn.Module):
             x = torch.cat([x, xx], dim=-1)
             x = lin(x)
 
-            x = x.view(*x.shape[:-1], -1, rs.dim(act.Rs_in))  # put multiplicity into batch
+            x = x.reshape(*x.shape[:-1], -1, rs.dim(act.Rs_in))  # put multiplicity into batch
             x = act(x)
             x = x.reshape(*x.shape[:-2], -1)  # put back into representation
 

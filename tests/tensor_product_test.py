@@ -63,7 +63,7 @@ class Tests(unittest.TestCase):
                 self.assertLess(d, 1e-10)
 
                 n = Q.size(0)
-                M = Q.view(n, n)
+                M = Q.reshape(n, n)
                 I = torch.eye(n, dtype=M.dtype)
 
                 d = ((M @ M.t()) - I).pow(2).mean().sqrt()
@@ -106,7 +106,7 @@ class Tests(unittest.TestCase):
                 self.assertLess(d, 1e-10)
 
                 n = Q.size(0)
-                M = Q.view(n, -1)
+                M = Q.reshape(n, -1)
                 I = torch.eye(n)
 
                 d = ((M @ M.t()) - I).pow(2).mean().sqrt()
@@ -130,7 +130,7 @@ class Tests(unittest.TestCase):
                 self.assertLess(d, 1e-10)
 
                 n = Q.size(0)
-                M = Q.view(n, -1)
+                M = Q.reshape(n, -1)
                 I = torch.eye(n, dtype=M.dtype)
 
                 d = ((M @ M.t()) - I).pow(2).mean().sqrt()
