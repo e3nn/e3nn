@@ -6,7 +6,7 @@ import glob
 import os
 import sys
 from functools import lru_cache, wraps
-from itertools import count
+from itertools import count, chain
 
 import torch
 
@@ -94,8 +94,15 @@ def cached_picklesjar(dirname, maxsize=128, open_jar=open, load=torch.load, save
             sys.stdout.flush()
 
             with FileSystemMutex(mutexfile):
-                for i in count():
-                    file = os.path.join(dirname, "{}.{}".format(i, ext))
+                name = " ".join(map(str, args))
+                if kwargs:
+                    name += " " + " ".join(
+                        "{}={}".format(key, value)
+                        for key, value in sorted(kwargs.items())
+                    )
+
+                for postfix in chain([''], ('_{}'.format(i) for i in count())):
+                    file = os.path.join(dirname, "{}{}.{}".format(name, postfix, ext))
                     if not os.path.isfile(file):
                         break
 
