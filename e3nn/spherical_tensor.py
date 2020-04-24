@@ -121,13 +121,18 @@ class SphericalTensor():
     def signal_on_sphere(self, n=100):
         grid = ToS2Grid(self.lmax, res=n, normalization='none')
         beta, alpha = torch.meshgrid(grid.betas, grid.alphas)  # [beta, alpha]
-        x, y, z = o3.angles_to_xyz(alpha, beta)
-        r = torch.stack([x, y, z], dim=-1)  # [beta, alpha, 3]
+        r = o3.angles_to_xyz(alpha, beta)  # [beta, alpha, 3]
         return r, grid(self.signal)
 
     def plot(self, n=100, radius=True, center=None, relu=True):
         """
-        surface = self.plot()
+        r, f = self.plot()
+        surface = go.Surface(
+            x=r[:, :, 0].numpy(), 
+            y=r[:, :, 1].numpy(), 
+            z=r[:, :, 2].numpy(), 
+            surfacecolor=f.numpy()
+        )
         fig = go.Figure(data=[surface])
         fig.show()
         """

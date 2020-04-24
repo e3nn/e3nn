@@ -22,7 +22,8 @@ def rsh_surface(l, m, scale, tr, rot):
     f = torch.einsum('ij,...j->...i', o3.irr_repr(l, *rot), f)
     f = f[..., l + m]
 
-    x, y, z = o3.angles_to_xyz(a, b)
+    r = o3.angles_to_xyz(a, b)
+    x, y, z = r[:, :, 0], r[:, :, 1], r[:, :, 2]
 
     r = f.abs()
     x = scale * r * x + tr[0]
