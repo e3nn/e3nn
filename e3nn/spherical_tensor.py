@@ -63,17 +63,23 @@ class SphericalTensor():
 
     @classmethod
     def from_geometry_with_radial(cls, vectors, radial_model, lmax, sum_points=True):
+        """
+        :param vectors: tensor of shape [..., xyz]
+        :param radial_model: function of signature R+ -> R^mul
+        :param lmax: maximal order of the signal
+        """
+        size = vectors.shape[:-1]
         vectors = vectors.reshape(-1, 3)  # [N, 3]
-        r = vectors.norm(2, -1)
-        radial_functions = radial_model(r)
-        _N, R = radial_functions.shape
+        radii = vectors.norm(2, -1)
+        radial_functions = radial_model(radii)
+        *_size, R = radial_functions.shape
         Rs = [(R, L) for L in range(lmax + 1)]
         mul_map = rs.map_mul_to_Rs(Rs)
         radial_functions = torch.einsum('nr,dr->nd',
                                         radial_functions.repeat(1, lmax + 1),
                                         mul_map)  # [N, signal]
 
-        Ys = projection(vectors / r.unsqueeze(-1), lmax)  # [N, l * m]
+        Ys = projection(vectors / radii.unsqueeze(-1), lmax)  # [N, l * m]
         irrep_map = rs.map_irrep_to_Rs(Rs)
         Ys = torch.einsum('nc,dc->nd', Ys, irrep_map)  # [N, l * mul * m]
 
@@ -81,6 +87,8 @@ class SphericalTensor():
 
         if sum_points:
             signal = signal.sum(0)
+        else:
+            signal = signal.reshape(*size, -1)
 
         new_cls = cls(signal, R, lmax)
         new_cls.radial_model = radial_model
