@@ -97,10 +97,13 @@ class SphericalTensorTests(unittest.TestCase):
         def radial_model(x):
             return torch.ones_like(x).unsqueeze(-1)
 
-        sph = sphten.SphericalTensor.from_geometry_with_radial(coords, radial_model, lmax)
+        sph = sphten.SphericalTensor.from_geometry_with_radial(coords,
+                                                               radial_model,
+                                                               lmax)
 
         n = 16
-        r, f = sph.plot_with_radial(box_length=3.0, n=n)
+        center = torch.ones(3)
+        r, f = sph.plot_with_radial(box_length=3.0, n=n, center=center)
         assert list(r.shape) == [n ** 3, 3]
         assert list(f.shape) == [n ** 3]
 
