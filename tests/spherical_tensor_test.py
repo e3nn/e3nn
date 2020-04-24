@@ -107,6 +107,15 @@ class SphericalTensorTests(unittest.TestCase):
         assert list(r.shape) == [n ** 3, 3]
         assert list(f.shape) == [n ** 3]
 
+    def test_signal_on_sphere(self):
+        torch.set_default_dtype(torch.float64)
+        lmax = 4
+        sph = sphten.SphericalTensor(torch.randn((lmax + 1)**2), 1, lmax)
+
+        r, val1 = sph.signal_on_sphere(2 * (lmax + 1))
+        val2 = sph.value(*o3.xyz_to_angles(r))
+        assert (val1 - val2).abs().max() < 1e-10
+
     def test_change_lmax(self):
         lmax = 0
         mul = 1
