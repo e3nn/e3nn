@@ -11,9 +11,9 @@ class Tests(unittest.TestCase):
     def test_sh_dirac(self):
         with o3.torch_default_dtype(torch.float64):
             for l in range(5):
-                angles = torch.tensor(1.2), torch.tensor(2.1)
-                a = sphten.spherical_harmonics_dirac(o3.angles_to_xyz(*angles), l)
-                v = sphten.SphericalTensor(a, 1, l).value(*angles)
+                r = torch.randn(3)
+                a = sphten.spherical_harmonics_dirac(r, l)
+                v = sphten.SphericalTensor(a, 1, l).signal_xyz(r)
                 self.assertAlmostEqual(v.item(), 1)
 
     def test_projection(self):
@@ -112,8 +112,8 @@ class SphericalTensorTests(unittest.TestCase):
         lmax = 4
         sph = sphten.SphericalTensor(torch.randn((lmax + 1)**2), 1, lmax)
 
-        r, val1 = sph.signal_on_sphere(2 * (lmax + 1))
-        val2 = sph.value(*o3.xyz_to_angles(r))
+        r, val1 = sph.signal_on_grid(2 * (lmax + 1))
+        val2 = sph.signal_xyz(r)
         assert (val1 - val2).abs().max() < 1e-10
 
     def test_change_lmax(self):

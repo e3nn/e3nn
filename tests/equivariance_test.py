@@ -136,8 +136,8 @@ class Tests(unittest.TestCase):
             D_in = rs.rep(Rs_in, 0, 0, 0, 1)
             D_out = rs.rep(act.Rs_out, 0, 0, 0, 1)
 
-            fea = torch.randn(1, 4, rs.dim(Rs_in))
-            geo = torch.randn(1, 4, 3)
+            fea = rs.randn(1, 3, Rs_in)
+            geo = torch.randn(1, 3, 3)
 
             x1 = torch.einsum("ij,zaj->zai", (D_out, act(conv(fea, geo))))
             x2 = act(conv(torch.einsum("ij,zaj->zai", (D_in, fea)), -geo))

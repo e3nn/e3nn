@@ -109,7 +109,16 @@ class SphericalTensor():
                 sig_index += 2 * l + 1
         return norms
 
-    def value(self, alpha, beta):
+    def signal_xyz(self, r):
+        """
+        Evaluate the signal on the sphere
+        """
+        sh = rsh.spherical_harmonics_xyz(list(range(self.lmax + 1)), r)
+        dim = (self.lmax + 1)**2
+        output = torch.einsum('ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
+        return output.reshape((*self.signal.shape[:-1], *r.shape[:-1]))
+
+    def signal_alpha_beta(self, alpha, beta):
         """
         Evaluate the signal on the sphere
         """
@@ -118,7 +127,10 @@ class SphericalTensor():
         output = torch.einsum('ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
         return output.reshape((*self.signal.shape[:-1], *alpha.shape))
 
-    def signal_on_sphere(self, n=100):
+    def signal_on_grid(self, n=100):
+        """
+        Evaluate the signal on the sphere
+        """
         grid = ToS2Grid(self.lmax, res=n, normalization='none')
         beta, alpha = torch.meshgrid(grid.betas, grid.alphas)  # [beta, alpha]
         r = o3.angles_to_xyz(alpha, beta)  # [beta, alpha, 3]
@@ -128,15 +140,15 @@ class SphericalTensor():
         """
         r, f = self.plot()
         surface = go.Surface(
-            x=r[:, :, 0].numpy(), 
-            y=r[:, :, 1].numpy(), 
-            z=r[:, :, 2].numpy(), 
+            x=r[:, :, 0].numpy(),
+            y=r[:, :, 1].numpy(),
+            z=r[:, :, 2].numpy(),
             surfacecolor=f.numpy()
         )
         fig = go.Figure(data=[surface])
         fig.show()
         """
-        r, f = self.signal_on_sphere(n)
+        r, f = self.signal_on_grid(n)
         f = f.relu() if relu else f
 
         r = torch.cat([r, r[:, :1]], dim=1)  # [beta, alpha, 3]
