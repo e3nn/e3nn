@@ -11,6 +11,5 @@ notebook
 # files
 mutex
 
-*.torch
 *.png
 *.gif
