@@ -132,7 +132,7 @@ class SphericalTensor():
         if radius:
             r *= f.abs().unsqueeze(-1)
 
-        if center:
+        if center is not None:
             r += center
 
         return r, f
@@ -154,7 +154,7 @@ class SphericalTensor():
         f = torch.einsum('xd,d->x', f, self.signal)
         f = f.relu() if relu else f
 
-        if center:
+        if center is not None:
             r += center.unsqueeze(0)
 
         return r, f
