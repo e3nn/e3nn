@@ -31,7 +31,7 @@ class KernelConv(Kernel):
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
-        r = self.R(radii.flatten()).view(*radii.shape, -1)  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
+        r = self.R(radii.flatten()).reshape(*radii.shape, -1)  # [batch, a, b, l_out * l_in * mul_out * mul_in * l_filter]
         r = r.clone()
         r[radii == 0] = 0
 
@@ -97,11 +97,11 @@ def kernel_conv_fn_forward(F, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, se
 
                 K += norm_coef[i, j] * torch.einsum(
                     "ijk,zabk,zabuv,zbvj->zaui",
-                    C, sub_Y, sub_R[..., k], F[..., s_in].view(batch, b, mul_in, -1)
+                    C, sub_Y, sub_R[..., k], F[..., s_in].reshape(batch, b, mul_in, -1)
                 )  # [batch, a, mul_out, m_out]
 
             if not isinstance(K, int):
-                kernel_conv[:, :, s_out] += K.view(batch, a, -1)
+                kernel_conv[:, :, s_out] += K.reshape(batch, a, -1)
 
     return kernel_conv
 
@@ -185,9 +185,9 @@ class KernelConvFn(torch.autograd.Function):
                         batch, b, mul_in, 2 * l_in + 1
                     )  # [batch, b, mul_in, 2 * l_in + 1]
                 if (grad_Y is not None) or (grad_R is not None):
-                    sub_F = F[..., s_in].view(batch, b, mul_in, 2 * l_in + 1)
+                    sub_F = F[..., s_in].reshape(batch, b, mul_in, 2 * l_in + 1)
 
-                grad_K = grad_kernel[:, :, s_out].view(
+                grad_K = grad_kernel[:, :, s_out].reshape(
                     batch, a, mul_out, 2 * l_out + 1
                 )
 
@@ -214,9 +214,9 @@ class KernelConvFn(torch.autograd.Function):
                             grad_K, C, sub_Y, sub_F
                         )  # [batch, a, b, mul_out, mul_in]
                 if grad_F is not None:
-                    grad_F[:, :, s_in] = sub_grad_F.view(batch, b, mul_in * (2 * l_in + 1))
+                    grad_F[:, :, s_in] = sub_grad_F.reshape(batch, b, mul_in * (2 * l_in + 1))
                 if grad_R is not None:
-                    grad_R[..., begin_R: begin_R + n] += sub_grad_R.view(batch, a, b, -1)
+                    grad_R[..., begin_R: begin_R + n] += sub_grad_R.reshape(batch, a, b, -1)
                 begin_R += n
 
         return grad_F, grad_Y, grad_R, None, None, None, None, None

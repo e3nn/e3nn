@@ -13,8 +13,8 @@ class Tests(unittest.TestCase):
     def test_scipy_spherical_harmonics(self):
         with o3.torch_default_dtype(torch.float64):
             ls = [0, 1, 2, 3, 4, 5]
-            beta = torch.linspace(1e-3, math.pi - 1e-3, 100, requires_grad=True).view(1, -1)
-            alpha = torch.linspace(0, 2 * math.pi, 100, requires_grad=True).view(-1, 1)
+            beta = torch.linspace(1e-3, math.pi - 1e-3, 100, requires_grad=True).reshape(1, -1)
+            alpha = torch.linspace(0, 2 * math.pi, 100, requires_grad=True).reshape(-1, 1)
             Y1 = rsh.spherical_harmonics_alpha_beta(ls, alpha, beta)
             Y2 = rsh.spherical_harmonics_alpha_beta(ls, alpha.detach(), beta.detach())
             self.assertLess((Y1 - Y2).abs().max(), 1e-10)
@@ -92,7 +92,7 @@ class Tests(unittest.TestCase):
             Ys = [rsh.spherical_harmonics_xyz([l], x) for l in range(0, 3 + 1)]
             for l1, Y1 in enumerate(Ys):
                 for l2, Y2 in enumerate(Ys):
-                    m = (Y1.view(-1, 2 * l1 + 1, 1) * Y2.view(-1, 1, 2 * l2 + 1)).mean(0) * 4 * math.pi
+                    m = (Y1.reshape(-1, 2 * l1 + 1, 1) * Y2.reshape(-1, 1, 2 * l2 + 1)).mean(0) * 4 * math.pi
                     if l1 == l2:
                         i = torch.eye(2 * l1 + 1)
                         self.assertLess((m - i).pow(2).max(), 1e-4)
@@ -104,7 +104,7 @@ class Tests(unittest.TestCase):
         Us = [torch.stack([o3.irr_repr(l, *abc) for abc in rots]) for l in range(3 + 1)]
         for l1, U1 in enumerate(Us):
             for l2, U2 in enumerate(Us):
-                m = torch.einsum('zij,zkl->zijkl', U1, U2).mean(0).view((2 * l1 + 1)**2, (2 * l2 + 1)**2)
+                m = torch.einsum('zij,zkl->zijkl', U1, U2).mean(0).reshape((2 * l1 + 1)**2, (2 * l2 + 1)**2)
                 if l1 == l2:
                     i = torch.eye((2 * l1 + 1)**2)
                     self.assertLess((m.mul(2 * l1 + 1) - i).abs().max(), 0.1)

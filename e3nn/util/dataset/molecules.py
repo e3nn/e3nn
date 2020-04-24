@@ -17,9 +17,9 @@ class VoxelizeBlobs:
         self.p = p
         lim = self.p * 0.5 * (self.size - 1)
         self.a = torch.linspace(-lim, lim, self.size)
-        self.xx = self.a.view(-1, 1, 1).expand(self.size, self.size, self.size)
-        self.yy = self.a.view(1, -1, 1).expand(self.size, self.size, self.size)
-        self.zz = self.a.view(1, 1, -1).expand(self.size, self.size, self.size)
+        self.xx = self.a.reshape(-1, 1, 1).expand(self.size, self.size, self.size)
+        self.yy = self.a.reshape(1, -1, 1).expand(self.size, self.size, self.size)
+        self.zz = self.a.reshape(1, 1, -1).expand(self.size, self.size, self.size)
 
     def __call__(self, positions, qualias):
         fields = torch.zeros((self.n_qualias, self.size, self.size, self.size))

@@ -40,26 +40,26 @@ class GroupNorm(nn.Module):
             field = field.reshape(input.size(0), m, d, -1)  # [batch, feature, repr, x * y * z]
 
             if d == 1:  # scalars
-                field_mean = field.view(input.size(0), -1).mean(-1)  # [batch]
-                field = field - field_mean.view(-1, 1, 1, 1)  # [batch, feature, repr, x * y * z]
+                field_mean = field.reshape(input.size(0), -1).mean(-1)  # [batch]
+                field = field - field_mean.reshape(-1, 1, 1, 1)  # [batch, feature, repr, x * y * z]
 
             field_norm = torch.sum(field ** 2, dim=2)  # [batch, feature, x * y * z]
-            field_norm = field_norm.view(input.size(0), -1).mean(-1)  # [batch]
-            field_norm = (field_norm + self.eps).pow(-0.5).view(-1, 1, 1, 1)  # [batch, feature, repr, x * y * z]
+            field_norm = field_norm.reshape(input.size(0), -1).mean(-1)  # [batch]
+            field_norm = (field_norm + self.eps).pow(-0.5).reshape(-1, 1, 1, 1)  # [batch, feature, repr, x * y * z]
 
             if self.affine:
                 weight = self.weight[iw: iw + m]  # [feature]
                 iw += m
-                field_norm = field_norm * weight.view(1, -1, 1, 1)  # [batch, feature, repr, x * y * z]
+                field_norm = field_norm * weight.reshape(1, -1, 1, 1)  # [batch, feature, repr, x * y * z]
 
             field = field * field_norm  # [batch, feature, repr, x * y * z]
 
             if self.affine and d == 1:  # scalars
                 bias = self.bias[ib: ib + m]  # [feature]
                 ib += m
-                field = field + bias.view(1, -1, 1, 1)  # [batch, feature, repr, x * y * z]
+                field = field + bias.reshape(1, -1, 1, 1)  # [batch, feature, repr, x * y * z]
 
-            fields.append(field.view(input.size(0), m * d, *input.size()[2:]))
+            fields.append(field.reshape(input.size(0), m * d, *input.size()[2:]))
 
         assert ix == input.size(1)
         if self.affine:

@@ -36,13 +36,13 @@ class TensorProduct(torch.nn.Module):
         :param features: [..., channels]
         '''
         *size_1, n_1 = features_1.size()
-        features_1 = features_1.view(-1, n_1)
+        features_1 = features_1.reshape(-1, n_1)
         *size_2, n_2 = features_2.size()
-        features_2 = features_2.view(-1, n_2)
+        features_2 = features_2.reshape(-1, n_2)
         assert size_1 == size_2
 
         output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
-        return output.view(*size_1, -1)
+        return output.reshape(*size_1, -1)
 
 
 class TensorSquare(torch.nn.Module):
@@ -71,10 +71,10 @@ class TensorSquare(torch.nn.Module):
         :param features: [..., channels]
         '''
         *size, n = features.size()
-        features = features.view(-1, n)
+        features = features.reshape(-1, n)
 
         output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features, features)
-        return output.view(*size, -1)
+        return output.reshape(*size, -1)
 
 
 class ElementwiseTensorProduct(torch.nn.Module):
@@ -97,13 +97,13 @@ class ElementwiseTensorProduct(torch.nn.Module):
         :param features: [..., channels]
         '''
         *size_1, n_1 = features_1.size()
-        features_1 = features_1.view(-1, n_1)
+        features_1 = features_1.reshape(-1, n_1)
         *size_2, n_2 = features_2.size()
-        features_2 = features_2.view(-1, n_2)
+        features_2 = features_2.reshape(-1, n_2)
         assert size_1 == size_2
 
         output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
-        return output.view(*size_1, -1)
+        return output.reshape(*size_1, -1)
 
 
 class LearnableTensorProduct(torch.nn.Module):
@@ -119,10 +119,10 @@ class LearnableTensorProduct(torch.nn.Module):
         """
         # split into mul x Rs
         *size, _ = x1.shape
-        x1 = x1.view(*size, self.mul_mid, -1)
-        x2 = x2.view(*size, self.mul_mid, -1)
+        x1 = x1.reshape(*size, self.mul_mid, -1)
+        x2 = x2.reshape(*size, self.mul_mid, -1)
 
-        x = self.tp(x1, x2).view(*size, -1)
+        x = self.tp(x1, x2).reshape(*size, -1)
         x = self.lin(x)
         return x
 

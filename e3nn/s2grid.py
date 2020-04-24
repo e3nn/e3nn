@@ -95,7 +95,7 @@ class ToS2Grid(torch.nn.Module):
 
         x = torch.einsum('mbi,zi->zmb', self.shb, x)
         x = torch.einsum('am,zmb->zba', self.sha, x)
-        return x.view(*size, *x.shape[1:])
+        return x.reshape(*size, *x.shape[1:])
 
 
 class FromS2Grid(torch.nn.Module):
@@ -156,8 +156,8 @@ class FromS2Grid(torch.nn.Module):
         """
         size = x.shape[:-2]
         res_beta, res_alpha = x.shape[-2:]
-        x = x.view(-1, res_beta, res_alpha)
+        x = x.reshape(-1, res_beta, res_alpha)
 
         x = torch.einsum('am,zba->zbm', self.sha, x)
         x = torch.einsum('mbi,zbm->zi', self.shb, x)
-        return x.view(*size, x.shape[1])
+        return x.reshape(*size, x.shape[1])
