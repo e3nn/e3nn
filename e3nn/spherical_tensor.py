@@ -133,7 +133,7 @@ class SphericalTensor():
             r *= f.abs().unsqueeze(-1)
 
         if center is not None:
-            r += center
+            r += center.unsqueeze(0).unsqueeze(0)
 
         return r, f
 
