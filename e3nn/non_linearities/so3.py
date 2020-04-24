@@ -39,6 +39,6 @@ class SO3Activation(torch.nn.Module):
         assert features.shape[dim] == self.Z.shape[1]  # assert mul == 1 for now
         features = features.transpose(0, dim)
         out_features = (self.Z.shape[1] / self.Z.shape[0]) * self.Z.T @ self.act(self.Z @ features.flatten(1))
-        out_features = out_features.view(*features.shape)
+        out_features = out_features.reshape(*features.shape)
         out_features = out_features.transpose(0, dim)
         return out_features

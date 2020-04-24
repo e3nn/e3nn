@@ -48,7 +48,7 @@ class ScalarActivation(torch.nn.Module):
 
             if act is not None:
                 if self.bias is not None:
-                    x = x + self.bias[begin2:begin2 + d].view(1, -1, 1)
+                    x = x + self.bias[begin2:begin2 + d].reshape(1, -1, 1)
                     begin2 += d
 
                 x = act(x)

@@ -127,7 +127,7 @@ class Kernel(torch.nn.Module):
         kernel[radii > r_eps] = kernel1
         kernel[radii <= r_eps] = kernel2
 
-        return kernel.view(*size, *kernel2.shape)
+        return kernel.reshape(*size, *kernel2.shape)
 
 
 def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
@@ -235,16 +235,16 @@ class KernelFn(torch.autograd.Function):
 
                 n = mul_out * mul_in * len(l_filters)
                 if grad_Y is not None:
-                    sub_R = R[:, begin_R: begin_R + n].view(
+                    sub_R = R[:, begin_R: begin_R + n].reshape(
                         -1, mul_out, mul_in, len(l_filters)
                     )  # [batch, mul_out, mul_in, l_filter]
                 if grad_R is not None:
-                    sub_grad_R = grad_R[:, begin_R: begin_R + n].view(
+                    sub_grad_R = grad_R[:, begin_R: begin_R + n].reshape(
                         -1, mul_out, mul_in, len(l_filters)
                     )  # [batch, mul_out, mul_in, l_filter]
                 begin_R += n
 
-                grad_K = grad_kernel[:, s_out, s_in].view(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
+                grad_K = grad_kernel[:, s_out, s_in].reshape(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
 
                 for k, l_filter in enumerate(l_filters):
                     tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)

@@ -48,11 +48,11 @@ class GRU(torch.nn.Module):
             d = mul * (2 * l + 1)
             h_ = h[:, i: i + d].reshape(batch, mul, 2 * l + 1, *size)
             h_tilde_ = h_tilde[:, i: i + d].reshape(batch, mul, 2 * l + 1, *size)
-            z_ = z[:, j: j + mul].view(batch, mul, 1, *size)
+            z_ = z[:, j: j + mul].reshape(batch, mul, 1, *size)
             i += d
             j += mul
 
             out = (1 - z_) * h_ + z_ * h_tilde_
-            outs.append(out.view(batch, -1, *size))
+            outs.append(out.reshape(batch, -1, *size))
 
         return torch.cat(outs, dim=1)

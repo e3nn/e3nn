@@ -102,9 +102,9 @@ def train(net):
         points, masses = random_points_and_masses(10)
         accels = accelerations(points, masses)
 
-        points = torch.from_numpy(points).view(1, -1, 3)
-        masses = torch.from_numpy(masses).view(1, -1, 1)
-        accels = torch.from_numpy(accels).view(1, -1, 3)
+        points = torch.from_numpy(points).reshape(1, -1, 3)
+        masses = torch.from_numpy(masses).reshape(1, -1, 1)
+        accels = torch.from_numpy(accels).reshape(1, -1, 3)
         output = net(masses, points)  # [3, N]
 
         # spherical harmonics are given in y,z,x order
@@ -119,9 +119,9 @@ def train(net):
                 val_points, val_masses = random_points_and_masses(50)
                 val_accels = accelerations(val_points, val_masses)
 
-                val_points = torch.from_numpy(val_points).view(1, -1, 3)
-                val_masses = torch.from_numpy(val_masses).view(1, -1, 1)
-                val_accels = torch.from_numpy(val_accels).view(1, -1, 3)
+                val_points = torch.from_numpy(val_points).reshape(1, -1, 3)
+                val_masses = torch.from_numpy(val_masses).reshape(1, -1, 1)
+                val_accels = torch.from_numpy(val_accels).reshape(1, -1, 3)
 
                 output = net(val_masses, val_points)
                 output = torch.transpose(output, 0, 1)

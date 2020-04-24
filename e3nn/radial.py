@@ -12,7 +12,7 @@ class ConstantRadialModel(torch.nn.Module):
 
     def forward(self, _radii):
         batch = _radii.size(0)
-        return self.weight.view(1, -1).expand(batch, -1)
+        return self.weight.reshape(1, -1).expand(batch, -1)
 
 
 class FiniteElementModel(torch.nn.Module):
@@ -35,7 +35,7 @@ class FiniteElementModel(torch.nn.Module):
         """
         diff = x.unsqueeze(1) - self.position.unsqueeze(0)  # [batch, i, ...]
         batch, n, *rest = diff.size()
-        x = self.basis(diff.view(-1, *rest)).view(batch, n)  # [batch, i]
+        x = self.basis(diff.reshape(-1, *rest)).reshape(batch, n)  # [batch, i]
         return self.f(x)
 
 

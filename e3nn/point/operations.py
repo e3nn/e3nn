@@ -137,7 +137,7 @@ class NeighborsConvolution(torch.nn.Module):
         rb = geometry.unsqueeze(1)  # [batch, 1, b, xyz]
         ra = geometry.unsqueeze(2)  # [batch, a, 1, xyz]
         diff = rb - ra  # [batch, a, b, xyz]
-        norm = diff.norm(2, dim=-1).view(batch * n, n)  # [batch * a, b]
+        norm = diff.norm(2, dim=-1).reshape(batch * n, n)  # [batch * a, b]
 
         neighbors = [
             (norm[i] < self.radius).nonzero().flatten()
@@ -148,19 +148,19 @@ class NeighborsConvolution(torch.nn.Module):
         rel_mask = features.new_zeros(batch * n, k)
         for i, nei in enumerate(neighbors):
             rel_mask[i, :len(nei)] = 1
-        rel_mask = rel_mask.view(batch, n, k)  # [batch, a, b]
+        rel_mask = rel_mask.reshape(batch, n, k)  # [batch, a, b]
 
         neighbors = torch.stack([
             torch.cat([nei, nei.new_zeros(k - len(nei))])
             for nei in neighbors
         ])
-        neighbors = neighbors.view(batch, n, k)  # [batch, a, b]
+        neighbors = neighbors.reshape(batch, n, k)  # [batch, a, b]
 
-        rb = geometry[torch.arange(batch).view(-1, 1, 1), neighbors, :]  # [batch, a, b, xyz]
-        ra = geometry[torch.arange(batch).view(-1, 1, 1), torch.arange(n).view(1, -1, 1), :]  # [batch, a, 1, xyz]
+        rb = geometry[torch.arange(batch).reshape(-1, 1, 1), neighbors, :]  # [batch, a, b, xyz]
+        ra = geometry[torch.arange(batch).reshape(-1, 1, 1), torch.arange(n).reshape(1, -1, 1), :]  # [batch, a, 1, xyz]
         diff = rb - ra  # [batch, a, b, xyz]
 
-        neighbor_features = features[torch.arange(batch).view(-1, 1, 1), neighbors, :]  # [batch, a, b, j]
+        neighbor_features = features[torch.arange(batch).reshape(-1, 1, 1), neighbors, :]  # [batch, a, b, j]
 
         k = self.kernel(diff)  # [batch, a, b, i, j]
         k.div_(n_norm ** 0.5)
@@ -191,7 +191,7 @@ class PeriodicConvolution(torch.nn.Module):
         in_channels, out_channels = rs.dim(self.kernel.Rs_in), rs.dim(self.kernel.Rs_out)
 
         geometry = geometry.cpu().numpy()
-        features = features.view(batch_size, points_num * in_channels)                                               # [z, b*j]
+        features = features.reshape(batch_size, points_num * in_channels)                                               # [z, b*j]
         out = features.new_zeros(batch_size, points_num, out_channels)                                               # [z, a, i]
 
         for z, geo in enumerate(geometry):
@@ -256,7 +256,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         points_num = features.size(0)
         in_channels, out_channels = kernels.size(2), kernels.size(1)
 
-        features = features.view(points_num * in_channels)                                          # [b*j]
+        features = features.reshape(points_num * in_channels)                                          # [b*j]
         bs_slice = bs_slice.long()                                                                  # comes as short int, but only long int can be used as index
 
         out = features.new_zeros(points_num, out_channels)                                          # [a, i]
@@ -284,7 +284,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         bs_slice = bs_slice.long()                                                                  # comes as short int, but only long int can be used as index
 
         # region features_grad[b, j] = sum_(a, i){ k_b[a, b, i, j] * grad_output[a, i] }
-        features_grad = torch.zeros_like(features).view(points_num * in_channels)                   # [b*j]
+        features_grad = torch.zeros_like(features).reshape(points_num * in_channels)                   # [b*j]
         ks_start = 0
         for a, bs in enumerate(bs_slice):
             bs = bs[1:1 + bs[0]]                                                                      # select data from padded vector
@@ -295,7 +295,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
 
             features_grad += (k_b * grad_output[a].unsqueeze(1).expand_as(k_b)).sum(dim=0)          # sum(i){ [i, b*j] * ([i] -> [i, b*j]) } -> [b*j]
 
-        features_grad = features_grad.view(points_num, in_channels)                                 # [b, j]
+        features_grad = features_grad.reshape(points_num, in_channels)                                 # [b, j]
         # endregion
 
         # no longer needed, frees the same amount of memory as kernels_grad is going to take

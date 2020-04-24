@@ -67,7 +67,7 @@ class GatedBlock(torch.nn.Module):
                 gate = self.gate_act(gate)
                 gate = gate.contiguous().unsqueeze(dim + 1)  # [..., feature, 1, ...]
 
-                sub = (sub * gate).view(*size_bef, mul * (2 * l + 1), *size_aft)  # [..., feature * repr, ...]
+                sub = (sub * gate).reshape(*size_bef, mul * (2 * l + 1), *size_aft)  # [..., feature * repr, ...]
                 del gate
 
             out.narrow(dim, begin_out, mul * (2 * l + 1)).copy_(sub)

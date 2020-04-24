@@ -77,8 +77,8 @@ class Linear(torch.nn.Module):
         :return:         tensor [..., channel]
         """
         *size, dim_in = features.shape
-        features = features.view(-1, dim_in)
+        features = features.reshape(-1, dim_in)
 
         output = torch.einsum('ij,zj->zi', self.kernel(), features)
 
-        return output.view(*size, -1)
+        return output.reshape(*size, -1)

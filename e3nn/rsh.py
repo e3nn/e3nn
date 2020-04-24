@@ -79,7 +79,7 @@ def spherical_harmonics_beta(ls, cosbeta):
     :return: tensor of shape [..., l * m]
     """
     size = cosbeta.shape
-    cosbeta = cosbeta.view(-1)
+    cosbeta = cosbeta.reshape(-1)
 
     output = []
     for l in ls:
@@ -88,7 +88,7 @@ def spherical_harmonics_beta(ls, cosbeta):
         out = (-1) ** l * quantum * legendre([l], cosbeta)  # [batch, m]
         output += [out]
     output = torch.cat(output, dim=-1)
-    return output.view(*size, -1)  # [..., l * m]
+    return output.reshape(*size, -1)  # [..., l * m]
 
 
 def spherical_harmonics_alpha(l, alpha):
@@ -117,7 +117,7 @@ def spherical_harmonics_alpha(l, alpha):
             math.sqrt(2) * cos,
         ], dim=-1)
 
-    return out.view(*size, -1)  # [..., m]
+    return out.reshape(*size, -1)  # [..., m]
 
 
 def spherical_harmonics_alpha_beta(ls, alpha, beta):
@@ -170,7 +170,7 @@ def spherical_harmonics_xyz_cuda(ls, xyz):
     from e3nn import cuda_rsh  # pylint: disable=no-name-in-module, import-outside-toplevel
 
     *size, _ = xyz.size()
-    xyz = xyz.view(-1, 3)
+    xyz = xyz.reshape(-1, 3)
     lmax = max(ls)
     out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
     cuda_rsh.real_spherical_harmonics(out, xyz)

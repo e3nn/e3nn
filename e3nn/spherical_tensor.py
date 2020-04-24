@@ -41,7 +41,7 @@ def adjusted_projection(vectors, lmax):
 
     coeff = projection(vectors, lmax)  # [batch, l * m]
     A = torch.einsum("ai,bi->ab", rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors), coeff)
-    coeff *= torch.lstsq(radii, A).solution.view(-1).unsqueeze(-1)
+    coeff *= torch.lstsq(radii, A).solution.reshape(-1).unsqueeze(-1)
     return coeff.sum(0)
 
 
@@ -140,8 +140,8 @@ class SphericalTensor():
         if radius:
             r *= f.abs().unsqueeze(-1)
 
-        if center:
-            r += center
+        if center is not None:
+            r += center.unsqueeze(0).unsqueeze(0)
 
         return r, f
 
@@ -162,7 +162,7 @@ class SphericalTensor():
         f = torch.einsum('xd,d->x', f, self.signal)
         f = f.relu() if relu else f
 
-        if center:
+        if center is not None:
             r += center.unsqueeze(0)
 
         return r, f

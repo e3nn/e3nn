@@ -108,7 +108,7 @@ class Kernel(torch.nn.Module):
         kernel[radii > r_eps] = kernel1
         kernel[radii <= r_eps] = kernel2
 
-        return kernel.view(*size, *kernel2.shape)
+        return kernel.reshape(*size, *kernel2.shape)
 
 
 class FrozenKernel(torch.nn.Module):
@@ -188,4 +188,4 @@ class FrozenKernel(torch.nn.Module):
         else:
             kernel = kernel1
 
-        return kernel.view(*self.size, *kernel2.shape)
+        return kernel.reshape(*self.size, *kernel2.shape)

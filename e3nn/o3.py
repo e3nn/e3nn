@@ -308,7 +308,7 @@ def __wigner_3j(l1, l2, l3, _version=0):
         D1 = irr_repr(l1, a, b, c)
         D2 = irr_repr(l2, a, b, c)
         D3 = irr_repr(l3, a, b, c)
-        return torch.einsum('il,jm,kn->ijklmn', (D1, D2, D3)).view(n, n)
+        return torch.einsum('il,jm,kn->ijklmn', (D1, D2, D3)).reshape(n, n)
 
     n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
     random_angles = [
@@ -337,7 +337,7 @@ def __wigner_3j(l1, l2, l3, _version=0):
 
     assert null_space.size(0) == 1, null_space.size()  # unique subspace solution
     Q = null_space[0]
-    Q = Q.view(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+    Q = Q.reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
 
     if next(x for x in Q.flatten() if x.abs() > 1e-10 * Q.abs().max()) < 0:
         Q.neg_()

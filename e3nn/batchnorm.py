@@ -61,7 +61,7 @@ class BatchNorm(nn.Module):
         :param input: [batch, ..., stacked features]
         '''
         batch, *size, dim = input.shape
-        input = input.view(batch, -1, dim)  # [batch, sample, stacked features]
+        input = input.reshape(batch, -1, dim)  # [batch, sample, stacked features]
 
         if self.training:
             new_means = []
@@ -83,7 +83,7 @@ class BatchNorm(nn.Module):
 
             if d == 1:  # scalars
                 if self.training:
-                    field_mean = field.mean([0, 1]).view(m)  # [mul]
+                    field_mean = field.mean([0, 1]).reshape(m)  # [mul]
                     new_means.append(
                         self._roll_avg(self.running_mean[irm:irm + m], field_mean)
                     )
@@ -92,7 +92,7 @@ class BatchNorm(nn.Module):
                 irm += m
 
                 # [batch, sample, mul, repr]
-                field = field - field_mean.view(m, 1)
+                field = field - field_mean.reshape(m, 1)
 
             if self.training:
                 if self.normalization == 'norm':
@@ -123,14 +123,14 @@ class BatchNorm(nn.Module):
 
                 field_norm = field_norm * weight  # [mul]
 
-            field = field * field_norm.view(m, 1)  # [batch, sample, mul, repr]
+            field = field * field_norm.reshape(m, 1)  # [batch, sample, mul, repr]
 
             if self.affine and d == 1:  # scalars
                 bias = self.bias[ib: ib + m]  # [mul]
                 ib += m
-                field += bias.view(m, 1)  # [batch, sample, mul, repr]
+                field += bias.reshape(m, 1)  # [batch, sample, mul, repr]
 
-            fields.append(field.view(batch, -1, m * d))  # [batch, sample, mul * repr]
+            fields.append(field.reshape(batch, -1, m * d))  # [batch, sample, mul * repr]
 
         if ix != dim:
             fmt = "`ix` should have reached input.size(-1) ({}), but it ended at {}"
@@ -149,4 +149,4 @@ class BatchNorm(nn.Module):
             self.running_var.copy_(torch.cat(new_vars))
 
         output = torch.cat(fields, dim=2)  # [batch, sample, stacked features]
-        return output.view(batch, *size, dim)
+        return output.reshape(batch, *size, dim)
