@@ -13,7 +13,7 @@ class Tests(unittest.TestCase):
             lmax = 5
             res = (50, 75)
 
-            for normalization in ['component', 'norm']:
+            for normalization in ['component', 'norm', 'none']:
                 to = s2grid.ToS2Grid(lmax, res, normalization=normalization)
                 fr = s2grid.FromS2Grid(res, lmax, normalization=normalization)
 
@@ -29,7 +29,7 @@ class Tests(unittest.TestCase):
             lout = 7
             res = (50, 60)
 
-            for normalization in ['component', 'norm']:
+            for normalization in ['component', 'norm', 'none']:
                 to = s2grid.ToS2Grid(lin, res, normalization=normalization)
                 fr = s2grid.FromS2Grid(res, lout, lmax_in=lin, normalization=normalization)
 

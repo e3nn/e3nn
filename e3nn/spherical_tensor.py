@@ -119,7 +119,7 @@ class SphericalTensor():
         return output.reshape((*self.signal.shape[:-1], *alpha.shape))
 
     def signal_on_sphere(self, n=100):
-        grid = ToS2Grid(self.lmax, res=n)
+        grid = ToS2Grid(self.lmax, res=n, normalization='none')
         beta, alpha = torch.meshgrid(grid.betas, grid.alphas)  # [beta, alpha]
         x, y, z = o3.angles_to_xyz(alpha, beta)
         r = torch.stack([x, y, z], dim=-1)  # [beta, alpha, 3]

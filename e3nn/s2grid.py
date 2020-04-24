@@ -51,7 +51,7 @@ class ToS2Grid(torch.nn.Module):
         """
         super().__init__()
 
-        assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+        assert normalization in ['norm', 'component', 'none'], "normalization needs to be 'norm', 'component' or 'none'"
 
         if isinstance(res, int):
             res_beta, res_alpha = res, res
@@ -75,6 +75,8 @@ class ToS2Grid(torch.nn.Module):
                 ]) / math.sqrt(lmax + 1)
             if normalization == 'norm':
                 n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
+            if normalization == 'none':
+                n = torch.ones(lmax + 1)
             m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
@@ -114,7 +116,7 @@ class FromS2Grid(torch.nn.Module):
         """
         super().__init__()
 
-        assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+        assert normalization in ['norm', 'component', 'none'], "normalization needs to be 'norm', 'component' or 'none'"
 
         if isinstance(res, int):
             res_beta, res_alpha = res, res
@@ -139,6 +141,8 @@ class FromS2Grid(torch.nn.Module):
                 ]) * math.sqrt(lmax_in + 1)
             if normalization == 'norm':
                 n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
+            if normalization == 'none':
+                n = 4 * math.pi * torch.ones(lmax + 1)
             m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
             qw = torch.tensor(S3.quadrature_weights(res_beta // 2)) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
