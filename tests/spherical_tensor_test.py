@@ -12,7 +12,7 @@ class Tests(unittest.TestCase):
         with o3.torch_default_dtype(torch.float64):
             for l in range(5):
                 angles = torch.tensor(1.2), torch.tensor(2.1)
-                a = sphten.spherical_harmonics_dirac(torch.stack(o3.angles_to_xyz(*angles), dim=-1), l)
+                a = sphten.spherical_harmonics_dirac(o3.angles_to_xyz(*angles), l)
                 v = sphten.SphericalTensor(a, 1, l).value(*angles)
                 self.assertAlmostEqual(v.item(), 1)
 

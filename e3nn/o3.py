@@ -93,7 +93,7 @@ def angles_to_xyz(alpha, beta):
     x = torch.sin(beta) * torch.cos(alpha)
     y = torch.sin(beta) * torch.sin(alpha)
     z = torch.cos(beta)
-    return x, y, z
+    return torch.stack([x, y, z], dim=-1)
 
 
 def xyz_to_angles(x, y=None, z=None):
