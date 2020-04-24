@@ -7,6 +7,7 @@ import os
 import sys
 from functools import lru_cache, wraps
 from itertools import count, chain
+import gzip
 
 import torch
 
@@ -47,7 +48,7 @@ class FileSystemMutex:
         self.release()
 
 
-def cached_picklesjar(dirname, maxsize=128, open_jar=open, load=torch.load, save=torch.save, ext='torch'):
+def cached_picklesjar(dirname, maxsize=128, open_jar=gzip.open, load=torch.load, save=torch.save, ext='torch'):
     '''
     Cache a function with a directory
 
