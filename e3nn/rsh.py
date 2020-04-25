@@ -129,7 +129,7 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
     :param beta: float or tensor of shape [...]
     :return: tensor of shape [..., m]
     """
-    if alpha.device.type == 'cuda' and max(ls) <= 10:
+    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and max(ls) <= 10:
         xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
@@ -151,7 +151,7 @@ def spherical_harmonics_xyz(ls, xyz):
     norm = torch.norm(xyz, 2, -1, keepdim=True)
     xyz = xyz / norm
 
-    if xyz.device.type == 'cuda' and max(ls) <= 10:
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
         except ImportError:
