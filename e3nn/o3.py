@@ -207,13 +207,19 @@ def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
 # Linear algebra
 ################################################################################
 
-def kron(x, y):
+def kron(*matrices):
     """
-    Kroneker product between two matrices
+    Kroneker product between matrices
     """
-    assert x.dim() == 2
-    assert y.dim() == 2
-    return torch.einsum("ij,kl->ikjl", (x, y)).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
+    for m in matrices:
+        assert m.dim() == 2
+
+    x, y, *matrices = matrices
+    z = torch.einsum("ij,kl->ikjl", x, y).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
+
+    if matrices:
+        return kron(z, *matrices)
+    return z
 
 
 def direct_sum(*matrices):
@@ -421,3 +427,79 @@ def tensor3x3_repr_basis_to_spherical_basis():
         assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
+
+
+def intertwiners(D1, D2):
+    """
+    Compute a basis of the vector space of matrices A such that
+    D1(g) A = A D2(g) for all g in SO(3)
+    """
+    I1 = D1(0, 0, 0)
+    I2 = D2(0, 0, 0)
+
+    # picking 10 random rotations seems good enough
+    rr = [rand_angles() for _ in range(10)]
+    xs = [kron(D1(*r), I2) - kron(I1, D2(*r).T) for r in rr]
+    xtx = sum(x.T @ x for x in xs)
+
+    res = xtx.symeig(eigenvectors=True)
+    null_space = res.eigenvectors.T[res.eigenvalues < 1e-10]
+    null_space = null_space.reshape(null_space.shape[0], I1.shape[0], I2.shape[0])
+
+    # check that it works
+    for A in null_space:
+        r = rand_angles()
+        d = A @ D2(*r) - D1(*r) @ A
+        assert d.abs().max() < 1e-10
+
+    return null_space
+
+
+def reduce(D, D_small):
+    """
+    Given a "big" representation and a "small" representation
+    computes how many times the small appears in the big one and return:
+    - how many times the "small" appears in the "big"
+    - a matrix that block diagonalize the "big" rep.
+    - the remaining of the "big" representation
+    """
+    def change_and_remove(A, oldD, d):
+        def newD(*g):
+            return (A @ oldD(*g) @ A.T)[d:][:, d:]
+        return newD
+
+    dim = D(0, 0, 0).shape[0]
+    dim_small = D_small(0, 0, 0).shape[0]
+
+    D_rest = D
+    dim_rest = dim
+    bigA = torch.eye(dim)
+    n = 0
+
+    while True:
+        A = intertwiners(D_small, D_rest) * dim_small**0.5
+
+        # stops if "small" does not appear in "big" anymore
+        if A.shape[0] == 0:
+            break
+
+        A = A[0]
+
+        for x in A:
+            assert (torch.norm(x) - 1).abs() < 1e-10
+
+        # complete the basis in an orthonomal way
+        for e in torch.eye(dim_rest):
+            for x in A:
+                e -= torch.dot(x, e) * x
+            if torch.norm(e) > 1e-10:
+                e /= torch.norm(e)
+                e *= next(x.sign() for x in e if x.abs() > 1e-10)
+                A = torch.cat([A, e.reshape(1, -1)])
+
+        bigA = direct_sum(torch.eye(n * dim_small), A) @ bigA
+        n += 1
+        D_rest = change_and_remove(bigA, D, n * dim_small)
+        dim_rest = dim - n * dim_small
+
+    return n, bigA, D_rest
