@@ -46,20 +46,42 @@ def adjusted_projection(vectors, lmax):
 
 
 class SphericalTensor():
-    def __init__(self, signal, mul, lmax):
+    def __init__(self, signal, mul, lmax, p_val=0, p_arg=0):
+        """
+        f: s2 -> R
+
+        Rotations
+        [D(g) f](x) = f(g^{-1} x)
+
+        Parity
+        [P f](x) = p_val f(p_arg x)
+
+        f(x) = sum F^l . Y^l(x)
+
+        This class contains the F^l
+
+        Rotations
+        [D(g) f](x) = sum [D^l(g) F^l] . Y^l(x)         (using equiv. of Y and orthogonality of D)
+
+        Parity
+        [P f](x) = sum [p_val p_arg^l F^l] . Y^l(x)     (using parity of Y)
+        """
         if signal.shape[-1] != mul * (lmax + 1)**2:
             raise ValueError("Last tensor dimension and Rs do not have same dimension.")
 
         self.signal = signal
         self.lmax = lmax
         self.mul = mul
-        self.Rs = rs.convention([(mul, l) for l in range(lmax + 1)])
+        self.Rs = rs.convention([(mul, l, p_val * p_arg**l) for l in range(lmax + 1)])
         self.radial_model = None
 
     @classmethod
-    def from_geometry(cls, vectors, lmax):
+    def from_geometry(cls, vectors, lmax, p=0):
+        """
+        :param vectors: tensor of vectors (p=-1) or pseudovectors (p=1)
+        """
         signal = adjusted_projection(vectors, lmax)
-        return cls(signal, 1, lmax)
+        return cls(signal, 1, lmax, p_val=1, p_arg=p)
 
     @classmethod
     def from_geometry_with_radial(cls, vectors, radial_model, lmax, sum_points=True):
