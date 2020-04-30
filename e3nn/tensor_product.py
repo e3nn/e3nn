@@ -5,7 +5,7 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.linear import Linear
-from e3nn.linear_mod import kernel_linear
+from e3nn.linear_mod import KernelLinear
 
 
 class TensorProduct(torch.nn.Module):
@@ -88,12 +88,11 @@ class LearnableTensorSquare(torch.nn.Module):
         super().__init__()
 
         self.Rs_in = rs.simplify(Rs_in)
-        Rs_ts, T = rs.tensor_square(self.Rs_in, selection_rule, sorted=True)  # [out, in1, in2]
+        Rs_ts, T = rs.tensor_square(self.Rs_in, selection_rule, sorted=True)
+        self.register_buffer('T', T)  # [out, in1, in2]
+
         self.Rs_out = sorted({(mul, l, p) for _, l, p in Rs_ts})
-        Q = kernel_linear(Rs_ts, self.Rs_out)  # [out, in, w]
-        mixing_matrix = torch.einsum('ijw,jlm->wilm', Q, T)  # [w, out, in1, in2]
-        self.register_buffer('mixing_matrix', mixing_matrix)
-        self.weight = torch.nn.Parameter(torch.randn(Q.shape[2]))
+        self.kernel = KernelLinear(Rs_ts, self.Rs_out)  # [out, in, w]
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
@@ -109,7 +108,8 @@ class LearnableTensorSquare(torch.nn.Module):
         *size, n = features.size()
         features = features.reshape(-1, n)
 
-        features = torch.einsum('w,wkij,zi,zj->zk', self.weight, self.mixing_matrix, features, features)
+        kernel = torch.einsum('ij,jkl->ikl', self.kernel(), self.T)  # [out, in1, in2]
+        features = torch.einsum('kij,zi,zj->zk', kernel, features, features)
         return features.reshape(*size, -1)
 
 
