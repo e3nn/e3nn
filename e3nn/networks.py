@@ -11,7 +11,7 @@ from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
-from e3nn.tensor_product import TensorSquare
+from e3nn.tensor_product import TensorSquare, LearnableTensorSquare
 
 
 class GatedConvNetwork(torch.nn.Module):
@@ -72,7 +72,7 @@ class GatedConvNetwork(torch.nn.Module):
 class GatedConvParityNetwork(torch.nn.Module):
     def __init__(self, Rs_in, mul, Rs_out, lmax, layers=3,
                  max_radius=1.0, number_of_basis=3, radial_layers=3,
-                 kernel=Kernel, convolution=Convolution):
+                 feature_product=False, kernel=Kernel, convolution=Convolution):
         super().__init__()
 
         R = partial(GaussianRadialModel, max_radius=max_radius,
@@ -83,7 +83,7 @@ class GatedConvParityNetwork(torch.nn.Module):
         modules = []
 
         Rs = Rs_in
-        for i in range(layers):
+        for _ in range(layers):
             scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1), (mul, 0, -1)] if rs.haslinearpath(Rs, l, p)]
             act_scalars = [(mul, swish if p == 1 else tanh) for mul, l, p in scalars]
 
@@ -91,13 +91,20 @@ class GatedConvParityNetwork(torch.nn.Module):
             gates = [(rs.mul_dim(nonscalars), 0, +1)]
             act_gates = [(-1, sigmoid)]
 
-            print("layer {}: from {} to {}".format(i, rs.format_Rs(Rs), rs.format_Rs(scalars + nonscalars)))
-
             act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
             conv = convolution(K, Rs, act.Rs_in)
+
+            if feature_product:
+                tr1 = rs.TransposeToMulL(act.Rs_out)
+                lts = LearnableTensorSquare(tr1.Rs_out, partial(o3.selection_rule, lmax=lmax))
+                tr2 = rs.MulTimesRs(tr1.mul, lts.Rs_out)
+                act = torch.nn.Sequential(act, tr1, lts, tr2)
+                Rs = tr2.Rs_out
+            else:
+                Rs = act.Rs_out
+
             block = torch.nn.ModuleList([conv, act])
             modules.append(block)
-            Rs = act.Rs_out
 
         self.firstlayers = torch.nn.ModuleList(modules)
 

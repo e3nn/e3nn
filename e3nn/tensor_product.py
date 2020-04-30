@@ -5,6 +5,7 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.linear import Linear
+from e3nn.linear_mod import kernel_linear
 
 
 class TensorProduct(torch.nn.Module):
@@ -56,7 +57,7 @@ class TensorSquare(torch.nn.Module):
 
         self.Rs_in = rs.simplify(Rs_in)
 
-        self.Rs_out, mixing_matrix = rs.tensor_square(Rs_in, selection_rule, sorted=True)
+        self.Rs_out, mixing_matrix = rs.tensor_square(self.Rs_in, selection_rule, sorted=True)
         self.register_buffer('mixing_matrix', mixing_matrix)
 
     def __repr__(self):
@@ -73,8 +74,43 @@ class TensorSquare(torch.nn.Module):
         *size, n = features.size()
         features = features.reshape(-1, n)
 
-        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features, features)
-        return output.reshape(*size, -1)
+        features = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features, features)
+        return features.reshape(*size, -1)
+
+
+class LearnableTensorSquare(torch.nn.Module):
+    """
+    (A x A)_k =  C_ijk A_i A_j
+
+    [(2, 0), (2, 1)] x [(2, 0), (2, 1)] = [(3, 0), (4, 1), (3, 0), (1, 1), (3, 2)]
+    """
+    def __init__(self, Rs_in, selection_rule=o3.selection_rule, mul=1):
+        super().__init__()
+
+        self.Rs_in = rs.simplify(Rs_in)
+        Rs_ts, T = rs.tensor_square(self.Rs_in, selection_rule, sorted=True)  # [out, in1, in2]
+        self.Rs_out = sorted({(mul, l, p) for _, l, p in Rs_ts})
+        Q = kernel_linear(Rs_ts, self.Rs_out)  # [out, in, w]
+        mixing_matrix = torch.einsum('ijw,jlm->wilm', Q, T)  # [w, out, in1, in2]
+        self.register_buffer('mixing_matrix', mixing_matrix)
+        self.weight = torch.nn.Parameter(torch.randn(Q.shape[2]))
+
+    def __repr__(self):
+        return "{name} ({Rs_in} -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in=rs.format_Rs(self.Rs_in),
+            Rs_out=rs.format_Rs(self.Rs_out),
+        )
+
+    def forward(self, features):
+        '''
+        :param features: [..., channels]
+        '''
+        *size, n = features.size()
+        features = features.reshape(-1, n)
+
+        features = torch.einsum('w,wkij,zi,zj->zk', self.weight, self.mixing_matrix, features, features)
+        return features.reshape(*size, -1)
 
 
 class ElementwiseTensorProduct(torch.nn.Module):

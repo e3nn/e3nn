@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin, arguments-differ
 """
 Some functions related to SO3 and his usual representations
 
@@ -68,7 +68,7 @@ def haslinearpath(Rs_in, l_out, p_out, selection_rule=o3.selection_rule):
     return False
 
 
-def split(Rs, cmul=-1):
+def transpose_mul(Rs, cmul=-1):
     """
     :param Rs: [(mul, 0), (mul, 1), (mul, 2)]
     :return:   mul * [(1, 0), (1, 1), (1, 2)]
@@ -79,7 +79,72 @@ def split(Rs, cmul=-1):
         cmul = reduce(gcd, muls)
     assert all(mul % cmul == 0 for mul, _, _ in Rs)
 
-    return cmul * [(mul // cmul, l, p) for mul, l, p in Rs]
+    return cmul, [(mul // cmul, l, p) for mul, l, p in Rs]
+
+
+def cut(features, *Rss, dim_=-1):
+    """
+    Cut `feaures` according to the list of Rs
+    """
+    index = 0
+    outputs = []
+    for Rs in Rss:
+        n = dim(Rs)
+        outputs.append(features.narrow(dim_, index, n))
+        index += n
+    assert index == features.shape[dim_]
+    return outputs
+
+
+class TransposeToMulL(torch.nn.Module):
+    """
+    [(mul, 1), (mul, 2)]  ->  mul * [(1, 1), (1, 2)]
+    [batch, l * mul * m]  ->  [batch, mul, l * m]
+    """
+    def __init__(self, Rs):
+        super().__init__()
+        self.Rs_in = convention(Rs)
+        self.mul, self.Rs_out = transpose_mul(self.Rs_in)
+        self.register_buffer('mixing_matrix', rearrange(self.Rs_in, self.mul * self.Rs_out))
+
+    def __repr__(self):
+        return "{name} ({Rs_in} -> {mul} x {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in=format_Rs(self.Rs_in),
+            mul=self.mul,
+            Rs_out=format_Rs(self.Rs_out),
+        )
+
+    def forward(self, features):
+        *size, n = features.size()
+        features = features.reshape(-1, n)
+
+        features = torch.einsum('ij,zj->zi', self.mixing_matrix, features)
+        return features.reshape(*size, self.mul, -1)
+
+
+class MulTimesRs(torch.nn.Module):
+    """
+    reshape [..., mul, Rs] into [..., mul * Rs]
+    """
+    def __init__(self, mul, Rs):
+        super().__init__()
+        self.mul = mul
+        self.Rs_in = convention(Rs)
+        self.Rs_out = self.mul * self.Rs_in
+
+    def __repr__(self):
+        return "{name} ({mul} x {Rs_in})".format(
+            name=self.__class__.__name__,
+            mul=self.mul,
+            Rs_in=format_Rs(self.Rs_in),
+        )
+
+    def forward(self, features):
+        *size, mul, n = features.size()
+        assert mul == self.mul
+        assert n == dim(self.Rs_in)
+        return features.reshape(*size, mul * n)
 
 
 def rearrange(Rs_in, Rs_out):

@@ -6,17 +6,6 @@ from e3nn.non_linearities.activation import Activation
 from e3nn.tensor_product import ElementwiseTensorProduct
 
 
-def split_features(features, *Rss, dim=-1):
-    index = 0
-    outputs = []
-    for Rs in Rss:
-        n = rs.dim(Rs)
-        outputs.append(features.narrow(dim, index, n))
-        index += n
-    assert index == features.size(dim)
-    return outputs
-
-
 class GatedBlockParity(torch.nn.Module):
     def __init__(self, Rs_scalars, act_scalars, Rs_gates, act_gates, Rs_nonscalars):
         super().__init__()
@@ -35,10 +24,19 @@ class GatedBlockParity(torch.nn.Module):
 
         self.Rs_out = Rs_scalars + Rs_nonscalars
 
+    def __repr__(self):
+        return "{name} ({Rs_scalars} + {Rs_gates} + {Rs_nonscalars} -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_scalars=rs.format_Rs(self.Rs_scalars),
+            Rs_gates=rs.format_Rs(self.Rs_gates),
+            Rs_nonscalars=rs.format_Rs(self.Rs_nonscalars),
+            Rs_out=rs.format_Rs(self.Rs_out),
+        )
+
     def forward(self, features, dim=-1):
-        scalars, gates, nonscalars = split_features(features, self.Rs_scalars, self.Rs_gates, self.Rs_nonscalars, dim=dim)
+        scalars, gates, nonscalars = rs.cut(features, self.Rs_scalars, self.Rs_gates, self.Rs_nonscalars, dim_=dim)
         scalars = self.act_scalars(scalars)
-        if gates.size(dim):
+        if gates.shape[dim]:
             gates = self.act_gates(gates)
             nonscalars = self.mul(nonscalars, gates)
             features = torch.cat([scalars, nonscalars], dim=dim)
