@@ -97,9 +97,9 @@ class GatedConvParityNetwork(torch.nn.Module):
             if feature_product:
                 tr1 = rs.TransposeToMulL(act.Rs_out)
                 lts = LearnableTensorSquare(tr1.Rs_out, partial(o3.selection_rule, lmax=lmax))
-                tr2 = rs.MulTimesRs(tr1.mul, lts.Rs_out)
+                tr2 = torch.nn.Flatten(2)
                 act = torch.nn.Sequential(act, tr1, lts, tr2)
-                Rs = tr2.Rs_out
+                Rs = tr1.mul * lts.Rs_out
             else:
                 Rs = act.Rs_out
 
