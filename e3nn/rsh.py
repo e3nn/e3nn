@@ -88,7 +88,7 @@ def spherical_harmonics_beta(ls, cosbeta):
         out = (-1) ** l * quantum * legendre([l], cosbeta)  # [batch, m]
         output += [out]
     output = torch.cat(output, dim=-1)
-    return output.reshape(*size, -1)  # [..., l * m]
+    return output.reshape(*size, output.shape[1])  # [..., l * m]
 
 
 def spherical_harmonics_alpha(l, alpha):
@@ -117,7 +117,7 @@ def spherical_harmonics_alpha(l, alpha):
             math.sqrt(2) * cos,
         ], dim=-1)
 
-    return out.reshape(*size, -1)  # [..., m]
+    return out.reshape(*size, 2 * l + 1)  # [..., m]
 
 
 def spherical_harmonics_alpha_beta(ls, alpha, beta):

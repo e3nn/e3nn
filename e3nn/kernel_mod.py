@@ -105,7 +105,10 @@ class Kernel(torch.nn.Module):
         # note: for the normalization we assume that the variance of R[i] is one
         R = self.R(radii[radii > r_eps])  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
-        kernel1 = torch.einsum('ijyw,zy,zw->zij', self.Q, Y, R)
+        if Y.shape[0] == 0:
+            kernel1 = torch.zeros(0, *self.Q.shape[:2])
+        else:
+            kernel1 = torch.einsum('ijyw,zy,zw->zij', self.Q, Y, R)
 
         # (2) Case r = 0
 
