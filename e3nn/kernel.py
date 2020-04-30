@@ -8,7 +8,11 @@ from e3nn.linear import KernelLinear
 
 
 class Kernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, selection_rule=o3.selection_rule_in_out_sh, sh=rsh.spherical_harmonics_xyz, normalization='component'):
+    def __init__(self, Rs_in, Rs_out, RadialModel,
+                 selection_rule=o3.selection_rule_in_out_sh,
+                 sh=rsh.spherical_harmonics_xyz,
+                 normalization='component',
+                 allow_unused_inputs=False):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -24,8 +28,10 @@ class Kernel(torch.nn.Module):
         self.Rs_out = rs.simplify(Rs_out)
 
         self.selection_rule = selection_rule
-        self.check_input_output()
         self.sh = sh
+        if not allow_unused_inputs:
+            self.check_input()
+        self.check_output()
 
         assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
@@ -84,14 +90,15 @@ class Kernel(torch.nn.Module):
             Rs_out=rs.format_Rs(self.Rs_out),
         )
 
-    def check_input_output(self):
-        for _, l_out, p_out in self.Rs_out:
-            if not any(self.selection_rule(l_in, p_in, l_out, p_out) for _, l_in, p_in in self.Rs_in):
-                raise ValueError("warning! the output (l={}, p={}) cannot be generated".format(l_out, p_out))
-
+    def check_input(self):
         for _, l_in, p_in in self.Rs_in:
             if not any(self.selection_rule(l_in, p_in, l_out, p_out) for _, l_out, p_out in self.Rs_out):
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))
+
+    def check_output(self):
+        for _, l_out, p_out in self.Rs_out:
+            if not any(self.selection_rule(l_in, p_in, l_out, p_out) for _, l_in, p_in in self.Rs_in):
+                raise ValueError("warning! the output (l={}, p={}) cannot be generated".format(l_out, p_out))
 
     def forward(self, r, r_eps=0, custom_backward=False):
         """
