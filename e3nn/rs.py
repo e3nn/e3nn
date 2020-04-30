@@ -123,30 +123,6 @@ class TransposeToMulL(torch.nn.Module):
         return features.reshape(*size, self.mul, -1)
 
 
-class MulTimesRs(torch.nn.Module):
-    """
-    reshape [..., mul, Rs] into [..., mul * Rs]
-    """
-    def __init__(self, mul, Rs):
-        super().__init__()
-        self.mul = mul
-        self.Rs_in = convention(Rs)
-        self.Rs_out = self.mul * self.Rs_in
-
-    def __repr__(self):
-        return "{name} ({mul} x {Rs_in})".format(
-            name=self.__class__.__name__,
-            mul=self.mul,
-            Rs_in=format_Rs(self.Rs_in),
-        )
-
-    def forward(self, features):
-        *size, mul, n = features.size()
-        assert mul == self.mul
-        assert n == dim(self.Rs_in)
-        return features.reshape(*size, mul * n)
-
-
 def rearrange(Rs_in, Rs_out):
     """
     :return: permutation_matrix
