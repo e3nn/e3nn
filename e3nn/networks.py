@@ -6,8 +6,8 @@ import torch
 from e3nn import o3, rs
 from e3nn.kernel import Kernel
 from e3nn.linear import Linear
-from e3nn.non_linearities import GatedBlock
-from e3nn.non_linearities.rescaled_act import sigmoid, swish
+from e3nn.non_linearities import GatedBlock, GatedBlockParity
+from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
@@ -67,6 +67,53 @@ class GatedConvNetwork(torch.nn.Module):
         output = layer(output, geometry, n_norm=N)
 
         return output
+
+
+class GatedConvParityNetwork(torch.nn.Module):
+    def __init__(self, Rs_in, mul, Rs_out, lmax, layers=3,
+                 max_radius=1.0, number_of_basis=3, radial_layers=3,
+                 kernel=Kernel, convolution=Convolution):
+        super().__init__()
+
+        R = partial(GaussianRadialModel, max_radius=max_radius,
+                    number_of_basis=number_of_basis, h=100,
+                    L=radial_layers, act=swish)
+        K = partial(kernel, RadialModel=R, selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
+
+        modules = []
+
+        Rs = Rs_in
+        for i in range(layers):
+            scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1), (mul, 0, -1)] if rs.haslinearpath(Rs, l, p)]
+            act_scalars = [(mul, swish if p == 1 else tanh) for mul, l, p in scalars]
+
+            nonscalars = [(mul, l, p) for l in range(1, lmax + 1) for p in [+1, -1] if rs.haslinearpath(Rs, l, p)]
+            gates = [(rs.mul_dim(nonscalars), 0, +1)]
+            act_gates = [(-1, sigmoid)]
+
+            print("layer {}: from {} to {}".format(i, rs.format_Rs(Rs), rs.format_Rs(scalars + nonscalars)))
+
+            act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
+            conv = convolution(K, Rs, act.Rs_in)
+            block = torch.nn.ModuleList([conv, act])
+            modules.append(block)
+            Rs = act.Rs_out
+
+        self.firstlayers = torch.nn.ModuleList(modules)
+
+        K = partial(K, allow_unused_inputs=True)
+        self.conv = convolution(K, Rs, Rs_out)
+
+    def forward(self, features, geometry, n_norm=None):
+        if n_norm is None:
+            n_norm = geometry.shape[1]
+
+        for conv, act in self.firstlayers:
+            features = conv(features, geometry, n_norm=n_norm)
+            features = act(features)
+
+        features = self.conv(features, geometry, n_norm=n_norm)
+        return features
 
 
 class S2Network(torch.nn.Module):

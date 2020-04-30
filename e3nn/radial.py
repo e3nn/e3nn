@@ -119,7 +119,7 @@ class BesselRadialModel(torch.nn.Module):
         n = torch.linspace(1, number_of_basis, number_of_basis).unsqueeze(0)
         n_scaled = n * math.pi / max_radius
         self.register_buffer('n_scaled', n_scaled)
-        self.factor = math.sqrt(2/max_radius)
+        self.factor = math.sqrt(2 / max_radius)
         self.max_radius = max_radius
         self.epsilon = epsilon
 
