@@ -37,7 +37,7 @@ class KernelLinear(torch.nn.Module):
         """
         :return: tensor [l_out * mul_out * m_out, l_in * mul_in * m_in]
         """
-        return torch.einsum('ijk,k', self.Q, self.weight)
+        return torch.einsum('ijk,k->ij', self.Q, self.weight)
 
 
 class Linear(torch.nn.Module):
