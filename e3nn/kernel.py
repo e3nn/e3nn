@@ -169,7 +169,7 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_f
 
             # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
             n = mul_out * mul_in * len(l_filters)
-            sub_R = R[:, begin_R: begin_R + n].reshape(batch, mul_out, mul_in, -1)  # [batch, mul_out, mul_in, l_filter]
+            sub_R = R[:, begin_R: begin_R + n].reshape(batch, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
             begin_R += n
 
             # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
