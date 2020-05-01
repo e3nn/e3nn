@@ -34,6 +34,7 @@ KWARGS = dict(
     install_requires=[
         'lie_learn',
         'scipy',
+        'sympy',
         'torch>=1.4.0',
     ],
     include_package_data=True,
