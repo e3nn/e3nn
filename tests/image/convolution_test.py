@@ -3,7 +3,7 @@ import unittest
 
 import torch
 
-from e3nn import rs
+# from e3nn import rs
 from e3nn.image.convolution import Convolution
 
 
@@ -39,27 +39,27 @@ class Tests(unittest.TestCase):
 
         self._test_equivariance(f)
 
-    def _test_normalization(self, f):
-        batch = 3
-        size = 5
-        input_size = 15
-        Rs_in = [(20, 0), (20, 1), (10, 2)]
-        Rs_out = [(2, 0), (2, 1), (2, 2)]
+    # def _test_normalization(self, f):
+    #     batch = 3
+    #     size = 5
+    #     input_size = 15
+    #     Rs_in = [(20, 0), (20, 1), (10, 2)]
+    #     Rs_out = [(2, 0), (2, 1), (2, 2)]
 
-        conv = f(Rs_in, Rs_out, size)
+    #     conv = f(Rs_in, Rs_out, size)
 
-        x = rs.randn(batch, Rs_in, input_size, input_size, input_size)
-        y = conv(x)
+    #     x = rs.randn(batch, Rs_in, input_size, input_size, input_size)
+    #     y = conv(x)
 
-        self.assertEqual(y.size(1), rs.dim(Rs_out))
+    #     self.assertEqual(y.size(1), rs.dim(Rs_out))
 
-        y_mean, y_std = y.mean().item(), y.std().item()
+    #     y_mean, y_std = y.mean().item(), y.std().item()
 
-        self.assertAlmostEqual(y_mean, 0, delta=0.3)
-        self.assertAlmostEqual(y_std, 1, delta=0.5)
+    #     self.assertAlmostEqual(y_mean, 0, delta=0.3)
+    #     self.assertAlmostEqual(y_std, 1, delta=0.5)
 
-    def test_normalization_conv(self):
-        self._test_normalization(Convolution)
+    # def test_normalization_conv(self):
+    #     self._test_normalization(Convolution)
 
 
 if __name__ == '__main__':

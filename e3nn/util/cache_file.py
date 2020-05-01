@@ -48,7 +48,8 @@ class FileSystemMutex:
         self.release()
 
 
-def cached_picklesjar(dirname, maxsize=128, open_jar=gzip.open, load=torch.load, save=torch.save, ext='torch'):
+def cached_picklesjar(dirname, maxsize=128, open_jar=gzip.open,
+                      load=torch.load, save=torch.save, ext='torch'):
     '''
     Cache a function with a directory
 

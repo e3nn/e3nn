@@ -3,9 +3,12 @@
 Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
 import math
+import os
 
 import torch
-from scipy import special
+from sympy import Integer, Poly, diff, factorial, sqrt, symbols, pi
+
+from e3nn.util.cache_file import cached_picklesjar
 
 
 def spherical_harmonics_expand_matrix(lmax):
@@ -28,38 +31,35 @@ def spherical_harmonics_expand_matrix(lmax):
     return m
 
 
-def _legendre(l, z):
+def sympy_legendre(l, m):
     """
-    associated Legendre polynomials
+    en.wikipedia.org/wiki/Associated_Legendre_polynomials
+    - remove two times (-1)^m
+    - use another normalization such that P(l, -m) = P(l, m)
 
-    :param l: int
-    :param z: tensor of shape [...]
-    :return: tensor of shape [..., m]
+    y = sqrt(1 - z^2)
     """
-    if not z.requires_grad:
-        return torch.stack([(-1)**m * torch.tensor(special.lpmv(m, l, z.cpu().double().numpy())).to(z) for m in range(-l, l + 1)], dim=-1)
-
-    fac = math.factorial(l)
-    sqz2 = (1 - z ** 2) ** 0.5
-    hsqz2 = 0.5 * sqz2
-    ihsqz2 = z / hsqz2
-
-    if l == 0:
-        return z.new_ones(*z.size(), 1)
-    if l == 1:
-        return torch.stack([-0.5 * sqz2, z, sqz2], dim=-1)
-
-    plm = [(1 - 2 * abs(l - 2 * l // 2)) * hsqz2 ** l / fac]
-    plm.append(-plm[0] * l * ihsqz2)
-    for mr in range(1, l):
-        plm.append((mr - l) * ihsqz2 * plm[mr] - (2 * l - mr + 1) * mr * plm[mr - 1])
-    plm = torch.stack(plm, dim=-1)  # [..., m]
-    c = torch.tensor([(-1)**m * (math.factorial(l + m) / math.factorial(l - m)) for m in range(1, l + 1)])
-    plm = torch.cat([plm, plm[..., :-1].flip(-1) * c], dim=-1)
-    return plm * (-1) ** l
+    l = Integer(l)
+    m = Integer(abs(m))
+    z, y = symbols('z y', real=True)
+    ex = 1 / (2**l * factorial(l)) * y**m * diff((z**2 - 1)**l, z, l + m)
+    ex *= (-1)**l * sqrt((2 * l + 1) / (4 * pi) * factorial(l - m) / factorial(l + m))
+    return ex
 
 
-def legendre(ls, z):
+@cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/legendre'), maxsize=None)
+def poly_legendre(l, m):
+    """
+    polynomial coefficients of legendre
+
+    y = sqrt(1 - z^2)
+    """
+    z, y = symbols('z y', real=True)
+    p = Poly(sympy_legendre(l, m), domain='R', gens=(z, y))
+    return {exp: float(coef) for exp, coef in p.as_dict().items()}
+
+
+def legendre(ls, z, y=None):
     """
     associated Legendre polynomials
 
@@ -67,10 +67,20 @@ def legendre(ls, z):
     :param z: tensor of shape [...]
     :return: tensor of shape [..., l * m]
     """
-    return torch.cat([_legendre(l, z) for l in ls], dim=-1)  # [..., l * m]
+    if y is None:
+        y = (1 - z**2).relu().sqrt()
+
+    zs = [z**m for m in range(max(ls) + 1)]
+    ys = [y**m for m in range(max(ls) + 1)]
+
+    ps = []
+    for l in ls:
+        p = torch.stack([sum(coef * zs[nz] * ys[ny] for (nz, ny), coef in poly_legendre(l, abs(m)).items()) for m in range(-l, 1)], dim=-1)
+        ps += [torch.cat([p, p[..., :-1].flip(-1)], dim=-1)]
+    return torch.cat(ps, dim=-1)
 
 
-def spherical_harmonics_beta(ls, cosbeta):
+def spherical_harmonics_beta(ls, cosbeta, abssinbeta=None):
     """
     the cosbeta componant of the spherical harmonics
     (useful to perform fourier transform)
@@ -78,17 +88,7 @@ def spherical_harmonics_beta(ls, cosbeta):
     :param cosbeta: tensor of shape [...]
     :return: tensor of shape [..., l * m]
     """
-    size = cosbeta.shape
-    cosbeta = cosbeta.reshape(-1)
-
-    output = []
-    for l in ls:
-        quantum = [((2 * l + 1) / (4 * math.pi) * math.factorial(l - m) / math.factorial(l + m)) ** 0.5 for m in range(-l, l + 1)]
-        quantum = torch.tensor(quantum).to(cosbeta)  # [m]
-        out = (-1) ** l * quantum * legendre([l], cosbeta)  # [batch, m]
-        output += [out]
-    output = torch.cat(output, dim=-1)
-    return output.reshape(*size, output.shape[1])  # [..., l * m]
+    return legendre(ls, cosbeta, abssinbeta)  # [..., l * m]
 
 
 def spherical_harmonics_alpha(l, alpha):
@@ -106,7 +106,7 @@ def spherical_harmonics_alpha(l, alpha):
         out = torch.ones_like(alpha)
     else:
         m = torch.arange(1, l + 1).flip(0).to(alpha)  # [l, l-1, l-2, ..., 1]
-        sin = torch.sin(((-1)**m * m) * alpha)  # [batch, m]
+        sin = torch.sin(m * alpha)  # [batch, m]
 
         m = torch.arange(1, l + 1).to(alpha)  # [1, 2, 3, ..., l]
         cos = torch.cos(m * alpha)  # [batch, m]
@@ -136,7 +136,7 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
         except ImportError:
             pass
 
-    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], beta.cos()) for l in ls]
+    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], beta.cos(), beta.sin().abs()) for l in ls]
     return torch.cat(output, dim=-1)
 
 
@@ -159,7 +159,8 @@ def spherical_harmonics_xyz(ls, xyz):
 
     alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
     cosbeta = xyz[..., 2]  # [...]
-    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta) for l in ls]
+    abssinbeta = (xyz[..., 1].pow(2) + xyz[..., 0].pow(2)).sqrt()
+    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta, abssinbeta) for l in ls]
     return torch.cat(output, dim=-1)
 
 
