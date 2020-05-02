@@ -102,20 +102,17 @@ def spherical_harmonics_alpha(l, alpha):
     size = alpha.shape
     alpha = alpha.reshape(-1, 1)  # [batch, 1]
 
-    if l == 0:
-        out = torch.ones_like(alpha)
-    else:
-        m = torch.arange(1, l + 1).flip(0).to(alpha)  # [l, l-1, l-2, ..., 1]
-        sin = torch.sin(m * alpha)  # [batch, m]
+    m = torch.arange(1, l + 1).flip(0).to(alpha)  # [l, l-1, l-2, ..., 1]
+    sin = torch.sin(m * alpha)  # [batch, m]
 
-        m = torch.arange(1, l + 1).to(alpha)  # [1, 2, 3, ..., l]
-        cos = torch.cos(m * alpha)  # [batch, m]
+    m = torch.arange(1, l + 1).to(alpha)  # [1, 2, 3, ..., l]
+    cos = torch.cos(m * alpha)  # [batch, m]
 
-        out = torch.cat([
-            math.sqrt(2) * sin,
-            torch.ones_like(alpha),
-            math.sqrt(2) * cos,
-        ], dim=-1)
+    out = torch.cat([
+        math.sqrt(2) * sin,
+        torch.ones_like(alpha),
+        math.sqrt(2) * cos,
+    ], dim=-1)
 
     return out.reshape(*size, 2 * l + 1)  # [..., m]
 

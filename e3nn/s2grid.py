@@ -32,7 +32,7 @@ def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta, _version=0):
     with torch_default_dtype(torch.float64):
         betas, alphas = s2_grid(res_beta, res_alpha)
         sha = rsh.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
-        shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos())  # [b, l * m]
+        shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
         return alphas, betas, sha, shb
 
 
