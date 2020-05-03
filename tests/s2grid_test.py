@@ -36,30 +36,29 @@ class Tests(unittest.TestCase):
 
                 # backward
                 y = torch.randn(res)
-                x1 = sha @ y / res
+                x1 = sha @ y
 
                 x2 = torch.stack([
                     torch.cat([y[lmax:lmax + 1], y[lmax + 1:] / 2**0.5]),
                     torch.cat([torch.zeros(1), -y[:lmax].flip(0) / 2**0.5]),
                 ], dim=-1)
-                x2 = torch.irfft(x2, 1)
+                x2 = torch.irfft(x2, 1) * res
 
                 self.assertLess((x1 - x2).abs().max(), 1e-10 * x1.abs().max())
 
     def test_inverse(self):
         with o3.torch_default_dtype(torch.float64):
             lmax = 5
-            res = (50, 75)
+            for res in [(50, 75), (2 * lmax + 2, 2 * lmax + 1)]:
+                for normalization in ['component', 'norm', 'none']:
+                    to = s2grid.ToS2Grid(lmax, res, normalization=normalization)
+                    fr = s2grid.FromS2Grid(res, lmax, normalization=normalization)
 
-            for normalization in ['component', 'norm', 'none']:
-                to = s2grid.ToS2Grid(lmax, res, normalization=normalization)
-                fr = s2grid.FromS2Grid(res, lmax, normalization=normalization)
+                    sig = rs.randn(10, [(1, l) for l in range(lmax + 1)])
+                    self.assertLess((fr(to(sig)) - sig).abs().max(), 1e-5)
 
-                sig = rs.randn(10, [(1, l) for l in range(lmax + 1)])
-                self.assertLess((fr(to(sig)) - sig).abs().max(), 1e-5)
-
-                s = to(sig)
-                self.assertLess((to(fr(s)) - s).abs().max(), 1e-5)
+                    s = to(sig)
+                    self.assertLess((to(fr(s)) - s).abs().max(), 1e-5)
 
     def test_inverse_different_ls(self):
         with o3.torch_default_dtype(torch.float64):

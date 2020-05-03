@@ -1,6 +1,8 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, arguments-differ
 """
-Fourier transform : sphere (grid) <--> spherical tensor (Rs=[(1, l) for l in range(lmax + 1)])
+Fourier Transform : sphere (grid) <--> spherical tensor (Rs=[(1, l) for l in range(lmax + 1)])
+
+We use the Fast Fourier Transform for specific
 """
 import math
 import os
@@ -36,6 +38,29 @@ def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta, _version=0):
         return alphas, betas, sha, shb
 
 
+def complete_lmax_res(lmax, res_beta, res_alpha):
+    """
+    try to use FFT
+    i.e. 2 * lmax + 1 == res_alpha
+    """
+    if res_beta is None:
+        res_beta = 2 * (lmax + 1)
+
+    if res_alpha is None:
+        if lmax is not None:
+            res_alpha = 2 * lmax + 1
+        elif res_beta is not None:
+            res_alpha = res_beta - 1
+
+    if lmax is None:
+        lmax = min(res_beta // 2 - 1, res_alpha // 2)
+
+    assert res_beta % 2 == 0
+    assert lmax + 1 <= res_beta // 2
+
+    return lmax, res_beta, res_alpha
+
+
 class ToS2Grid(torch.nn.Module):
     """
     Transform spherical tensor into signal on the sphere
@@ -43,7 +68,7 @@ class ToS2Grid(torch.nn.Module):
     The inverse transformation of FromS2Grid
     """
 
-    def __init__(self, lmax, res=None, normalization='component'):
+    def __init__(self, lmax=None, res=None, normalization='component'):
         """
         :param lmax: lmax of the input signal
         :param res: resolution of the output as a tuple (beta resolution, alpha resolution)
@@ -53,16 +78,10 @@ class ToS2Grid(torch.nn.Module):
 
         assert normalization in ['norm', 'component', 'none'], "normalization needs to be 'norm', 'component' or 'none'"
 
-        if isinstance(res, int):
-            res_beta, res_alpha = res, res
-        elif res is None:
-            res_beta = 2 * (lmax + 1)
-            res_alpha = 2 * res_beta
+        if isinstance(res, int) or res is None:
+            lmax, res_beta, res_alpha = complete_lmax_res(lmax, res, None)
         else:
-            res_beta, res_alpha = res
-        del res
-        assert res_beta % 2 == 0
-        assert res_beta >= 2 * (lmax + 1)
+            lmax, res_beta, res_alpha = complete_lmax_res(lmax, *res)
 
         alphas, betas, sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
 
@@ -95,8 +114,17 @@ class ToS2Grid(torch.nn.Module):
         lmax = round(x.shape[-1] ** 0.5) - 1
         x = x.reshape(-1, (lmax + 1) ** 2)
 
-        x = torch.einsum('mbi,zi->zmb', self.shb, x)
-        x = torch.einsum('am,zmb->zba', self.sha, x)
+        x = torch.einsum('mbi,zi->zbm', self.shb, x)
+
+        if self.sha.shape[0] == self.sha.shape[1] and self.sha.shape[0] % 2 == 1:
+            l = self.sha.shape[0] // 2
+            x = torch.stack([
+                torch.cat([x[:, :, l:l + 1], x[:, :, l + 1:] / 2**0.5], dim=-1),
+                torch.cat([torch.zeros_like(x[:, :, :1]), -x[:, :, :l].flip(-1) / 2**0.5], dim=-1),
+            ], dim=-1)
+            x = torch.irfft(x, 1) * (2 * l + 1)
+        else:
+            x = torch.einsum('am,zbm->zba', self.sha, x)
         return x.reshape(*size, *x.shape[1:])
 
 
@@ -107,7 +135,7 @@ class FromS2Grid(torch.nn.Module):
     The inverse transformation of ToS2Grid
     """
 
-    def __init__(self, res, lmax=None, normalization='component', lmax_in=None):
+    def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None):
         """
         :param res: resolution of the input as a tuple (beta resolution, alpha resolution)
         :param lmax: maximum l of the output
@@ -118,15 +146,11 @@ class FromS2Grid(torch.nn.Module):
 
         assert normalization in ['norm', 'component', 'none'], "normalization needs to be 'norm', 'component' or 'none'"
 
-        if isinstance(res, int):
-            res_beta, res_alpha = res, res
+        if isinstance(res, int) or res is None:
+            lmax, res_beta, res_alpha = complete_lmax_res(lmax, res, None)
         else:
-            res_beta, res_alpha = res
-        del res
-        if lmax is None:
-            lmax = res_beta // 2 - 1
-        assert res_beta % 2 == 0
-        assert lmax <= res_beta // 2 - 1
+            lmax, res_beta, res_alpha = complete_lmax_res(lmax, *res)
+
         if lmax_in is None:
             lmax_in = lmax
 
@@ -162,6 +186,10 @@ class FromS2Grid(torch.nn.Module):
         res_beta, res_alpha = x.shape[-2:]
         x = x.reshape(-1, res_beta, res_alpha)
 
-        x = torch.einsum('am,zba->zbm', self.sha, x)
+        if self.sha.shape[0] == self.sha.shape[1] and self.sha.shape[0] % 2 == 1:
+            x = torch.rfft(x, 1)
+            x = torch.cat([-2**0.5 * x[..., 1:, 1].flip(-1), x[..., :1, 0], 2**0.5 * x[..., 1:, 0]], dim=-1)
+        else:
+            x = torch.einsum('am,zba->zbm', self.sha, x)
         x = torch.einsum('mbi,zbm->zi', self.shb, x)
         return x.reshape(*size, x.shape[1])
