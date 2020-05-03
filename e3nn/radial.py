@@ -82,7 +82,7 @@ def FiniteElementFCModel(out_dim, position, basis, h, L, act):
 
 
 def CosineBasisModel(out_dim, max_radius, number_of_basis, h, L, act):
-    """ The tex for the math reads
+    r""" The tex for the math reads
     \begin{cases}
         cos^2 (\gamma (d_{ab} - \mu_{k}) \frac{\pi}{2}) & 1 \geq \gamma (d_{ab} - \mu_{k}) \geq -1 \\
         0 & otherwise
@@ -108,7 +108,7 @@ def GaussianRadialModel(out_dim, max_radius, number_of_basis, h, L, act, min_rad
 
 
 class BesselRadialModel(torch.nn.Module):
-    """The tex for the math reads
+    r"""The tex for the math reads
     \begin{cases}
         \sqrt{\frac{2}{c}} \frac{sin(\frac{n \pi}{c} d)}{d} & 0 \leq x \leq max_radius \\
         0 & otherwise
