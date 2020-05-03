@@ -14,7 +14,7 @@ class Tests(unittest.TestCase):
                 print(lmax)
                 res = 2 * lmax + 1
 
-                _alphas, _betas, sha, _shb = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
+                _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
 
                 # orthogonal
                 self.assertLess((sha @ sha.T / res - torch.eye(res)).abs().max(), 1e-10)

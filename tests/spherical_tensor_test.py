@@ -84,8 +84,8 @@ class SphericalTensorTests(unittest.TestCase):
 
         n = 16
         r, f = sph.plot(n=n)
-        assert list(r.shape) == [n, n + 1, 3]
-        assert list(f.shape) == [n, n + 1]
+        assert r.shape[2] == 3
+        assert f.shape[:2] == r.shape[:2]
 
     def test_plot_with_radial(self):
         torch.set_default_dtype(torch.float64)
