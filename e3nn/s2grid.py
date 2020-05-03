@@ -27,7 +27,7 @@ def s2_grid(res_beta, res_alpha):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/spherical_harmonics_s2_grid'))
-def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta, _version=0):
+def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, _version=0):
     """
     computes the spherical harmonics on the grid on the sphere
     """
@@ -35,7 +35,7 @@ def spherical_harmonics_s2_grid(lmax, res_alpha, res_beta, _version=0):
         betas, alphas = s2_grid(res_beta, res_alpha)
         sha = rsh.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
         shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
-        return alphas, betas, sha, shb
+        return betas, alphas, shb, sha
 
 
 def complete_lmax_res(lmax, res_beta, res_alpha):
@@ -48,7 +48,10 @@ def complete_lmax_res(lmax, res_beta, res_alpha):
 
     if res_alpha is None:
         if lmax is not None:
-            res_alpha = 2 * lmax + 1
+            if res_beta is not None:
+                res_alpha = max(2 * lmax + 1, res_beta - 1)
+            else:
+                res_alpha = 2 * lmax + 1
         elif res_beta is not None:
             res_alpha = res_beta - 1
 
@@ -83,7 +86,9 @@ class ToS2Grid(torch.nn.Module):
         else:
             lmax, res_beta, res_alpha = complete_lmax_res(lmax, *res)
 
-        alphas, betas, sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
+        print(lmax, res_beta, res_alpha)
+
+        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
 
         with torch_default_dtype(torch.float64):
             # normalize such that all l has the same variance on the sphere
@@ -154,7 +159,7 @@ class FromS2Grid(torch.nn.Module):
         if lmax_in is None:
             lmax_in = lmax
 
-        alphas, betas, sha, shb = spherical_harmonics_s2_grid(lmax, res_alpha, res_beta)
+        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
 
         with torch_default_dtype(torch.float64):
             # normalize such that it is the inverse of ToS2Grid
