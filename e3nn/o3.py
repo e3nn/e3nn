@@ -45,6 +45,7 @@ def rot_y(beta):
     """
     if not torch.is_tensor(beta):
         beta = torch.tensor(beta, dtype=torch.get_default_dtype())
+
     return torch.stack([
         torch.stack([beta.cos(),
                      beta.new_zeros(beta.shape),
@@ -100,14 +101,7 @@ def xyz_to_angles(x, y=None, z=None):
     """
     Convert point (x, y, z) on the sphere into (alpha, beta)
     """
-    if not torch.is_tensor(x):
-        x = torch.tensor(x, dtype=torch.get_default_dtype())
-
     if y is not None and z is not None:
-        if not torch.is_tensor(y):
-            y = torch.tensor(y, dtype=torch.get_default_dtype())
-        if not torch.is_tensor(z):
-            z = torch.tensor(z, dtype=torch.get_default_dtype())
         x = torch.stack([x, y, z], dim=-1)
 
     x = torch.nn.functional.normalize(x, p=2, dim=-1)  # forward 0's instead of nan for zero-radius
@@ -251,12 +245,9 @@ def wigner_3j(l1, l2, l3, cached=False, dtype=None, device=None, like=None):
 
     D(l1)_il D(l2)_jm D(l3)_kn Q_lmn == Q_ijk
     """
-    if torch.is_tensor(l1):
-        l1 = l1.item()
-    if torch.is_tensor(l2):
-        l2 = l2.item()
-    if torch.is_tensor(l3):
-        l3 = l3.item()
+    assert isinstance(l1, int)
+    assert isinstance(l2, int)
+    assert isinstance(l3, int)
 
     if dtype is None:
         if like is not None:
