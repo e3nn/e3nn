@@ -75,8 +75,54 @@ class Tests(unittest.TestCase):
             r1 = A.t() @ o3.irr_repr(1, a, b, c) @ A
             r2 = o3.rot(a, b, c)
 
-            self.assertLess((r1 - r2).abs().max(), 1e-10)
+            assert torch.allclose(r1, r2)
 
+    def test_derivative_irr_repr(self):
+        with o3.torch_default_dtype(torch.float64):
+            l = 4
+            angles = o3.rand_angles()
+            da, db, dc = o3.derivative_irr_repr(l, *angles)
+            h = 1e-7
+            da1 = (o3.irr_repr(l, angles[0] + h, angles[1], angles[2]) - o3.irr_repr(l, *angles)) / h
+            db1 = (o3.irr_repr(l, angles[0], angles[1] + h, angles[2]) - o3.irr_repr(l, *angles)) / h
+            dc1 = (o3.irr_repr(l, angles[0], angles[1], angles[2] + h) - o3.irr_repr(l, *angles)) / h
+            self.assertLess((da1 - da).abs().max(), 1e-5)
+            self.assertLess((db1 - db).abs().max(), 1e-5)
+            self.assertLess((dc1 - dc).abs().max(), 1e-5)
+
+    def test_kron(self):
+        with o3.torch_default_dtype(torch.float64):
+            m1 = torch.randn(4, 4)
+            m2 = torch.randn(3, 5)
+            m3 = torch.randn(6, 6)
+
+            x1 = o3.kron(m1, m2, m3)
+            x2 = o3.kron(m1, o3.kron(m2, m3))
+            assert torch.allclose(x1, x2)
+
+    def test_tensor3x3_repr_basis_to_spherical_basis(self):
+        o3.tensor3x3_repr_basis_to_spherical_basis()
+
+    def test_intertwiners(self):
+        with o3.torch_default_dtype(torch.float64):
+            A = o3.intertwiners(partial(o3.irr_repr, 1), partial(o3.irr_repr, 1))
+            assert A.shape[0] == 1
+
+    def test_reduce(self):
+        with o3.torch_default_dtype(torch.float64):
+            A = torch.randn(3 + 3 + 5, 3 + 3 + 5)
+            torch.nn.init.orthogonal_(A)
+
+            def D(*angles):
+                d = o3.direct_sum(
+                    o3.irr_repr(1, *angles),
+                    o3.irr_repr(1, *angles),
+                    o3.irr_repr(2, *angles),
+                )
+                return A @ d @ torch.inverse(A)
+
+            n, bigA, D_rest = o3.reduce(D, partial(o3.irr_repr, 1))
+            assert n == 2
 
 if __name__ == '__main__':
     unittest.main()

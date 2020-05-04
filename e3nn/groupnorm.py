@@ -66,12 +66,3 @@ class GroupNorm(nn.Module):
             assert iw == self.weight.size(0)
             assert ib == self.bias.size(0)
         return torch.cat(fields, dim=1)  # [batch, stacked feature, x, y, z]
-
-
-def test_groupnorm():
-    bn = GroupNorm([(3, 1), (4, 3), (1, 5)])
-
-    x = torch.rand(16, 3 + 12 + 5, 10, 10, 10)
-
-    y = bn(x)
-    return y
