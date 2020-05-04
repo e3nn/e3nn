@@ -11,7 +11,6 @@ class Tests(unittest.TestCase):
     def test_fft(self):
         with o3.torch_default_dtype(torch.float64):
             for lmax in [0, 1, 10, 20]:
-                print(lmax)
                 res = 2 * lmax + 1
 
                 _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
@@ -45,6 +44,24 @@ class Tests(unittest.TestCase):
                 x2 = torch.irfft(x2, 1) * res
 
                 self.assertLess((x1 - x2).abs().max(), 1e-10 * x1.abs().max())
+
+    def test_fft2(self):
+        with o3.torch_default_dtype(torch.float64):
+            lmax = 5
+            res = 31
+            _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
+
+            x = torch.randn(2 * lmax + 1)
+            y1 = sha @ x
+            y2 = s2grid.irfft(x, res)
+
+            self.assertLess((y1 - y2).abs().max(), 1e-10 * y1.abs().max())
+
+            x = torch.randn(res)
+            y1 = x @ sha
+            y2 = s2grid.rfft(x, lmax)
+
+            self.assertLess((y1 - y2).abs().max(), 1e-10 * y1.abs().max())
 
     def test_inverse(self):
         with o3.torch_default_dtype(torch.float64):
