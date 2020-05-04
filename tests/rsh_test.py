@@ -32,8 +32,8 @@ class Tests(unittest.TestCase):
                 for l in range(10 + 1):
                     x = torch.randn(10, 3)
                     x_cuda = x.cuda()
-                    Y1 = rsh.spherical_harmonics_xyz(l, x)
-                    Y2 = rsh.spherical_harmonics_xyz(l, x_cuda).cpu()
+                    Y1 = rsh.spherical_harmonics_xyz([l], x)
+                    Y2 = rsh.spherical_harmonics_xyz([l], x_cuda).cpu()
                     self.assertLess((Y1 - Y2).abs().max(), 1e-7)
         else:
             print("Cuda is not available! test_sh_cuda_single skipped!")

@@ -11,7 +11,7 @@ from sympy import Integer, Poly, diff, factorial, sqrt, symbols, pi
 from e3nn.util.cache_file import cached_picklesjar
 
 
-def spherical_harmonics_expand_matrix(lmax):
+def spherical_harmonics_expand_matrix(ls):
     """
     convertion matrix between a flatten vector (L, m) like that
     (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
@@ -23,10 +23,11 @@ def spherical_harmonics_expand_matrix(lmax):
 
     :return: tensor [l, m, l * m]
     """
-    m = torch.zeros(lmax + 1, 2 * lmax + 1, sum(2 * l + 1 for l in range(lmax + 1)))
+    lmax = max(ls)
+    m = torch.zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
     i = 0
-    for l in range(lmax + 1):
-        m[l, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
+    for j, l in enumerate(ls):
+        m[j, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
         i += 2 * l + 1
     return m
 
@@ -133,11 +134,17 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
         except ImportError:
             pass
 
-    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], beta.cos(), beta.sin().abs()) for l in ls]
-    return torch.cat(output, dim=-1)
+    sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
+    shb = spherical_harmonics_beta(ls, beta.flatten().cos(), beta.flatten().sin().abs())  # [z, l * m]
+    mix = spherical_harmonics_expand_matrix(ls).to(alpha)  # [l, m, l * m]
+
+    shb = torch.einsum('zi,lmi->zlm', shb, mix)
+    x = torch.einsum('zm,zlm->zlm', sha, shb)
+    x = torch.einsum('zlm,lmi->zi', x, mix)
+    return x.reshape(*alpha.shape, mix.shape[2])
 
 
-def spherical_harmonics_xyz(ls, xyz):
+def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
     """
     spherical harmonics
 
@@ -148,17 +155,27 @@ def spherical_harmonics_xyz(ls, xyz):
     norm = torch.norm(xyz, 2, -1, keepdim=True)
     xyz = xyz / norm
 
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10 and allow_cuda_kernel:
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
         except ImportError:
             pass
 
-    alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
-    cosbeta = xyz[..., 2]  # [...]
-    abssinbeta = (xyz[..., 1].pow(2) + xyz[..., 0].pow(2)).sqrt()
-    output = [spherical_harmonics_alpha(l, alpha) * spherical_harmonics_beta([l], cosbeta, abssinbeta) for l in ls]
-    return torch.cat(output, dim=-1)
+    *size, _ = xyz.shape
+    xyz = xyz.reshape(-1, 3)
+
+    alpha = torch.atan2(xyz[:, 1], xyz[:, 0])  # [z]
+    cosbeta = xyz[:, 2]  # [z]
+    abssinbeta = (xyz[:, 1].pow(2) + xyz[:, 0].pow(2)).sqrt()  # [z]
+
+    sha = spherical_harmonics_alpha(max(ls), alpha)  # [z, m]
+    shb = spherical_harmonics_beta(ls, cosbeta, abssinbeta)  # [z, l * m]
+    mix = spherical_harmonics_expand_matrix(ls).to(alpha)  # [l, m, l * m]
+
+    shb = torch.einsum('zi,lmi->zlm', shb, mix)
+    x = torch.einsum('zm,zlm->zlm', sha, shb)
+    x = torch.einsum('zlm,lmi->zi', x, mix)
+    return x.reshape(*size, mix.shape[2])
 
 
 def spherical_harmonics_xyz_cuda(ls, xyz):
