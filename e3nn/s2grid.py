@@ -44,24 +44,69 @@ def complete_lmax_res(lmax, res_beta, res_alpha):
     i.e. 2 * lmax + 1 == res_alpha
     """
     if res_beta is None:
-        res_beta = 2 * (lmax + 1)
+        res_beta = 2 * (lmax + 1)  # minimum req. to go on sphere and back
 
     if res_alpha is None:
         if lmax is not None:
             if res_beta is not None:
                 res_alpha = max(2 * lmax + 1, res_beta - 1)
             else:
-                res_alpha = 2 * lmax + 1
+                res_alpha = 2 * lmax + 1  # minimum req. to go on sphere and back
         elif res_beta is not None:
             res_alpha = res_beta - 1
 
     if lmax is None:
-        lmax = min(res_beta // 2 - 1, res_alpha // 2)
+        lmax = min(res_beta // 2 - 1, res_alpha // 2)  # maximum possible to go on sphere and back
 
     assert res_beta % 2 == 0
     assert lmax + 1 <= res_beta // 2
 
     return lmax, res_beta, res_alpha
+
+
+def irfft(x, res):
+    """
+    :param x: tensor of shape [..., m]
+    :return: tensor of shape [..., alpha]
+    """
+    assert res % 2 == 1
+    *size, sm = x.shape
+    x = x.reshape(-1, sm)
+    x = torch.cat([
+        x.new_zeros(x.shape[0], (res - sm) // 2),
+        x,
+        x.new_zeros(x.shape[0], (res - sm) // 2),
+    ], dim=-1)
+    assert x.shape[1] == res
+    l = res // 2
+    x = torch.stack([
+        torch.cat([
+            x[:, l:l + 1],
+            x[:, l + 1:].div(math.sqrt(2))
+        ], dim=1),
+        torch.cat([
+            torch.zeros_like(x[:, :1]),
+            x[:, :l].flip(-1).div(-math.sqrt(2)),
+        ], dim=1),
+    ], dim=-1)
+    x = torch.irfft(x, 1) * res
+    return x.reshape(*size, res)
+
+
+def rfft(x, l):
+    """
+    :param x: tensor of shape [..., alpha]
+    :return: tensor of shape [..., m]
+    """
+    *size, res = x.shape
+    x = x.reshape(-1, res)
+    x = torch.rfft(x, 1)
+    x = torch.cat([
+        x[:, 1:l + 1, 1].flip(1).mul(-math.sqrt(2)),
+        x[:, :1, 0],
+        x[:, 1:l + 1, 0].mul(math.sqrt(2)),
+    ], dim=1)
+    return x.reshape(*size, 2 * l + 1)
 
 
 class ToS2Grid(torch.nn.Module):
@@ -85,8 +130,6 @@ class ToS2Grid(torch.nn.Module):
             lmax, res_beta, res_alpha = complete_lmax_res(lmax, res, None)
         else:
             lmax, res_beta, res_alpha = complete_lmax_res(lmax, *res)
-
-        print(lmax, res_beta, res_alpha)
 
         betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
 
@@ -119,15 +162,11 @@ class ToS2Grid(torch.nn.Module):
         lmax = round(x.shape[-1] ** 0.5) - 1
         x = x.reshape(-1, (lmax + 1) ** 2)
 
-        x = torch.einsum('mbi,zi->zbm', self.shb, x)
+        x = torch.einsum('mbi,zi->zbm', self.shb, x)  # [batch, beta, m]
 
-        if self.sha.shape[0] == self.sha.shape[1] and self.sha.shape[0] % 2 == 1:
-            l = self.sha.shape[0] // 2
-            x = torch.stack([
-                torch.cat([x[:, :, l:l + 1], x[:, :, l + 1:] / 2**0.5], dim=-1),
-                torch.cat([torch.zeros_like(x[:, :, :1]), -x[:, :, :l].flip(-1) / 2**0.5], dim=-1),
-            ], dim=-1)
-            x = torch.irfft(x, 1) * (2 * l + 1)
+        sa, sm = self.sha.shape
+        if sa >= sm and sa % 2 == 1:
+            x = irfft(x, sa)
         else:
             x = torch.einsum('am,zbm->zba', self.sha, x)
         return x.reshape(*size, *x.shape[1:])
@@ -173,6 +212,7 @@ class FromS2Grid(torch.nn.Module):
             if normalization == 'none':
                 n = 4 * math.pi * torch.ones(lmax + 1)
             m = rsh.spherical_harmonics_expand_matrix(lmax)  # [l, m, i]
+            assert res_beta % 2 == 0
             qw = torch.tensor(S3.quadrature_weights(res_beta // 2)) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
 
@@ -191,9 +231,9 @@ class FromS2Grid(torch.nn.Module):
         res_beta, res_alpha = x.shape[-2:]
         x = x.reshape(-1, res_beta, res_alpha)
 
-        if self.sha.shape[0] == self.sha.shape[1] and self.sha.shape[0] % 2 == 1:
-            x = torch.rfft(x, 1)
-            x = torch.cat([-2**0.5 * x[..., 1:, 1].flip(-1), x[..., :1, 0], 2**0.5 * x[..., 1:, 0]], dim=-1)
+        sa, sm = self.sha.shape
+        if sm <= sa and sa % 2 == 1:
+            x = rfft(x, sm // 2)
         else:
             x = torch.einsum('am,zba->zbm', self.sha, x)
         x = torch.einsum('mbi,zbm->zi', self.shb, x)
