@@ -33,6 +33,16 @@ def spherical_harmonics_expand_matrix(ls, like=None):
     return m
 
 
+@torch.jit.script
+def mul_m_lm(ls, x_m, x_lm):
+    # type: (List[int], Tensor, Tensor)
+    lmax = x_m.shape[-1] // 2
+    i = 0
+    for l in ls:
+        x_lm[..., i: i + 2 * l + 1].mul_(x_m[..., lmax - l: lmax + l + 1])
+        i += 2 * l + 1
+
+
 def sympy_legendre(l, m):
     """
     en.wikipedia.org/wiki/Associated_Legendre_polynomials
@@ -155,12 +165,8 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
 
     sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
     shb = spherical_harmonics_beta(ls, beta.flatten().cos(), beta.flatten().sin().abs())  # [z, l * m]
-    mix = spherical_harmonics_expand_matrix(ls, like=alpha)  # [l, m, l * m]
-
-    shb = torch.einsum('zi,lmi->zlm', shb, mix)
-    x = torch.einsum('zm,zlm->zlm', sha, shb)
-    x = torch.einsum('zlm,lmi->zi', x, mix)
-    return x.reshape(*alpha.shape, mix.shape[2])
+    mul_m_lm(ls, sha, shb)
+    return shb.reshape(*alpha.shape, shb.shape[1])
 
 
 def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
@@ -189,12 +195,8 @@ def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
 
     sha = spherical_harmonics_alpha(max(ls), alpha)  # [z, m]
     shb = spherical_harmonics_beta(ls, cosbeta, abssinbeta)  # [z, l * m]
-    mix = spherical_harmonics_expand_matrix(ls, like=alpha)  # [l, m, l * m]
-
-    shb = torch.einsum('zi,lmi->zlm', shb, mix)
-    x = torch.einsum('zm,zlm->zlm', sha, shb)
-    x = torch.einsum('zlm,lmi->zi', x, mix)
-    return x.reshape(*size, mix.shape[2])
+    mul_m_lm(ls, sha, shb)
+    return shb.reshape(*size, shb.shape[1])
 
 
 def spherical_harmonics_xyz_cuda(ls, xyz):
