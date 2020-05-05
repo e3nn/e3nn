@@ -7,7 +7,7 @@ import os
 
 import torch
 from sympy import Integer, Poly, diff, factorial, sqrt, symbols, pi
-
+from typing import Tuple, List
 from e3nn.util.cache_file import cached_picklesjar
 
 
@@ -34,8 +34,7 @@ def spherical_harmonics_expand_matrix(ls, like=None):
 
 
 @torch.jit.script
-def mul_m_lm(ls, x_m, x_lm):
-    # type: (List[int], Tensor, Tensor)
+def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor):
     lmax = x_m.shape[-1] // 2
     i = 0
     for l in ls:
@@ -75,8 +74,9 @@ def poly_legendre(l):
 
 
 @torch.jit.script
-def _legendre_eval_polys(polys, pwz, pwy):
-    # type: (List[List[Tuple[float, Tuple[int, int]]]], List[Tensor], List[Tensor]) -> Tensor
+def _legendre_eval_polys(polys: List[List[Tuple[float, Tuple[int, int]]]],
+                         pwz: List[torch.Tensor],
+                         pwy: List[torch.Tensor]) -> torch.Tensor:
     p = []
     for m in range(len(polys)):
         val = torch.zeros_like(pwz[0])
