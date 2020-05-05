@@ -50,15 +50,33 @@ def sympy_legendre(l, m):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/legendre'), maxsize=None)
-def poly_legendre(l, m):
+def poly_legendre(l):
     """
     polynomial coefficients of legendre
 
     y = sqrt(1 - z^2)
     """
     z, y = symbols('z y', real=True)
-    p = Poly(sympy_legendre(l, m), domain='R', gens=(z, y))
-    return {exp: float(coef) for exp, coef in p.as_dict().items()}
+    ps = []
+    for m in range(l + 1):
+        p = Poly(sympy_legendre(l, m), domain='R', gens=(z, y))
+        ps += [[(float(coef), exp) for exp, coef in p.as_dict().items()]]
+    return ps
+
+
+@torch.jit.script
+def _legendre_eval_polys(polys, pwz, pwy):
+    # type: (List[List[Tuple[float, Tuple[int, int]]]], List[Tensor], List[Tensor]) -> Tensor
+    p = []
+    for m in range(len(polys)):
+        val = torch.zeros_like(pwz[0])
+        for coef, (nz, ny) in polys[m]:
+            val += coef * pwz[nz] * pwy[ny]
+        if m == 0:
+            p.append(val)
+        else:
+            p = [val] + p + [val]
+    return torch.stack(p, dim=-1)
 
 
 def legendre(ls, z, y=None):
@@ -77,19 +95,9 @@ def legendre(ls, z, y=None):
 
     ps = []
     for l in ls:
-        p = None
-        for m in range(0, l + 1):
-            poly = poly_legendre(l, abs(m))
-            val = 0
-            for (nz, ny), coef in poly.items():
-                val += coef * zs[nz] * ys[ny]
-            if p is None:
-                p = [val]
-            else:
-                p = [val] + p + [val]
-        ps += p
-    p = torch.stack(ps, dim=-1)
-    return p
+        polys = poly_legendre(l)
+        ps += [_legendre_eval_polys(polys, zs, ys)]
+    return torch.cat(ps, dim=-1)
 
 
 def spherical_harmonics_beta(ls, cosbeta, abssinbeta=None):
