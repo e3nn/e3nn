@@ -11,7 +11,7 @@ from sympy import Integer, Poly, diff, factorial, sqrt, symbols, pi
 from e3nn.util.cache_file import cached_picklesjar
 
 
-def spherical_harmonics_expand_matrix(ls):
+def spherical_harmonics_expand_matrix(ls, like=None):
     """
     convertion matrix between a flatten vector (L, m) like that
     (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
@@ -24,7 +24,8 @@ def spherical_harmonics_expand_matrix(ls):
     :return: tensor [l, m, l * m]
     """
     lmax = max(ls)
-    m = torch.zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
+    zeros = torch.zeros if like is None else like.new_zeros
+    m = zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
     i = 0
     for j, l in enumerate(ls):
         m[j, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
@@ -76,9 +77,19 @@ def legendre(ls, z, y=None):
 
     ps = []
     for l in ls:
-        p = torch.stack([sum(coef * zs[nz] * ys[ny] for (nz, ny), coef in poly_legendre(l, abs(m)).items()) for m in range(-l, 1)], dim=-1)
-        ps += [torch.cat([p, p[..., :-1].flip(-1)], dim=-1)]
-    return torch.cat(ps, dim=-1)
+        p = None
+        for m in range(0, l + 1):
+            poly = poly_legendre(l, abs(m))
+            val = 0
+            for (nz, ny), coef in poly.items():
+                val += coef * zs[nz] * ys[ny]
+            if p is None:
+                p = [val]
+            else:
+                p = [val] + p + [val]
+        ps += p
+    p = torch.stack(ps, dim=-1)
+    return p
 
 
 def spherical_harmonics_beta(ls, cosbeta, abssinbeta=None):
@@ -103,11 +114,11 @@ def spherical_harmonics_alpha(l, alpha):
     size = alpha.shape
     alpha = alpha.reshape(-1, 1)  # [batch, 1]
 
-    m = torch.arange(1, l + 1).flip(0).to(alpha)  # [l, l-1, l-2, ..., 1]
-    sin = torch.sin(m * alpha)  # [batch, m]
-
-    m = torch.arange(1, l + 1).to(alpha)  # [1, 2, 3, ..., l]
+    m = torch.arange(1, l + 1, dtype=alpha.dtype, device=alpha.device)  # [1, 2, 3, ..., l]
     cos = torch.cos(m * alpha)  # [batch, m]
+
+    m = torch.arange(l, 0, -1, dtype=alpha.dtype, device=alpha.device)  # [l, l-1, l-2, ..., 1]
+    sin = torch.sin(m * alpha)  # [batch, m]
 
     out = torch.cat([
         math.sqrt(2) * sin,
@@ -136,7 +147,7 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
 
     sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
     shb = spherical_harmonics_beta(ls, beta.flatten().cos(), beta.flatten().sin().abs())  # [z, l * m]
-    mix = spherical_harmonics_expand_matrix(ls).to(alpha)  # [l, m, l * m]
+    mix = spherical_harmonics_expand_matrix(ls, like=alpha)  # [l, m, l * m]
 
     shb = torch.einsum('zi,lmi->zlm', shb, mix)
     x = torch.einsum('zm,zlm->zlm', sha, shb)
@@ -170,7 +181,7 @@ def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
 
     sha = spherical_harmonics_alpha(max(ls), alpha)  # [z, m]
     shb = spherical_harmonics_beta(ls, cosbeta, abssinbeta)  # [z, l * m]
-    mix = spherical_harmonics_expand_matrix(ls).to(alpha)  # [l, m, l * m]
+    mix = spherical_harmonics_expand_matrix(ls, like=alpha)  # [l, m, l * m]
 
     shb = torch.einsum('zi,lmi->zlm', shb, mix)
     x = torch.einsum('zm,zlm->zlm', sha, shb)
@@ -194,7 +205,7 @@ def spherical_harmonics_xyz_cuda(ls, xyz):
     norm_coef = [elem for lh in range((lmax + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
     if lmax % 2 == 0:
         norm_coef.extend([1.] * (2 * lmax + 1))
-    norm_coef = torch.tensor(norm_coef).to(out).unsqueeze(1)
+    norm_coef = out.new_tensor(norm_coef).unsqueeze(1)
     out.mul_(norm_coef)
 
     if ls != list(range(lmax + 1)):
