@@ -29,8 +29,9 @@ nvcc --version
 
 If like me you have `Cuda compilation tools, release 9.2, V9.2.148` install pytorch with
 ```
-pip install torch==1.4.0+cu92 torchvision==0.5.0+cu92 -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch==1.5.0+cu92 torchvision==0.6.0+cu92 -f https://download.pytorch.org/whl/torch_stable.html
 ```
+**The version of cuda needs to match between pytorch and nvcc!**
 
 Now we can check if cuda works
 ```
@@ -58,6 +59,6 @@ python setup_cuda.py install
 
 Check compilation success
 ```
-python -c "import e3nn.cuda_rsh"
+python -c "import torch; import e3nn.cuda_rsh"
 ```
 
