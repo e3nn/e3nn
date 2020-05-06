@@ -63,6 +63,25 @@ class Tests(unittest.TestCase):
             check_matrix[4:, 2] = 1.
             self.assertTrue(torch.allclose(mapping_matrix, check_matrix))
 
+    def test_tensor_product_sparse_vs_dense(self):
+        import numpy as np
+        Rs_in1 = [(1, 1), (1, 3)]
+        Rs_in2 = [(4, 1)]
+        Rs_out, Q = rs._tensor_product_in_in(Rs_in1, Rs_in2, o3.selection_rule, "norm", sorted=False)
+        Rs_out, index, value = rs._tensor_product_in_in_sparse(Rs_in1, Rs_in2, o3.selection_rule, "norm")
+        print("num coeff in Q: ", np.array(Q.shape).prod(), "num coeff in value: ", value.shape[0])
+
+        for i, v in zip (index, value):
+            assert torch.allclose(Q[i[0], i[1], i[2]], v)
+
+        Rs_in1 = [(2, 1)]
+        Rs_out = [(3, 1), (1, 3)]
+        Rs_in2, Q = rs._tensor_product_in_out(Rs_in1, o3.selection_rule, Rs_out, "norm", sorted=False)
+        Rs_in2, index, value = rs._tensor_product_in_out_sparse(Rs_in1, o3.selection_rule, Rs_out, "norm")
+        print("num coeff in Q: ", np.array(Q.shape).prod(), "num coeff in value: ", value.shape[0])
+
+        for i, v in zip (index, value):
+            assert torch.allclose(Q[i[0], i[1], i[2]], v)
 
 if __name__ == '__main__':
     unittest.main()
