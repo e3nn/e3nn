@@ -69,5 +69,6 @@ def main():
 
     print('equivariance error={}'.format((out - r_out).pow(2).mean().sqrt().item()))
 
+
 if __name__ == '__main__':
     main()
