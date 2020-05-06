@@ -17,7 +17,7 @@ def get_dataset():
     labels = torch.arange(len(tetris))
 
     # apply random rotation
-    tetris = torch.stack([torch.einsum("ij,nj->ni", (rand_rot(), x)) for x in tetris])
+    tetris = torch.einsum('ij,zaj->zai', rand_rot(), tetris)
 
     return tetris, labels
 
