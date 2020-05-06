@@ -163,13 +163,20 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
         except ImportError:
             pass
 
+    return spherical_harmonics_alpha_beta_cpu(ls, alpha, beta.cos(), beta.sin().abs())
+
+
+def spherical_harmonics_alpha_beta_cpu(ls, alpha, beta_cos, beta_asin):
+    """
+    cpu version of spherical_harmonics_alpha_beta
+    """
     sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
-    shb = spherical_harmonics_beta(ls, beta.flatten().cos(), beta.flatten().sin().abs())  # [z, l * m]
+    shb = spherical_harmonics_beta(ls, beta_cos.flatten(), beta_asin.flatten())  # [z, l * m]
     mul_m_lm(ls, sha, shb)
     return shb.reshape(*alpha.shape, shb.shape[1])
 
 
-def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
+def spherical_harmonics_xyz(ls, xyz):
     """
     spherical harmonics
 
@@ -177,26 +184,27 @@ def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
     :param xyz: tensor of shape [..., 3]
     :return: tensor of shape [..., m]
     """
-    norm = torch.norm(xyz, 2, -1, keepdim=True)
-    xyz = xyz / norm
 
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10 and allow_cuda_kernel:
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
         except ImportError:
             pass
 
-    *size, _ = xyz.shape
-    xyz = xyz.reshape(-1, 3)
+    return spherical_harmonics_xyz_cpu(ls, xyz)
 
-    alpha = torch.atan2(xyz[:, 1], xyz[:, 0])  # [z]
-    cosbeta = xyz[:, 2]  # [z]
-    abssinbeta = (xyz[:, 1].pow(2) + xyz[:, 0].pow(2)).sqrt()  # [z]
 
-    sha = spherical_harmonics_alpha(max(ls), alpha)  # [z, m]
-    shb = spherical_harmonics_beta(ls, cosbeta, abssinbeta)  # [z, l * m]
-    mul_m_lm(ls, sha, shb)
-    return shb.reshape(*size, shb.shape[1])
+def spherical_harmonics_xyz_cpu(ls, xyz):
+    """
+    non cuda version of spherical_harmonics_xyz
+    """
+    xyz = xyz / torch.norm(xyz, 2, dim=-1, keepdim=True)
+
+    alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
+    beta_cos = xyz[..., 2]  # [...]
+    beta_asin = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2)).sqrt()  # [...]
+
+    return spherical_harmonics_alpha_beta_cpu(ls, alpha, beta_cos, beta_asin)
 
 
 def spherical_harmonics_xyz_cuda(ls, xyz):
@@ -207,6 +215,8 @@ def spherical_harmonics_xyz_cuda(ls, xyz):
 
     *size, _ = xyz.size()
     xyz = xyz.reshape(-1, 3)
+    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
+
     lmax = max(ls)
     out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
     cuda_rsh.real_spherical_harmonics(out, xyz)
