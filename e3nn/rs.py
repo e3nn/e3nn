@@ -392,7 +392,7 @@ def _tensor_product_in_in_sparse(Rs_in1, Rs_in2, selection_rule, normalization):
 
     example:
     _, index, value = tensor_product_in_in(Rs_in1, Rs_in2)
-    """ 
+    """
     assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
     Rs_in1 = simplify(Rs_in1)
