@@ -1,7 +1,6 @@
 # pylint: disable=C, R, not-callable, no-member, arguments-differ
 from functools import partial
 import torch
-import e3nn
 from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
 
@@ -31,7 +30,7 @@ class SumNetwork(torch.nn.Module):
 
     def forward(self, *args, **kwargs):
         output = self.network(*args, **kwargs)
-        return output.sum(-2) # Sum over N
+        return output.sum(-2)  # Sum over N
 
 
 def main():
