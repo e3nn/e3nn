@@ -392,7 +392,7 @@ def _tensor_product_in_in_sparse(Rs_in1, Rs_in2, selection_rule, normalization):
 
     example:
     _, index, value = tensor_product_in_in(Rs_in1, Rs_in2)
-    """    
+    """  
     assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
     Rs_in1 = simplify(Rs_in1)
@@ -430,7 +430,7 @@ def _tensor_product_in_in_sparse(Rs_in1, Rs_in2, selection_rule, normalization):
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
                 index.append(torch.stack(
                     torch.meshgrid(
-                        [torch.arange(index_out, index_out + dim_out), 
+                        [torch.arange(index_out, index_out + dim_out),
                          torch.arange(index_1, index_1 + dim_1),
                          torch.arange(index_2, index_2 + dim_2)]
                     ),
@@ -587,7 +587,7 @@ def _tensor_product_in_out_sparse(Rs_in1, selection_rule, Rs_out, normalization)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
                 index.append(torch.stack(
                     torch.meshgrid(
-                        [torch.arange(index_out, index_out + dim_out), 
+                        [torch.arange(index_out, index_out + dim_out),
                          torch.arange(index_1, index_1 + dim_1),
                          torch.arange(index_2, index_2 + dim_2)]
                     ),
