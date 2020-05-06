@@ -4,10 +4,11 @@ Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
 import math
 import os
+from typing import List, Tuple
 
 import torch
-from sympy import Integer, Poly, diff, factorial, sqrt, symbols, pi
-from typing import Tuple, List
+from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
+
 from e3nn.util.cache_file import cached_picklesjar
 
 
@@ -35,6 +36,9 @@ def spherical_harmonics_expand_matrix(ls, like=None):
 
 @torch.jit.script
 def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor):
+    """
+    multiply inplace tensor [..., l * m] by [..., m]
+    """
     lmax = x_m.shape[-1] // 2
     i = 0
     for l in ls:
@@ -78,9 +82,9 @@ def _legendre_eval_polys(polys: List[List[Tuple[float, Tuple[int, int]]]],
                          pwz: List[torch.Tensor],
                          pwy: List[torch.Tensor]) -> torch.Tensor:
     p = []
-    for m in range(len(polys)):
+    for m, poly in enumerate(polys):
         val = torch.zeros_like(pwz[0])
-        for coef, (nz, ny) in polys[m]:
+        for coef, (nz, ny) in poly:
             val += coef * pwz[nz] * pwy[ny]
         if m == 0:
             p.append(val)
