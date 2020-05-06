@@ -1,13 +1,6 @@
 # pylint: disable=C, R, not-callable, no-member, arguments-differ
-from functools import partial
-
 import torch
-
-from e3nn.non_linearities import GatedBlock
-from e3nn.point.operations import Convolution
-from e3nn.non_linearities.rescaled_act import relu, sigmoid
-from e3nn.kernel_mod import Kernel
-from e3nn.radial import CosineBasisModel
+from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
 
 
@@ -29,38 +22,14 @@ def get_dataset():
     return tetris, labels
 
 
-class AvgSpacial(torch.nn.Module):
-    def forward(self, features):
-        return features.mean(1)
-
-
-class SE3Net(torch.nn.Module):
-    def __init__(self, num_classes):
+class SumNetwork(torch.nn.Module):
+    def __init__(self, *args, **kwargs):
         super().__init__()
+        self.network = GatedConvNetwork(*args, **kwargs)
 
-        representations = [(1,), (2, 2, 2, 1), (4, 4, 4, 4), (6, 4, 4, 0), (64,)]
-        representations = [[(mul, l) for l, mul in enumerate(rs)] for rs in representations]
-
-        R = partial(CosineBasisModel, max_radius=3.0, number_of_basis=3, h=100, L=50, act=relu)
-        K = partial(Kernel, RadialModel=R)
-
-        def make_layer(Rs_in, Rs_out):
-            act = GatedBlock(Rs_out, relu, sigmoid)
-            conv = Convolution(K, Rs_in, act.Rs_in)
-            return torch.nn.ModuleList([conv, act])
-
-        self.firstlayers = torch.nn.ModuleList([
-            make_layer(Rs_in, Rs_out)
-            for Rs_in, Rs_out in zip(representations, representations[1:])
-        ])
-        self.lastlayers = torch.nn.Sequential(AvgSpacial(), torch.nn.Linear(64, num_classes))
-
-    def forward(self, features, geometry):
-        for conv, act in self.firstlayers:
-            features = conv(features, geometry, n_norm=4)
-            features = act(features)
-
-        return self.lastlayers(features)
+    def forward(self, *args, **kwargs):
+        output = self.network(*args, **kwargs)
+        return output.sum(-2)  # Sum over N
 
 
 def main():
@@ -70,10 +39,15 @@ def main():
     tetris, labels = get_dataset()
     tetris = tetris.to(device)
     labels = labels.to(device)
-    f = SE3Net(len(tetris))
+    Rs_in = [(1, 0)]
+    Rs_hidden = [(16, 0), (16, 1), (16, 2)]
+    Rs_out = [(len(tetris), 0)]
+    lmax = 3
+
+    f = SumNetwork(Rs_in, Rs_hidden, Rs_out, lmax)
     f = f.to(device)
 
-    optimizer = torch.optim.Adam(f.parameters())
+    optimizer = torch.optim.Adam(f.parameters(), lr=1e-2)
 
     feature = tetris.new_ones(tetris.size(0), tetris.size(1), 1)
 
@@ -94,7 +68,6 @@ def main():
     r_out = f(feature, r_tetris)
 
     print('equivariance error={}'.format((out - r_out).pow(2).mean().sqrt().item()))
-
 
 if __name__ == '__main__':
     main()

@@ -71,7 +71,7 @@ class PeriodicConvolutionPrep(torch.nn.Module):
         super().__init__()
         self.kernel = Kernel(Rs_in, Rs_out)
 
-    def forward(self, features, radii, bs_slice):
+    def forward(self, features, radii, bs_slice, n_norm=None):
         """
         :param features: [point, channel_in]
         :param radii: [r, xyz]
@@ -80,6 +80,10 @@ class PeriodicConvolutionPrep(torch.nn.Module):
         """
         kernels = self.kernel(radii)                                                                # [r, i, j]
         out = PeriodicConvolutionFunc.apply(kernels, bs_slice, features)
+
+        if n_norm:
+            out.div_(n_norm ** 0.5)
+
         return out
 
 
