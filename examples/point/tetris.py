@@ -1,5 +1,4 @@
 # pylint: disable=C, R, not-callable, no-member, arguments-differ
-from functools import partial
 import torch
 from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
