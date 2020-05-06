@@ -4,14 +4,15 @@ Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
 import math
 import os
+from typing import List, Tuple
 
 import torch
-from sympy import Integer, Poly, diff, factorial, sqrt, symbols, pi
+from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
 from e3nn.util.cache_file import cached_picklesjar
 
 
-def spherical_harmonics_expand_matrix(ls):
+def spherical_harmonics_expand_matrix(ls, like=None):
     """
     convertion matrix between a flatten vector (L, m) like that
     (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
@@ -24,12 +25,25 @@ def spherical_harmonics_expand_matrix(ls):
     :return: tensor [l, m, l * m]
     """
     lmax = max(ls)
-    m = torch.zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
+    zeros = torch.zeros if like is None else like.new_zeros
+    m = zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
     i = 0
     for j, l in enumerate(ls):
         m[j, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
         i += 2 * l + 1
     return m
+
+
+@torch.jit.script
+def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor):
+    """
+    multiply inplace tensor [..., l * m] by [..., m]
+    """
+    lmax = x_m.shape[-1] // 2
+    i = 0
+    for l in ls:
+        x_lm[..., i: i + 2 * l + 1].mul_(x_m[..., lmax - l: lmax + l + 1])
+        i += 2 * l + 1
 
 
 def sympy_legendre(l, m):
@@ -49,15 +63,34 @@ def sympy_legendre(l, m):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/legendre'), maxsize=None)
-def poly_legendre(l, m):
+def poly_legendre(l):
     """
     polynomial coefficients of legendre
 
     y = sqrt(1 - z^2)
     """
     z, y = symbols('z y', real=True)
-    p = Poly(sympy_legendre(l, m), domain='R', gens=(z, y))
-    return {exp: float(coef) for exp, coef in p.as_dict().items()}
+    ps = []
+    for m in range(l + 1):
+        p = Poly(sympy_legendre(l, m), domain='R', gens=(z, y))
+        ps += [[(float(coef), exp) for exp, coef in p.as_dict().items()]]
+    return ps
+
+
+@torch.jit.script
+def _legendre_eval_polys(polys: List[List[Tuple[float, Tuple[int, int]]]],
+                         pwz: List[torch.Tensor],
+                         pwy: List[torch.Tensor]) -> torch.Tensor:
+    p = []
+    for m, poly in enumerate(polys):
+        val = torch.zeros_like(pwz[0])
+        for coef, (nz, ny) in poly:
+            val += coef * pwz[nz] * pwy[ny]
+        if m == 0:
+            p.append(val)
+        else:
+            p = [val] + p + [val]
+    return torch.stack(p, dim=-1)
 
 
 def legendre(ls, z, y=None):
@@ -76,8 +109,8 @@ def legendre(ls, z, y=None):
 
     ps = []
     for l in ls:
-        p = torch.stack([sum(coef * zs[nz] * ys[ny] for (nz, ny), coef in poly_legendre(l, abs(m)).items()) for m in range(-l, 1)], dim=-1)
-        ps += [torch.cat([p, p[..., :-1].flip(-1)], dim=-1)]
+        polys = poly_legendre(l)
+        ps += [_legendre_eval_polys(polys, zs, ys)]
     return torch.cat(ps, dim=-1)
 
 
@@ -103,11 +136,11 @@ def spherical_harmonics_alpha(l, alpha):
     size = alpha.shape
     alpha = alpha.reshape(-1, 1)  # [batch, 1]
 
-    m = torch.arange(1, l + 1).flip(0).to(alpha)  # [l, l-1, l-2, ..., 1]
-    sin = torch.sin(m * alpha)  # [batch, m]
-
-    m = torch.arange(1, l + 1).to(alpha)  # [1, 2, 3, ..., l]
+    m = torch.arange(1, l + 1, dtype=alpha.dtype, device=alpha.device)  # [1, 2, 3, ..., l]
     cos = torch.cos(m * alpha)  # [batch, m]
+
+    m = torch.arange(l, 0, -1, dtype=alpha.dtype, device=alpha.device)  # [l, l-1, l-2, ..., 1]
+    sin = torch.sin(m * alpha)  # [batch, m]
 
     out = torch.cat([
         math.sqrt(2) * sin,
@@ -134,17 +167,20 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
         except ImportError:
             pass
 
+    return spherical_harmonics_alpha_beta_cpu(ls, alpha, beta.cos(), beta.sin().abs())
+
+
+def spherical_harmonics_alpha_beta_cpu(ls, alpha, beta_cos, beta_asin):
+    """
+    cpu version of spherical_harmonics_alpha_beta
+    """
     sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
-    shb = spherical_harmonics_beta(ls, beta.flatten().cos(), beta.flatten().sin().abs())  # [z, l * m]
-    mix = spherical_harmonics_expand_matrix(ls).to(alpha)  # [l, m, l * m]
-
-    shb = torch.einsum('zi,lmi->zlm', shb, mix)
-    x = torch.einsum('zm,zlm->zlm', sha, shb)
-    x = torch.einsum('zlm,lmi->zi', x, mix)
-    return x.reshape(*alpha.shape, mix.shape[2])
+    shb = spherical_harmonics_beta(ls, beta_cos.flatten(), beta_asin.flatten())  # [z, l * m]
+    mul_m_lm(ls, sha, shb)
+    return shb.reshape(*alpha.shape, shb.shape[1])
 
 
-def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
+def spherical_harmonics_xyz(ls, xyz):
     """
     spherical harmonics
 
@@ -152,30 +188,27 @@ def spherical_harmonics_xyz(ls, xyz, allow_cuda_kernel=True):
     :param xyz: tensor of shape [..., 3]
     :return: tensor of shape [..., m]
     """
-    norm = torch.norm(xyz, 2, -1, keepdim=True)
-    xyz = xyz / norm
 
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10 and allow_cuda_kernel:
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
         except ImportError:
             pass
 
-    *size, _ = xyz.shape
-    xyz = xyz.reshape(-1, 3)
+    return spherical_harmonics_xyz_cpu(ls, xyz)
 
-    alpha = torch.atan2(xyz[:, 1], xyz[:, 0])  # [z]
-    cosbeta = xyz[:, 2]  # [z]
-    abssinbeta = (xyz[:, 1].pow(2) + xyz[:, 0].pow(2)).sqrt()  # [z]
 
-    sha = spherical_harmonics_alpha(max(ls), alpha)  # [z, m]
-    shb = spherical_harmonics_beta(ls, cosbeta, abssinbeta)  # [z, l * m]
-    mix = spherical_harmonics_expand_matrix(ls).to(alpha)  # [l, m, l * m]
+def spherical_harmonics_xyz_cpu(ls, xyz):
+    """
+    non cuda version of spherical_harmonics_xyz
+    """
+    xyz = xyz / torch.norm(xyz, 2, dim=-1, keepdim=True)
 
-    shb = torch.einsum('zi,lmi->zlm', shb, mix)
-    x = torch.einsum('zm,zlm->zlm', sha, shb)
-    x = torch.einsum('zlm,lmi->zi', x, mix)
-    return x.reshape(*size, mix.shape[2])
+    alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
+    beta_cos = xyz[..., 2]  # [...]
+    beta_asin = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2)).sqrt()  # [...]
+
+    return spherical_harmonics_alpha_beta_cpu(ls, alpha, beta_cos, beta_asin)
 
 
 def spherical_harmonics_xyz_cuda(ls, xyz):
@@ -186,6 +219,8 @@ def spherical_harmonics_xyz_cuda(ls, xyz):
 
     *size, _ = xyz.size()
     xyz = xyz.reshape(-1, 3)
+    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
+
     lmax = max(ls)
     out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
     cuda_rsh.real_spherical_harmonics(out, xyz)
@@ -194,7 +229,7 @@ def spherical_harmonics_xyz_cuda(ls, xyz):
     norm_coef = [elem for lh in range((lmax + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
     if lmax % 2 == 0:
         norm_coef.extend([1.] * (2 * lmax + 1))
-    norm_coef = torch.tensor(norm_coef).to(out).unsqueeze(1)
+    norm_coef = out.new_tensor(norm_coef).unsqueeze(1)
     out.mul_(norm_coef)
 
     if ls != list(range(lmax + 1)):
