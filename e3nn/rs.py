@@ -379,7 +379,72 @@ def tensor_product(input1, input2, output, normalization='component', sorted=Fal
         return Rs_in1, Q
 
 
-def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted):
+def _tensor_product_in_in_sparse(Rs_in1, Rs_in2, selection_rule, normalization):
+    """
+    Compute the sparse matrix entries for Q
+    from Rs_out to Rs_in1 tensor product with Rs_in2
+    where Rs_out is a direct sum of irreducible representations
+
+    For normalization='component',
+    The set of "lines" { Q[i] }_i is orthonormal
+
+    :return: Rs_out, index, value
+
+    example:
+    _, index, value = tensor_product_in_in(Rs_in1, Rs_in2)
+    """    
+    assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+
+    Rs_in1 = simplify(Rs_in1)
+    Rs_in2 = simplify(Rs_in2)
+
+    Rs_out = []
+
+    for mul_1, l_1, p_1 in Rs_in1:
+        for mul_2, l_2, p_2 in Rs_in2:
+            for l_out in selection_rule(l_1, p_1, l_2, p_2):
+                Rs_out.append((mul_1 * mul_2, l_out, p_1 * p_2))
+
+    Rs_out = simplify(Rs_out)
+
+    index = []
+    value = []
+
+    index_out = 0
+
+    index_1 = 0
+    for mul_1, l_1, p_1 in Rs_in1:
+        dim_1 = mul_1 * (2 * l_1 + 1)
+
+        index_2 = 0
+        for mul_2, l_2, p_2 in Rs_in2:
+            dim_2 = mul_2 * (2 * l_2 + 1)
+            for l_out in selection_rule(l_1, p_1, l_2, p_2):
+                dim_out = mul_1 * mul_2 * (2 * l_out + 1)
+                C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
+                if normalization == 'component':
+                    C *= (2 * l_out + 1) ** 0.5
+                if normalization == 'norm':
+                    C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
+                I = torch.eye(mul_1 * mul_2).reshape(mul_1 * mul_2, mul_1, mul_2)
+                m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
+                index.append(torch.stack(
+                    torch.meshgrid(
+                        [torch.arange(index_out, index_out + dim_out), 
+                         torch.arange(index_1, index_1 + dim_1),
+                         torch.arange(index_2, index_2 + dim_2)]
+                    ),
+                    dim=-1
+                ).reshape(-1, 3))
+                value.append(m.flatten())
+                index_out += dim_out
+            index_2 += dim_2
+        index_1 += dim_1
+
+    return Rs_out, torch.cat(index, dim=0), torch.cat(value, dim=0)
+
+
+def _tensor_product_in_in_use_sparse(Rs_in1, Rs_in2, selection_rule, normalization, sorted):
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -390,6 +455,30 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
 
     :return: Rs_out, Q
 
+    example:
+    _, Q = tensor_product_in_in(Rs_in1, Rs_in2)
+    torch.einsum('kij,i,j->k', Q, A, B)
+    """
+    Rs_out, index, value = _tensor_product_in_in_sparse(Rs_in1, Rs_in2, selection_rule, normalization)
+    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
+    wigner_3j_tensor[index[..., 0], index[..., 1], index[..., 2]] = value
+
+    if sorted:
+        Rs_out, perm = sort(Rs_out)
+        Rs_out = simplify(Rs_out)
+        wigner_3j_tensor = torch.einsum('ij,jkl->ikl', perm, wigner_3j_tensor)
+
+    return Rs_out, wigner_3j_tensor
+
+
+def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted):
+    """
+    Compute the matrix Q
+    from Rs_out to Rs_in1 tensor product with Rs_in2
+    where Rs_out is a direct sum of irreducible representations
+    For normalization='component',
+    The set of "lines" { Q[i] }_i is orthonormal
+    :return: Rs_out, Q
     example:
     _, Q = tensor_product_in_in(Rs_in1, Rs_in2)
     torch.einsum('kij,i,j->k', Q, A, B)
@@ -440,6 +529,103 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
         wigner_3j_tensor = torch.einsum('ij,jkl->ikl', perm, wigner_3j_tensor)
 
     return Rs_out, wigner_3j_tensor
+
+
+def _tensor_product_in_out_sparse(Rs_in1, selection_rule, Rs_out, normalization):
+    """
+    Compute the sparse matrix entries for Q
+    from Rs_out to Rs_in1 tensor product with Rs_in2
+    where Rs_in2 is a direct sum of irreducible representations
+
+    For normalization='component',
+    The set of "lines" { Q[i] }_i is orthonormal
+
+    :return: Rs_in2, index, value
+
+    example:
+    _, index, value = tensor_product_in_out(Rs_in1, Rs_out)
+    """
+    assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
+
+    Rs_in1 = simplify(Rs_in1)
+    Rs_out = simplify(Rs_out)
+
+    Rs_in2 = []
+
+    for mul_out, l_out, p_out in Rs_out:
+        for mul_1, l_1, p_1 in Rs_in1:
+            for l_2 in selection_rule(l_1, p_1, l_out, p_out):
+                Rs_in2.append((mul_1 * mul_out, l_2, p_1 * p_out))
+
+    Rs_in2 = simplify(Rs_in2)
+
+    index = []
+    value = []
+
+    index_2 = 0
+
+    index_out = 0
+    for mul_out, l_out, p_out in Rs_out:
+        dim_out = mul_out * (2 * l_out + 1)
+
+        n_path = 0
+        for mul_1, l_1, p_1 in Rs_in1:
+            for l_2 in selection_rule(l_1, p_1, l_out, p_out):
+                n_path += mul_1
+
+        index_1 = 0
+        for mul_1, l_1, p_1 in Rs_in1:
+            dim_1 = mul_1 * (2 * l_1 + 1)
+            for l_2 in selection_rule(l_1, p_1, l_out, p_out):
+                dim_2 = mul_1 * mul_out * (2 * l_2 + 1)
+                C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
+                if normalization == 'component':
+                    C *= (2 * l_out + 1) ** 0.5
+                if normalization == 'norm':
+                    C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
+                I = torch.eye(mul_out * mul_1).reshape(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
+                m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
+                index.append(torch.stack(
+                    torch.meshgrid(
+                        [torch.arange(index_out, index_out + dim_out), 
+                         torch.arange(index_1, index_1 + dim_1),
+                         torch.arange(index_2, index_2 + dim_2)]
+                    ),
+                    dim=-1
+                ).reshape(-1, 3))
+                value.append(m.flatten())
+                index_2 += dim_2
+            index_1 += dim_1
+        index_out += dim_out
+
+    return Rs_in2, torch.cat(index, dim=0), torch.cat(value, dim=0)
+
+
+def _tensor_product_in_out_use_sparse(Rs_in1, selection_rule, Rs_out, normalization, sorted):
+    """
+    Compute the matrix Q
+    from Rs_out to Rs_in1 tensor product with Rs_in2
+    where Rs_out is a direct sum of irreducible representations
+
+    For normalization='component',
+    The set of "lines" { Q[i] }_i is orthonormal
+
+    :return: Rs_out, Q
+
+    example:
+    _, Q = tensor_product_in_in(Rs_in1, Rs_in2)
+    torch.einsum('kij,i,j->k', Q, A, B)
+    """
+    Rs_in2, index, value = _tensor_product_in_in_sparse(Rs_in1, selection_rule, Rs_out, normalization)
+    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
+    wigner_3j_tensor[index[..., 0], index[..., 1], index[..., 2]] = value
+
+    if sorted:
+        Rs_in2, perm = sort(Rs_in2)
+        Rs_in2 = simplify(Rs_in2)
+        wigner_3j_tensor = torch.einsum('jl,kil->kij', perm, wigner_3j_tensor)
+
+    return Rs_in2, wigner_3j_tensor
 
 
 def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted):
