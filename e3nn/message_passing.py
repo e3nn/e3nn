@@ -12,15 +12,11 @@ class E3Conv(MessagePassing):
         if size is None:
             size = edge_index.shape
         k = self.kernel(edge_attr)
-        print('kernel forward: ', k.shape)
         k.div_(n_norm ** 0.5)
         return self.propagate(edge_index, size=size, x=x, k=k)
 
     def message(self, x_i, k):
-        print('x_i: ', x_i.shape, x_i.dtype)
-        print('k: ', k.shape, k.dtype)
         out = torch.einsum('eij,ej->ei', k, x_i)
-        print(out.shape)
         return out
 
     def update(self, aggr_out):
