@@ -1,6 +1,5 @@
 import torch
 from torch_geometric.nn import MessagePassing
-from e3nn.kernel_mod import kernel_geometric
 
 
 class E3Conv(MessagePassing):
