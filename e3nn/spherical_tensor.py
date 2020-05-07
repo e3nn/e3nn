@@ -193,7 +193,7 @@ class SphericalTensor():
 
     def dot(self, other):
         scalars = self.__mul__(other)
-        dot = scalars.signal.sum(-1)
+        dot = scalars.tensor.sum(-1)
         dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
         return dot
 
@@ -344,11 +344,11 @@ class FourierTensor():
         mult = (new_self.signal * new_other.signal)
         mapping_matrix = rs.map_mul_to_Rs(new_self.Rs)
         scalars = torch.einsum('rm,r->m', mapping_matrix, mult)
-        return FourierTensor(scalars, mul=new_self.mul * (new_self.lmax + 1), lmax=0)
+        return IrrepTensor(scalars, [(new_self.mul * (new_self.lmax + 1),0)])
 
     def dot(self, other):
         scalars = self.__mul__(other)
-        dot = scalars.signal.sum(-1)
+        dot = scalars.tensor.sum(-1)
         dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
         return dot
 
