@@ -27,14 +27,14 @@ def s2_grid(res_beta, res_alpha):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/spherical_harmonics_s2_grid'))
-def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, _version=0):
+def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, _version=1):
     """
     computes the spherical harmonics on the grid on the sphere
     """
     with torch_default_dtype(torch.float64):
         betas, alphas = s2_grid(res_beta, res_alpha)
         sha = rsh.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
-        shb = rsh.spherical_harmonics_beta(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
+        shb = rsh.spherical_harmonics_z(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
         return betas, alphas, shb, sha
 
 

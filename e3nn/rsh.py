@@ -3,14 +3,12 @@
 Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
 import math
-import os
 from functools import lru_cache
-from typing import List, Tuple
+from typing import List
 
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
-from e3nn.util.cache_file import cached_picklesjar
 from e3nn.util.eval_code import eval_code
 
 
@@ -66,35 +64,49 @@ def sympy_legendre(l, m):
     return ex
 
 
-@cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/legendre'), maxsize=None)
-def poly_legendre(l):
+def poly_legendre(l, m):
     """
     polynomial coefficients of legendre
 
     y = sqrt(1 - z^2)
     """
     z, y = symbols('z y', real=True)
-    ps = []
-    for m in range(l + 1):
-        p = Poly(sympy_legendre(l, m), domain='R', gens=(z, y))
-        ps += [[(float(coef), exp) for exp, coef in p.as_dict().items()]]
-    return ps
+    return Poly(sympy_legendre(l, m), domain='R', gens=(z, y)).as_dict()
 
+
+_legendre_code = """
+import torch
+from e3nn import rsh
 
 @torch.jit.script
-def _legendre_eval_polys(polys: List[List[Tuple[float, Tuple[int, int]]]],
-                         pwz: List[torch.Tensor],
-                         pwy: List[torch.Tensor]) -> torch.Tensor:
-    p = []
-    for m, poly in enumerate(polys):
-        val = torch.zeros_like(pwz[0])
-        for coef, (nz, ny) in poly:
-            val += coef * pwz[nz] * pwy[ny]
-        if m == 0:
-            p.append(val)
-        else:
-            p = [val] + p + [val]
-    return torch.stack(p, dim=-1)
+def main(z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    out = z.new_zeros(z.shape + (lsize,))
+
+# fill out
+
+    return out
+"""
+
+
+@lru_cache()
+def _legendre_genjit(ls):
+    ls = list(ls)
+    fill = ""
+    i = 0
+    for l in ls:
+        for m in range(l + 1):
+            p = poly_legendre(l, m)
+            formula = " + ".join("{:.25f} * z**{} * y**{}".format(c, zn, yn) for (zn, yn), c in p.items())
+            fill += "    l{} = {}\n".format(m, formula)
+
+        for m in range(-l, l + 1):
+            fill += "    out[..., {}] = l{}\n".format(i, abs(m))
+            i += 1
+
+    code = _legendre_code
+    code = code.replace("lsize", str(sum(2 * l + 1 for l in ls)))
+    code = code.replace("# fill out", fill)
+    return eval_code(code).main
 
 
 def legendre(ls, z, y=None):
@@ -108,31 +120,24 @@ def legendre(ls, z, y=None):
     if y is None:
         y = (1 - z**2).relu().sqrt()
 
-    zs = [z**m for m in range(max(ls) + 1)]
-    ys = [y**m for m in range(max(ls) + 1)]
-
-    ps = []
-    for l in ls:
-        polys = poly_legendre(l)
-        ps += [_legendre_eval_polys(polys, zs, ys)]
-    return torch.cat(ps, dim=-1)
+    return _legendre_genjit(tuple(ls))(z, y)
 
 
-def spherical_harmonics_beta(ls, cosbeta, abssinbeta=None):
+def spherical_harmonics_z(ls, z, y=None):
     """
-    the cosbeta componant of the spherical harmonics
+    the z componant of the spherical harmonics
     (useful to perform fourier transform)
 
-    :param cosbeta: tensor of shape [...]
+    :param z: tensor of shape [...]
     :return: tensor of shape [..., l * m]
     """
-    return legendre(ls, cosbeta, abssinbeta)  # [..., l * m]
+    return legendre(ls, z, y)  # [..., l * m]
 
 
 @torch.jit.script
 def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
     """
-    the alpha componant of the spherical harmonics
+    the alpha (x, y) componant of the spherical harmonics
     (useful to perform fourier transform)
 
     :param alpha: tensor of shape [...]
@@ -171,62 +176,17 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
         except ImportError:
             pass
 
-    return spherical_harmonics_alpha_z_y_jit(ls, alpha, beta.cos(), beta.sin().abs())
+    return spherical_harmonics_alpha_z_y(ls, alpha, beta.cos(), beta.sin().abs())
 
 
-def spherical_harmonics_alpha_z_y_cpu(ls, alpha, z, y):
+def spherical_harmonics_alpha_z_y(ls, alpha, z, y):
     """
     cpu version of spherical_harmonics_alpha_beta
     """
     sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
-    shb = spherical_harmonics_beta(ls, z.flatten(), y.flatten())  # [z, l * m]
-    out = mul_m_lm(ls, sha, shb)
-    return out.reshape(*alpha.shape, shb.shape[1])
-
-
-_spherical_harmonics_alpha_z_y_jit_code = """
-import torch
-from e3nn import rsh
-
-@torch.jit.script
-def main(alpha: torch.Tensor, z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-# ll_m
-
-    shb = torch.stack([
-# shb
-    ], dim=-1)
-
-    sha = rsh.spherical_harmonics_alpha(lmax, alpha)  # [..., m]
-    return rsh.mul_m_lm(ls, sha, shb)
-"""
-
-
-@lru_cache()
-def _spherical_harmonics_alpha_z_y_jit(ls):
-    ls = list(ls)
-    ll_m = ""
-    shb = ""
-    for l in ls:
-        for m, p in enumerate(poly_legendre(l)):
-            formula = " + ".join("{:.25f} * z**{} * y**{}".format(c, zn, yn) for c, (zn, yn) in p)
-            ll_m += "    l{}_{} = {}\n".format(l, m, formula)
-
-        shb += "        {},\n".format(", ".join("l{}_{}".format(l, abs(m)) for m in range(-l, l + 1)))
-
-    code = _spherical_harmonics_alpha_z_y_jit_code
-    code = code.replace("lmax", str(max(ls)))
-    code = code.replace("ls", str(ls))
-    code = code.replace("# ll_m", ll_m)
-    code = code.replace("# shb", shb)
-    return eval_code(code).main
-
-
-def spherical_harmonics_alpha_z_y_jit(ls, alpha, z, y):
-    """
-    jit version of spherical_harmonics_alpha_beta
-    """
-    f = _spherical_harmonics_alpha_z_y_jit(tuple(ls))
-    return f(alpha, z, y)
+    shz = spherical_harmonics_z(ls, z.flatten(), y.flatten())  # [z, l * m]
+    out = mul_m_lm(ls, sha, shz)
+    return out.reshape(alpha.shape + (shz.shape[1],))
 
 
 def spherical_harmonics_xyz(ls, xyz):
@@ -244,20 +204,13 @@ def spherical_harmonics_xyz(ls, xyz):
         except ImportError:
             pass
 
-    return spherical_harmonics_xyz_cpu(ls, xyz)
-
-
-def spherical_harmonics_xyz_cpu(ls, xyz):
-    """
-    non cuda version of spherical_harmonics_xyz
-    """
     xyz = xyz / torch.norm(xyz, 2, dim=-1, keepdim=True)
 
     alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
-    beta_cos = xyz[..., 2]  # [...]
-    beta_asin = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2)).sqrt()  # [...]
+    z = xyz[..., 2]  # [...]
+    y = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2)).sqrt()  # [...]
 
-    return spherical_harmonics_alpha_z_y_jit(ls, alpha, beta_cos, beta_asin)
+    return spherical_harmonics_alpha_z_y(ls, alpha, z, y)
 
 
 def spherical_harmonics_xyz_cuda(ls, xyz):
