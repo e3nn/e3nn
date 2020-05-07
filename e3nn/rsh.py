@@ -125,7 +125,8 @@ def spherical_harmonics_beta(ls, cosbeta, abssinbeta=None):
     return legendre(ls, cosbeta, abssinbeta)  # [..., l * m]
 
 
-def spherical_harmonics_alpha(l, alpha):
+@torch.jit.script
+def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
     """
     the alpha componant of the spherical harmonics
     (useful to perform fourier transform)
@@ -133,14 +134,13 @@ def spherical_harmonics_alpha(l, alpha):
     :param alpha: tensor of shape [...]
     :return: tensor of shape [..., m]
     """
-    size = alpha.shape
-    alpha = alpha.reshape(-1, 1)  # [batch, 1]
+    alpha = alpha.unsqueeze(-1)  # [..., 1]
 
     m = torch.arange(1, l + 1, dtype=alpha.dtype, device=alpha.device)  # [1, 2, 3, ..., l]
-    cos = torch.cos(m * alpha)  # [batch, m]
+    cos = torch.cos(m * alpha)  # [..., m]
 
     m = torch.arange(l, 0, -1, dtype=alpha.dtype, device=alpha.device)  # [l, l-1, l-2, ..., 1]
-    sin = torch.sin(m * alpha)  # [batch, m]
+    sin = torch.sin(m * alpha)  # [..., m]
 
     out = torch.cat([
         math.sqrt(2) * sin,
@@ -148,7 +148,7 @@ def spherical_harmonics_alpha(l, alpha):
         math.sqrt(2) * cos,
     ], dim=-1)
 
-    return out.reshape(*size, 2 * l + 1)  # [..., m]
+    return out  # [..., m]
 
 
 def spherical_harmonics_alpha_beta(ls, alpha, beta):
