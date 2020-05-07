@@ -40,13 +40,14 @@ def adjusted_projection(vectors, lmax):
     vectors = vectors[radii > 0]  # [batch, 3]
 
     coeff = projection(vectors, lmax)  # [batch, l * m]
-    A = torch.einsum("ai,bi->ab", rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors), coeff)
+    A = torch.einsum(
+        "ai,bi->ab", rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors), coeff)
     coeff *= torch.lstsq(radii, A).solution.reshape(-1).unsqueeze(-1)
     return coeff.sum(0)
 
 
 class SphericalTensor():
-    def __init__(self, signal, mul, lmax, p_val=0, p_arg=0):
+    def __init__(self, signal, lmax, p_val=0, p_arg=0):
         """
         f: s2 -> R
 
@@ -66,13 +67,15 @@ class SphericalTensor():
         Parity
         [P f](x) = sum [p_val p_arg^l F^l] . Y^l(x)     (using parity of Y)
         """
-        if signal.shape[-1] != mul * (lmax + 1)**2:
-            raise ValueError("Last tensor dimension and Rs do not have same dimension.")
+        if signal.shape[-1] != (lmax + 1)**2:
+            raise ValueError(
+                "Last tensor dimension and Rs do not have same dimension.")
 
         self.signal = signal
         self.lmax = lmax
-        self.mul = mul
-        self.Rs = rs.convention([(mul, l, p_val * p_arg**l) for l in range(lmax + 1)])
+        self.mul = 1
+        self.Rs = rs.convention([(self.mul, l, p_val * p_arg**l)
+                                 for l in range(lmax + 1)])
         self.radial_model = None
 
     @classmethod
@@ -81,7 +84,163 @@ class SphericalTensor():
         :param vectors: tensor of vectors (p=-1) or pseudovectors (p=1)
         """
         signal = adjusted_projection(vectors, lmax)
-        return cls(signal, 1, lmax, p_val=1, p_arg=p)
+        return cls(signal, lmax, p_val=1, p_arg=p)
+
+    def sph_norm(self):
+        Rs = self.Rs
+        signal = self.signal
+        n_mul = sum([mul for mul, l, p in Rs])
+        # Keep shape after Rs the same
+        norms = torch.zeros(n_mul, *signal.shape[1:])
+        sig_index = 0
+        norm_index = 0
+        for mul, l, _p in Rs:
+            for _ in range(mul):
+                norms[norm_index] = signal[sig_index: sig_index +
+                                           (2 * l + 1)].norm(2, 0)
+                norm_index += 1
+                sig_index += 2 * l + 1
+        return norms
+
+    def signal_xyz(self, r):
+        """
+        Evaluate the signal on the sphere
+        """
+        sh = rsh.spherical_harmonics_xyz(list(range(self.lmax + 1)), r)
+        dim = (self.lmax + 1)**2
+        output = torch.einsum(
+            'ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
+        return output.reshape((*self.signal.shape[:-1], *r.shape[:-1]))
+
+    def signal_alpha_beta(self, alpha, beta):
+        """
+        Evaluate the signal on the sphere
+        """
+        sh = rsh.spherical_harmonics_alpha_beta(
+            list(range(self.lmax + 1)), alpha, beta)
+        dim = (self.lmax + 1)**2
+        output = torch.einsum(
+            'ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
+        return output.reshape((*self.signal.shape[:-1], *alpha.shape))
+
+    def signal_on_grid(self, n=100):
+        """
+        Evaluate the signal on the sphere
+        """
+        grid = ToS2Grid(self.lmax, res=n, normalization='none')
+        beta, alpha = torch.meshgrid(grid.betas, grid.alphas)  # [beta, alpha]
+        r = o3.angles_to_xyz(alpha, beta)  # [beta, alpha, 3]
+        return r, grid(self.signal)
+
+    def plot(self, n=100, radius=True, center=None, relu=True):
+        """
+        r, f = self.plot()
+        surface = go.Surface(
+            x=r[:, :, 0].numpy(),
+            y=r[:, :, 1].numpy(),
+            z=r[:, :, 2].numpy(),
+            surfacecolor=f.numpy()
+        )
+        fig = go.Figure(data=[surface])
+        fig.show()
+        """
+        r, f = self.signal_on_grid(n)
+        f = f.relu() if relu else f
+
+        r = torch.cat([r, r[:, :1]], dim=1)  # [beta, alpha, 3]
+        f = torch.cat([f, f[:, :1]], dim=1)  # [beta, alpha]
+
+        if radius:
+            r *= f.abs().unsqueeze(-1)
+
+        if center is not None:
+            r += center.unsqueeze(0).unsqueeze(0)
+
+        return r, f
+
+    def change_lmax(self, lmax):
+        new_Rs = [(self.mul, l) for l in range(lmax + 1)]
+        if self.lmax == lmax:
+            return self
+        elif self.lmax > lmax:
+            new_signal = self.signal[:rs.dim(new_Rs)]
+            return SphericalTensor(new_signal, lmax)
+        elif self.lmax < lmax:
+            new_signal = torch.zeros(rs.dim(new_Rs))
+            new_signal[:rs.dim(self.Rs)] = self.signal
+            return SphericalTensor(new_signal, lmax)
+
+    def __add__(self, other):
+        if self.mul != other.mul:
+            raise ValueError("Multiplicities do not match.")
+        lmax = max(self.lmax, other.lmax)
+        new_self = self.change_lmax(lmax)
+        new_other = other.change_lmax(lmax)
+        return SphericalTensor(new_self.signal + new_other.signal, self.lmax)
+
+    def __mul__(self, other):
+        # Dot product if Rs of both objects match
+        if self.mul != other.mul:
+            raise ValueError("Multiplicities do not match.")
+        lmax = max(self.lmax, other.lmax)
+        new_self = self.change_lmax(lmax)
+        new_other = other.change_lmax(lmax)
+
+        mult = (new_self.signal * new_other.signal)
+        mapping_matrix = rs.map_mul_to_Rs(new_self.Rs)
+        scalars = torch.einsum('rm,r->m', mapping_matrix, mult)
+        return IrrepTensor(scalars, [(new_self.mul * (new_self.lmax + 1), 0)])
+
+    def dot(self, other):
+        scalars = self.__mul__(other)
+        dot = scalars.signal.sum(-1)
+        dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
+        return dot
+
+    def __matmul__(self, other):
+        # Tensor product
+        # Better handle mismatch of features indices
+        Rs_out, C = rs.tensor_product(self.Rs, other.Rs, o3.selection_rule)
+        new_signal = torch.einsum('kij,...i,...j->...k',
+                                  (C, self.signal, other.signal))
+        return IrrepTensor(new_signal, Rs_out)
+
+    def __rmatmul__(self, other):
+        # Tensor product
+        return self.__matmul__(other)
+
+
+class FourierTensor():
+    def __init__(self, signal, mul, lmax, p_val=0, p_arg=0):
+        """
+        f: s2 x r -> R^N
+
+        Rotations
+        [D(g) f](x) = f(g^{-1} x)
+
+        Parity
+        [P f](x) = p_val f(p_arg x)
+
+        f(x) = sum F^l . Y^l(x)
+
+        This class contains the F^l
+
+        Rotations
+        [D(g) f](x) = sum [D^l(g) F^l] . Y^l(x)         (using equiv. of Y and orthogonality of D)
+
+        Parity
+        [P f](x) = sum [p_val p_arg^l F^l] . Y^l(x)     (using parity of Y)
+        """
+        if signal.shape[-1] != mul * (lmax + 1)**2:
+            raise ValueError(
+                "Last tensor dimension and Rs do not have same dimension.")
+
+        self.signal = signal
+        self.lmax = lmax
+        self.mul = mul
+        self.Rs = rs.convention([(mul, l, p_val * p_arg**l)
+                                 for l in range(lmax + 1)])
+        self.radial_model = None
 
     @classmethod
     def from_geometry_with_radial(cls, vectors, radial_model, lmax, sum_points=True):
@@ -126,67 +285,15 @@ class SphericalTensor():
         norm_index = 0
         for mul, l, _p in Rs:
             for _ in range(mul):
-                norms[norm_index] = signal[sig_index: sig_index + (2 * l + 1)].norm(2, 0)
+                norms[norm_index] = signal[sig_index: sig_index +
+                                           (2 * l + 1)].norm(2, 0)
                 norm_index += 1
                 sig_index += 2 * l + 1
         return norms
 
-    def signal_xyz(self, r):
-        """
-        Evaluate the signal on the sphere
-        """
-        sh = rsh.spherical_harmonics_xyz(list(range(self.lmax + 1)), r)
-        dim = (self.lmax + 1)**2
-        output = torch.einsum('ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
-        return output.reshape((*self.signal.shape[:-1], *r.shape[:-1]))
-
-    def signal_alpha_beta(self, alpha, beta):
-        """
-        Evaluate the signal on the sphere
-        """
-        sh = rsh.spherical_harmonics_alpha_beta(list(range(self.lmax + 1)), alpha, beta)
-        dim = (self.lmax + 1)**2
-        output = torch.einsum('ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
-        return output.reshape((*self.signal.shape[:-1], *alpha.shape))
-
-    def signal_on_grid(self, n=100):
-        """
-        Evaluate the signal on the sphere
-        """
-        grid = ToS2Grid(self.lmax, res=n, normalization='none')
-        beta, alpha = torch.meshgrid(grid.betas, grid.alphas)  # [beta, alpha]
-        r = o3.angles_to_xyz(alpha, beta)  # [beta, alpha, 3]
-        return r, grid(self.signal)
-
-    def plot(self, n=100, radius=True, center=None, relu=True):
-        """
-        r, f = self.plot()
-        surface = go.Surface(
-            x=r[:, :, 0].numpy(),
-            y=r[:, :, 1].numpy(),
-            z=r[:, :, 2].numpy(),
-            surfacecolor=f.numpy()
-        )
-        fig = go.Figure(data=[surface])
-        fig.show()
-        """
-        r, f = self.signal_on_grid(n)
-        f = f.relu() if relu else f
-
-        r = torch.cat([r, r[:, :1]], dim=1)  # [beta, alpha, 3]
-        f = torch.cat([f, f[:, :1]], dim=1)  # [beta, alpha]
-
-        if radius:
-            r *= f.abs().unsqueeze(-1)
-
-        if center is not None:
-            r += center.unsqueeze(0).unsqueeze(0)
-
-        return r, f
-
-    def plot_with_radial(self, box_length, center=None,
-                         sh=rsh.spherical_harmonics_xyz, n=30,
-                         radial_model=None, relu=True):
+    def plot(self, box_length, center=None,
+             sh=rsh.spherical_harmonics_xyz, n=30,
+             radial_model=None, relu=True):
         muls, _ls, _ps = zip(*self.Rs)
         # We assume radial functions are repeated across L's
         assert len(set(muls)) == 1
@@ -212,11 +319,11 @@ class SphericalTensor():
             return self
         elif self.lmax > lmax:
             new_signal = self.signal[:rs.dim(new_Rs)]
-            return SphericalTensor(new_signal, self.mul, lmax)
+            return FourierTensor(new_signal, self.mul, lmax)
         elif self.lmax < lmax:
             new_signal = torch.zeros(rs.dim(new_Rs))
             new_signal[:rs.dim(self.Rs)] = self.signal
-            return SphericalTensor(new_signal, self.mul, lmax)
+            return FourierTensor(new_signal, self.mul, lmax)
 
     def __add__(self, other):
         if self.mul != other.mul:
@@ -224,7 +331,7 @@ class SphericalTensor():
         lmax = max(self.lmax, other.lmax)
         new_self = self.change_lmax(lmax)
         new_other = other.change_lmax(lmax)
-        return SphericalTensor(new_self.signal + new_other.signal, self.mul, self.lmax)
+        return FourierTensor(new_self.signal + new_other.signal, self.mul, self.lmax)
 
     def __mul__(self, other):
         # Dot product if Rs of both objects match
@@ -237,7 +344,7 @@ class SphericalTensor():
         mult = (new_self.signal * new_other.signal)
         mapping_matrix = rs.map_mul_to_Rs(new_self.Rs)
         scalars = torch.einsum('rm,r->m', mapping_matrix, mult)
-        return SphericalTensor(scalars, mul=new_self.mul * (new_self.lmax + 1), lmax=0)
+        return FourierTensor(scalars, mul=new_self.mul * (new_self.lmax + 1), lmax=0)
 
     def dot(self, other):
         scalars = self.__mul__(other)
