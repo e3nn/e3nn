@@ -37,7 +37,7 @@ class Tests(unittest.TestCase):
         # edge_attr is the radii of the relative distance vectors
         edge_attr = torch.randn(edge_index.shape[-1], 3)
         out = conv(x, edge_index, edge_attr, size=(N, N))
-        assert list(out.shape) == [9, 7]
+        assert list(out.shape) == [N, c_out]
 
 
 if __name__ == '__main__':
