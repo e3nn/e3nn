@@ -190,9 +190,6 @@ from e3nn import rsh
 
 @torch.jit.script
 def main(alpha: torch.Tensor, z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    zs = [z**m for m in range(lmax + 1)]
-    ys = [y**m for m in range(lmax + 1)]
-
 # ll_m
 
     shb = torch.stack([
@@ -211,7 +208,7 @@ def _spherical_harmonics_alpha_z_y_jit(ls):
     shb = ""
     for l in ls:
         for m, p in enumerate(poly_legendre(l)):
-            formula = " + ".join("{:.25f} * zs[{}] * ys[{}]".format(c, zn, yn) for c, (zn, yn) in p)
+            formula = " + ".join("{:.25f} * z**{} * y**{}".format(c, zn, yn) for c, (zn, yn) in p)
             ll_m += "    l{}_{} = {}\n".format(l, m, formula)
 
         shb += "        {},\n".format(", ".join("l{}_{}".format(l, abs(m)) for m in range(-l, l + 1)))
