@@ -61,7 +61,7 @@ class SphericalAndFourierTensorTests(unittest.TestCase):
         def radial_model(x):
             return torch.ones_like(x).unsqueeze(-1)
 
-        sphten.FourierTensor.from_geometry_with_radial(coords, radial_model, lmax)
+        sphten.FourierTensor.from_geometry(coords, radial_model, lmax)
 
     def test_sph_norm(self):
         torch.set_default_dtype(torch.float64)
@@ -71,7 +71,8 @@ class SphericalAndFourierTensorTests(unittest.TestCase):
         sph.sph_norm()
 
         mul = 3
-        sph = sphten.FourierTensor(torch.randn(mul * (lmax + 1) ** 2), mul, lmax)
+        sph = sphten.FourierTensor(torch.randn(
+            mul * (lmax + 1) ** 2), mul, lmax)
         sph.sph_norm()
 
     def test_plot(self):
@@ -97,9 +98,9 @@ class SphericalAndFourierTensorTests(unittest.TestCase):
         def radial_model(x):
             return torch.ones_like(x).unsqueeze(-1)
 
-        sph = sphten.FourierTensor.from_geometry_with_radial(coords,
-                                                             radial_model,
-                                                             lmax)
+        sph = sphten.FourierTensor.from_geometry(coords,
+                                                 radial_model,
+                                                 lmax)
 
         n = 16
         center = torch.ones(3)

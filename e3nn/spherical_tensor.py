@@ -210,7 +210,7 @@ class SphericalTensor():
         return self.__matmul__(other)
 
 
-class FourierTensor():
+class FourierTensor(SphericalTensor):
     def __init__(self, signal, mul, lmax, p_val=0, p_arg=0):
         """
         f: s2 x r -> R^N
@@ -243,7 +243,7 @@ class FourierTensor():
         self.radial_model = None
 
     @classmethod
-    def from_geometry_with_radial(cls, vectors, radial_model, lmax, sum_points=True):
+    def from_geometry(cls, vectors, radial_model, lmax, sum_points=True):
         """
         :param vectors: tensor of shape [..., xyz]
         :param radial_model: function of signature R+ -> R^mul
@@ -274,22 +274,6 @@ class FourierTensor():
         new_cls = cls(signal, R, lmax)
         new_cls.radial_model = radial_model
         return new_cls
-
-    def sph_norm(self):
-        Rs = self.Rs
-        signal = self.signal
-        n_mul = sum([mul for mul, l, p in Rs])
-        # Keep shape after Rs the same
-        norms = torch.zeros(n_mul, *signal.shape[1:])
-        sig_index = 0
-        norm_index = 0
-        for mul, l, _p in Rs:
-            for _ in range(mul):
-                norms[norm_index] = signal[sig_index: sig_index +
-                                           (2 * l + 1)].norm(2, 0)
-                norm_index += 1
-                sig_index += 2 * l + 1
-        return norms
 
     def plot(self, box_length, center=None,
              sh=rsh.spherical_harmonics_xyz, n=30,
@@ -332,37 +316,6 @@ class FourierTensor():
         new_self = self.change_lmax(lmax)
         new_other = other.change_lmax(lmax)
         return FourierTensor(new_self.signal + new_other.signal, self.mul, self.lmax)
-
-    def __mul__(self, other):
-        # Dot product if Rs of both objects match
-        if self.mul != other.mul:
-            raise ValueError("Multiplicities do not match.")
-        lmax = max(self.lmax, other.lmax)
-        new_self = self.change_lmax(lmax)
-        new_other = other.change_lmax(lmax)
-
-        mult = (new_self.signal * new_other.signal)
-        mapping_matrix = rs.map_mul_to_Rs(new_self.Rs)
-        scalars = torch.einsum('rm,r->m', mapping_matrix, mult)
-        return IrrepTensor(scalars, [(new_self.mul * (new_self.lmax + 1),0)])
-
-    def dot(self, other):
-        scalars = self.__mul__(other)
-        dot = scalars.tensor.sum(-1)
-        dot /= (self.signal.norm(2, 0) * other.signal.norm(2, 0))
-        return dot
-
-    def __matmul__(self, other):
-        # Tensor product
-        # Better handle mismatch of features indices
-        Rs_out, C = rs.tensor_product(self.Rs, other.Rs, o3.selection_rule)
-        new_signal = torch.einsum('kij,...i,...j->...k',
-                                  (C, self.signal, other.signal))
-        return IrrepTensor(new_signal, Rs_out)
-
-    def __rmatmul__(self, other):
-        # Tensor product
-        return self.__matmul__(other)
 
 
 def plot_on_grid(box_length, radial_model, Rs, sh=rsh.spherical_harmonics_xyz, n=30):
