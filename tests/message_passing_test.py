@@ -23,7 +23,7 @@ class Tests(unittest.TestCase):
 
         K = partial(Kernel, RadialModel=RadialModel,
                     selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
-        
+
         conv = E3Conv(K, Rs_in, Rs_out)
 
         N = 9
