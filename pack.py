@@ -36,6 +36,7 @@ KWARGS = dict(
         'scipy',
         'sympy',
         'torch>=1.4.0',
+        'torch_geometric',
     ],
     include_package_data=True,
     classifiers=[
