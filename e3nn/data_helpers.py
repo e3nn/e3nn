@@ -33,7 +33,7 @@ def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
         dist = cart - p
         nei_list.append(indices)
         geo_list.append(dist)
-    return torch.cat(nei_list, dim=0), torch.cat(geo_list, dim=0)
+    return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
 
 
 def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True):
@@ -71,7 +71,7 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
         dist = cart - torch.tensor(site.coords)
         nei_list.append(indices)
         geo_list.append(dist)
-    return torch.cat(nei_list, dim=0), torch.cat(geo_list, dim=0)
+    return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
 
 
 class DataNeighbors(tg.data.Data):
