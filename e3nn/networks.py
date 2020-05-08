@@ -48,23 +48,25 @@ class GatedConvNetwork(torch.nn.Module):
         self.layers.append(Convolution(K, representations[-2], representations[-1]))
         self.feature_product = feature_product
 
-    def forward(self, input, geometry):
+    def forward(self, input, *args, **kwargs):
         output = input
-        _, N, _ = geometry.shape
+        N = args[0].shape[-2]
+        if 'n_norm' not in kwargs:
+            kwargs['n_norm'] = N
 
         if self.feature_product:
             for tp, lin, conv, act in self.layers[:-1]:
                 output = tp(output)
                 output = lin(output)
-                output = conv(output, geometry, n_norm=N)
+                output = conv(output, *args, **kwargs)
                 output = act(output)
         else:
             for conv, act in self.layers[:-1]:
-                output = conv(output, geometry, n_norm=N)
+                output = conv(output, *args, **kwargs)
                 output = act(output)
 
         layer = self.layers[-1]
-        output = layer(output, geometry, n_norm=N)
+        output = layer(output, *args, **kwargs)
 
         return output
 
