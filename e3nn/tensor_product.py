@@ -6,6 +6,7 @@ import torch
 from e3nn import o3, rs
 from e3nn.linear import Linear
 from e3nn.linear_mod import KernelLinear
+from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
 
 class TensorProduct(torch.nn.Module):
@@ -14,15 +15,15 @@ class TensorProduct(torch.nn.Module):
 
     [(2, 0), (1, 1)] x [(1, 1), (2, 0)] = [(2, 1), (5, 0), (1, 1), (1, 2), (2, 1)]
     """
-    def __init__(self, Rs_1, Rs_2, selection_rule=o3.selection_rule):
+    def __init__(self, Rs_1, Rs_2, selection_rule=o3.selection_rule, sorted=True):
         super().__init__()
 
         self.Rs_1 = rs.simplify(Rs_1)
         self.Rs_2 = rs.simplify(Rs_2)
 
-        Rs_out, mixing_matrix = rs.tensor_product(Rs_1, Rs_2, selection_rule)
+        Rs_out, mixing_matrix = rs.tensor_product(Rs_1, Rs_2, selection_rule, sorted=sorted)
         self.Rs_out = rs.simplify(Rs_out)
-        self.register_buffer('mixing_matrix', mixing_matrix)
+        register_sparse_buffer(self, 'mixing_matrix', mixing_matrix)
 
     def __repr__(self):
         return "{name} ({Rs_1} x {Rs_2} -> {Rs_out})".format(
@@ -42,8 +43,11 @@ class TensorProduct(torch.nn.Module):
         features_2 = features_2.reshape(-1, n_2)
         assert size_1 == size_2
 
-        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
-        return output.reshape(*size_1, -1)
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")
+
+        features = torch.einsum('zi,zj->ijz', features_1, features_2)
+        features = mixing_matrix @ features.reshape(-1, features.shape[2])
+        return features.T.reshape(*size_1, -1)
 
 
 class TensorSquare(torch.nn.Module):
@@ -58,7 +62,7 @@ class TensorSquare(torch.nn.Module):
         self.Rs_in = rs.simplify(Rs_in)
 
         self.Rs_out, mixing_matrix = rs.tensor_square(self.Rs_in, selection_rule, sorted=True)
-        self.register_buffer('mixing_matrix', mixing_matrix)
+        register_sparse_buffer(self, 'mixing_matrix', mixing_matrix)
 
     def __repr__(self):
         return "{name} ({Rs_in} ^ 2 -> {Rs_out})".format(
@@ -74,8 +78,11 @@ class TensorSquare(torch.nn.Module):
         *size, n = features.size()
         features = features.reshape(-1, n)
 
-        features = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features, features)
-        return features.reshape(*size, -1)
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")
+
+        features = torch.einsum('zi,zj->ijz', features, features)
+        features = mixing_matrix @ features.reshape(-1, features.shape[2])
+        return features.T.reshape(*size, -1)
 
 
 class LearnableTensorSquare(torch.nn.Module):
@@ -89,7 +96,7 @@ class LearnableTensorSquare(torch.nn.Module):
 
         self.Rs_in = rs.simplify(Rs_in)
         Rs_ts, T = rs.tensor_square(self.Rs_in, selection_rule, sorted=True)
-        self.register_buffer('T', T)  # [out, in1, in2]
+        register_sparse_buffer(self, 'T', T)  # [out, in1 * in2]
 
         self.Rs_out = sorted({(mul, l, p) for _, l, p in Rs_ts})
         self.kernel = KernelLinear(Rs_ts, self.Rs_out)  # [out, in, w]
@@ -108,7 +115,9 @@ class LearnableTensorSquare(torch.nn.Module):
         *size, n = features.size()
         features = features.reshape(-1, n)
 
-        kernel = torch.einsum('ij,jkl->ikl', self.kernel(), self.T)  # [out, in1, in2]
+        # kernel = torch.einsum('ij,jkl->ikl', self.kernel(), self.T)  # [out, in1, in2]
+        T = get_sparse_buffer(self, 'T')
+        kernel = self.kernel() @ T  # [out, in1 * in2]
         features = torch.einsum('kij,zi,zj->zk', kernel, features, features)
         return features.reshape(*size, -1)
 
@@ -125,7 +134,7 @@ class ElementwiseTensorProduct(torch.nn.Module):
         assert sum(mul for mul, _, _ in Rs_1) == sum(mul for mul, _, _ in Rs_2)
 
         Rs_out, mixing_matrix = rs.elementwise_tensor_product(Rs_1, Rs_2, selection_rule)
-        self.register_buffer("mixing_matrix", mixing_matrix)
+        register_sparse_buffer(self, "mixing_matrix", mixing_matrix)
         self.Rs_out = rs.simplify(Rs_out)
 
     def forward(self, features_1, features_2):
@@ -138,8 +147,11 @@ class ElementwiseTensorProduct(torch.nn.Module):
         features_2 = features_2.reshape(-1, n_2)
         assert size_1 == size_2
 
-        output = torch.einsum('kij,zi,zj->zk', self.mixing_matrix, features_1, features_2)
-        return output.reshape(*size_1, -1)
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")
+
+        features = torch.einsum('zi,zj->ijz', features_1, features_2)
+        features = mixing_matrix @ features.reshape(-1, features.shape[2])
+        return features.T.reshape(*size_1, -1)
 
 
 class LearnableTensorProduct(torch.nn.Module):
