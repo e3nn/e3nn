@@ -142,7 +142,6 @@ class SphericalAndFourierTensorTests(unittest.TestCase):
 
     def test_mul_and_dot(self):
         lmax = 4
-        mul = 1
         signal1 = torch.zeros((lmax + 1) ** 2)
         signal2 = signal1.clone()
         signal1[0] = 1.
