@@ -96,8 +96,7 @@ class SphericalTensor():
         norm_index = 0
         for mul, l, _p in Rs:
             for _ in range(mul):
-                norms[norm_index] = signal[sig_index: sig_index +
-                                           (2 * l + 1)].norm(2, 0)
+                norms[norm_index] = signal[sig_index: sig_index + (2 * l + 1)].norm(2, 0)
                 norm_index += 1
                 sig_index += 2 * l + 1
         return norms
