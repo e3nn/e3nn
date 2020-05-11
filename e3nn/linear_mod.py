@@ -11,7 +11,9 @@ def kernel_linear(Rs_in, Rs_out):
             return [0]
         return []
 
-    Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out)  # [out, in, w]
+    Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out)  # [out, in * w]
+    Q = Q.to_dense().reshape(rs.dim(Rs_out), rs.dim(Rs_in), rs.dim(Rs_f))
+
     Rs_f = rs.simplify(Rs_f)
     [(_n_path, l, p)] = Rs_f
     assert l == 0 and p in [0, 1]

@@ -22,7 +22,9 @@ class Tests(unittest.TestCase):
         x2 = torch.randn(1, rs.dim(Rs_2))
 
         y1 = mul(x1, x2)
-        y2 = torch.einsum('kij,zi,zj->zk', m, x1, x2)
+        y2 = torch.einsum('zi,zj->ijz', x1, x2)
+        y2 = m @ y2.reshape(-1, y2.shape[2])
+        y2 = y2.T
 
         self.assertEqual(rs.dim(Rs_out), y1.shape[1])
         self.assertLess((y1 - y2).abs().max(), 1e-7 * y1.abs().max())
@@ -34,7 +36,7 @@ class Tests(unittest.TestCase):
         Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
 
         Rs_out, m = rs.tensor_product(Rs_1, Rs_2, o3.selection_rule, sorted=True)
-        mul = TensorProduct(Rs_1, Rs_2)
+        mul = TensorProduct(Rs_1, Rs_2, o3.selection_rule)
 
         x1 = rs.randn(1, Rs_1)
         x2 = rs.randn(1, Rs_2)
@@ -51,26 +53,13 @@ class Tests(unittest.TestCase):
             with o3.torch_default_dtype(torch.float64):
                 Rs_out, Q = rs.tensor_product(Rs_in1, Rs_in2, o3.selection_rule)
 
-                abc = torch.rand(3, dtype=torch.float64)
+                n = rs.dim(Rs_out)
+                I = torch.eye(n, dtype=Q.dtype())
 
-                D_in1 = rs.rep(Rs_in1, *abc)
-                D_in2 = rs.rep(Rs_in2, *abc)
-                D_out = rs.rep(Rs_out, *abc)
-
-                Q1 = torch.einsum("ijk,il->ljk", (Q, D_out))
-                Q2 = torch.einsum("li,mj,kij->klm", (D_in1, D_in2, Q))
-
-                d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
+                d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
                 self.assertLess(d, 1e-10)
 
-                n = Q.size(0)
-                M = Q.reshape(n, n)
-                I = torch.eye(n, dtype=M.dtype)
-
-                d = ((M @ M.t()) - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                d = ((M.t() @ M) - I).pow(2).mean().sqrt()
+                d = ((Q.t() @ Q).to_dense() - I).pow(2).mean().sqrt()
                 self.assertLess(d, 1e-10)
 
     def test_tensor_square_equivariance(self):
@@ -106,23 +95,12 @@ class Tests(unittest.TestCase):
             with o3.torch_default_dtype(torch.float64):
                 Rs_in2, Q = rs.tensor_product(Rs_in1, o3.selection_rule, Rs_out)
 
-                abc = torch.rand(3, dtype=torch.float64)
+                n = rs.dim(Rs_out)
+                I = torch.eye(n, dtype=Q.dtype())
 
-                D_in1 = rs.rep(Rs_in1, *abc)
-                D_in2 = rs.rep(Rs_in2, *abc)
-                D_out = rs.rep(Rs_out, *abc)
-
-                Q1 = torch.einsum("ijk,il->ljk", (Q, D_out))
-                Q2 = torch.einsum("li,mj,kij->klm", (D_in1, D_in2, Q))
-
-                d = (Q1 - Q2).pow(2).mean().sqrt() / Q1.pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                n = Q.size(0)
-                M = Q.reshape(n, -1)
-                I = torch.eye(n, dtype=M.dtype)
-
-                d = ((M @ M.t()) - I).pow(2).mean().sqrt()
+                x = Q @ Q.t()
+                x = x.to_dense()
+                d = (x - I).pow(2).mean().sqrt()
                 self.assertLess(d, 1e-10)
 
 

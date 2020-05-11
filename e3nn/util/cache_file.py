@@ -89,10 +89,8 @@ def cached_picklesjar(dirname, maxsize=128, open_jar=gzip.open,
                         if key == loadedkey:
                             return load(file)
 
-            print("compute... ", end="")
             sys.stdout.flush()
             result = func(*args, **kwargs)
-            print("save... ", end="")
             sys.stdout.flush()
 
             with FileSystemMutex(mutexfile):
@@ -112,7 +110,6 @@ def cached_picklesjar(dirname, maxsize=128, open_jar=gzip.open,
                     with open_jar(file, "wb") as file:
                         save(key, file)
                         save(result, file)
-                    print("done")
                 except PermissionError:
                     pass
 

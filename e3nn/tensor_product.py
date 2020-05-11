@@ -15,27 +15,34 @@ class TensorProduct(torch.nn.Module):
 
     [(2, 0), (1, 1)] x [(1, 1), (2, 0)] = [(2, 1), (5, 0), (1, 1), (1, 2), (2, 1)]
     """
-    def __init__(self, Rs_1, Rs_2, selection_rule=o3.selection_rule, sorted=True):
+    def __init__(self, input1, input2, output, normalization='component', sorted=True):
         super().__init__()
 
-        self.Rs_1 = rs.simplify(Rs_1)
-        self.Rs_2 = rs.simplify(Rs_2)
+        Rs, mat = rs.tensor_product(input1, input2, output, normalization, sorted)
 
-        Rs_out, mixing_matrix = rs.tensor_product(Rs_1, Rs_2, selection_rule, sorted=sorted)
-        self.Rs_out = rs.simplify(Rs_out)
-        register_sparse_buffer(self, 'mixing_matrix', mixing_matrix)
+        self.Rs_in1, self.Rs_in2, self.Rs_out = input1, input2, output
+        if not isinstance(self.Rs_in1, list):
+            self.Rs_in1 = Rs
+        if not isinstance(self.Rs_in2, list):
+            self.Rs_in2 = Rs
+        if not isinstance(self.Rs_out, list):
+            self.Rs_out = Rs
+
+        register_sparse_buffer(self, 'mixing_matrix', mat)
 
     def __repr__(self):
-        return "{name} ({Rs_1} x {Rs_2} -> {Rs_out})".format(
+        return "{name} ({Rs_in1} x {Rs_in2} -> {Rs_out})".format(
             name=self.__class__.__name__,
-            Rs_1=rs.format_Rs(self.Rs_1),
-            Rs_2=rs.format_Rs(self.Rs_2),
+            Rs_in1=rs.format_Rs(self.Rs_in1),
+            Rs_in2=rs.format_Rs(self.Rs_in2),
             Rs_out=rs.format_Rs(self.Rs_out),
         )
 
     def forward(self, features_1, features_2):
         '''
-        :param features: [..., channels]
+        :param features_1: [..., channels]
+        :param features_2: [..., channels]
+        :return: [..., channels]
         '''
         *size_1, n_1 = features_1.size()
         features_1 = features_1.reshape(-1, n_1)
@@ -43,11 +50,25 @@ class TensorProduct(torch.nn.Module):
         features_2 = features_2.reshape(-1, n_2)
         assert size_1 == size_2
 
-        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
 
-        features = torch.einsum('zi,zj->ijz', features_1, features_2)
-        features = mixing_matrix @ features.reshape(-1, features.shape[2])
+        features = torch.einsum('zi,zj->ijz', features_1, features_2)  # [in1, in2, batch]
+        features = features.reshape(features_1.shape[1] * features_2.shape[1], features.shape[2])
+        features = mixing_matrix @ features  # [out, batch]
         return features.T.reshape(*size_1, -1)
+
+    def right(self, features_2):
+        '''
+        :param features_2: [..., ch_in2]
+        :return: [..., ch_out, ch_in1]
+        '''
+        *size_2, n_2 = features_2.size()
+        features_2 = features_2.reshape(-1, n_2)
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+        mixing_matrix = mixing_matrix.sparse_reshape(rs.dim(self.Rs_out) * rs.dim(self.Rs_in1), rs.dim(self.Rs_in2))
+        output = mixing_matrix @ features_2.T  # [out * in1, batch]
+        return output.T.reshape(*size_2, rs.dim(self.Rs_out), rs.dim(self.Rs_in1))
 
 
 class TensorSquare(torch.nn.Module):
@@ -117,7 +138,7 @@ class LearnableTensorSquare(torch.nn.Module):
 
         # kernel = torch.einsum('ij,jkl->ikl', self.kernel(), self.T)  # [out, in1, in2]
         T = get_sparse_buffer(self, 'T')
-        kernel = self.kernel() @ T  # [out, in1 * in2]
+        kernel = (T.t() @ self.kernel().T).T.reshape(rs.dim(self.Rs_out), rs.dim(self.Rs_in), rs.dim(self.Rs_in))  # [out, in1, in2]
         features = torch.einsum('kij,zi,zj->zk', kernel, features, features)
         return features.reshape(*size, -1)
 

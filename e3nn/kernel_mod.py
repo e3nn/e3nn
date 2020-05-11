@@ -2,20 +2,16 @@
 import math
 
 import torch
+from torch_sparse import SparseTensor
 
 from e3nn import o3, rs, rsh
 from e3nn.linear_mod import KernelLinear
+from e3nn.tensor_product import TensorProduct
 
 
 def kernel_geometric(Rs_in, Rs_out, selection_rule=o3.selection_rule_in_out_sh, normalization='component'):
     # Compute Clebsh-Gordan coefficients
-    Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out, normalization)  # [out, in, Y]
-
-    # Sort filters representation
-    Rs_f, perm = rs.sort(Rs_f)
-    Rs_f = rs.simplify(Rs_f)
-    Q = torch.einsum('ijk,lk->ijl', Q, perm)
-    del perm
+    Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out, normalization, sorted=True)  # [out, in, Y]
 
     # Normalize the spherical harmonics
     if normalization == 'component':
@@ -31,14 +27,15 @@ def kernel_geometric(Rs_in, Rs_out, selection_rule=o3.selection_rule_in_out_sh, 
     # Create the radial model: R+ -> R^n_path
     mat_R = rs.map_mul_to_Rs(Rs_f)  # [Rs_f, R]
 
-    mixing_matrix = torch.einsum('ijk,ky,kw->ijyw', Q, mat_Y, mat_R)  # [out, in, Y, R]
+    #  mixing_matrix = torch.einsum('ijk,ky,kw->ijyw', Q, mat_Y, mat_R)  # [out, in, Y, R]
+    x = SparseTensor.from_dense(torch.einsum('ky,kw->kyw', mat_Y, mat_R).reshape(rs.dim(Rs_f), -1))
+    mixing_matrix = Q.sparse_reshape(-1, rs.dim(Rs_f)) @ x  # [out * in, Y * R]
     return Rs_f, mixing_matrix
 
 
 class Kernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel,
                  selection_rule=o3.selection_rule_in_out_sh,
-                 sh=rsh.spherical_harmonics_xyz,
                  normalization='component',
                  allow_unused_inputs=False):
         """
@@ -59,12 +56,13 @@ class Kernel(torch.nn.Module):
             self.check_input(selection_rule)
         self.check_output(selection_rule)
 
-        Rs_f, Q = kernel_geometric(self.Rs_in, self.Rs_out, selection_rule, normalization)
-        self.register_buffer('Q', Q)  # [out, in, Y, R]
+        self.normalization = normalization
 
-        self.sh = sh
-        self.Ls = [l for _, l, _ in Rs_f]
-        self.R = RadialModel(rs.mul_dim(Rs_f))
+        self.tp = TensorProduct(self.Rs_in, selection_rule, Rs_out, normalization, sorted=True)
+        self.Rs_f = self.tp.Rs_in2
+
+        self.Ls = [l for _, l, _ in self.Rs_f]
+        self.R = RadialModel(rs.mul_dim(self.Rs_f))
 
         self.linear = KernelLinear(self.Rs_in, self.Rs_out)
 
@@ -99,16 +97,25 @@ class Kernel(torch.nn.Module):
         # (1) Case r > 0
 
         # precompute all needed spherical harmonics
-        Y = self.sh(self.Ls, r[radii > r_eps])  # [batch, l_filter * m_filter]
+        Y = rsh.spherical_harmonics_xyz(self.Ls, r[radii > r_eps])  # [batch, l_filter * m_filter]
+
+        # Normalize the spherical harmonics
+        if self.normalization == 'component':
+            Y = math.sqrt(4 * math.pi) * Y
+        if self.normalization == 'norm':
+            diag = math.sqrt(4 * math.pi) * torch.cat([torch.ones(2 * l + 1) / math.sqrt(2 * l + 1) for _, l, _ in self.Rs_f])
+            Y.mul_(diag)
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one
         R = self.R(radii[radii > r_eps])  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
+        RY = rsh.mul_radial_angular(self.Rs_f, R, Y)
+
         if Y.shape[0] == 0:
-            kernel1 = torch.zeros(0, *self.Q.shape[:2])
+            kernel1 = torch.zeros(0, rs.dim(self.Rs_out), rs.dim(self.Rs_in))
         else:
-            kernel1 = torch.einsum('ijyw,zy,zw->zij', self.Q, Y, R)
+            kernel1 = self.tp.right(RY)
 
         # (2) Case r = 0
 
@@ -148,6 +155,7 @@ class FrozenKernel(torch.nn.Module):
         self.r_eps = r_eps
 
         Rs_f, Q = kernel_geometric(self.Rs_in, self.Rs_out, selection_rule, normalization)
+        Q = Q.to_dense().reshape(rs.dim(self.Rs_out), rs.dim(self.Rs_in), rs.irrep_dim(Rs_f), -1)
         Y = sh([l for _, l, _ in Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
         Q = torch.einsum('ijyw,zy->zijw', Q, Y)
         self.register_buffer('Q', Q)  # [out, in, Y, R]

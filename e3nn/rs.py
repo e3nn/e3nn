@@ -12,7 +12,7 @@ import torch
 from torch_sparse import SparseTensor
 
 from e3nn import o3
-from e3nn.util.sparse import spreshape
+from e3nn.util.sparse import register_sparse_buffer, get_sparse_buffer
 
 
 def rep(Rs, alpha, beta, gamma, parity=None):
@@ -107,7 +107,7 @@ class TransposeToMulL(torch.nn.Module):
         super().__init__()
         self.Rs_in = convention(Rs)
         self.mul, self.Rs_out = transpose_mul(self.Rs_in)
-        self.register_buffer('mixing_matrix', rearrange(self.Rs_in, self.mul * self.Rs_out))
+        register_sparse_buffer(self, 'mixing_matrix', rearrange(self.Rs_in, self.mul * self.Rs_out))
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {mul} x {Rs_out})".format(
@@ -121,7 +121,9 @@ class TransposeToMulL(torch.nn.Module):
         *size, n = features.size()
         features = features.reshape(-1, n)
 
-        features = torch.einsum('ij,zj->zi', self.mixing_matrix, features)
+        mixing_matrix = get_sparse_buffer(self, 'mixing_matrix')
+        # features = torch.einsum('ij,zj->zi', self.mixing_matrix, features)
+        features = (mixing_matrix @ features.T).T
         return features.reshape(*size, self.mul, -1)
 
 
@@ -456,7 +458,11 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
             index_2 += dim_2
         index_1 += dim_1
 
-    wigner_3j_tensor = SparseTensor(row=torch.cat(row), col=torch.cat(col), value=torch.cat(val))
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     if sorted:
         Rs_out, perm = sort(Rs_out)
@@ -538,15 +544,19 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
             index_1 += dim_1
         index_out += dim_out
 
-    wigner_3j_tensor = SparseTensor(row=torch.cat(row), col=torch.cat(col), value=torch.cat(val))
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     if sorted:
         Rs_in2, perm = sort(Rs_in2)
         Rs_in2 = simplify(Rs_in2)
         # wigner_3j_tensor = torch.einsum('jl,kil->kij', perm, wigner_3j_tensor)
-        wigner_3j_tensor = spreshape(wigner_3j_tensor, dim(Rs_in2))
+        wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in2))
         wigner_3j_tensor = wigner_3j_tensor @ perm.t()
-        wigner_3j_tensor = spreshape(wigner_3j_tensor, dim(Rs_in1) * dim(Rs_in2))
+        wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in1) * dim(Rs_in2))
 
     return Rs_in2, wigner_3j_tensor
 
@@ -652,7 +662,11 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
             index_2 += dim_2
         index_1 += dim_1
 
-    wigner_3j_tensor = SparseTensor(row=torch.cat(row), col=torch.cat(col), value=torch.cat(val))
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in) * dim(Rs_in)))
 
     if sorted:
         Rs_out, perm = sort(Rs_out)
@@ -735,6 +749,10 @@ def elementwise_tensor_product(Rs_in1, Rs_in2, selection_rule=o3.selection_rule,
         index_1 += dim_1
         index_2 += dim_2
 
-    wigner_3j_tensor = SparseTensor(row=torch.cat(row), col=torch.cat(col), value=torch.cat(val))
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     return Rs_out, wigner_3j_tensor
