@@ -4,7 +4,7 @@ from functools import partial
 
 import torch
 
-from e3nn import o3
+from e3nn import o3, rsh
 from e3nn.kernel import Kernel, KernelFn
 from e3nn.radial import ConstantRadialModel
 
@@ -24,7 +24,7 @@ class Tests(unittest.TestCase):
                 n_path += mul_out * mul_in * len(l_filters)
 
         r = torch.randn(2, 3)
-        Y = kernel.sh(kernel.set_of_l_filters, r)  # [l_filter * m_filter, batch]
+        Y = rsh.spherical_harmonics_xyz(kernel.set_of_l_filters, r)  # [l_filter * m_filter, batch]
         Y = Y.clone().detach().requires_grad_(True)
         R = torch.randn(2, n_path, requires_grad=True)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 

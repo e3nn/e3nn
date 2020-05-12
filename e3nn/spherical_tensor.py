@@ -275,7 +275,7 @@ class FourierTensor(SphericalTensor):
         return new_cls
 
     def plot(self, box_length, center=None,
-             sh=rsh.spherical_harmonics_xyz, n=30,
+             n=30,
              radial_model=None, relu=True):
         muls, _ls, _ps = zip(*self.Rs)
         # We assume radial functions are repeated across L's
@@ -286,7 +286,7 @@ class FourierTensor(SphericalTensor):
 
         def new_radial(x):
             return radial_model(x).repeat(1, num_L)  # Repeat along filter dim
-        r, f = plot_on_grid(box_length, new_radial, self.Rs, sh=sh, n=n)
+        r, f = plot_on_grid(box_length, new_radial, self.Rs, n=n)
         # Multiply coefficients
         f = torch.einsum('xd,d->x', f, self.signal)
         f = f.relu() if relu else f
@@ -317,7 +317,7 @@ class FourierTensor(SphericalTensor):
         return FourierTensor(new_self.signal + new_other.signal, self.mul, self.lmax)
 
 
-def plot_on_grid(box_length, radial_model, Rs, sh=rsh.spherical_harmonics_xyz, n=30):
+def plot_on_grid(box_length, radial_model, Rs, n=30):
     l_to_index = {}
     set_of_l = set([l for mul, l, p in Rs])
     start = 0
@@ -336,8 +336,8 @@ def plot_on_grid(box_length, radial_model, Rs, sh=rsh.spherical_harmonics_xyz, n
     def radial_lambda(_ignored):
         return radial_model
 
-    grid = FrozenKernel(Rs_in, Rs_out, radial_lambda, r, sh=sh)
-    R = grid.R(grid.radii)
-    # j is just 1 because Rs_in is 1d
-    f = torch.einsum('xjmw,xw->xj', grid.Q, R)
+    grid = FrozenKernel(Rs_in, Rs_out, radial_lambda, r)
+    f = grid()
+    # input is just 1 because Rs_in is 1d
+    f = f[..., 0]
     return r, f
