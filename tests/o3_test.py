@@ -124,5 +124,6 @@ class Tests(unittest.TestCase):
             n, bigA, D_rest = o3.reduce(D, partial(o3.irr_repr, 1))
             assert n == 2
 
+
 if __name__ == '__main__':
     unittest.main()
