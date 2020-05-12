@@ -44,31 +44,56 @@ class TensorProduct(torch.nn.Module):
         :param features_2: [..., channels]
         :return: [..., channels]
         '''
-        *size_1, n_1 = features_1.size()
-        features_1 = features_1.reshape(-1, n_1)
-        *size_2, n_2 = features_2.size()
-        features_2 = features_2.reshape(-1, n_2)
-        assert size_1 == size_2
+        d_out = rs.dim(self.Rs_out)
+        d_in1 = rs.dim(self.Rs_in1)
+        d_in2 = rs.dim(self.Rs_in2)
+
+        features = features_1[..., :, None] * features_2[..., None, :]
+
+        size = features.shape[:-2]
+        features = features.reshape(-1, d_in1, d_in2)  # [in1, in2, batch]
 
         mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
 
-        features = torch.einsum('zi,zj->ijz', features_1, features_2)  # [in1, in2, batch]
-        features = features.reshape(features_1.shape[1] * features_2.shape[1], features.shape[2])
+        features = torch.einsum('zij->ijz', features)  # [in1, in2, batch]
+        features = features.reshape(d_in1 * d_in2, features.shape[2])
         features = mixing_matrix @ features  # [out, batch]
-        return features.T.reshape(*size_1, -1)
+        return features.T.reshape(*size, d_out)
 
     def right(self, features_2):
         '''
         :param features_2: [..., ch_in2]
         :return: [..., ch_out, ch_in1]
         '''
-        *size_2, n_2 = features_2.size()
-        features_2 = features_2.reshape(-1, n_2)
+        d_out = rs.dim(self.Rs_out)
+        d_in1 = rs.dim(self.Rs_in1)
+        d_in2 = rs.dim(self.Rs_in2)
+        size_2 = features_2.shape[:-1]
+        features_2 = features_2.reshape(-1, d_in2)
 
         mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
-        mixing_matrix = mixing_matrix.sparse_reshape(rs.dim(self.Rs_out) * rs.dim(self.Rs_in1), rs.dim(self.Rs_in2))
+        mixing_matrix = mixing_matrix.sparse_reshape(d_out * d_in1, d_in2)
         output = mixing_matrix @ features_2.T  # [out * in1, batch]
-        return output.T.reshape(*size_2, rs.dim(self.Rs_out), rs.dim(self.Rs_in1))
+        return output.T.reshape(*size_2, d_out, d_in1)
+
+    def left(self, features_1):
+        '''
+        :param features_1: [..., ch_in1]
+        :return: [..., ch_out, ch_in2]
+        '''
+        d_out = rs.dim(self.Rs_out)
+        d_in1 = rs.dim(self.Rs_in1)
+        d_in2 = rs.dim(self.Rs_in2)
+        size_1 = features_1.shape[:-1]
+        features_1 = features_1.reshape(-1, d_in1)
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+        mixing_matrix = mixing_matrix.sparse_reshape(d_out * d_in1, d_in2).t()  # [in2, out * in1]
+        mixing_matrix = mixing_matrix.sparse_reshape(d_in2 * d_out, d_in1)  # [in2 * out, in1]
+        output = mixing_matrix @ features_1.T  # [in2 * out, batch]
+        output = output.reshape(d_in2, d_out, features_1.shape[0])
+        output = torch.einsum('jiz->zij', output)
+        return output.reshape(*size_1, d_out, d_in2)
 
 
 class TensorSquare(torch.nn.Module):
