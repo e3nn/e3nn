@@ -56,7 +56,7 @@ def mul_radial_angular(Rs: List[Tuple[int, int, int]], radial, angular):
     :param radial: [..., l * mul]
     """
     n = 0
-    for mul, l, p in Rs:
+    for mul, l, _ in Rs:
         n += mul * (2 * l + 1)
 
     y = radial[..., 0] * angular[..., 0]
@@ -65,7 +65,7 @@ def mul_radial_angular(Rs: List[Tuple[int, int, int]], radial, angular):
     a = 0
     r = 0
     i = 0
-    for mul, l, p in Rs:
+    for mul, l, _ in Rs:
         dim = mul * (2 * l + 1)
         x = radial[..., r: r + mul, None] * angular[..., None, a: a + 2 * l + 1]
         x = x.reshape(y.shape + (dim,))

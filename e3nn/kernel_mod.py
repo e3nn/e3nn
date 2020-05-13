@@ -5,7 +5,6 @@ import torch
 
 from e3nn import o3, rs, rsh
 from e3nn.linear_mod import KernelLinear
-from e3nn.tensor_product import TensorProduct
 
 
 class Kernel(torch.nn.Module):
@@ -33,7 +32,7 @@ class Kernel(torch.nn.Module):
 
         self.normalization = normalization
 
-        self.tp = TensorProduct(self.Rs_in, selection_rule, Rs_out, normalization, sorted=True)
+        self.tp = rs.TensorProduct(self.Rs_in, selection_rule, Rs_out, normalization, sorted=True)
         self.Rs_f = self.tp.Rs_in2
 
         self.Ls = [l for _, l, _ in self.Rs_f]
@@ -129,7 +128,7 @@ class FrozenKernel(torch.nn.Module):
         self.radii = r.norm(2, dim=1)  # [batch]
         self.r_eps = r_eps
 
-        self.tp = TensorProduct(self.Rs_in, selection_rule, self.Rs_out, normalization, sorted=True)
+        self.tp = rs.TensorProduct(self.Rs_in, selection_rule, self.Rs_out, normalization, sorted=True)
         self.Rs_f = self.tp.Rs_in2
 
         self.Y = rsh.spherical_harmonics_xyz([l for _, l, _ in self.Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
