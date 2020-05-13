@@ -5,7 +5,7 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.tensor.spherical_tensor import spherical_harmonics_dirac, SphericalTensor, projection, adjusted_projection
-from e3nn.tensor.fourrier_tensor import FourierTensor
+from e3nn.tensor.fourier_tensor import FourierTensor
 
 
 class Tests(unittest.TestCase):
