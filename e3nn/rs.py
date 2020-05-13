@@ -5,12 +5,14 @@ Some functions related to SO3 and his usual representations
 Using ZYZ Euler angles parametrisation
 """
 
-from fractions import gcd
+from math import gcd
 from functools import reduce
 
 import torch
+from torch_sparse import SparseTensor
 
 from e3nn import o3
+from e3nn.util.sparse import register_sparse_buffer, get_sparse_buffer
 
 
 def rep(Rs, alpha, beta, gamma, parity=None):
@@ -105,7 +107,7 @@ class TransposeToMulL(torch.nn.Module):
         super().__init__()
         self.Rs_in = convention(Rs)
         self.mul, self.Rs_out = transpose_mul(self.Rs_in)
-        self.register_buffer('mixing_matrix', rearrange(self.Rs_in, self.mul * self.Rs_out))
+        register_sparse_buffer(self, 'mixing_matrix', rearrange(self.Rs_in, self.mul * self.Rs_out))
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {mul} x {Rs_out})".format(
@@ -119,7 +121,9 @@ class TransposeToMulL(torch.nn.Module):
         *size, n = features.size()
         features = features.reshape(-1, n)
 
-        features = torch.einsum('ij,zj->zi', self.mixing_matrix, features)
+        mixing_matrix = get_sparse_buffer(self, 'mixing_matrix')
+        # features = torch.einsum('ij,zj->zi', self.mixing_matrix, features)
+        features = (mixing_matrix @ features.T).T
         return features.reshape(*size, self.mul, -1)
 
 
@@ -139,13 +143,15 @@ def rearrange(Rs_in, Rs_out):
     Rs_in, a = sort(Rs_in)
     Rs_out, b = sort(Rs_out)
     assert simplify(Rs_in) == simplify(Rs_out)
-    return b.T @ a
+    return b.t() @ a
 
 
 def sort(Rs):
     """
     :return: (Rs_out, permutation_matrix)
     stable sorting of the representation by (l, p)
+
+    sorted = perm @ unsorted
 
     >>> sort([(1, 1), (1, 0)])
     ([(1, 0, 0), (1, 1, 0)],
@@ -167,14 +173,19 @@ def sort(Rs):
         xs.append((l, p, mul, j, d))
         j += d
 
-    permutation_matrix = torch.zeros(j, j)
+    index = []
 
     Rs_out = []
     i = 0  # output offset
     for l, p, mul, j, d in sorted(xs):
         Rs_out.append((mul, l, p))
-        permutation_matrix[i:i + d, j:j + d] = torch.eye(d)
-        i += d
+        for _ in range(d):
+            index.append([i, j])
+            i += 1
+            j += 1
+
+    index = torch.tensor(index).T
+    permutation_matrix = SparseTensor(row=index[0], col=index[1], value=torch.ones(index.shape[1]))
 
     return Rs_out, permutation_matrix
 
@@ -375,8 +386,101 @@ def tensor_product(input1, input2, output, normalization='component', sorted=Fal
 
     if isinstance(input2, list) and isinstance(output, list):
         Rs_in1, Q = _tensor_product_in_out(input2, input1, output, normalization, sorted)
-        Q = torch.einsum('kij->kji', Q)
+        # [out, in2 * in1] -> [out, in1 * in2]
+        row, col, val = Q.coo()
+        n1 = dim(Rs_in1)
+        n2 = dim(input2)
+        col = n2 * (col % n1) + col // n1
+        Q = SparseTensor(row=row,
+                         col=col,
+                         value=val,
+                         sparse_sizes=(dim(output), n1 * n2))
         return Rs_in1, Q
+
+
+class TensorProduct(torch.nn.Module):
+    """
+    Module for tensor_product
+    """
+    def __init__(self, input1, input2, output, normalization='component', sorted=True):
+        super().__init__()
+
+        Rs, mat = tensor_product(input1, input2, output, normalization, sorted)
+
+        self.Rs_in1, self.Rs_in2, self.Rs_out = input1, input2, output
+        if not isinstance(self.Rs_in1, list):
+            self.Rs_in1 = Rs
+        if not isinstance(self.Rs_in2, list):
+            self.Rs_in2 = Rs
+        if not isinstance(self.Rs_out, list):
+            self.Rs_out = Rs
+
+        register_sparse_buffer(self, 'mixing_matrix', mat)
+
+    def __repr__(self):
+        return "{name} ({Rs_in1} x {Rs_in2} -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in1=format_Rs(self.Rs_in1),
+            Rs_in2=format_Rs(self.Rs_in2),
+            Rs_out=format_Rs(self.Rs_out),
+        )
+
+    def forward(self, features_1, features_2):
+        '''
+        :param features_1: [..., in1]
+        :param features_2: [..., in2]
+        :return: [..., out]
+        '''
+        d_out = dim(self.Rs_out)
+        d_in1 = dim(self.Rs_in1)
+        d_in2 = dim(self.Rs_in2)
+
+        features = features_1[..., :, None] * features_2[..., None, :]
+
+        size = features.shape[:-2]
+        features = features.reshape(-1, d_in1, d_in2)  # [in1, in2, batch]
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+
+        features = torch.einsum('zij->ijz', features)  # [in1, in2, batch]
+        features = features.reshape(d_in1 * d_in2, features.shape[2])
+        features = mixing_matrix @ features  # [out, batch]
+        return features.T.reshape(*size, d_out)
+
+    def right(self, features_2):
+        '''
+        :param features_2: [..., in2]
+        :return: [..., out, in1]
+        '''
+        d_out = dim(self.Rs_out)
+        d_in1 = dim(self.Rs_in1)
+        d_in2 = dim(self.Rs_in2)
+        size_2 = features_2.shape[:-1]
+        features_2 = features_2.reshape(-1, d_in2)
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+        mixing_matrix = mixing_matrix.sparse_reshape(d_out * d_in1, d_in2)
+        output = mixing_matrix @ features_2.T  # [out * in1, batch]
+        return output.T.reshape(*size_2, d_out, d_in1)
+
+    def left(self, features_1):
+        '''
+        :param features_1: [..., in1]
+        :return: [..., out, in2]
+        '''
+        d_out = dim(self.Rs_out)
+        d_in1 = dim(self.Rs_in1)
+        d_in2 = dim(self.Rs_in2)
+        size_1 = features_1.shape[:-1]
+        features_1 = features_1.reshape(-1, d_in1)
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+        mixing_matrix = mixing_matrix.sparse_reshape(d_out * d_in1, d_in2).t()  # [in2, out * in1]
+        mixing_matrix = mixing_matrix.sparse_reshape(d_in2 * d_out, d_in1)  # [in2 * out, in1]
+        output = mixing_matrix @ features_1.T  # [in2 * out, batch]
+        output = output.reshape(d_in2, d_out, features_1.shape[0])
+        output = torch.einsum('jiz->zij', output)
+        return output.reshape(*size_1, d_out, d_in2)
 
 
 def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted):
@@ -408,7 +512,10 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
 
     Rs_out = simplify(Rs_out)
 
-    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
+    dim_in2 = dim(Rs_in2)
+    row = []
+    col = []
+    val = []
 
     index_out = 0
 
@@ -428,16 +535,28 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).reshape(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                i_out, i_1, i_2 = m.nonzero().T
+                i_out += index_out
+                i_1 += index_1
+                i_2 += index_2
+                row.append(i_out)
+                col.append(i_1 * dim_in2 + i_2)
+                val.append(m[m != 0])
 
                 index_out += dim_out
             index_2 += dim_2
         index_1 += dim_1
 
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
+
     if sorted:
         Rs_out, perm = sort(Rs_out)
         Rs_out = simplify(Rs_out)
-        wigner_3j_tensor = torch.einsum('ij,jkl->ikl', perm, wigner_3j_tensor)
+        wigner_3j_tensor = perm @ wigner_3j_tensor
 
     return Rs_out, wigner_3j_tensor
 
@@ -471,7 +590,10 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
 
     Rs_in2 = simplify(Rs_in2)
 
-    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in1), dim(Rs_in2))
+    dim_in2 = dim(Rs_in2)
+    row = []
+    col = []
+    val = []
 
     index_2 = 0
 
@@ -496,16 +618,31 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_out * mul_1).reshape(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                i_out, i_1, i_2 = m.nonzero().T
+                i_out += index_out
+                i_1 += index_1
+                i_2 += index_2
+                row.append(i_out)
+                col.append(i_1 * dim_in2 + i_2)
+                val.append(m[m != 0])
 
                 index_2 += dim_2
             index_1 += dim_1
         index_out += dim_out
 
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
+
     if sorted:
         Rs_in2, perm = sort(Rs_in2)
         Rs_in2 = simplify(Rs_in2)
-        wigner_3j_tensor = torch.einsum('jl,kil->kij', perm, wigner_3j_tensor)
+        # sorted = perm @ unsorted
+        wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in2))
+        wigner_3j_tensor = wigner_3j_tensor @ perm.t()
+        wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in1) * dim(Rs_in2))
 
     return Rs_in2, wigner_3j_tensor
 
@@ -544,7 +681,10 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
 
     Rs_out = simplify(Rs_out)
 
-    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_in), dim(Rs_in))
+    dim_in = dim(Rs_in)
+    row = []
+    col = []
+    val = []
 
     index_out = 0
 
@@ -570,7 +710,13 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_1 + 1) ** 0.5
             dim_out = I.shape[0] * (2 * l_out + 1)
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_1)
-            wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_1:index_1 + dim_1] = m
+            i_out, i_1, i_2 = m.nonzero().T
+            i_out += index_out
+            i_1 += index_1
+            i_2 += index_1
+            row.append(i_out)
+            col.append(i_1 * dim_in + i_2)
+            val.append(m[m != 0])
 
             index_out += dim_out
 
@@ -587,20 +733,67 @@ def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='compon
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 dim_out = I.shape[0] * (2 * l_out + 1)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+                i_out, i_1, i_2 = m.nonzero().T
+                i_out += index_out
+                i_1 += index_1
+                i_2 += index_2
+                row.append(i_out)
+                col.append(i_1 * dim_in + i_2)
+                val.append(m[m != 0])
 
                 index_out += dim_out
             index_2 += dim_2
         index_1 += dim_1
 
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in) * dim(Rs_in)))
+
     if sorted:
         Rs_out, perm = sort(Rs_out)
         Rs_out = simplify(Rs_out)
-        wigner_3j_tensor = torch.einsum('ij,jkl->ikl', perm, wigner_3j_tensor)
+        # sorted = perm @ unsorted
+        wigner_3j_tensor = perm @ wigner_3j_tensor
+
     return Rs_out, wigner_3j_tensor
 
 
-def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, normalization='component'):
+class TensorSquare(torch.nn.Module):
+    """
+    Module for tensor_square
+    """
+    def __init__(self, Rs_in, selection_rule=o3.selection_rule):
+        super().__init__()
+
+        self.Rs_in = simplify(Rs_in)
+
+        self.Rs_out, mixing_matrix = tensor_square(self.Rs_in, selection_rule, sorted=True)
+        register_sparse_buffer(self, 'mixing_matrix', mixing_matrix)
+
+    def __repr__(self):
+        return "{name} ({Rs_in} ^ 2 -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in=format_Rs(self.Rs_in),
+            Rs_out=format_Rs(self.Rs_out),
+        )
+
+    def forward(self, features):
+        '''
+        :param features: [..., channels]
+        '''
+        *size, n = features.size()
+        features = features.reshape(-1, n)
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")
+
+        features = torch.einsum('zi,zj->ijz', features, features)
+        features = mixing_matrix @ features.reshape(-1, features.shape[2])
+        return features.T.reshape(*size, -1)
+
+
+def elementwise_tensor_product(Rs_in1, Rs_in2, selection_rule=o3.selection_rule, normalization='component'):
     """
     :return: Rs_out, matrix
 
@@ -608,39 +801,42 @@ def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, nor
     """
     assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
 
-    Rs_1 = simplify(Rs_1)
-    Rs_2 = simplify(Rs_2)
+    Rs_in1 = simplify(Rs_in1)
+    Rs_in2 = simplify(Rs_in2)
 
-    assert sum(mul for mul, _, _ in Rs_1) == sum(mul for mul, _, _ in Rs_2)
+    assert sum(mul for mul, _, _ in Rs_in1) == sum(mul for mul, _, _ in Rs_in2)
 
     i = 0
-    while i < len(Rs_1):
-        mul_1, l_1, p_1 = Rs_1[i]
-        mul_2, l_2, p_2 = Rs_2[i]
+    while i < len(Rs_in1):
+        mul_1, l_1, p_1 = Rs_in1[i]
+        mul_2, l_2, p_2 = Rs_in2[i]
 
         if mul_1 < mul_2:
-            Rs_2[i] = (mul_1, l_2, p_2)
-            Rs_2.insert(i + 1, (mul_2 - mul_1, l_2, p_2))
+            Rs_in2[i] = (mul_1, l_2, p_2)
+            Rs_in2.insert(i + 1, (mul_2 - mul_1, l_2, p_2))
 
         if mul_2 < mul_1:
-            Rs_1[i] = (mul_2, l_1, p_1)
-            Rs_1.insert(i + 1, (mul_1 - mul_2, l_1, p_1))
+            Rs_in1[i] = (mul_2, l_1, p_1)
+            Rs_in1.insert(i + 1, (mul_1 - mul_2, l_1, p_1))
         i += 1
 
     Rs_out = []
-    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
+    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_in1, Rs_in2):
         assert mul == mul_2
         for l in selection_rule(l_1, p_1, l_2, p_2):
             Rs_out.append((mul, l, p_1 * p_2))
 
     Rs_out = simplify(Rs_out)
 
-    wigner_3j_tensor = torch.zeros(dim(Rs_out), dim(Rs_1), dim(Rs_2))
+    dim_in2 = dim(Rs_in2)
+    row = []
+    col = []
+    val = []
 
     index_out = 0
     index_1 = 0
     index_2 = 0
-    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_1, Rs_2):
+    for (mul, l_1, p_1), (mul_2, l_2, p_2) in zip(Rs_in1, Rs_in2):
         assert mul == mul_2
         dim_1 = mul * (2 * l_1 + 1)
         dim_2 = mul * (2 * l_2 + 1)
@@ -654,10 +850,60 @@ def elementwise_tensor_product(Rs_1, Rs_2, selection_rule=o3.selection_rule, nor
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-            wigner_3j_tensor[index_out:index_out + dim_out, index_1:index_1 + dim_1, index_2:index_2 + dim_2] = m
+            i_out, i_1, i_2 = m.nonzero().T
+            i_out += index_out
+            i_1 += index_1
+            i_2 += index_2
+            row.append(i_out)
+            col.append(i_1 * dim_in2 + i_2)
+            val.append(m[m != 0])
+
             index_out += dim_out
 
         index_1 += dim_1
         index_2 += dim_2
 
+    wigner_3j_tensor = SparseTensor(
+        row=torch.cat(row),
+        col=torch.cat(col),
+        value=torch.cat(val),
+        sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
+
     return Rs_out, wigner_3j_tensor
+
+
+class ElementwiseTensorProduct(torch.nn.Module):
+    """
+    Module for elementwise_tensor_product
+    """
+    def __init__(self, Rs_in1, Rs_in2, selection_rule=o3.selection_rule):
+        super().__init__()
+
+        self.Rs_in1 = simplify(Rs_in1)
+        self.Rs_in2 = simplify(Rs_in2)
+        assert sum(mul for mul, _, _ in self.Rs_in1) == sum(mul for mul, _, _ in self.Rs_in2)
+
+        self.Rs_out, mixing_matrix = elementwise_tensor_product(self.Rs_in1, self.Rs_in2, selection_rule)
+        register_sparse_buffer(self, "mixing_matrix", mixing_matrix)
+
+    def forward(self, features_1, features_2):
+        '''
+        :param features_1: [..., in1]
+        :param features_2: [..., in2]
+        :return: [..., out]
+        '''
+        d_out = dim(self.Rs_out)
+        d_in1 = dim(self.Rs_in1)
+        d_in2 = dim(self.Rs_in2)
+
+        features = features_1[..., :, None] * features_2[..., None, :]
+
+        size = features.shape[:-2]
+        features = features.reshape(-1, d_in1, d_in2)  # [in1, in2, batch]
+
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+
+        features = torch.einsum('zij->ijz', features)  # [in1, in2, batch]
+        features = features.reshape(d_in1 * d_in2, features.shape[2])
+        features = mixing_matrix @ features  # [out, batch]
+        return features.T.reshape(*size, d_out)

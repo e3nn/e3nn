@@ -1,8 +1,7 @@
 # pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member, pointless-statement
 import torch
 
-import e3nn.o3 as o3
-import e3nn.rs as rs
+from e3nn import o3, rs, rsh
 from e3nn.kernel import Kernel
 
 
@@ -25,7 +24,7 @@ class KernelConv(Kernel):
 
         # precompute all needed spherical harmonics
         if y is None:
-            y = self.sh(self.set_of_l_filters, difference_geometry)  # [batch, a, b, l_filter * m_filter]
+            y = rsh.spherical_harmonics_xyz(self.set_of_l_filters, difference_geometry)  # [batch, a, b, l_filter * m_filter]
 
         y[radii == 0] = 0
 
