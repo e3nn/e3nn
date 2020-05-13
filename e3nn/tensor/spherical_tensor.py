@@ -6,7 +6,6 @@ import torch
 from e3nn import o3, rs, rsh
 from e3nn.s2grid import ToS2Grid
 from e3nn.tensor.irrep_tensor import IrrepTensor
-from e3nn.tensor_product import TensorProduct
 
 
 def spherical_harmonics_dirac(vectors, lmax):
@@ -185,5 +184,5 @@ class SphericalTensor:
     def __matmul__(self, other):
         # Tensor product
         # Better handle mismatch of features indices
-        tp = TensorProduct(self.Rs, other.Rs, o3.selection_rule)
+        tp = rs.TensorProduct(self.Rs, other.Rs, o3.selection_rule)
         return IrrepTensor(tp(self.signal, other.signal), tp.Rs_out)
