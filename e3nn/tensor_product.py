@@ -40,9 +40,9 @@ class TensorProduct(torch.nn.Module):
 
     def forward(self, features_1, features_2):
         '''
-        :param features_1: [..., channels]
-        :param features_2: [..., channels]
-        :return: [..., channels]
+        :param features_1: [..., in1]
+        :param features_2: [..., in2]
+        :return: [..., out]
         '''
         d_out = rs.dim(self.Rs_out)
         d_in1 = rs.dim(self.Rs_in1)
@@ -62,8 +62,8 @@ class TensorProduct(torch.nn.Module):
 
     def right(self, features_2):
         '''
-        :param features_2: [..., ch_in2]
-        :return: [..., ch_out, ch_in1]
+        :param features_2: [..., in2]
+        :return: [..., out, in1]
         '''
         d_out = rs.dim(self.Rs_out)
         d_in1 = rs.dim(self.Rs_in1)
@@ -78,8 +78,8 @@ class TensorProduct(torch.nn.Module):
 
     def left(self, features_1):
         '''
-        :param features_1: [..., ch_in1]
-        :return: [..., ch_out, ch_in2]
+        :param features_1: [..., in1]
+        :return: [..., out, in2]
         '''
         d_out = rs.dim(self.Rs_out)
         d_in1 = rs.dim(self.Rs_in1)
