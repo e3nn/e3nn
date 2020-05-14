@@ -410,14 +410,19 @@ class TensorProduct(torch.nn.Module):
 
         Rs, mat = tensor_product(input1, input2, output, normalization, sorted)
 
-        self.Rs_in1, self.Rs_in2, self.Rs_out = input1, input2, output
-        if not isinstance(self.Rs_in1, list):
+        if not isinstance(input1, list):
             self.Rs_in1 = Rs
+            self.Rs_in2 = convention(input2)
+            self.Rs_out = convention(output)
             self._complete = 'in1'
-        if not isinstance(self.Rs_in2, list):
+        if not isinstance(input2, list):
+            self.Rs_in1 = convention(input1)
             self.Rs_in2 = Rs
+            self.Rs_out = convention(output)
             self._complete = 'in2'
-        if not isinstance(self.Rs_out, list):
+        if not isinstance(output, list):
+            self.Rs_in1 = convention(input1)
+            self.Rs_in2 = convention(input2)
             self.Rs_out = Rs
             self._complete = 'out'
 
