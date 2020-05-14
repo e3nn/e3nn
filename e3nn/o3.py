@@ -8,6 +8,7 @@ import gc
 import math
 import os
 from functools import lru_cache
+from typing import Callable, List
 
 import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
 import scipy
@@ -174,7 +175,10 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return dDda, dDdb, dDdc
 
 
-def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
+TY_SELECTION_RULE = Callable[[int, int, int, int], List[int]]
+
+
+def selection_rule(l1: int, _p1: int, l2: int, _p2: int, lmax=None, lfilter=None) -> List[int]:
     """
     selection rule
     :return: list from |l1-l2|... to l1+l2
@@ -189,7 +193,7 @@ def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
     return ls
 
 
-def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
+def selection_rule_in_out_sh(l_in: int, p_in: int, l_out: int, p_out: int, lmax=None) -> List[int]:
     """
     all possible spherical harmonics such that
     Input * SH = Output

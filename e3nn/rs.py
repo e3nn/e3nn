@@ -5,14 +5,18 @@ Some functions related to SO3 and his usual representations
 Using ZYZ Euler angles parametrisation
 """
 
-from math import gcd
 from functools import reduce
+from math import gcd
+from typing import List, Tuple, Union, Literal
 
 import torch
 from torch_sparse import SparseTensor
 
 from e3nn import o3
-from e3nn.util.sparse import register_sparse_buffer, get_sparse_buffer
+from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
+
+TY_RS_LOOSE = List[Union[Tuple[int, int], Tuple[int, int, int]]]
+TY_RS_STRICT = List[Tuple[int, int, int]]
 
 
 def rep(Rs, alpha, beta, gamma, parity=None):
@@ -55,7 +59,7 @@ def randn(*size, normalization='component', dtype=None, device=None, requires_gr
     assert False, "normalization needs to be 'norm' or 'component'"
 
 
-def haslinearpath(Rs_in, l_out, p_out, selection_rule=o3.selection_rule):
+def haslinearpath(Rs_in: TY_RS_STRICT, l_out: int, p_out: int, selection_rule: o3.TY_SELECTION_RULE = o3.selection_rule):
     """
     :param Rs_in: list of triplet (multiplicity, representation order, parity)
     :return: if there is a linear operation between them
@@ -146,7 +150,7 @@ def rearrange(Rs_in, Rs_out):
     return b.t() @ a
 
 
-def sort(Rs):
+def sort(Rs: TY_RS_LOOSE) -> SparseTensor:
     """
     :return: (Rs_out, permutation_matrix)
     stable sorting of the representation by (l, p)
@@ -190,7 +194,7 @@ def sort(Rs):
     return Rs_out, permutation_matrix
 
 
-def irrep_dim(Rs):
+def irrep_dim(Rs: TY_RS_LOOSE) -> int:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: number of irreps of the representation without multiplicities
@@ -199,7 +203,7 @@ def irrep_dim(Rs):
     return sum(2 * l + 1 for _, l, _ in Rs)
 
 
-def mul_dim(Rs):
+def mul_dim(Rs: TY_RS_LOOSE) -> int:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: number of multiplicities of the representation
@@ -208,7 +212,7 @@ def mul_dim(Rs):
     return sum(mul for mul, _, _ in Rs)
 
 
-def dim(Rs):
+def dim(Rs: TY_RS_LOOSE) -> int:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: dimention of the representation
@@ -217,7 +221,7 @@ def dim(Rs):
     return sum(mul * (2 * l + 1) for mul, l, _ in Rs)
 
 
-def convention(Rs):
+def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: conventional version of the same list which always includes parity
@@ -242,7 +246,7 @@ def convention(Rs):
     return out
 
 
-def simplify(Rs):
+def simplify(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: An equivalent list with parity = {-1, 0, 1} and neighboring orders consolidated into higher multiplicity.
@@ -269,7 +273,7 @@ def simplify(Rs):
     return out
 
 
-def are_equal(Rs1, Rs2):
+def are_equal(Rs1: TY_RS_LOOSE, Rs2: TY_RS_LOOSE) -> bool:
     """
     :param Rs1: first list of triplet (multiplicity, representation order, [parity])
     :param Rs2: second list of triplet (multiplicity, representation order, [parity])
@@ -289,7 +293,7 @@ def are_equal(Rs1, Rs2):
     return simplify(Rs1) == simplify(Rs2)
 
 
-def format_Rs(Rs):
+def format_Rs(Rs: TY_RS_LOOSE) -> str:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: simplified version of the same list with the parity
@@ -303,7 +307,7 @@ def format_Rs(Rs):
     return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
 
 
-def map_irrep_to_Rs(Rs):
+def map_irrep_to_Rs(Rs: TY_RS_LOOSE) -> torch.Tensor:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: mapping matrix from irreps to full representation order (Rs) such
@@ -333,7 +337,7 @@ def map_irrep_to_Rs(Rs):
     return mapping_matrix  # [dim(Rs), irrep_dim(Rs)]
 
 
-def map_mul_to_Rs(Rs):
+def map_mul_to_Rs(Rs: TY_RS_LOOSE) -> torch.Tensor:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: mapping matrix for multiplicity and full representation order (Rs)
@@ -362,7 +366,13 @@ def map_mul_to_Rs(Rs):
     return mapping_matrix  # [dim(Rs), mul_dim(Rs)]
 
 
-def tensor_product(input1, input2, output, normalization='component', sorted=False):
+def tensor_product(
+        input1: Union[TY_RS_LOOSE, o3.TY_SELECTION_RULE],
+        input2: Union[TY_RS_LOOSE, o3.TY_SELECTION_RULE],
+        output: Union[TY_RS_LOOSE, o3.TY_SELECTION_RULE],
+        normalization: Literal['component', 'norm'] = 'component',
+        sorted: bool = False
+) -> Tuple[TY_RS_STRICT, SparseTensor]:
     """
     Compute the matrix Q
     from Rs_out to Rs_in1 tensor product with Rs_in2
@@ -665,7 +675,12 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
     return Rs_in2, wigner_3j_tensor
 
 
-def tensor_square(Rs_in, selection_rule=o3.selection_rule, normalization='component', sorted=False):
+def tensor_square(
+        Rs_in: TY_RS_LOOSE,
+        selection_rule: o3.TY_SELECTION_RULE = o3.selection_rule,
+        normalization: Literal['component', 'norm'] = 'component',
+        sorted: bool = False
+) -> Tuple[TY_RS_STRICT, SparseTensor]:
     """
     Compute the matrix Q
     from Rs_out to Rs_in tensor product with Rs_in
@@ -811,7 +826,12 @@ class TensorSquare(torch.nn.Module):
         return features.T.reshape(*size, -1)
 
 
-def elementwise_tensor_product(Rs_in1, Rs_in2, selection_rule=o3.selection_rule, normalization='component'):
+def elementwise_tensor_product(
+        Rs_in1: TY_RS_LOOSE,
+        Rs_in2: TY_RS_LOOSE,
+        selection_rule: o3.TY_SELECTION_RULE = o3.selection_rule,
+        normalization: Literal['component', 'norm'] = 'component'
+) -> Tuple[TY_RS_STRICT, SparseTensor]:
     """
     :return: Rs_out, matrix
 
