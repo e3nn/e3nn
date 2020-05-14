@@ -229,12 +229,14 @@ def convention(Rs):
             p = 0
         if len(r) == 3:
             mul, l, p = r
-            mul = round(mul)
-            assert mul >= 0
             if p > 0:
                 p = 1
             if p < 0:
                 p = -1
+        mul = round(mul)
+        assert mul >= 0
+        l = round(l)
+        assert l >= 0
 
         out.append((mul, l, p))
     return out
@@ -292,6 +294,7 @@ def format_Rs(Rs):
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: simplified version of the same list with the parity
     """
+    Rs = convention(Rs)
     d = {
         0: "",
         1: "+",
