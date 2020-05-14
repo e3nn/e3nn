@@ -410,10 +410,13 @@ class TensorProduct(torch.nn.Module):
         self.Rs_in1, self.Rs_in2, self.Rs_out = input1, input2, output
         if not isinstance(self.Rs_in1, list):
             self.Rs_in1 = Rs
+            self._complete = 'in1'
         if not isinstance(self.Rs_in2, list):
             self.Rs_in2 = Rs
+            self._complete = 'in2'
         if not isinstance(self.Rs_out, list):
             self.Rs_out = Rs
+            self._complete = 'out'
 
         register_sparse_buffer(self, 'mixing_matrix', mat)
 
@@ -435,17 +438,24 @@ class TensorProduct(torch.nn.Module):
         d_in1 = dim(self.Rs_in1)
         d_in2 = dim(self.Rs_in2)
 
-        features = features_1[..., :, None] * features_2[..., None, :]
+        if self._complete == 'out':
+            features = features_1[..., :, None] * features_2[..., None, :]
 
-        size = features.shape[:-2]
-        features = features.reshape(-1, d_in1, d_in2)  # [in1, in2, batch]
+            size = features.shape[:-2]
+            features = features.reshape(-1, d_in1, d_in2)  # [in1, in2, batch]
 
-        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+            mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
 
-        features = torch.einsum('zij->ijz', features)  # [in1, in2, batch]
-        features = features.reshape(d_in1 * d_in2, features.shape[2])
-        features = mixing_matrix @ features  # [out, batch]
-        return features.T.reshape(*size, d_out)
+            features = torch.einsum('zij->ijz', features)  # [in1, in2, batch]
+            features = features.reshape(d_in1 * d_in2, features.shape[2])
+            features = mixing_matrix @ features  # [out, batch]
+            return features.T.reshape(*size, d_out)
+        if self._complete == 'in1':
+            k = self.left(features_1)  # [..., out, in2]
+            return torch.einsum('...ij,...j->...i', k, features_2)
+        if self._complete == 'in2':
+            k = self.right(features_2)  # [..., out, in1]
+            return torch.einsum('...ij,...j->...i', k, features_1)
 
     def right(self, features_2):
         '''
