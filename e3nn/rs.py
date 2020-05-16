@@ -7,7 +7,7 @@ Using ZYZ Euler angles parametrisation
 
 from functools import reduce
 from math import gcd
-from typing import List, Tuple, Union, Literal
+from typing import List, Tuple, Union
 
 import torch
 from torch_sparse import SparseTensor
@@ -370,7 +370,7 @@ def tensor_product(
         input1: Union[TY_RS_LOOSE, o3.TY_SELECTION_RULE],
         input2: Union[TY_RS_LOOSE, o3.TY_SELECTION_RULE],
         output: Union[TY_RS_LOOSE, o3.TY_SELECTION_RULE],
-        normalization: Literal['component', 'norm'] = 'component',
+        normalization: str = 'component',
         sorted: bool = False
 ) -> Tuple[TY_RS_STRICT, SparseTensor]:
     """
@@ -678,7 +678,7 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
 def tensor_square(
         Rs_in: TY_RS_LOOSE,
         selection_rule: o3.TY_SELECTION_RULE = o3.selection_rule,
-        normalization: Literal['component', 'norm'] = 'component',
+        normalization: str = 'component',
         sorted: bool = False
 ) -> Tuple[TY_RS_STRICT, SparseTensor]:
     """
@@ -830,7 +830,7 @@ def elementwise_tensor_product(
         Rs_in1: TY_RS_LOOSE,
         Rs_in2: TY_RS_LOOSE,
         selection_rule: o3.TY_SELECTION_RULE = o3.selection_rule,
-        normalization: Literal['component', 'norm'] = 'component'
+        normalization: str = 'component'
 ) -> Tuple[TY_RS_STRICT, SparseTensor]:
     """
     :return: Rs_out, matrix
