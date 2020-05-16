@@ -125,21 +125,22 @@ class FrozenKernel(torch.nn.Module):
         *self.size, xyz = r.size()
         assert xyz == 3
         r = r.reshape(-1, 3)  # [batch, space]
-        self.radii = r.norm(2, dim=1)  # [batch]
+        self.register_buffer('radii', r.norm(2, dim=1))  # [batch]
         self.r_eps = r_eps
 
         self.tp = rs.TensorProduct(self.Rs_in, selection_rule, self.Rs_out, normalization, sorted=True)
         self.Rs_f = self.tp.Rs_in2
 
-        self.Y = rsh.spherical_harmonics_xyz([l for _, l, _ in self.Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
+        Y = rsh.spherical_harmonics_xyz([l for _, l, _ in self.Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
 
         # Normalize the spherical harmonics
         if normalization == 'component':
-            self.Y.mul_(math.sqrt(4 * math.pi))
+            Y.mul_(math.sqrt(4 * math.pi))
         if normalization == 'norm':
             diag = math.sqrt(4 * math.pi) * torch.cat([torch.ones(2 * l + 1) / math.sqrt(2 * l + 1) for _, l, _ in self.Rs_f])
-            self.Y.mul_(diag)
+            Y.mul_(diag)
 
+        self.register_buffer('Y', Y)
         self.R = RadialModel(rs.mul_dim(self.Rs_f))
 
         if (self.radii <= self.r_eps).any():
