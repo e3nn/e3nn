@@ -959,6 +959,8 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
             raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
 
         for i, j in zip(f0, f):
+            if i in kw_Rs and j in kw_Rs and kw_Rs[i] != kw_Rs[j]:
+                raise RuntimeError(f'Rs of {i} and {j} should be the same')
             if i in kw_Rs:
                 kw_Rs[j] = kw_Rs[i]
             if j in kw_Rs:
