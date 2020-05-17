@@ -426,7 +426,7 @@ def tensor3x3_repr_basis_to_spherical_basis():
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
-def intertwiners(D1, D2):
+def intertwiners(D1, D2, eps=1e-10):
     """
     Compute a basis of the vector space of matrices A such that
     D1(g) A = A D2(g) for all g in SO(3)
@@ -440,19 +440,19 @@ def intertwiners(D1, D2):
     xtx = sum(x.T @ x for x in xs)
 
     res = xtx.symeig(eigenvectors=True)
-    null_space = res.eigenvectors.T[res.eigenvalues < 1e-10]
+    null_space = res.eigenvectors.T[res.eigenvalues < eps]
     null_space = null_space.reshape(null_space.shape[0], I1.shape[0], I2.shape[0])
 
     # check that it works
     for A in null_space:
         r = rand_angles()
         d = A @ D2(*r) - D1(*r) @ A
-        assert d.abs().max() < 1e-10
+        assert d.abs().max() < eps
 
     return null_space
 
 
-def reduce(D, D_small):
+def reduce(D, D_small, eps=1e-10):
     """
     Given a "big" representation and a "small" representation
     computes how many times the small appears in the big one and return:
@@ -469,34 +469,51 @@ def reduce(D, D_small):
     dim_small = D_small(0, 0, 0).shape[0]
 
     D_rest = D
-    dim_rest = dim
     bigA = torch.eye(dim)
     n = 0
 
     while True:
-        A = intertwiners(D_small, D_rest) * dim_small**0.5
+        A = intertwiners(D_small, D_rest, eps) * dim_small**0.5
 
         # stops if "small" does not appear in "big" anymore
         if A.shape[0] == 0:
             break
 
-        A = A[0]
-
-        for x in A:
-            assert (torch.norm(x) - 1).abs() < 1e-10
-
-        # complete the basis in an orthonomal way
-        for e in torch.eye(dim_rest):
-            for x in A:
-                e -= torch.dot(x, e) * x
-            if torch.norm(e) > 1e-10:
-                e /= torch.norm(e)
-                e *= next(x.sign() for x in e if x.abs() > 1e-10)
-                A = torch.cat([A, e.reshape(1, -1)])
+        A, expand = orthonormalize(A[0], eps)
+        A = torch.cat([A, expand])
 
         bigA = direct_sum(torch.eye(n * dim_small), A) @ bigA
         n += 1
         D_rest = change_and_remove(bigA, D, n * dim_small)
-        dim_rest = dim - n * dim_small
 
     return n, bigA, D_rest
+
+
+def orthonormalize(vecs, eps=1e-10):
+    assert vecs.dim() == 2
+    dim = vecs.shape[1]
+
+    base = []
+    for x in vecs:
+        for y in base:
+            x -= torch.dot(x, y) * y
+        if x.norm() > eps:
+            x = x / x.norm()
+            x *= next(e.sign() for e in x if e.abs() > eps)
+            x[x.abs() < eps] = 0
+            base += [x]
+
+    expand = []
+    for x in torch.eye(dim):
+        for y in base + expand:
+            x -= torch.dot(x, y) * y
+        if x.norm() > eps:
+            x /= x.norm()
+            x *= next(e.sign() for e in x if e.abs() > eps)
+            x[x.abs() < eps] = 0
+            expand += [x]
+
+    base = torch.stack(base) if base else torch.zeros(0, dim)
+    expand = torch.stack(expand) if expand else torch.zeros(0, dim)
+
+    return base, expand
