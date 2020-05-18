@@ -1,6 +1,6 @@
 import torch
 from torch_geometric.data import Batch
-import e3nn.data_helpers as dh
+import e3nn.point.data_helpers as dh
 from e3nn.point.message_passing import E3Conv
 from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
