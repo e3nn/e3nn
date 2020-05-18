@@ -1011,11 +1011,17 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
             if len(formulas) == n:
                 break
 
+        for i in kw_Rs:
+            Rs = convention(kw_Rs[i])
+            if not all(p == 0 for _, _, p in Rs):
+                raise RuntimeError(f'{format_Rs(Rs)} parity support is not implemented')
+            kw_Rs[i] = Rs
+
         for _s, p in formulas:
             f = "".join(f0[i] for i in p)
             for i, j in zip(f0, f):
                 if i in kw_Rs and j in kw_Rs and kw_Rs[i] != kw_Rs[j]:
-                    raise RuntimeError(f'Rs of {i} and {j} should be the same')
+                    raise RuntimeError(f'Rs of {i} (Rs={format_Rs(kw_Rs[i])}) and {j} (Rs={format_Rs(kw_Rs[j])}) should be the same')
                 if i in kw_Rs:
                     kw_Rs[j] = kw_Rs[i]
                 if j in kw_Rs:
