@@ -8,7 +8,7 @@ import gc
 import math
 import os
 from functools import lru_cache
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
 import scipy
@@ -489,7 +489,11 @@ def reduce(D, D_small, eps=1e-10):
     return n, bigA, D_rest
 
 
-def orthonormalize(vecs, eps=1e-10):
+@torch.jit.script
+def orthonormalize(
+    vecs: torch.Tensor,
+    eps: float = 1e-10
+) -> Tuple[torch.Tensor, torch.Tensor]:
     assert vecs.dim() == 2
     dim = vecs.shape[1]
 
@@ -499,8 +503,8 @@ def orthonormalize(vecs, eps=1e-10):
             x -= torch.dot(x, y) * y
         if x.norm() > eps:
             x = x / x.norm()
-            x *= next(e.sign() for e in x if e.abs() > eps)
-            x[x.abs() < eps] = 0
+            x[x.abs() < eps] = torch.zeros(())
+            x *= x[x.nonzero()[0, 0]].sign()
             base += [x]
 
     expand = []
@@ -509,11 +513,11 @@ def orthonormalize(vecs, eps=1e-10):
             x -= torch.dot(x, y) * y
         if x.norm() > eps:
             x /= x.norm()
-            x *= next(e.sign() for e in x if e.abs() > eps)
-            x[x.abs() < eps] = 0
+            x[x.abs() < eps] = torch.zeros(())
+            x *= x[x.nonzero()[0, 0]].sign()
             expand += [x]
 
-    base = torch.stack(base) if base else torch.zeros(0, dim)
-    expand = torch.stack(expand) if expand else torch.zeros(0, dim)
+    base = torch.stack(base) if len(base) > 0 else torch.zeros(0, dim)
+    expand = torch.stack(expand) if len(expand) > 0 else torch.zeros(0, dim)
 
     return base, expand
