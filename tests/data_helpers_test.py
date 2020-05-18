@@ -2,7 +2,7 @@
 import unittest
 
 import torch
-import e3nn.data_helpers as dh
+import e3nn.point.data_helpers as dh
 from e3nn import rs
 
 
