@@ -12,7 +12,7 @@ from typing import List, Tuple, Union
 import torch
 from torch_sparse import SparseTensor
 
-from e3nn import o3
+from e3nn import o3, perm
 from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
@@ -583,9 +583,9 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
         sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     if sorted:
-        Rs_out, perm = sort(Rs_out)
+        Rs_out, perm_mat = sort(Rs_out)
         Rs_out = simplify(Rs_out)
-        wigner_3j_tensor = perm @ wigner_3j_tensor
+        wigner_3j_tensor = perm_mat @ wigner_3j_tensor
 
     return Rs_out, wigner_3j_tensor
 
@@ -666,11 +666,11 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
         sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     if sorted:
-        Rs_in2, perm = sort(Rs_in2)
+        Rs_in2, perm_mat = sort(Rs_in2)
         Rs_in2 = simplify(Rs_in2)
-        # sorted = perm @ unsorted
+        # sorted = perm_mat @ unsorted
         wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in2))
-        wigner_3j_tensor = wigner_3j_tensor @ perm.t()
+        wigner_3j_tensor = wigner_3j_tensor @ perm_mat.t()
         wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in1) * dim(Rs_in2))
 
     return Rs_in2, wigner_3j_tensor
@@ -786,10 +786,10 @@ def tensor_square(
         sparse_sizes=(dim(Rs_out), dim(Rs_in) * dim(Rs_in)))
 
     if sorted:
-        Rs_out, perm = sort(Rs_out)
+        Rs_out, perm_mat = sort(Rs_out)
         Rs_out = simplify(Rs_out)
-        # sorted = perm @ unsorted
-        wigner_3j_tensor = perm @ wigner_3j_tensor
+        # sorted = perm_mat @ unsorted
+        wigner_3j_tensor = perm_mat @ wigner_3j_tensor
 
     return Rs_out, wigner_3j_tensor
 
@@ -948,41 +948,69 @@ class ElementwiseTensorProduct(torch.nn.Module):
         return features.T.reshape(*size, d_out)
 
 
+def _is_representation(D, eps):
+    I = D(0, 0, 0)
+    if not torch.allclose(I, I @ I):
+        return False
+
+    g1 = o3.rand_angles()
+    g2 = o3.rand_angles()
+
+    g12 = o3.compose(*g1, *g2)
+    D12 = D(*g12)
+
+    D1D2 = D(*g1) @ D(*g2)
+
+    return (D12 - D1D2).abs().max().item() < eps * D12.abs().max().item()
+
+
+def _round_sqrt(x, eps):
+    x[x.abs() < eps] = 0
+    x = x.sign() / x.pow(2)
+    x = x.div(eps).round().mul(eps)
+    x = x.sign() / x.abs().sqrt()
+    x[torch.isnan(x)] = 0
+    x[torch.isinf(x)] = 0
+    return x
+
+
 def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
+    """
+    Usage
+    Rs, Q = rs.reduce_tensor('ijkl=jikl=ikjl=ijlk', i=[(1, 1)])
+    Rs = 2x0,2x2,4
+    Q = tensor of shape [21, 81]
+    """
     with torch_default_dtype(torch.float64):
         formulas = [
             (-1 if f.startswith('-') else 1, f.replace('-', ''))
             for f in formula.split('=')
         ]
-        sign0, f0 = formulas[0]
+        s0, f0 = formulas[0]
+        assert s0 == 1
 
-        for sign, f in formulas:
+        for _s, f in formulas:
             if len(set(f)) != len(f) or set(f) != set(f0):
                 raise RuntimeError(f'{f} is not a permutation of {f0}')
             if len(f0) != len(f):
                 raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
 
-        assert sign0 == 1
-        formulas = set(formulas)  # set of generators (permutations)
+        formulas = {(s, tuple(f.index(i) for i in f0)) for s, f in formulas}  # set of generators (permutations)
 
         # create the entire group
-        n = len(formulas)
         while True:
-            new = []
-            for s1, f1 in formulas:
-                for s2, f2 in formulas:
-                    s = s1 * s2
-                    f = ''
-                    for i in f1:
-                        f += f2[f0.index(i)]
-                    new.append((s, f))
-            for sf in new:
-                formulas.add(sf)
+            n = len(formulas)
+            formulas = formulas.union([(s, perm.inverse(p)) for s, p in formulas])
+            formulas = formulas.union([
+                (s1 * s2, perm.compose(p1, p2))
+                for s1, p1 in formulas
+                for s2, p2 in formulas
+            ])
             if len(formulas) == n:
                 break
-            n = len(formulas)
 
-        for sign, f in formulas:
+        for _s, p in formulas:
+            f = "".join(f0[i] for i in p)
             for i, j in zip(f0, f):
                 if i in kw_Rs and j in kw_Rs and kw_Rs[i] != kw_Rs[j]:
                     raise RuntimeError(f'Rs of {i} and {j} should be the same')
@@ -999,26 +1027,38 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
         for i in f0:
             d *= dim(kw_Rs[i])
 
-        x = torch.eye(d)
+        base = torch.eye(d)
 
-        x = x.reshape(-1, *(dim(kw_Rs[i]) for i in f0))
-        for sign, f in formulas:
-            x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
+        for s, p in formulas:
+            f = "".join(f0[i] for i in p)
 
-        x = x.reshape(-1, d)
-        x, _ = o3.orthonormalize(x, eps)
-        d_sym = len(x)
+            sym = base.reshape(-1, *(dim(kw_Rs[i]) for i in f0))
+            sym = sym + s * torch.einsum(f'...{f0}->...{f}', sym)
+            sym = sym.reshape(-1, d)
+            sym = _round_sqrt(sym, eps)
+            sym, _ = o3.orthonormalize(sym, eps)
+            sym = _round_sqrt(sym, eps)
+            if len(sym) < len(base):
+                base = sym
+        d_sym = len(base)
+
+        assert torch.allclose(base @ base.T, torch.eye(d_sym))
+
+        if d_sym == 0:
+            return [], torch.zeros(d_sym, d)
 
         def representation(alpha, beta, gamma):
             m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
-            return x @ m @ x.T
+            return base @ m @ base.T
+
+        assert _is_representation(representation, eps)
 
         Rs_out = []
-        Q = x
+        Q = base
         for l in range(lmax + 1):
             mul, A, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
             Q = o3.direct_sum(torch.eye(d_sym - A.shape[0]), A) @ Q
-            Q[Q.abs() < eps] = 0
+            Q = _round_sqrt(Q, eps)
             Rs_out += [(mul, l)]
 
             if dim(Rs_out) == d_sym:

@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, no-value-for-parameter
 import unittest
 from functools import partial
 
@@ -54,17 +54,15 @@ class Tests(unittest.TestCase):
         R(Z(a1) Y(b1) Z(c1) Z(a2) Y(b2) Z(c2)) = R(Z(a1) Y(b1) Z(c1)) R(Z(a2) Y(b2) Z(c2))
         """
         with o3.torch_default_dtype(torch.float64):
-            a1, b1, c1, a2, b2, c2 = torch.rand(6)
+            g1 = o3.rand_angles()
+            g2 = o3.rand_angles()
 
-            r1 = R(a1, b1, c1)
-            r2 = R(a2, b2, c2)
+            g12 = o3.compose(*g1, *g2)
+            D12 = R(*g12)
 
-            a, b, c = o3.compose(a1, b1, c1, a2, b2, c2)
-            r = R(a, b, c)
+            D1D2 = R(*g1) @ R(*g2)
 
-            r_ = r1 @ r2
-
-            self.assertLess((r - r_).abs().max(), 1e-10 * r.abs().max())
+            self.assertLess((D12 - D1D2).abs().max(), 1e-10 * D12.abs().max())
 
     def test_xyz_vector_basis_to_spherical_basis(self, ):
         with o3.torch_default_dtype(torch.float64):
@@ -121,7 +119,7 @@ class Tests(unittest.TestCase):
                 )
                 return A @ d @ torch.inverse(A)
 
-            n, bigA, D_rest = o3.reduce(D, partial(o3.irr_repr, 1))
+            n, _, _ = o3.reduce(D, partial(o3.irr_repr, 1))
             assert n == 2
 
 
