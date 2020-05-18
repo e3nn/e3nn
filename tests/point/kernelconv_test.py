@@ -9,7 +9,7 @@ from e3nn.radial import ConstantRadialModel
 from e3nn.point.operations import Convolution
 from e3nn.point.kernelconv import KernelConv, KernelConvFn
 from e3nn.rs import dim
-from e3nn import o3
+from e3nn import o3, rsh
 
 
 class TestKernelConvFn(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestKernelConvFn(unittest.TestCase):
         F = torch.randn(batch, atoms, dim(Rs_in), requires_grad=True).to(device)
         geo = torch.randn(batch, atoms, 3)
         r = (geo.unsqueeze(1) - geo.unsqueeze(2)).to(device)
-        Y = KC.sh(KC.set_of_l_filters, r)  # [batch, a, b, l_filter * m_filter]
+        Y = rsh.spherical_harmonics_xyz(KC.set_of_l_filters, r)  # [batch, a, b, l_filter * m_filter]
         Y[r.norm(2, dim=-1) == 0] = 0
         Y = Y.clone().detach().requires_grad_(True).to(device)
         R = torch.randn(

@@ -10,7 +10,6 @@ from e3nn.linear import KernelLinear
 class Kernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel,
                  selection_rule=o3.selection_rule_in_out_sh,
-                 sh=rsh.spherical_harmonics_xyz,
                  normalization='component',
                  allow_unused_inputs=False):
         """
@@ -18,7 +17,6 @@ class Kernel(torch.nn.Module):
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
         :param selection_rule: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
-        :param sh: spherical harmonics function of signature ([l_filter], xyz[..., 3]) -> Y[..., m]
         :param normalization: either 'norm' or 'component'
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
@@ -28,7 +26,6 @@ class Kernel(torch.nn.Module):
         self.Rs_out = rs.simplify(Rs_out)
 
         self.selection_rule = selection_rule
-        self.sh = sh
         if not allow_unused_inputs:
             self.check_input()
         self.check_output()
@@ -115,7 +112,7 @@ class Kernel(torch.nn.Module):
         # (1) Case r > 0
 
         # precompute all needed spherical harmonics
-        Y = self.sh(self.set_of_l_filters, r[radii > r_eps])  # [batch, l_filter * m_filter]
+        Y = rsh.spherical_harmonics_xyz(self.set_of_l_filters, r[radii > r_eps])  # [batch, l_filter * m_filter]
 
         # use the radial model to fix all the degrees of freedom
         # note: for the normalization we assume that the variance of R[i] is one

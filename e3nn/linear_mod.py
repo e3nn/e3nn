@@ -1,22 +1,9 @@
 # pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member, pointless-statement, unbalanced-tuple-unpacking
+from functools import partial
+
 import torch
 
-from e3nn import rs
-
-
-def kernel_linear(Rs_in, Rs_out):
-    # Compute Clebsh-Gordan coefficients
-    def selection_rule(l_in, p_in, l_out, p_out):
-        if l_in == l_out and p_out in [0, p_in]:
-            return [0]
-        return []
-
-    Rs_f, Q = rs.tensor_product(Rs_in, selection_rule, Rs_out)  # [out, in, w]
-    Rs_f = rs.simplify(Rs_f)
-    [(_n_path, l, p)] = Rs_f
-    assert l == 0 and p in [0, 1]
-
-    return Q
+from e3nn import o3, rs
 
 
 class KernelLinear(torch.nn.Module):
@@ -29,15 +16,15 @@ class KernelLinear(torch.nn.Module):
         """
         super().__init__()
 
-        Q = kernel_linear(Rs_in, Rs_out)  # [out, in, w]
-        self.register_buffer('Q', Q)
-        self.weight = torch.nn.Parameter(torch.randn(Q.shape[2]))
+        selection_rule = partial(o3.selection_rule_in_out_sh, lmax=0)
+        self.tp = rs.TensorProduct(Rs_in, selection_rule, Rs_out, sorted=True)
+        self.weight = torch.nn.Parameter(torch.randn(rs.dim(self.tp.Rs_in2)))
 
     def forward(self):
         """
         :return: tensor [l_out * mul_out * m_out, l_in * mul_in * m_in]
         """
-        return torch.einsum('ijk,k->ij', self.Q, self.weight)
+        return self.tp.right(self.weight)
 
 
 class Linear(torch.nn.Module):
@@ -79,9 +66,9 @@ class Linear(torch.nn.Module):
         :param features: tensor [..., channel]
         :return:         tensor [..., channel]
         """
-        *size, dim_in = features.shape
-        features = features.reshape(-1, dim_in)
+        size = features.shape[:-1]
+        features = features.reshape(-1, rs.dim(self.Rs_in))
 
         output = torch.einsum('ij,zj->zi', self.kernel(), features)
 
-        return output.reshape(*size, -1)
+        return output.reshape(*size, rs.dim(self.Rs_out))

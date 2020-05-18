@@ -78,7 +78,8 @@ def main(lmax, resolution, steps):
         margin=dict(l=0, r=0, t=0, b=0)
     )
 
-    shutil.rmtree('sh')
+    if os.path.exists('sh'):
+        shutil.rmtree('sh')
     os.makedirs('sh')
 
     for i in tqdm.tqdm(range(steps)):

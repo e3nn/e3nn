@@ -8,6 +8,7 @@ import gc
 import math
 import os
 from functools import lru_cache
+from typing import Callable, List, Tuple
 
 import lie_learn.representations.SO3.pinchon_hoggan.pinchon_hoggan_dense as ph
 import scipy
@@ -174,7 +175,10 @@ def derivative_irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
     return dDda, dDdb, dDdc
 
 
-def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
+TY_SELECTION_RULE = Callable[[int, int, int, int], List[int]]
+
+
+def selection_rule(l1: int, _p1: int, l2: int, _p2: int, lmax=None, lfilter=None) -> List[int]:
     """
     selection rule
     :return: list from |l1-l2|... to l1+l2
@@ -189,7 +193,7 @@ def selection_rule(l1, _p1, l2, _p2, lmax=None, lfilter=None):
     return ls
 
 
-def selection_rule_in_out_sh(l_in, p_in, l_out, p_out, lmax=None):
+def selection_rule_in_out_sh(l_in: int, p_in: int, l_out: int, p_out: int, lmax=None) -> List[int]:
     """
     all possible spherical harmonics such that
     Input * SH = Output
@@ -422,7 +426,7 @@ def tensor3x3_repr_basis_to_spherical_basis():
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
-def intertwiners(D1, D2):
+def intertwiners(D1, D2, eps=1e-10):
     """
     Compute a basis of the vector space of matrices A such that
     D1(g) A = A D2(g) for all g in SO(3)
@@ -430,25 +434,27 @@ def intertwiners(D1, D2):
     I1 = D1(0, 0, 0)
     I2 = D2(0, 0, 0)
 
-    # picking 10 random rotations seems good enough
-    rr = [rand_angles() for _ in range(10)]
+    # picking 20 random rotations seems good enough
+    rr = [rand_angles() for _ in range(20)]
     xs = [kron(D1(*r), I2) - kron(I1, D2(*r).T) for r in rr]
     xtx = sum(x.T @ x for x in xs)
 
     res = xtx.symeig(eigenvectors=True)
-    null_space = res.eigenvectors.T[res.eigenvalues < 1e-10]
+    null_space = res.eigenvectors.T[res.eigenvalues.abs() < eps]
     null_space = null_space.reshape(null_space.shape[0], I1.shape[0], I2.shape[0])
 
     # check that it works
+    solutions = []
     for A in null_space:
         r = rand_angles()
         d = A @ D2(*r) - D1(*r) @ A
-        assert d.abs().max() < 1e-10
+        if d.abs().max() < eps:
+            solutions.append(A)
 
-    return null_space
+    return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
 
-def reduce(D, D_small):
+def reduce(D, D_small, eps=1e-10):
     """
     Given a "big" representation and a "small" representation
     computes how many times the small appears in the big one and return:
@@ -465,34 +471,55 @@ def reduce(D, D_small):
     dim_small = D_small(0, 0, 0).shape[0]
 
     D_rest = D
-    dim_rest = dim
     bigA = torch.eye(dim)
     n = 0
 
     while True:
-        A = intertwiners(D_small, D_rest) * dim_small**0.5
+        A = intertwiners(D_small, D_rest, eps) * dim_small**0.5
 
         # stops if "small" does not appear in "big" anymore
         if A.shape[0] == 0:
             break
 
-        A = A[0]
-
-        for x in A:
-            assert (torch.norm(x) - 1).abs() < 1e-10
-
-        # complete the basis in an orthonomal way
-        for e in torch.eye(dim_rest):
-            for x in A:
-                e -= torch.dot(x, e) * x
-            if torch.norm(e) > 1e-10:
-                e /= torch.norm(e)
-                e *= next(x.sign() for x in e if x.abs() > 1e-10)
-                A = torch.cat([A, e.reshape(1, -1)])
+        A, expand = orthonormalize(A[0], eps)
+        A = torch.cat([A, expand])
 
         bigA = direct_sum(torch.eye(n * dim_small), A) @ bigA
         n += 1
         D_rest = change_and_remove(bigA, D, n * dim_small)
-        dim_rest = dim - n * dim_small
 
     return n, bigA, D_rest
+
+
+@torch.jit.script
+def orthonormalize(
+    vecs: torch.Tensor,
+    eps: float = 1e-10
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    assert vecs.dim() == 2
+    dim = vecs.shape[1]
+
+    base = []
+    for x in vecs:
+        for y in base:
+            x -= torch.dot(x, y) * y
+        if x.norm() > eps:
+            x = x / x.norm()
+            x[x.abs() < eps] = torch.zeros(())
+            x *= x[x.nonzero()[0, 0]].sign()
+            base += [x]
+
+    expand = []
+    for x in torch.eye(dim):
+        for y in base + expand:
+            x -= torch.dot(x, y) * y
+        if x.norm() > eps:
+            x /= x.norm()
+            x[x.abs() < eps] = torch.zeros(())
+            x *= x[x.nonzero()[0, 0]].sign()
+            expand += [x]
+
+    base = torch.stack(base) if len(base) > 0 else torch.zeros(0, dim)
+    expand = torch.stack(expand) if len(expand) > 0 else torch.zeros(0, dim)
+
+    return base, expand

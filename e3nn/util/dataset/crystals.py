@@ -40,12 +40,7 @@ class CrystalCIF(Dataset):
         preprocessed_dir = join(root, 'preprocessed')
         preprocessed_radius_dir = join(preprocessed_dir, f'max_radius_{max_radius}')
 
-        if (
-                isdir(preprocessed_radius_dir)
-                and (not isfile(join(preprocessed_radius_dir, 'radii.pth'))
-                     or not isfile(join(preprocessed_radius_dir, 'bs.pth'))
-                     or not isfile(join(preprocessed_radius_dir, 'partitions.pth')))
-        ):
+        if isdir(preprocessed_radius_dir) and not all(isfile(join(preprocessed_radius_dir, f)) for f in ['radii.pth', 'bs.pth', 'partitions.pth']):
             rmtree(preprocessed_radius_dir)
             CrystalCIF.preprocess(root, max_radius, bs_pad)
         elif not isdir(preprocessed_radius_dir):

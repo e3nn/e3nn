@@ -11,7 +11,7 @@ from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
-from e3nn.tensor_product import TensorSquare, LearnableTensorSquare
+from e3nn.tensor_product import LearnableTensorSquare
 
 
 class GatedConvNetwork(torch.nn.Module):
@@ -32,13 +32,17 @@ class GatedConvNetwork(torch.nn.Module):
 
         def make_layer(Rs_in, Rs_out):
             if feature_product:
-                tp = TensorSquare(Rs_in, selection_rule=partial(o3.selection_rule, lmax=lmax))
-                lin = Linear(tp.Rs_out, Rs_in)
-            act = GatedBlock(Rs_out, swish, sigmoid)
-            conv = convolution(K, Rs_in, act.Rs_in)
-            if feature_product:
-                return torch.nn.ModuleList([tp, lin, conv, act])
-            return torch.nn.ModuleList([conv, act])
+                tr1 = rs.TransposeToMulL(Rs_in)
+                lts = LearnableTensorSquare(tr1.Rs_out, partial(o3.selection_rule, lmax=lmax))
+                tr2 = torch.nn.Flatten(2)
+                Rs = tr1.mul * lts.Rs_out
+                act = GatedBlock(Rs_out, swish, sigmoid)
+                conv = convolution(K, Rs, act.Rs_in)
+                return torch.nn.ModuleList([torch.nn.Sequential(tr1, lts, tr2), conv, act])
+            else:
+                act = GatedBlock(Rs_out, swish, sigmoid)
+                conv = convolution(K, Rs_in, act.Rs_in)
+                return torch.nn.ModuleList([conv, act])
 
         self.layers = torch.nn.ModuleList([
             make_layer(Rs_layer_in, Rs_layer_out)
@@ -55,9 +59,8 @@ class GatedConvNetwork(torch.nn.Module):
             kwargs['n_norm'] = N
 
         if self.feature_product:
-            for tp, lin, conv, act in self.layers[:-1]:
-                output = tp(output)
-                output = lin(output)
+            for ts, conv, act in self.layers[:-1]:
+                output = ts(output)
                 output = conv(output, *args, **kwargs)
                 output = act(output)
         else:
@@ -135,7 +138,7 @@ class S2Network(torch.nn.Module):
 
         for _ in range(layers):
             # tensor product: nonlinear and mixes the l's
-            tp = TensorSquare(Rs, selection_rule=partial(o3.selection_rule, lmax=lmax))
+            tp = rs.TensorSquare(Rs, selection_rule=partial(o3.selection_rule, lmax=lmax))
 
             # direct sum
             Rs = Rs + tp.Rs_out
@@ -155,7 +158,7 @@ class S2Network(torch.nn.Module):
         def lfilter(l):
             return l in [j for _, j, _ in Rs_out]
 
-        tp = TensorSquare(Rs, selection_rule=partial(o3.selection_rule, lfilter=lfilter))
+        tp = rs.TensorSquare(Rs, selection_rule=partial(o3.selection_rule, lfilter=lfilter))
         Rs = Rs + tp.Rs_out
         lin = Linear(Rs, Rs_out, allow_unused_inputs=True)
         self.tail = torch.nn.ModuleList([tp, lin])

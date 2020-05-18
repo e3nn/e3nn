@@ -4,7 +4,7 @@ Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
 import math
 from functools import lru_cache
-from typing import List
+from typing import List, Tuple
 
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
@@ -46,6 +46,38 @@ def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tens
         out.append(x_lm[..., i: i + 2 * l + 1] * x_m[..., lmax - l: lmax + l + 1])
         i += 2 * l + 1
     return torch.cat(out, dim=-1)
+
+
+@torch.jit.script
+def mul_radial_angular(Rs: List[Tuple[int, int, int]], radial, angular):
+    """
+    :param Rs: output representation
+    :param angular: [..., l * m]
+    :param radial: [..., l * mul]
+    """
+    n = 0
+    for mul, l, _ in Rs:
+        n += mul * (2 * l + 1)
+
+    y = radial[..., 0] * angular[..., 0]
+    out = radial.new_empty(y.shape + (n,))
+
+    a = 0
+    r = 0
+    i = 0
+    for mul, l, _ in Rs:
+        dim = mul * (2 * l + 1)
+        x = radial[..., r: r + mul, None] * angular[..., None, a: a + 2 * l + 1]
+        x = x.reshape(y.shape + (dim,))
+        out[..., i: i + dim] = x
+        i += dim
+        r += mul
+        a += 2 * l + 1
+
+    assert r == radial.shape[-1]
+    assert a == angular.shape[-1]
+
+    return out
 
 
 def sympy_legendre(l, m):

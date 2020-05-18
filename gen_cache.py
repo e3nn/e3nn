@@ -3,7 +3,7 @@ Generate the .cache files
 """
 from e3nn import o3
 
-lmax = 9
+lmax = 10
 
 for l1 in range(lmax + 1):
     for l2 in range(lmax + 1):
