@@ -158,5 +158,15 @@ class Tests(unittest.TestCase):
                 self.assertLess(d, 1e-10)
 
 
+def test_reduce_tensor_Levi_Civita_symbol():
+    Rs, Q = rs.reduce_tensor('ijk=-ikj=-jik', i=[(1, 1)])
+    assert Rs == [(1, 0, 0)]
+    r = o3.rand_angles()
+    D = o3.irr_repr(1, *r)
+    Q = Q.reshape(3, 3, 3)
+    Q1 = torch.einsum('li,mj,nk,ijk', D, D, D, Q)
+    assert (Q1 - Q).abs().max() < 1e-10
+
+
 if __name__ == '__main__':
     unittest.main()
