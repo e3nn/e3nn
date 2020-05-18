@@ -49,7 +49,7 @@ class GatedConvNetwork(torch.nn.Module):
             for Rs_layer_in, Rs_layer_out in zip(representations[:-2], representations[1:-1])
         ])
 
-        self.layers.append(Convolution(K, representations[-2], representations[-1]))
+        self.layers.append(convolution(K, representations[-2], representations[-1]))
         self.feature_product = feature_product
 
     def forward(self, input, *args, **kwargs):
@@ -70,7 +70,6 @@ class GatedConvNetwork(torch.nn.Module):
 
         layer = self.layers[-1]
         output = layer(output, *args, **kwargs)
-
         return output
 
 
