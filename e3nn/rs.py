@@ -5,6 +5,8 @@ Some functions related to SO3 and his usual representations
 Using ZYZ Euler angles parametrisation
 """
 
+import itertools
+from collections import defaultdict
 from functools import partial, reduce
 from math import gcd
 from typing import List, Tuple, Union
@@ -1023,42 +1025,49 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
             if i not in kw_Rs:
                 raise RuntimeError(f'index {i} has not Rs associated to it')
 
-        d = 1
-        for i in f0:
-            d *= dim(kw_Rs[i])
+        full_base = list(itertools.product(*(range(dim(kw_Rs[i])) for i in f0)))
 
-        base = torch.eye(d)
+        base = set()
+        for x in full_base:
+            dic = defaultdict(set)
+            for s, p in formulas:
+                px = tuple(x[i] for i in p)
+                dic[px].add(s)
+            xs = {(next(iter(signs)), x) for x, signs in dic.items() if len(signs) == 1}
+            if len(xs) > 0:
+                xs = frozenset({
+                    frozenset(xs),
+                    frozenset({(-s, x) for s, x in xs})
+                })
+                base.add(frozenset(xs))
 
-        for s, p in formulas:
-            f = "".join(f0[i] for i in p)
-
-            sym = base.reshape(-1, *(dim(kw_Rs[i]) for i in f0))
-            sym = sym + s * torch.einsum(f'...{f0}->...{f}', sym)
-            sym = sym.reshape(-1, d)
-            sym = _round_sqrt(sym, eps)
-            sym, _ = o3.orthonormalize(sym, eps)
-            sym = _round_sqrt(sym, eps)
-            if len(sym) < len(base):
-                base = sym
         d_sym = len(base)
+        d = len(full_base)
+        Q = torch.zeros(d_sym, d)
 
-        assert torch.allclose(base @ base.T, torch.eye(d_sym))
+        for i, x in enumerate(base):
+            x = next(iter(x))
+            for s, e in x:
+                j = full_base.index(e)
+                Q[i, j] = s / len(x)**0.5
+
+        assert torch.allclose(Q @ Q.T, torch.eye(d_sym))
 
         if d_sym == 0:
             return [], torch.zeros(d_sym, d)
 
         def representation(alpha, beta, gamma):
             m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
-            return base @ m @ base.T
+            return Q @ m @ Q.T
 
         assert _is_representation(representation, eps)
 
         Rs_out = []
-        Q = base
+        A = Q.clone()
         for l in range(lmax + 1):
-            mul, A, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
-            Q = o3.direct_sum(torch.eye(d_sym - A.shape[0]), A) @ Q
-            Q = _round_sqrt(Q, eps)
+            mul, B, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
+            A = o3.direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
+            A = _round_sqrt(A, eps)
             Rs_out += [(mul, l)]
 
             if dim(Rs_out) == d_sym:
@@ -1068,4 +1077,4 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
         if dim(Rs_out) != d_sym:
             raise RuntimeError(f'lmax {lmax} it too small')
 
-        return Rs_out, Q
+        return Rs_out, A
