@@ -15,4 +15,3 @@ def test_data_helpers():
     dh.DataPeriodicNeighbors(x, Rs_in, pos, lattice, r_max)
     dh.neighbor_list_and_relative_vec(pos, r_max)
     dh.DataNeighbors(x, Rs_in, pos, r_max)
-
