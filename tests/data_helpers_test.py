@@ -14,12 +14,11 @@ class Tests(unittest.TestCase):
         Rs_in = [(3, 0), (1, 1)]
         x = torch.randn(N, rs.dim(Rs_in))
         r_max = 1
-        indices, rel_vec = dh.neighbor_list_and_relative_vec_lattice(pos, lattice, r_max)
+        dh.neighbor_list_and_relative_vec_lattice(pos, lattice, r_max)
         dh.DataPeriodicNeighbors(x, Rs_in, pos, lattice, r_max)
-        indices, rel_vec = dh.neighbor_list_and_relative_vec(pos, r_max)
+        dh.neighbor_list_and_relative_vec(pos, r_max)
         dh.DataNeighbors(x, Rs_in, pos, r_max)
 
 
 if __name__ == '__main__':
     unittest.main()
-
