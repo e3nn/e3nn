@@ -41,6 +41,8 @@ KWARGS = dict(
         'torch_cluster',
         'torch_spline_conv',
         'torch_geometric',
+        'ase',
+        'pymatgen',
     ],
     include_package_data=True,
     classifiers=[
