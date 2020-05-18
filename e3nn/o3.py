@@ -434,22 +434,24 @@ def intertwiners(D1, D2, eps=1e-10):
     I1 = D1(0, 0, 0)
     I2 = D2(0, 0, 0)
 
-    # picking 10 random rotations seems good enough
-    rr = [rand_angles() for _ in range(10)]
+    # picking 20 random rotations seems good enough
+    rr = [rand_angles() for _ in range(20)]
     xs = [kron(D1(*r), I2) - kron(I1, D2(*r).T) for r in rr]
     xtx = sum(x.T @ x for x in xs)
 
     res = xtx.symeig(eigenvectors=True)
-    null_space = res.eigenvectors.T[res.eigenvalues < eps]
+    null_space = res.eigenvectors.T[res.eigenvalues.abs() < eps]
     null_space = null_space.reshape(null_space.shape[0], I1.shape[0], I2.shape[0])
 
     # check that it works
+    solutions = []
     for A in null_space:
         r = rand_angles()
         d = A @ D2(*r) - D1(*r) @ A
-        assert d.abs().max() < eps
+        if d.abs().max() < eps:
+            solutions.append(A)
 
-    return null_space
+    return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
 
 def reduce(D, D_small, eps=1e-10):

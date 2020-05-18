@@ -956,10 +956,33 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
         ]
         sign0, f0 = formulas[0]
 
-        for sign, f in formulas[1:]:
+        for sign, f in formulas:
+            if len(set(f)) != len(f) or set(f) != set(f0):
+                raise RuntimeError(f'{f} is not a permutation of {f0}')
             if len(f0) != len(f):
                 raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
 
+        assert sign0 == 1
+        formulas = set(formulas)  # set of generators (permutations)
+
+        # create the entire group
+        n = len(formulas)
+        while True:
+            new = []
+            for s1, f1 in formulas:
+                for s2, f2 in formulas:
+                    s = s1 * s2
+                    f = ''
+                    for i in f1:
+                        f += f2[f0.index(i)]
+                    new.append((s, f))
+            for sf in new:
+                formulas.add(sf)
+            if len(formulas) == n:
+                break
+            n = len(formulas)
+
+        for sign, f in formulas:
             for i, j in zip(f0, f):
                 if i in kw_Rs and j in kw_Rs and kw_Rs[i] != kw_Rs[j]:
                     raise RuntimeError(f'Rs of {i} and {j} should be the same')
@@ -977,18 +1000,14 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
             d *= dim(kw_Rs[i])
 
         x = torch.eye(d)
-        d_sym = d
 
-        while True:
-            x = x.reshape(-1, *(dim(kw_Rs[i]) for i in f0))
-            for sign, f in formulas[1:]:
-                x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
+        x = x.reshape(-1, *(dim(kw_Rs[i]) for i in f0))
+        for sign, f in formulas:
+            x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
 
-            x = x.reshape(-1, d)
-            x, _ = o3.orthonormalize(x, eps)
-            if len(x) == d_sym:
-                break
-            d_sym = len(x)
+        x = x.reshape(-1, d)
+        x, _ = o3.orthonormalize(x, eps)
+        d_sym = len(x)
 
         def representation(alpha, beta, gamma):
             m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
