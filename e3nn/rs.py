@@ -5,7 +5,7 @@ Some functions related to SO3 and his usual representations
 Using ZYZ Euler angles parametrisation
 """
 
-from functools import reduce, partial
+from functools import partial, reduce
 from math import gcd
 from typing import List, Tuple, Union
 
@@ -13,6 +13,7 @@ import torch
 from torch_sparse import SparseTensor
 
 from e3nn import o3
+from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
 TY_RS_LOOSE = List[Union[Tuple[int, int], Tuple[int, int, int]]]
@@ -948,60 +949,61 @@ class ElementwiseTensorProduct(torch.nn.Module):
 
 
 def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
-    formulas = [
-        (-1 if f.startswith('-') else 1, f.replace('-', ''))
-        for f in formula.split('=')
-    ]
-    sign0, f0 = formulas[0]
+    with torch_default_dtype(torch.float64):
+        formulas = [
+            (-1 if f.startswith('-') else 1, f.replace('-', ''))
+            for f in formula.split('=')
+        ]
+        sign0, f0 = formulas[0]
 
-    for sign, f in formulas[1:]:
-        if len(f0) != len(f):
-            raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
+        for sign, f in formulas[1:]:
+            if len(f0) != len(f):
+                raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
 
-        for i, j in zip(f0, f):
-            if i in kw_Rs and j in kw_Rs and kw_Rs[i] != kw_Rs[j]:
-                raise RuntimeError(f'Rs of {i} and {j} should be the same')
-            if i in kw_Rs:
-                kw_Rs[j] = kw_Rs[i]
-            if j in kw_Rs:
-                kw_Rs[i] = kw_Rs[j]
+            for i, j in zip(f0, f):
+                if i in kw_Rs and j in kw_Rs and kw_Rs[i] != kw_Rs[j]:
+                    raise RuntimeError(f'Rs of {i} and {j} should be the same')
+                if i in kw_Rs:
+                    kw_Rs[j] = kw_Rs[i]
+                if j in kw_Rs:
+                    kw_Rs[i] = kw_Rs[j]
 
-    for i in f0:
-        if i not in kw_Rs:
-            raise RuntimeError(f'index {i} has not Rs associated to it')
+        for i in f0:
+            if i not in kw_Rs:
+                raise RuntimeError(f'index {i} has not Rs associated to it')
 
-    d = 1
-    for i in f0:
-        d *= dim(kw_Rs[i])
+        d = 1
+        for i in f0:
+            d *= dim(kw_Rs[i])
 
-    x = torch.eye(d)
-    x = x.reshape(d, *(dim(kw_Rs[i]) for i in f0))
+        x = torch.eye(d)
+        x = x.reshape(d, *(dim(kw_Rs[i]) for i in f0))
 
-    for sign, f in formulas[1:]:
-        x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
+        for sign, f in formulas[1:]:
+            x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
 
-    x = x.reshape(d, d)
-    x, _ = o3.orthonormalize(x, eps)
-    d = len(x)
+        x = x.reshape(d, d)
+        x, _ = o3.orthonormalize(x, eps)
+        d = len(x)
 
-    def representation(alpha, beta, gamma):
-        m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
-        return x @ m @ x.T
+        def representation(alpha, beta, gamma):
+            m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
+            return x @ m @ x.T
 
-    Rs_out = []
-    Q = x
-    for l in range(lmax + 1):
-        mul, A, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
-        Q = o3.direct_sum(torch.eye(d - A.shape[0]), A) @ Q
-        Rs_out += [(mul, l)]
+        Rs_out = []
+        Q = x
+        for l in range(lmax + 1):
+            mul, A, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
+            Q = o3.direct_sum(torch.eye(d - A.shape[0]), A) @ Q
+            Rs_out += [(mul, l)]
 
-        if dim(Rs_out) == d:
-            break
+            if dim(Rs_out) == d:
+                break
 
-    Rs_out = simplify(Rs_out)
-    if dim(Rs_out) != d:
-        raise RuntimeError(f'lmax {lmax} it too small')
+        Rs_out = simplify(Rs_out)
+        if dim(Rs_out) != d:
+            raise RuntimeError(f'lmax {lmax} it too small')
 
-    Q[Q.abs() < eps] = 0
+        Q[Q.abs() < eps] = 0
 
-    return Rs_out, Q
+        return Rs_out, Q
