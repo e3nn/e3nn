@@ -1,10 +1,11 @@
 import torch
 from torch_geometric.data import Batch
 import e3nn.data_helpers as dh
-from e3nn.message_passing import E3Conv
+from e3nn.point.message_passing import E3Conv
 from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
 from torch_scatter import scatter_add
+
 
 def get_dataset():
     tetris = [[(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)],  # chiral_shape_1
@@ -12,9 +13,9 @@ def get_dataset():
               [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)],  # square
               [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 0, 3)],  # line
               [(0, 0, 0), (0, 0, 1), (0, 1, 0), (1, 0, 0)],  # corner
-              [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 0)],  # T 
+              [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 0)],  # T
               [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1)],  # zigzag
-              [(0, 0, 0), (1, 0, 0), (1, 1, 0), (2, 1, 0)]]  # L 
+              [(0, 0, 0), (1, 0, 0), (1, 1, 0), (2, 1, 0)]]  # L
     tetris = torch.tensor(tetris, dtype=torch.get_default_dtype())
     labels = torch.arange(len(tetris))
 
@@ -79,7 +80,7 @@ def main():
         for shape, label in zip(r_tetris, labels):
             data = dh.DataNeighbors(x, Rs_in, shape, r_max, y=torch.tensor([label]))
             r_tetris_dataset.append(data)
-            
+
         r_batch = Batch.from_data_list(r_tetris_dataset)
         r_batch = r_batch.to(device)
 
