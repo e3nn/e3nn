@@ -977,14 +977,18 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
             d *= dim(kw_Rs[i])
 
         x = torch.eye(d)
-        x = x.reshape(d, *(dim(kw_Rs[i]) for i in f0))
+        d_sym = d
 
-        for sign, f in formulas[1:]:
-            x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
+        while True:
+            x = x.reshape(-1, *(dim(kw_Rs[i]) for i in f0))
+            for sign, f in formulas[1:]:
+                x = sign0 * x + sign * torch.einsum(f'...{f0}->...{f}', x)
 
-        x = x.reshape(d, d)
-        x, _ = o3.orthonormalize(x, eps)
-        d = len(x)
+            x = x.reshape(-1, d)
+            x, _ = o3.orthonormalize(x, eps)
+            if len(x) == d_sym:
+                break
+            d_sym = len(x)
 
         def representation(alpha, beta, gamma):
             m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
@@ -994,16 +998,15 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
         Q = x
         for l in range(lmax + 1):
             mul, A, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
-            Q = o3.direct_sum(torch.eye(d - A.shape[0]), A) @ Q
+            Q = o3.direct_sum(torch.eye(d_sym - A.shape[0]), A) @ Q
+            Q[Q.abs() < eps] = 0
             Rs_out += [(mul, l)]
 
-            if dim(Rs_out) == d:
+            if dim(Rs_out) == d_sym:
                 break
 
         Rs_out = simplify(Rs_out)
-        if dim(Rs_out) != d:
+        if dim(Rs_out) != d_sym:
             raise RuntimeError(f'lmax {lmax} it too small')
-
-        Q[Q.abs() < eps] = 0
 
         return Rs_out, Q
