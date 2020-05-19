@@ -446,10 +446,14 @@ def intertwiners(D1, D2, eps=1e-10):
     # check that it works
     solutions = []
     for A in null_space:
-        r = rand_angles()
-        d = A @ D2(*r) - D1(*r) @ A
+        d = 0
+        for _ in range(4):
+            r = rand_angles()
+            d += A @ D2(*r) - D1(*r) @ A
+        d /= 4
         if d.abs().max() < eps:
-            solutions.append(A)
+            solutions.append((d.norm(), A))
+    solutions = [A for _, A in sorted(solutions)]
 
     return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
@@ -493,9 +497,19 @@ def reduce(D, D_small, eps=1e-10):
 
 @torch.jit.script
 def orthonormalize(
-    vecs: torch.Tensor,
-    eps: float = 1e-10
+        vecs: torch.Tensor,
+        eps: float = 1e-10
 ) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    :param vecs: tensor of shape [n, m] with n <= m
+    :return: (base, expand)
+
+    base.shape[1] == m
+    expand.shape[1] == m
+    base.shape[0] + expand.shape[0] == m
+
+    cat[base, expand] is orthonormal
+    """
     assert vecs.dim() == 2
     dim = vecs.shape[1]
 

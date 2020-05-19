@@ -304,10 +304,10 @@ def format_Rs(Rs: TY_RS_LOOSE) -> str:
     Rs = convention(Rs)
     d = {
         0: "",
-        1: "+",
-        -1: "-",
+        1: "e",
+        -1: "o",
     }
-    return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs)
+    return ",".join("{}{}{}".format("{}x".format(mul) if mul > 1 else "", l, d[p]) for mul, l, p in Rs if mul > 0)
 
 
 def map_irrep_to_Rs(Rs: TY_RS_LOOSE) -> torch.Tensor:
@@ -976,12 +976,12 @@ def _round_sqrt(x, eps):
     return x
 
 
-def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
+def reduce_tensor(formula, eps=1e-10, **kw_Rs):
     """
     Usage
     Rs, Q = rs.reduce_tensor('ijkl=jikl=ikjl=ijlk', i=[(1, 1)])
-    Rs = 2x0,2x2,4
-    Q = tensor of shape [21, 81]
+    Rs = 0,2,4
+    Q = tensor of shape [15, 81]
     """
     with torch_default_dtype(torch.float64):
         formulas = [
@@ -1070,7 +1070,10 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
 
         Rs_out = []
         A = Q.clone()
-        for l in range(lmax + 1):
+        for l in range(int((d_sym - 1) // 2) + 1):
+            if 2 * l + 1 > d_sym - dim(Rs_out):
+                break
+
             mul, B, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
             A = o3.direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
             A = _round_sqrt(A, eps)
@@ -1079,8 +1082,6 @@ def reduce_tensor(formula, lmax=15, eps=1e-10, **kw_Rs):
             if dim(Rs_out) == d_sym:
                 break
 
-        Rs_out = simplify(Rs_out)
         if dim(Rs_out) != d_sym:
-            raise RuntimeError(f'lmax {lmax} it too small')
-
-        return Rs_out, A
+            raise RuntimeError(f'unable to decompose into irreducible representations')
+        return simplify(Rs_out), A
