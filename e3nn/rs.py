@@ -1045,14 +1045,14 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
                     frozenset(xs),
                     frozenset({(-s, x) for s, x in xs})
                 })
-                base.add(frozenset(xs))
+                base.add(xs)
 
         d_sym = len(base)
         d = len(full_base)
         Q = torch.zeros(d_sym, d)
 
         for i, x in enumerate(base):
-            x = next(iter(x))
+            x = max(x, key=lambda xs: sum(s for s, x in xs))
             for s, e in x:
                 j = full_base.index(e)
                 Q[i, j] = s / len(x)**0.5
