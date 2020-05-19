@@ -17,7 +17,7 @@ from e3nn import o3, perm
 from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
-TY_RS_LOOSE = List[Union[Tuple[int, int], Tuple[int, int, int]]]
+TY_RS_LOOSE = List[Union[int, Tuple[int, int], Tuple[int, int, int]]]
 TY_RS_STRICT = List[Tuple[int, int, int]]
 
 
@@ -230,19 +230,16 @@ def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     """
     out = []
     for r in Rs:
-        if len(r) == 2:
-            mul, l = r
-            p = 0
-        if len(r) == 3:
+        if isinstance(r, int):
+            mul, l, p = 1, r, 0
+        elif len(r) == 2:
+            (mul, l), p = r, 0
+        elif len(r) == 3:
             mul, l, p = r
-            if p > 0:
-                p = 1
-            if p < 0:
-                p = -1
-        mul = round(mul)
-        assert mul >= 0
-        l = round(l)
-        assert l >= 0
+
+        assert isinstance(mul, int) and mul >= 0
+        assert isinstance(l, int) and l >= 0
+        assert p in [0, 1, -1]
 
         out.append((mul, l, p))
     return out
