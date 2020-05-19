@@ -6,7 +6,6 @@ Using ZYZ Euler angles parametrisation
 """
 
 import itertools
-from collections import defaultdict
 from functools import partial, reduce
 from math import gcd
 from typing import List, Tuple, Union
