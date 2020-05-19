@@ -1035,17 +1035,14 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
 
         base = set()
         for x in full_base:
-            dic = defaultdict(set)
-            for s, p in formulas:
-                px = tuple(x[i] for i in p)
-                dic[px].add(s)
-            xs = {(next(iter(signs)), x) for x, signs in dic.items() if len(signs) == 1}
-            if len(xs) > 0:
-                xs = frozenset({
+            xs = {(s, tuple(x[i] for i in p)) for s, p in formulas}
+            # s * T[x] all equal for (s, x) in xs
+            if not (-1, x) in xs:
+                # the sign is arbitrary, put both possibilities
+                base.add(frozenset({
                     frozenset(xs),
                     frozenset({(-s, x) for s, x in xs})
-                })
-                base.add(xs)
+                }))
 
         d_sym = len(base)
         d = len(full_base)
