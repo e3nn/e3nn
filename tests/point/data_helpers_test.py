@@ -27,7 +27,6 @@ def test_silicon_neighbors():
         [0.        , 0.        , 0.        ],
         [1.11646617, 0.7894608 , 1.93377613]
     ])
-    species = ['Si', 'Si']
     r_max = 2.5
     edge_index, edge_attr = dh.neighbor_list_and_relative_vec_lattice(coords, lattice, r_max=r_max)
     edge_index_true = torch.LongTensor([
