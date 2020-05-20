@@ -36,7 +36,7 @@ def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
 
 
-def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True):
+def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True, r_min=1e-8):
     """
     Create neighbor list (edge_index) and relative vectors (edge_attr)
     based on radial cutoff and periodic lattice.
@@ -53,11 +53,6 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
     nei_list = []
     geo_list = []
 
-    if self_interaction:
-        r_min = 0.
-    else:
-        r_min = 1e-8
-
     neighbors = structure.get_all_neighbors(
         r_max,
         include_index=True,
@@ -69,6 +64,11 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
         cart = torch.tensor(cart)
         indices = torch.LongTensor([[i, target] for target in indices])
         dist = cart - torch.tensor(site.coords)
+        if self_interaction:
+            self_index = torch.LongTensor([[i, i]])
+            indices = torch.cat([self_index, indices], dim=0)
+            self_dist = torch.zeros(1, 3, dtype=dist.dtype)
+            dist = torch.cat([self_dist, dist], dim=0)
         nei_list.append(indices)
         geo_list.append(dist)
     return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
