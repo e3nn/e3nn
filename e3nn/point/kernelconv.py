@@ -140,7 +140,7 @@ class KernelConvFn(torch.autograd.Function):
         )
 
     @staticmethod
-    def backward(ctx, grad_kernel):
+    def backward(ctx, grad_kernel):  # pragma: no cover
         F, Y, R, norm_coef = ctx.saved_tensors
         batch, a, b = ctx.batch, ctx.a, ctx.b
 

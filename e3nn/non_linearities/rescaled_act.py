@@ -79,7 +79,7 @@ class SwishJitAutoFn(torch.autograd.Function):
         return swish_jit_fwd(x)
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output):  # pragma: no cover
         x = ctx.saved_tensors[0]
         return swish_jit_bwd(x, grad_output)
 

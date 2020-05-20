@@ -43,7 +43,7 @@ class ConvolutionEinsumFn(torch.autograd.Function):
         return torch.einsum("zabij,zbj->zai", k, features)  # [batch, point, channel]
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output):  # pragma: no cover
         k, features = ctx.saved_tensors
         del ctx
         grad_k = torch.einsum("zai,zbj->zabij", grad_output, features)

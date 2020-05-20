@@ -35,7 +35,7 @@ def spherical_harmonics_expand_matrix(ls, like=None):
 
 
 @torch.jit.script
-def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tensor:
+def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tensor:  # pragma: no cover
     """
     multiply tensor [..., l * m] by [..., m]
     """
@@ -49,7 +49,7 @@ def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tens
 
 
 @torch.jit.script
-def mul_radial_angular(Rs: List[Tuple[int, int, int]], radial, angular):
+def mul_radial_angular(Rs: List[Tuple[int, int, int]], radial, angular):  # pragma: no cover
     """
     :param Rs: output representation
     :param angular: [..., l * m]
@@ -167,7 +167,7 @@ def spherical_harmonics_z(ls, z, y=None):
 
 
 @torch.jit.script
-def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
+def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # pragma: no cover
     """
     the alpha (x, y) componant of the spherical harmonics
     (useful to perform fourier transform)
@@ -201,7 +201,7 @@ def spherical_harmonics_alpha_beta(ls, alpha, beta):
     :param beta: float or tensor of shape [...]
     :return: tensor of shape [..., m]
     """
-    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and max(ls) <= 10:
+    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and max(ls) <= 10:  # pragma: no cover
         xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
@@ -230,7 +230,7 @@ def spherical_harmonics_xyz(ls, xyz):
     :return: tensor of shape [..., m]
     """
 
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:  # pragma: no cover
         try:
             return spherical_harmonics_xyz_cuda(ls, xyz)
         except ImportError:
@@ -245,7 +245,7 @@ def spherical_harmonics_xyz(ls, xyz):
     return spherical_harmonics_alpha_z_y(ls, alpha, z, y)
 
 
-def spherical_harmonics_xyz_cuda(ls, xyz):
+def spherical_harmonics_xyz_cuda(ls, xyz):  # pragma: no cover
     """
     cuda version of spherical_harmonics_xyz
     """

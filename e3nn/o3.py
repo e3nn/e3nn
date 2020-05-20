@@ -291,7 +291,7 @@ def _wigner_3j(l1, l2, l3):
 
 
 @cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/wigner_3j'))
-def __wigner_3j(l1, l2, l3, _version=1):
+def __wigner_3j(l1, l2, l3, _version=1):  # pragma: no cover
     """
     Computes the 3-j symbol
     https://en.wikipedia.org/wiki/3-j_symbol

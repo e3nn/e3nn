@@ -112,7 +112,7 @@ class PeriodicConvolutionFunc(torch.autograd.Function):
         return out
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output):  # pragma: no cover
         kernels, bs_slice, features = ctx.saved_tensors                                             # restore input from context
         # pros: allows to decrease peak memory usage (del kernels); cons: backward cannot be called more than once!
         del ctx

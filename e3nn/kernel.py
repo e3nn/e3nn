@@ -211,7 +211,7 @@ class KernelFn(torch.autograd.Function):
         return kernel_fn_forward(Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.selection_rule, ctx.set_of_l_filters)
 
     @staticmethod
-    def backward(ctx, grad_kernel):
+    def backward(ctx, grad_kernel):  # pragma: no cover
         Y, R, norm_coef = ctx.saved_tensors
 
         grad_Y = grad_R = None
