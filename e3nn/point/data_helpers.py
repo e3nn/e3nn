@@ -48,7 +48,7 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
     """
     from pymatgen.core.structure import Structure
     N, _ = pos.shape
-    structure = Structure(lattice, ['H'] * N, pos)
+    structure = Structure(lattice, ['H'] * N, pos, coords_are_cartesian=True)
 
     nei_list = []
     geo_list = []
