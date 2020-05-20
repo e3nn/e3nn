@@ -10,13 +10,13 @@ class E3Conv(MessagePassing):
 
     def forward(self, x, edge_index, edge_attr, size=None, n_norm=1):
         if size is None:
-            size = edge_index.shape
+            size = int(x.shape[-2])
         k = self.kernel(edge_attr)
         k.div_(n_norm ** 0.5)
         return self.propagate(edge_index, size=size, x=x, k=k)
 
-    def message(self, x_i, k):
-        out = torch.einsum('eij,ej->ei', k, x_i)
+    def message(self, x_i, x_j, k):
+        out = torch.einsum('eij,ej->ei', k, x_j)
         return out
 
     def update(self, aggr_out):
