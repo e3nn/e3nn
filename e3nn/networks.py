@@ -33,7 +33,7 @@ class GatedConvNetwork(torch.nn.Module):
         def make_layer(Rs_in, Rs_out):
             if feature_product:
                 tr1 = rs.TransposeToMulL(Rs_in)
-                lts = LearnableTensorSquare(tr1.Rs_out, partial(o3.selection_rule, lmax=lmax))
+                lts = LearnableTensorSquare(tr1.Rs_out, list(range(lmax + 1)), allow_change_output=True)
                 tr2 = torch.nn.Flatten(2)
                 Rs = tr1.mul * lts.Rs_out
                 act = GatedBlock(Rs_out, swish, sigmoid)
@@ -100,7 +100,7 @@ class GatedConvParityNetwork(torch.nn.Module):
 
             if feature_product:
                 tr1 = rs.TransposeToMulL(act.Rs_out)
-                lts = LearnableTensorSquare(tr1.Rs_out, partial(o3.selection_rule, lmax=lmax))
+                lts = LearnableTensorSquare(tr1.Rs_out, [(1, l, p) for l in range(lmax + 1) for p in [-1, 1]], allow_change_output=True)
                 tr2 = torch.nn.Flatten(2)
                 act = torch.nn.Sequential(act, tr1, lts, tr2)
                 Rs = tr1.mul * lts.Rs_out
