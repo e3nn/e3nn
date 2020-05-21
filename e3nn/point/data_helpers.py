@@ -1,5 +1,8 @@
+# pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable
 import torch
 import torch_geometric as tg
+from ase import Atoms, neighborlist
+from pymatgen.core.structure import Structure
 
 
 def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
@@ -11,7 +14,6 @@ def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     :param r_max: float of radial cutoff
     :param self_interaction: whether or not to include self edge
     """
-    from ase import Atoms, neighborlist
     N, _ = pos.shape
     atoms = Atoms(symbols=['H'] * N, positions=pos)
     nl = neighborlist.NeighborList(
@@ -46,7 +48,6 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
     :param self_interaction: whether or not to include self edge
 
     """
-    from pymatgen.core.structure import Structure
     N, _ = pos.shape
     structure = Structure(lattice, ['H'] * N, pos, coords_are_cartesian=True)
 
