@@ -46,9 +46,10 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
 
     assert (out1 - out2).abs().max() < 1e-10
 
+
 def test_flow():
         """
-        This test checks that information is flowing as expected. 
+        This test checks that information is flowing as expected.
         edge_index[0] is "source"
         edge_index[1] is "target"
         """
@@ -75,4 +76,4 @@ def test_flow():
             [0, 0, 0, 0]
         ])
         output = conv(features, edge_index, edge_attr)
-        torch.allclose(output, torch.tensor([0., -1., -1., -1., -1.]).unsqueeze(-1)) 
+        torch.allclose(output, torch.tensor([0., -1., -1., -1., -1.]).unsqueeze(-1))
