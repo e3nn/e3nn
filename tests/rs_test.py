@@ -115,6 +115,14 @@ class Tests(unittest.TestCase):
 ############################################################################
 
 
+def test_format():
+    assert rs.format_Rs([]) == ""
+    assert rs.format_Rs([2]) == "2"
+
+
+############################################################################
+
+
 def test_tensor_product():
     with o3.torch_default_dtype(torch.float64):
         Rs_1 = [(3, 0), (2, 1), (5, 2)]
@@ -132,6 +140,32 @@ def test_tensor_product():
 
         assert rs.dim(Rs_out) == y1.shape[1]
         assert (y1 - y2).abs().max() < 1e-10 * y1.abs().max()
+
+
+def test_tensor_to_dense():
+    with o3.torch_default_dtype(torch.float64):
+        Rs_1 = [(3, 0), (2, 1), (5, 2)]
+        Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
+
+        mul = rs.TensorProduct(Rs_1, Rs_2, o3.selection_rule)
+        assert mul.to_dense().shape == (rs.dim(mul.Rs_out), rs.dim(Rs_1), rs.dim(Rs_2))
+
+
+def test_tensor_product_symmetry():
+    with o3.torch_default_dtype(torch.float64):
+        Rs_in = [(3, 0), (2, 1), (5, 2)]
+        Rs_out = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
+
+        mul1 = rs.TensorProduct(Rs_in, o3.selection_rule, Rs_out)
+        mul2 = rs.TensorProduct(o3.selection_rule, Rs_in, Rs_out)
+
+        assert mul1.Rs_in2 == mul2.Rs_in1
+
+        x = torch.randn(rs.dim(Rs_in), rs.dim(mul1.Rs_in2))
+        y1 = mul1(x)
+        y2 = mul2(x.T)
+
+        assert (y1 - y2).abs().max() < 1e-10
 
 
 def test_tensor_product_left_right():

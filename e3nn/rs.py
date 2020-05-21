@@ -39,12 +39,15 @@ def randn(*size, normalization='component', dtype=None, device=None, requires_gr
     """
     di = 0
     Rs = None
-    for di, Rs in enumerate(size):
-        if isinstance(Rs, list):
+    for di, n in enumerate(size):
+        if isinstance(n, list):
+            if Rs is not None:
+                raise RuntimeError('Only one Rs is allowed')
             lsize = size[:di]
-            Rs = convention(Rs)
+            Rs = convention(n)
             rsize = size[di + 1:]
-            break
+    if Rs is None:
+        raise RuntimeError('Rs missing')
 
     if normalization == 'component':
         return torch.randn(*lsize, dim(Rs), *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
@@ -511,6 +514,15 @@ class TensorProduct(torch.nn.Module):
         output = output.reshape(d_in2, d_out, features_1.shape[0])
         output = torch.einsum('jiz->zij', output)
         return output.reshape(*size_1, d_out, d_in2)
+
+    def to_dense(self):
+        """
+        :return: tensor of shape [dim(Rs_out), dim(Rs_in1), dim(Rs_in2)]
+        """
+        mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
+        mixing_matrix = mixing_matrix.to_dense()
+        mixing_matrix = mixing_matrix.reshape(dim(self.Rs_out), dim(self.Rs_in1), dim(self.Rs_in2))
+        return mixing_matrix
 
 
 def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted):
