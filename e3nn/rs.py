@@ -445,9 +445,9 @@ class TensorProduct(torch.nn.Module):
             Rs_out=format_Rs(self.Rs_out),
         )
 
-    def forward(self, features_1, features_2):
+    def forward(self, features_1, features_2=None):
         '''
-        :param features_1: [..., in1]
+        :param features_1: [..., in1] or [..., in1, in2] if features_2 is None
         :param features_2: [..., in2]
         :return: [..., out]
         '''
@@ -455,8 +455,11 @@ class TensorProduct(torch.nn.Module):
         d_in1 = dim(self.Rs_in1)
         d_in2 = dim(self.Rs_in2)
 
-        if self._complete == 'out':
-            features = features_1[..., :, None] * features_2[..., None, :]
+        if self._complete == 'out' or features_2 is None:
+            if features_2 is None:
+                features = features_1
+            else:
+                features = features_1[..., :, None] * features_2[..., None, :]
 
             size = features.shape[:-2]
             features = features.reshape(-1, d_in1, d_in2)  # [in1, in2, batch]

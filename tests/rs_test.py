@@ -1,6 +1,7 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, protected-access
 import unittest
 
+import pytest
 import torch
 
 from e3nn import o3, rs
@@ -83,39 +84,6 @@ class Tests(unittest.TestCase):
         self.assertEqual(rs.dim(Rs_out), y1.shape[1])
         self.assertLess((y1 - y2).abs().max(), 1e-7 * y1.abs().max())
 
-    def test_tensor_product(self):
-        torch.set_default_dtype(torch.float64)
-
-        Rs_1 = [(3, 0), (2, 1), (5, 2)]
-        Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
-
-        Rs_out, m = rs.tensor_product(Rs_1, Rs_2, o3.selection_rule, sorted=True)
-        mul = rs.TensorProduct(Rs_1, Rs_2, o3.selection_rule)
-
-        x1 = rs.randn(1, Rs_1)
-        x2 = rs.randn(1, Rs_2)
-
-        y1 = mul(x1, x2)
-        y2 = torch.einsum('zi,zj->ijz', x1, x2)
-        y2 = (m @ y2.reshape(rs.dim(Rs_1) * rs.dim(Rs_2), -1)).T
-
-        self.assertEqual(rs.dim(Rs_out), y1.shape[1])
-        self.assertLess((y1 - y2).abs().max(), 1e-7 * y1.abs().max())
-
-    def test_tensor_product_norm(self):
-        for Rs_in1, Rs_in2 in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
-            with o3.torch_default_dtype(torch.float64):
-                Rs_out, Q = rs.tensor_product(Rs_in1, Rs_in2, o3.selection_rule)
-
-                n = rs.dim(Rs_out)
-                I = torch.eye(n, dtype=Q.dtype())
-
-                d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
-                d = ((Q.t() @ Q).to_dense() - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
-
     def test_tensor_square_equivariance(self):
         with o3.torch_default_dtype(torch.float64):
             Rs_in = [(3, 0), (2, 1), (5, 2)]
@@ -144,18 +112,83 @@ class Tests(unittest.TestCase):
                 d = (I1 - I2).pow(2).mean().sqrt()
                 self.assertLess(d, 1e-10)
 
-    def test_tensor_product_in_out_norm(self):
-        for Rs_in1, Rs_out in [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])]:
-            with o3.torch_default_dtype(torch.float64):
-                _, Q = rs.tensor_product(Rs_in1, o3.selection_rule, Rs_out)
+############################################################################
 
-                n = rs.dim(Rs_out)
-                I = torch.eye(n, dtype=Q.dtype())
 
-                x = Q @ Q.t()
-                x = x.to_dense()
-                d = (x - I).pow(2).mean().sqrt()
-                self.assertLess(d, 1e-10)
+def test_tensor_product():
+    with o3.torch_default_dtype(torch.float64):
+        Rs_1 = [(3, 0), (2, 1), (5, 2)]
+        Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
+
+        Rs_out, m = rs.tensor_product(Rs_1, Rs_2, o3.selection_rule, sorted=True)
+        mul = rs.TensorProduct(Rs_1, Rs_2, o3.selection_rule)
+
+        x1 = rs.randn(1, Rs_1)
+        x2 = rs.randn(1, Rs_2)
+
+        y1 = mul(x1, x2)
+        y2 = torch.einsum('zi,zj->ijz', x1, x2)
+        y2 = (m @ y2.reshape(rs.dim(Rs_1) * rs.dim(Rs_2), -1)).T
+
+        assert rs.dim(Rs_out) == y1.shape[1]
+        assert (y1 - y2).abs().max() < 1e-10 * y1.abs().max()
+
+
+def test_tensor_product_left_right():
+    with o3.torch_default_dtype(torch.float64):
+        Rs_1 = [(3, 0), (2, 1), (5, 2)]
+        Rs_2 = [(1, 0), (2, 1), (2, 2), (2, 0), (2, 1), (1, 2)]
+
+        mul = rs.TensorProduct(Rs_1, Rs_2, o3.selection_rule)
+
+        x1 = rs.randn(2, Rs_1)
+        x2 = rs.randn(2, Rs_2)
+
+        y0 = mul(x1, x2)
+
+        y1 = mul(torch.einsum('zi,zj->zij', x1, x2))
+        assert (y0 - y1).abs().max() < 1e-10 * y0.abs().max()
+
+        mul._complete = 'in1'
+        y1 = mul(x1, x2)
+        assert (y0 - y1).abs().max() < 1e-10 * y0.abs().max()
+
+        mul._complete = 'in2'
+        y1 = mul(x1, x2)
+        assert (y0 - y1).abs().max() < 1e-10 * y0.abs().max()
+
+
+@pytest.mark.parametrize('Rs_in1, Rs_in2', [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])])
+def test_tensor_product_norm(Rs_in1, Rs_in2):
+    with o3.torch_default_dtype(torch.float64):
+        Rs_out, Q = rs.tensor_product(Rs_in1, Rs_in2, o3.selection_rule)
+
+        n = rs.dim(Rs_out)
+        I = torch.eye(n)
+
+        d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
+        assert d < 1e-10
+
+        d = ((Q.t() @ Q).to_dense() - I).pow(2).mean().sqrt()
+        assert d < 1e-10
+
+
+@pytest.mark.parametrize('Rs_in1, Rs_out', [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(2, 0), (1, 1), (1, 3)])])
+def test_tensor_product_in_out_norm(Rs_in1, Rs_out):
+    with o3.torch_default_dtype(torch.float64):
+        n = rs.dim(Rs_out)
+        I = torch.eye(n)
+
+        _, Q = rs.tensor_product(Rs_in1, o3.selection_rule, Rs_out)
+        d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
+        assert d < 1e-10
+
+        _, Q = rs.tensor_product(o3.selection_rule, Rs_in1, Rs_out)
+        d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
+        assert d < 1e-10
+
+
+############################################################################
 
 
 def test_reduce_tensor_Levi_Civita_symbol():
