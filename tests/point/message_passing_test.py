@@ -11,7 +11,7 @@ from e3nn.radial import ConstantRadialModel
 
 
 @pytest.mark.parametrize('Rs_in, Rs_out, n_source, n_target, n_edge', itertools.product([[1]], [[2]], [2, 3], [1, 3], [0, 3]))
-def test_E3conv(Rs_in, Rs_out, n_source, n_target, n_edge):
+def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
     torch.set_default_dtype(torch.float64)
 
     mp = MessagePassing(Kernel(Rs_in, Rs_out, ConstantRadialModel))

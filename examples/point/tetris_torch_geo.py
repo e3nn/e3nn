@@ -1,10 +1,12 @@
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
 import torch
 from torch_geometric.data import Batch
+from torch_scatter import scatter_add
+
 import e3nn.point.data_helpers as dh
-from e3nn.point.message_passing import E3Conv
 from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
-from torch_scatter import scatter_add
+from e3nn.point.message_passing import MessagePassing
 
 
 def get_dataset():
@@ -53,7 +55,7 @@ def main():
     Rs_out = [(len(tetris), 0)]
     lmax = 3
 
-    f = SumNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=E3Conv)
+    f = SumNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=MessagePassing)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)
@@ -70,7 +72,6 @@ def main():
         optimizer.step()
 
         acc = out.cpu().argmax(1).eq(labels).double().mean().item()
-        print("step={} loss={} accuracy={}".format(step, loss.item(), acc))
 
         out = f(batch.x, batch.edge_index, batch.edge_attr, size=N, batch=batch.batch)
 
@@ -86,7 +87,7 @@ def main():
 
         r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr, size=N, batch=r_batch.batch)
 
-        print('equivariance error={}'.format((out - r_out).pow(2).mean().sqrt().item()))
+        print("step={} loss={:.2e} accuracy={:.2f} equivariance error={:.1e}".format(step, loss.item(), acc, (out - r_out).pow(2).mean().sqrt().item()))
 
 
 if __name__ == '__main__':
