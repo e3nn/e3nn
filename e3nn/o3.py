@@ -499,7 +499,7 @@ def reduce(D, D_small, eps=1e-10):
 def orthonormalize(
         vecs: torch.Tensor,
         eps: float = 1e-10
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor]:  # pragma: no cover
     """
     :param vecs: tensor of shape [n, m] with n <= m
     :return: (base, expand)
