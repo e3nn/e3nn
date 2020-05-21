@@ -39,6 +39,38 @@ class Tests(unittest.TestCase):
         out = conv(x, edge_index, edge_attr, size=(N, N))
         assert list(out.shape) == [N, c_out]
 
+    def test_flow(self):
+        """
+        This test checks that information is flowing as expected. 
+        edge_index[0] is "source"
+        edge_index[1] is "target"
+        """
+
+        edge_index = torch.LongTensor([
+            [0, 0, 0, 0],
+            [1, 2, 3, 4]
+        ])
+        features = torch.tensor(
+            [-1., 1., 1., 1., 1.]
+        )
+        features = features.unsqueeze(-1)
+        edge_attr = torch.ones(edge_index.shape[-1], 3)
+
+        K = partial(Kernel, RadialModel=ConstantRadialModel)
+        Rs = [0]
+        conv = E3Conv(K, Rs, Rs)
+        conv.kernel.R.weight.data.fill_(1.)  # Fix weight to 1.
+
+        output = conv(features, edge_index, edge_attr)
+        torch.allclose(output, torch.tensor([4., 0., 0., 0., 0.]).unsqueeze(-1))
+
+        edge_index = torch.LongTensor([
+            [1, 2, 3, 4],
+            [0, 0, 0, 0]
+        ])
+        output = conv(features, edge_index, edge_attr)
+        torch.allclose(output, torch.tensor([0., -1., -1., -1., -1.]).unsqueeze(-1)) 
+
 
 if __name__ == '__main__':
     unittest.main()
