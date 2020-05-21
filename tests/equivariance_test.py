@@ -75,7 +75,7 @@ class Tests(unittest.TestCase):
             K = partial(K, RadialModel=ConstantRadialModel)
 
             act = GatedBlock(Rs_out, scalar_activation=sigmoid, gate_activation=sigmoid)
-            conv = Convolution(K, Rs_in, act.Rs_in)
+            conv = Convolution(K(Rs_in, act.Rs_in))
 
             abc = torch.randn(3)
             rot_geo = o3.rot(*abc)
@@ -131,7 +131,7 @@ class Tests(unittest.TestCase):
             gates = [(n, 0, +1), (n, 0, -1)], [(n, sigmoid), (n, tanh)]
 
             act = GatedBlockParity(*scalars, *gates, rs_nonscalars)
-            conv = Convolution(K, Rs_in, act.Rs_in)
+            conv = Convolution(K(Rs_in, act.Rs_in))
 
             D_in = rs.rep(Rs_in, 0, 0, 0, 1)
             D_out = rs.rep(act.Rs_out, 0, 0, 0, 1)
@@ -163,7 +163,7 @@ class Tests(unittest.TestCase):
             gates = [(n, 0, +1), (n, 0, -1)], [(n, sigmoid), (n, tanh)]
 
             act = GatedBlockParity(*scalars, *gates, rs_nonscalars)
-            conv = Convolution(K, Rs_in, act.Rs_in)
+            conv = Convolution(K(Rs_in, act.Rs_in))
 
             abc = torch.randn(3)
             rot_geo = -o3.rot(*abc)

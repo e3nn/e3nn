@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, arguments-differ
 import torch
 from torch_geometric.data import Batch
 from torch_scatter import scatter_add
