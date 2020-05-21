@@ -1,5 +1,8 @@
+# pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable
 import torch
 import torch_geometric as tg
+from ase import Atoms, neighborlist
+from pymatgen.core.structure import Structure
 
 
 def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
@@ -10,8 +13,16 @@ def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     :param pos: torch.tensor of coordinates with shape (N, 3)
     :param r_max: float of radial cutoff
     :param self_interaction: whether or not to include self edge
+
+    :return: list of edges [(2, num_edges)], Tensor of relative vectors [num_edges, 3]
+
+    edges are given by the convention
+    edge_list[0] = source (convolution center)
+    edge_list[1] = target (neighbor)
+
+    Thus, the edge_list has the same convention vector notation for relative vectors
+    \vec{r}_{source, target}
     """
-    from ase import Atoms, neighborlist
     N, _ = pos.shape
     atoms = Atoms(symbols=['H'] * N, positions=pos)
     nl = neighborlist.NeighborList(
@@ -45,8 +56,17 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
     :param r_max: float of radial cutoff
     :param self_interaction: whether or not to include self edge
 
+    :return: list of edges [(2, num_edges)], Tensor of relative vectors [num_edges, 3]
+
+    edges are given by the convention
+    edge_list[0] = source (convolution center)
+    edge_list[1] = target (neighbor index)
+
+    Thus, the edge_list has the same convention vector notation for relative vectors
+    \vec{r}_{source, target}
+
+    Relative vectors are given for the different images of the neighbor atom within r_max.
     """
-    from pymatgen.core.structure import Structure
     N, _ = pos.shape
     structure = Structure(lattice, ['H'] * N, pos, coords_are_cartesian=True)
 

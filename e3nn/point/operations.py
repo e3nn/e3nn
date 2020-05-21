@@ -3,9 +3,9 @@ import torch
 
 
 class Convolution(torch.nn.Module):
-    def __init__(self, Kernel, Rs_in, Rs_out):
+    def __init__(self, kernel):
         super().__init__()
-        self.kernel = Kernel(Rs_in, Rs_out)
+        self.kernel = kernel
 
     def forward(self, features, geometry, out_geometry=None, n_norm=1,
                 custom_backward_conv=False, custom_backward_kernel=False, r_eps=0):
@@ -52,9 +52,9 @@ class ConvolutionEinsumFn(torch.autograd.Function):
 
 
 class ApplyKernel(torch.nn.Module):
-    def __init__(self, Kernel, Rs_in, Rs_out):
+    def __init__(self, kernel):
         super().__init__()
-        self.kernel = Kernel(Rs_in, Rs_out)
+        self.kernel = kernel
 
     def forward(self, features, geometry):
         """

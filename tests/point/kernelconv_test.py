@@ -70,8 +70,7 @@ class TestKernelConv(unittest.TestCase):
 
     def get_kernel_conv_kernelconv(self, seed, normalization):
         torch.manual_seed(seed)
-        K = partial(Kernel, RadialModel=ConstantRadialModel, normalization=normalization)
-        C = Convolution(K, self.Rs_in, self.Rs_out)
+        C = Convolution(Kernel(self.Rs_in, self.Rs_out, ConstantRadialModel, normalization=normalization))
 
         torch.manual_seed(seed)
         KC = KernelConv(self.Rs_in, self.Rs_out, RadialModel=ConstantRadialModel, normalization=normalization)

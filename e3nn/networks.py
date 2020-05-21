@@ -37,11 +37,11 @@ class GatedConvNetwork(torch.nn.Module):
                 tr2 = torch.nn.Flatten(2)
                 Rs = tr1.mul * lts.Rs_out
                 act = GatedBlock(Rs_out, swish, sigmoid)
-                conv = convolution(K, Rs, act.Rs_in)
+                conv = convolution(K(Rs, act.Rs_in))
                 return torch.nn.ModuleList([torch.nn.Sequential(tr1, lts, tr2), conv, act])
             else:
                 act = GatedBlock(Rs_out, swish, sigmoid)
-                conv = convolution(K, Rs_in, act.Rs_in)
+                conv = convolution(K(Rs_in, act.Rs_in))
                 return torch.nn.ModuleList([conv, act])
 
         self.layers = torch.nn.ModuleList([
@@ -49,7 +49,7 @@ class GatedConvNetwork(torch.nn.Module):
             for Rs_layer_in, Rs_layer_out in zip(representations[:-2], representations[1:-1])
         ])
 
-        self.layers.append(convolution(K, representations[-2], representations[-1]))
+        self.layers.append(convolution(K(representations[-2], representations[-1])))
         self.feature_product = feature_product
 
     def forward(self, input, *args, **kwargs):
@@ -96,7 +96,7 @@ class GatedConvParityNetwork(torch.nn.Module):
             act_gates = [(-1, sigmoid)]
 
             act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
-            conv = convolution(K, Rs, act.Rs_in)
+            conv = convolution(K(Rs, act.Rs_in))
 
             if feature_product:
                 tr1 = rs.TransposeToMulL(act.Rs_out)
@@ -113,7 +113,7 @@ class GatedConvParityNetwork(torch.nn.Module):
         self.firstlayers = torch.nn.ModuleList(modules)
 
         K = partial(K, allow_unused_inputs=True)
-        self.conv = convolution(K, Rs, Rs_out)
+        self.conv = convolution(K(Rs, Rs_out))
 
     def forward(self, features, geometry, n_norm=None):
         if n_norm is None:
