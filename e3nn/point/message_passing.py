@@ -12,8 +12,8 @@ class E3Conv(tg.nn.MessagePassing):
         """
         :param features: Tensor of shape [n_source, dim(Rs_in)]
         :param edge_index: LongTensor of shape [2, num_messages]
-                           edge_index[0] = targets
-                           edge_index[1] = sources
+                           edge_index[0] = sources
+                           edge_index[1] = targets
         :param edge_r: Tensor of shape [num_messages, 3]
                        edge_r = position_source - position_target
         :param size: (n_target, n_source) or None
