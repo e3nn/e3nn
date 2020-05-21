@@ -49,9 +49,9 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
 
 def test_flow():
         """
-        This test checks that information is flowing as expected.
-        edge_index[0] is "source"
-        edge_index[1] is "target"
+        This test checks that information is flowing as expected from target to source.
+        edge_index[0] is source (convolution center)
+        edge_index[1] is target (neighbors)
         """
 
         edge_index = torch.LongTensor([
