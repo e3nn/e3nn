@@ -15,11 +15,11 @@ class Convolution(tg.nn.MessagePassing):
                            edge_index[0] = sources (convolution centers)
                            edge_index[1] = targets (neighbors)
         :param edge_r: Tensor of shape [num_messages, 3]
-                       edge_r = position_source - position_target
-        :param size: (n_target, n_source) or None
+                       edge_r = position_target - position_source
+        :param size: (n_source, n_target) or None
         :param n_norm: typical number of sources per target
 
-        :return: Tensor of shape [n_target, dim(Rs_out)]
+        :return: Tensor of shape [n_source, dim(Rs_out)]
         """
         if size is None:
             size = features.shape[0]
