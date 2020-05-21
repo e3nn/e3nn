@@ -10,7 +10,7 @@ class Convolution(tg.nn.MessagePassing):
 
     def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
         """
-        :param features: Tensor of shape [n_source, dim(Rs_in)]
+        :param features: Tensor of shape [n_target, dim(Rs_in)]
         :param edge_index: LongTensor of shape [2, num_messages]
                            edge_index[0] = sources (convolution centers)
                            edge_index[1] = targets (neighbors)
