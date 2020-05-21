@@ -64,13 +64,13 @@ class Network(torch.nn.Module):
             print("layer {}: from {} to {}".format(i, rs.format_Rs(Rs), rs.format_Rs(scalars + nonscalars)))
 
             act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
-            conv = Convolution(K, Rs, act.Rs_in)
+            conv = Convolution(K(Rs, act.Rs_in))
             block = torch.nn.ModuleList([conv, act])
             layers.append(block)
             Rs = act.Rs_out
 
         act = GatedBlockParity([(mul, 0, +1), (mul, 0, -1)], [(mul, relu), (mul, tanh)], [], [], [])
-        conv = Convolution(K, Rs, act.Rs_in)
+        conv = Convolution(K(Rs, act.Rs_in))
         block = torch.nn.ModuleList([conv, act])
         layers.append(block)
 

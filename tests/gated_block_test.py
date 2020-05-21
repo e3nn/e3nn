@@ -1,6 +1,5 @@
 # pylint: disable=invalid-name, missing-docstring, no-member, line-too-long
 import unittest
-from functools import partial
 
 import torch
 
@@ -19,9 +18,7 @@ class Tests(unittest.TestCase):
             Rs_out = [(3, 0), (3, 1), (1, 2), (3, 0)]
 
             f = GatedBlock(Rs_out, rescaled_act.Softplus(beta=5), rescaled_act.sigmoid)
-
-            K = partial(Kernel, RadialModel=ConstantRadialModel)
-            c = Convolution(K, Rs_in, f.Rs_in)
+            c = Convolution(Kernel(Rs_in, f.Rs_in, ConstantRadialModel))
 
             abc = torch.randn(3)
             D_in = o3.direct_sum(*[o3.irr_repr(l, *abc) for mul, l in Rs_in for _ in range(mul)])
