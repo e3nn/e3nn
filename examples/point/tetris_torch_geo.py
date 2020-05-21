@@ -6,7 +6,7 @@ from torch_scatter import scatter_add
 import e3nn.point.data_helpers as dh
 from e3nn.networks import GatedConvNetwork
 from e3nn.o3 import rand_rot
-from e3nn.point.message_passing import E3Conv
+from e3nn.point.message_passing import Convolution
 
 
 def get_dataset():
@@ -55,7 +55,7 @@ def main():
     Rs_out = [(len(tetris), 0)]
     lmax = 3
 
-    f = SumNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=E3Conv)
+    f = SumNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=Convolution)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)

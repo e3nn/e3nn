@@ -6,7 +6,7 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.kernel import Kernel
-from e3nn.point.message_passing import E3Conv
+from e3nn.point.message_passing import Convolution
 from e3nn.radial import ConstantRadialModel
 
 
@@ -14,7 +14,7 @@ from e3nn.radial import ConstantRadialModel
 def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
     torch.set_default_dtype(torch.float64)
 
-    mp = E3Conv(Kernel(Rs_in, Rs_out, ConstantRadialModel))
+    mp = Convolution(Kernel(Rs_in, Rs_out, ConstantRadialModel))
 
     features = rs.randn(n_source, Rs_in)
 
@@ -65,7 +65,7 @@ def test_flow():
         edge_attr = torch.ones(edge_index.shape[-1], 3)
 
         Rs = [0]
-        conv = E3Conv(Kernel(Rs, Rs, ConstantRadialModel))
+        conv = Convolution(Kernel(Rs, Rs, ConstantRadialModel))
         conv.kernel.R.weight.data.fill_(1.)  # Fix weight to 1.
 
         output = conv(features, edge_index, edge_attr)

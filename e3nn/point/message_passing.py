@@ -3,9 +3,9 @@ import torch
 import torch_geometric as tg
 
 
-class E3Conv(tg.nn.MessagePassing):
+class Convolution(tg.nn.MessagePassing):
     def __init__(self, kernel):
-        super(E3Conv, self).__init__(aggr='add', flow='target_to_source')
+        super(Convolution, self).__init__(aggr='add', flow='target_to_source')
         self.kernel = kernel
 
     def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
