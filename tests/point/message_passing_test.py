@@ -16,22 +16,22 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
 
     mp = Convolution(Kernel(Rs_in, Rs_out, ConstantRadialModel))
 
-    features = rs.randn(n_source, Rs_in)
+    features = rs.randn(n_target, Rs_in)
 
     r_source = torch.randn(n_source, 3)
     r_target = torch.randn(n_target, 3)
 
     edge_index = torch.stack([
-        torch.randint(n_target, size=(n_edge,)),
         torch.randint(n_source, size=(n_edge,)),
+        torch.randint(n_target, size=(n_edge,)),
     ])
-    size = (n_target, n_source)
+    size = (n_source, n_target)
 
     if n_edge == 0:
         edge_r = torch.zeros(0, 3)
     else:
         edge_r = torch.stack([
-            r_source[j] - r_target[i]
+            r_target[j] - r_source[i]
             for i, j in edge_index.T
         ])
 
@@ -48,32 +48,32 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
 
 
 def test_flow():
-        """
-        This test checks that information is flowing as expected from target to source.
-        edge_index[0] is source (convolution center)
-        edge_index[1] is target (neighbors)
-        """
+    """
+    This test checks that information is flowing as expected from target to source.
+    edge_index[0] is source (convolution center)
+    edge_index[1] is target (neighbors)
+    """
 
-        edge_index = torch.LongTensor([
-            [0, 0, 0, 0],
-            [1, 2, 3, 4]
-        ])
-        features = torch.tensor(
-            [-1., 1., 1., 1., 1.]
-        )
-        features = features.unsqueeze(-1)
-        edge_attr = torch.ones(edge_index.shape[-1], 3)
+    edge_index = torch.LongTensor([
+        [0, 0, 0, 0],
+        [1, 2, 3, 4],
+    ])
+    features = torch.tensor(
+        [-1., 1., 1., 1., 1.]
+    )
+    features = features.unsqueeze(-1)
+    edge_r = torch.ones(edge_index.shape[-1], 3)
 
-        Rs = [0]
-        conv = Convolution(Kernel(Rs, Rs, ConstantRadialModel))
-        conv.kernel.R.weight.data.fill_(1.)  # Fix weight to 1.
+    Rs = [0]
+    conv = Convolution(Kernel(Rs, Rs, ConstantRadialModel))
+    conv.kernel.R.weight.data.fill_(1.)  # Fix weight to 1.
 
-        output = conv(features, edge_index, edge_attr)
-        torch.allclose(output, torch.tensor([4., 0., 0., 0., 0.]).unsqueeze(-1))
+    output = conv(features, edge_index, edge_r)
+    torch.allclose(output, torch.tensor([4., 0., 0., 0., 0.]).unsqueeze(-1))
 
-        edge_index = torch.LongTensor([
-            [1, 2, 3, 4],
-            [0, 0, 0, 0]
-        ])
-        output = conv(features, edge_index, edge_attr)
-        torch.allclose(output, torch.tensor([0., -1., -1., -1., -1.]).unsqueeze(-1))
+    edge_index = torch.LongTensor([
+        [1, 2, 3, 4],
+        [0, 0, 0, 0]
+    ])
+    output = conv(features, edge_index, edge_r)
+    torch.allclose(output, torch.tensor([0., -1., -1., -1., -1.]).unsqueeze(-1))
