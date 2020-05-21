@@ -9,7 +9,7 @@ from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
 
 class LearnableTensorSquare(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, allow_change_out=False):
+    def __init__(self, Rs_in, Rs_out, allow_change_output=False):
         super().__init__()
 
         self.Rs_in = rs.simplify(Rs_in)
@@ -22,7 +22,7 @@ class LearnableTensorSquare(torch.nn.Module):
         register_sparse_buffer(self, 'T', T)  # [out, in1 * in2]
 
         ls = [l for _, l, _ in Rs_ts]
-        if allow_change_out:
+        if allow_change_output:
             self.Rs_out = [(mul, l, p) for mul, l, p in self.Rs_out if l in ls]
         else:
             assert all(l in ls for _, l, _ in self.Rs_out)
@@ -50,7 +50,7 @@ class LearnableTensorSquare(torch.nn.Module):
 
 
 class LearnableTensorProduct(torch.nn.Module):
-    def __init__(self, Rs_in1, Rs_in2, Rs_out, allow_change_out=False):
+    def __init__(self, Rs_in1, Rs_in2, Rs_out, allow_change_output=False):
         super().__init__()
 
         self.Rs_in1 = rs.simplify(Rs_in1)
@@ -64,7 +64,7 @@ class LearnableTensorProduct(torch.nn.Module):
         register_sparse_buffer(self, 'T', T)  # [out, in1 * in2]
 
         ls = [l for _, l, _ in Rs_ts]
-        if allow_change_out:
+        if allow_change_output:
             self.Rs_out = [(mul, l, p) for mul, l, p in self.Rs_out if l in ls]
         else:
             assert all(l in ls for _, l, _ in self.Rs_out)
