@@ -17,7 +17,7 @@ class Convolution(tg.nn.MessagePassing):
         :param edge_r: Tensor of shape [num_messages, 3]
                        edge_r = position_target - position_source
         :param size: (n_source, n_target) or None
-        :param n_norm: typical number of sources per target
+        :param n_norm: typical number of targets per source
 
         :return: Tensor of shape [n_source, dim(Rs_out)]
         """
