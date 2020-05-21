@@ -578,9 +578,9 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
         index_1 += dim_1
 
     wigner_3j_tensor = SparseTensor(
-        row=torch.cat(row),
-        col=torch.cat(col),
-        value=torch.cat(val),
+        row=torch.cat(row) if row else torch.zeros(0, dtype=torch.long),
+        col=torch.cat(col) if col else torch.zeros(0, dtype=torch.long),
+        value=torch.cat(val) if val else torch.zeros(0),
         sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     if sorted:
@@ -661,9 +661,9 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
         index_out += dim_out
 
     wigner_3j_tensor = SparseTensor(
-        row=torch.cat(row),
-        col=torch.cat(col),
-        value=torch.cat(val),
+        row=torch.cat(row) if row else torch.zeros(0, dtype=torch.long),
+        col=torch.cat(col) if col else torch.zeros(0, dtype=torch.long),
+        value=torch.cat(val) if val else torch.zeros(0),
         sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     if sorted:
@@ -781,9 +781,9 @@ def tensor_square(
         index_1 += dim_1
 
     wigner_3j_tensor = SparseTensor(
-        row=torch.cat(row),
-        col=torch.cat(col),
-        value=torch.cat(val),
+        row=torch.cat(row) if row else torch.zeros(0, dtype=torch.long),
+        col=torch.cat(col) if col else torch.zeros(0, dtype=torch.long),
+        value=torch.cat(val) if val else torch.zeros(0),
         sparse_sizes=(dim(Rs_out), dim(Rs_in) * dim(Rs_in)))
 
     if sorted:
@@ -904,9 +904,9 @@ def elementwise_tensor_product(
         index_2 += dim_2
 
     wigner_3j_tensor = SparseTensor(
-        row=torch.cat(row),
-        col=torch.cat(col),
-        value=torch.cat(val),
+        row=torch.cat(row) if row else torch.zeros(0, dtype=torch.long),
+        col=torch.cat(col) if col else torch.zeros(0, dtype=torch.long),
+        value=torch.cat(val) if val else torch.zeros(0),
         sparse_sizes=(dim(Rs_out), dim(Rs_in1) * dim(Rs_in2)))
 
     return Rs_out, wigner_3j_tensor
