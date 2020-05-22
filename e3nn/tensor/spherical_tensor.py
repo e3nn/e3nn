@@ -22,9 +22,8 @@ def projection(vectors, lmax):
     :return: tensor of shape [..., l * m]
     """
     coeff = spherical_harmonics_dirac(vectors, lmax)  # [..., l * m]
-    radii = vectors.norm(2, -1)  # [...]
-    coeff[radii == 0] = 0
-    return coeff * radii.unsqueeze(-1)
+    radii = vectors.norm(2, dim=-1, keepdim=True)  # [...]
+    return coeff * radii
 
 
 def adjusted_projection(vectors, lmax):
@@ -36,11 +35,17 @@ def adjusted_projection(vectors, lmax):
     radii = vectors.norm(2, -1)  # [batch]
     vectors = vectors[radii > 0]  # [batch, 3]
 
-    coeff = projection(vectors, lmax)  # [batch, l * m]
+    coeff = rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors)  # [batch, l * m]
     A = torch.einsum(
-        "ai,bi->ab", rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors), coeff)
-    coeff *= torch.lstsq(radii, A).solution.reshape(-1).unsqueeze(-1)
-    return coeff.sum(0)
+        "ai,bi->ab",
+        coeff,
+        coeff
+    )
+    # Y(v_a) . Y(v_b) solution_b = radii_a
+    solution = torch.lstsq(radii, A).solution.reshape(-1)  # [b]
+    assert (radii - A @ solution).abs().max() < 1e-5 * radii.abs().max()
+
+    return solution @ coeff
 
 
 class SphericalTensor:
@@ -75,12 +80,29 @@ class SphericalTensor:
         self.p_arg = p_arg
 
     @classmethod
-    def from_geometry(cls, vectors, lmax, p=0):
+    def from_geometry(cls, vectors, lmax, p=0, adjusted=True):
         """
-        :param vectors: tensor of vectors (p=-1) or pseudovectors (p=1)
+        :param vectors: tensor of vectors (p=-1) or pseudovectors (p=1) of shape [..., 3=xyz]
         """
-        signal = adjusted_projection(vectors, lmax)
+        if adjusted:
+            signal = adjusted_projection(vectors, lmax)
+        else:
+            vectors = vectors.reshape(-1, 3)
+            r = vectors.norm(dim=1)
+            sh = rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors)
+            # 0.5 * sum_a ( Y(v_a) . sum_b r_b Y(v_b) s - r_a )^2
+            A = torch.einsum('ai,b,bi->a', sh, r, sh)
+            # 0.5 * sum_a ( A_a s - r_a )^2
+            # sum_a A_a^2 s = sum_a A_a r_a
+            s = torch.dot(A, r) / A.norm().pow(2)
+            signal = s * torch.einsum('a,ai->i', r, sh)
         return cls(signal, lmax, p_val=1, p_arg=p)
+
+    def __repr__(self):
+        p_str = ""
+        if self.p_arg != 0 and self.p_val != 0:
+            p_str = f", [Parity f](x) = {'-' if self.p_val == -1 else ''}f({'-' if self.p_arg == -1 else ''}x)"
+        return f"{self.__class__.__name__}(lmax={self.lmax}{p_str})"
 
     def sph_norm(self):
         i = 0
@@ -121,14 +143,16 @@ class SphericalTensor:
         r = o3.angles_to_xyz(alpha, beta)  # [beta, alpha, 3]
         return r, grid(self.signal)
 
-    def plot(self, n=100, radius=True, center=None, relu=True):
+    def plot(self, n=100, radius=True, center=None, relu=False):
         """
         r, f = self.plot()
+
+        import plotly.graph_objects as go
         surface = go.Surface(
             x=r[:, :, 0].numpy(),
             y=r[:, :, 1].numpy(),
             z=r[:, :, 2].numpy(),
-            surfacecolor=f.numpy()
+            surfacecolor=f.numpy(),
         )
         fig = go.Figure(data=[surface])
         fig.show()
