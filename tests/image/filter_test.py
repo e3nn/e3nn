@@ -1,16 +1,10 @@
-# pylint: disable=C,E1101,E1102
-import unittest
-
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, protected-access
 import torch
 
-from e3nn.image.filter import low_pass_filter
+from e3nn.image.filter import LowPassFilter
 
 
-class Tests(unittest.TestCase):
-    def test_low_pass_filter(self):
-        x = torch.randn(32, 32, 32)
-        low_pass_filter(x, 2.0, 2)
-
-
-if __name__ == '__main__':
-    unittest.main()
+def test_low_pass_filter():
+    x = torch.randn(3, 3, 32, 32, 32, 2)
+    x = LowPassFilter(2.0, 2)(x)
+    assert x.shape == (3, 3, 16, 16, 16, 2)

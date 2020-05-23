@@ -38,7 +38,7 @@ class Convolution(torch.nn.Module):
             # re-evaluate spherical harmonics by adding randomness
             r = r.reshape(-1, 3)
             r = r[self.kernel.radii > 0]
-            rand = torch.rand(30**3, *r.shape).mul(2).sub(1)  # [-1, 1]
+            rand = torch.rand(20**3, *r.shape).mul(2).sub(1)  # [-1, 1]
             rand.mul_(1 / (size - 1))
             rand[:, :, 0].mul_(steps[0] / min(steps))
             rand[:, :, 1].mul_(steps[1] / min(steps))
@@ -51,8 +51,12 @@ class Convolution(torch.nn.Module):
 
     def forward(self, features):
         """
-        :param tensor features: [batch, j, x, y, z]
+        :param tensor features: [batch, x, y, z, channel]
+        :return: [batch, x, y, z, channel]
         """
+        features = torch.einsum('txyzi->tixyz', features)
         k = torch.einsum('xyzij->ijxyz', self.kernel())
         k.mul_(1 / k[0, 0].numel() ** 0.5)
-        return torch.nn.functional.conv3d(features, k, **self.kwargs)
+        features = torch.nn.functional.conv3d(features, k, **self.kwargs)
+        features = torch.einsum('tixyz->txyzi', features)
+        return features

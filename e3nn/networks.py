@@ -10,6 +10,8 @@ from e3nn.non_linearities import GatedBlock, GatedBlockParity
 from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
+from e3nn.image.convolution import Convolution as ImageConvolution
+from e3nn.image.filter import LowPassFilter
 from e3nn.radial import GaussianRadialModel
 from e3nn.tensor_product import LearnableTensorSquare
 
@@ -144,7 +146,7 @@ class S2Network(torch.nn.Module):
             Rs = Rs + tp.Rs_out
 
             # linear: learned but don't mix l's
-            Rs_act = [(1, l) for l in range(lmax + 1)]
+            Rs_act = list(range(lmax + 1))
             lin = Linear(Rs, mul * Rs_act, allow_unused_inputs=True)
 
             # s2 nonlinearity
@@ -178,4 +180,53 @@ class S2Network(torch.nn.Module):
         x = torch.cat([x, xx], dim=-1)
         x = lin(x)
 
+        return x
+
+
+class ImageS2Network(torch.nn.Module):
+    def __init__(self, Rs_in, mul, lmax, Rs_out, size=5, layers=3):
+        super().__init__()
+
+        Rs = rs.simplify(Rs_in)
+        Rs_out = rs.simplify(Rs_out)
+        Rs_act = list(range(lmax + 1))
+
+        self.mul = mul
+        self.layers = []
+
+        for _ in range(layers):
+            conv = ImageConvolution(Rs, mul * Rs_act, size, lmax=lmax, fuzzy_pixels=True, padding=size // 2)
+
+            # s2 nonlinearity
+            act = S2Activation(Rs_act, swish, res=20 * (lmax + 1))
+            Rs = mul * act.Rs_out
+
+            pool = LowPassFilter(scale=2.0, stride=2)
+
+            self.layers += [torch.nn.ModuleList([conv, act, pool])]
+
+        self.layers = torch.nn.ModuleList(self.layers)
+        self.tail = LearnableTensorSquare(Rs, Rs_out)
+
+    def forward(self, x):
+        """
+        :param x: [batch, x, y, z, channel_in]
+        :return: [batch, x, y, z, channel_out]
+        """
+        from e3nn.util import time_logging
+        t = time_logging.start()
+        for conv, act, pool in self.layers:
+            x = conv(x)
+            t = time_logging.end('conv', t)
+
+            x = x.reshape(*x.shape[:-1], self.mul, rs.dim(act.Rs_in))  # put multiplicity into batch
+            x = act(x)
+            x = x.reshape(*x.shape[:-2], self.mul * rs.dim(act.Rs_out))  # put back into representation
+            t = time_logging.end('act', t)
+
+            x = pool(x)
+            t = time_logging.end('pool', t)
+
+        x = self.tail(x)
+        t = time_logging.end('ts', t)
         return x

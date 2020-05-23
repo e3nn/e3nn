@@ -22,19 +22,20 @@ def test_equivariance(fuzzy_pixels):
             Rs_in=[0, 0, 1, 1, 2],
             Rs_out=[0],
             size=5,
+            steps=(0.5, 0.5, 0.9),
             fuzzy_pixels=fuzzy_pixels
         ),
     )
 
     def rotate(t):
-        # rotate 90 degrees in plane of axes 2 and 3
-        return t.flip(2).transpose(2, 3)
+        # rotate 90 degrees in plane of axes 1 and 2
+        return t.flip(1).transpose(1, 2)
 
     def unrotate(t):
         # undo the rotation by 3 more rotations
         return rotate(rotate(rotate(t)))
 
-    inp = torch.randn(2, 1, 16, 16, 16)
+    inp = torch.randn(2, 16, 16, 16, 1)
     inp_r = rotate(inp)
 
     diff_inp = (inp - unrotate(inp_r)).abs().max().item()
@@ -57,8 +58,8 @@ def test_normalization(fuzzy_pixels):
 
     conv = Convolution(Rs_in, Rs_out, size, lmax=2, fuzzy_pixels=fuzzy_pixels)
 
-    x = rs.randn(batch, Rs_in, input_size, input_size, input_size)
+    x = rs.randn(batch, input_size, input_size, input_size, Rs_in)
     y = conv(x)
 
-    assert y.shape[1] == rs.dim(Rs_out)
-    assert y.var().log10().abs() < 1
+    assert y.shape[-1] == rs.dim(Rs_out)
+    assert y.var().log10().abs() < 1.5
