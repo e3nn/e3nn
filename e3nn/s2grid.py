@@ -9,7 +9,7 @@ import os
 
 import lie_learn.spaces.S3 as S3
 import torch
-from e3nn import rsh
+from e3nn import rsh, o3
 from e3nn.util.cache_file import cached_picklesjar
 from e3nn.util.default_dtype import torch_default_dtype
 
@@ -153,6 +153,14 @@ class ToS2Grid(torch.nn.Module):
         self.register_buffer('shb', shb)
         self.to(torch.get_default_dtype())
 
+    @property
+    def grid(self):
+        """
+        grid of positions
+        """
+        beta, alpha = torch.meshgrid(self.betas, self.alphas)
+        return o3.angles_to_xyz(alpha, beta)
+
     def forward(self, x):
         """
         :param x: tensor [..., i=l * m]
@@ -221,6 +229,14 @@ class FromS2Grid(torch.nn.Module):
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
         self.to(torch.get_default_dtype())
+
+    @property
+    def grid(self):
+        """
+        grid of positions
+        """
+        beta, alpha = torch.meshgrid(self.betas, self.alphas)
+        return o3.angles_to_xyz(alpha, beta)
 
     def forward(self, x):
         """

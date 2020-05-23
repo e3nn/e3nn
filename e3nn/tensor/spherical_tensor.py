@@ -4,7 +4,7 @@ import math
 import torch
 
 from e3nn import o3, rs, rsh
-from e3nn.s2grid import ToS2Grid
+from e3nn.s2grid import ToS2Grid, FromS2Grid
 from e3nn.tensor.irrep_tensor import IrrepTensor
 
 
@@ -98,6 +98,22 @@ class SphericalTensor:
             signal = s * torch.einsum('a,ai->i', r, sh)
         return cls(signal, lmax, p_val=1, p_arg=p)
 
+    @classmethod
+    def from_samples(cls, positions, values, lmax, res=100, p_val=0, p_arg=0):
+        """
+        :param positions: tensor of shape [num_points, 3=xyz]
+        :param values: tensor of shape [num_points]
+        """
+        positions /= positions.norm(p=2, dim=1, keepdim=True)
+
+        s2 = FromS2Grid(res=res, lmax=lmax, normalization='none')
+        pos = s2.grid
+
+        cd = torch.cdist(pos, positions, p=2)
+        val = values[cd.argmin(2)]
+
+        return cls(s2(val), lmax, p_val=p_val, p_arg=p_arg)
+
     def __repr__(self):
         p_str = ""
         if self.p_arg != 0 and self.p_val != 0:
@@ -138,10 +154,8 @@ class SphericalTensor:
         """
         Evaluate the signal on the sphere
         """
-        grid = ToS2Grid(self.lmax, res=n, normalization='none')
-        beta, alpha = torch.meshgrid(grid.betas, grid.alphas)  # [beta, alpha]
-        r = o3.angles_to_xyz(alpha, beta)  # [beta, alpha, 3]
-        return r, grid(self.signal)
+        s2 = ToS2Grid(self.lmax, res=n, normalization='none')
+        return s2.grid, s2(self.signal)
 
     def plot(self, n=100, radius=True, center=None, relu=False):
         """

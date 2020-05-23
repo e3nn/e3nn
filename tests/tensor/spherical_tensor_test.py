@@ -51,6 +51,14 @@ class SphericalAndFourierTensorTests(unittest.TestCase):
         coords = coords[coords.norm(2, -1) > 0]
         SphericalTensor.from_geometry(coords, lmax)
 
+    def test_from_samples(self):
+        torch.set_default_dtype(torch.float64)
+        N = 4
+        lmax = 6
+        coords = torch.randn(N, 3)
+        values = torch.randn(N)
+        SphericalTensor.from_samples(coords, values, lmax)
+
     def test_from_geometry_with_radial(self):
         torch.set_default_dtype(torch.float64)
         N = 4
