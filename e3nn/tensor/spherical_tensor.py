@@ -49,7 +49,7 @@ def adjusted_projection(vectors, lmax):
 
 
 class SphericalTensor:
-    def __init__(self, signal: torch.Tensor, lmax: int, p_val: int = 0, p_arg: int = 0):
+    def __init__(self, signal: torch.Tensor, p_val: int = 0, p_arg: int = 0):
         """
         f: s2 -> R
 
@@ -69,6 +69,8 @@ class SphericalTensor:
         Parity
         [P f](x) = sum [p_val p_arg^l F^l] . Y^l(x)     (using parity of Y)
         """
+        lmax = round(math.sqrt(signal.shape[-1]) - 1)
+
         if signal.shape[-1] != (lmax + 1)**2:
             raise ValueError(
                 "Last tensor dimension and Rs do not have same dimension.")
@@ -96,7 +98,7 @@ class SphericalTensor:
             # sum_a A_a^2 s = sum_a A_a r_a
             s = torch.dot(A, r) / A.norm().pow(2)
             signal = s * torch.einsum('a,ai->i', r, sh)
-        return cls(signal, lmax, p_val=1, p_arg=p)
+        return cls(signal, p_val=1, p_arg=p)
 
     @classmethod
     def from_samples(cls, positions, values, lmax, res=100, p_val=0, p_arg=0):
@@ -104,6 +106,8 @@ class SphericalTensor:
         :param positions: tensor of shape [num_points, 3=xyz]
         :param values: tensor of shape [num_points]
         """
+        positions = positions.reshape(-1, 3)
+        values = values.reshape(-1)
         positions /= positions.norm(p=2, dim=1, keepdim=True)
 
         s2 = FromS2Grid(res=res, lmax=lmax, normalization='none')
@@ -112,7 +116,7 @@ class SphericalTensor:
         cd = torch.cdist(pos, positions, p=2)
         val = values[cd.argmin(2)]
 
-        return cls(s2(val), lmax, p_val=p_val, p_arg=p_arg)
+        return cls(s2(val), p_val=p_val, p_arg=p_arg)
 
     def __repr__(self):
         p_str = ""
@@ -191,18 +195,18 @@ class SphericalTensor:
             return self
         elif self.lmax > lmax:
             new_signal = self.signal[..., :rs.dim(new_Rs)]
-            return SphericalTensor(new_signal, lmax, self.p_val, self.p_arg)
+            return SphericalTensor(new_signal, self.p_val, self.p_arg)
         elif self.lmax < lmax:
             new_signal = torch.zeros(*self.signal.shape[:-1], rs.dim(new_Rs))
             new_signal[..., :rs.dim(self.Rs)] = self.signal
-            return SphericalTensor(new_signal, lmax, self.p_val, self.p_arg)
+            return SphericalTensor(new_signal, self.p_val, self.p_arg)
 
     def __add__(self, other):
         lmax = max(self.lmax, other.lmax)
         new_self = self.change_lmax(lmax)
         new_other = other.change_lmax(lmax)
 
-        return SphericalTensor(new_self.signal + new_other.signal, new_self.lmax, self.p_val, self.p_arg)
+        return SphericalTensor(new_self.signal + new_other.signal, self.p_val, self.p_arg)
 
     def __mul__(self, other):
         # Dot product if Rs of both objects match
