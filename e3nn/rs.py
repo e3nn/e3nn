@@ -226,6 +226,14 @@ def dim(Rs: TY_RS_LOOSE) -> int:
     return sum(mul * (2 * l + 1) for mul, l, _ in Rs)
 
 
+def lmax(Rs: TY_RS_LOOSE) -> int:
+    """
+    :param Rs: list of triplet (multiplicity, representation order, [parity])
+    :return: maximum l present in the signal
+    """
+    return max(l for mul, l, _ in convention(Rs) if mul > 0)
+
+
 def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])

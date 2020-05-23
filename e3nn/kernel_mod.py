@@ -131,7 +131,7 @@ class FrozenKernel(torch.nn.Module):
         self.tp = rs.TensorProduct(self.Rs_in, selection_rule, self.Rs_out, normalization, sorted=True)
         self.Rs_f = self.tp.Rs_in2
 
-        Y = rsh.spherical_harmonics_xyz([l for _, l, _ in self.Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
+        Y = rsh.spherical_harmonics_xyz([(1, l, p) for _, l, p in self.Rs_f], r[self.radii > self.r_eps])  # [batch, l_filter * m_filter]
 
         # Normalize the spherical harmonics
         if normalization == 'component':

@@ -4,11 +4,11 @@ Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
 import math
 from functools import lru_cache
-from typing import List, Tuple
 
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
+from e3nn import rs
 from e3nn.util.eval_code import eval_code
 
 
@@ -35,21 +35,28 @@ def spherical_harmonics_expand_matrix(ls, like=None):
 
 
 @torch.jit.script
-def mul_m_lm(ls: List[int], x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tensor:  # pragma: no cover
+def mul_m_lm(Rs: rs.TY_RS_STRICT, x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tensor:  # pragma: no cover
     """
     multiply tensor [..., l * m] by [..., m]
     """
     lmax = x_m.shape[-1] // 2
     out = []
     i = 0
-    for l in ls:
-        out.append(x_lm[..., i: i + 2 * l + 1] * x_m[..., lmax - l: lmax + l + 1])
-        i += 2 * l + 1
+    for mul, l, _ in Rs:
+        d = mul * (2 * l + 1)
+        x1 = x_lm[..., i: i + d]  # [..., mul * m]
+        x1 = x1.reshape(x1.shape[:-1] + (mul, 2 * l + 1))  # [..., mul, m]
+        x2 = x_m[..., lmax - l: lmax + l + 1]  # [..., m]
+        x2 = x2.reshape(x2.shape[:-1] + (1, 2 * l + 1))  # [..., mul=1, m]
+        x = x1 * x2
+        x = x.reshape(x.shape[:-2] + (d,))
+        out.append(x)
+        i += d
     return torch.cat(out, dim=-1)
 
 
 @torch.jit.script
-def mul_radial_angular(Rs: List[Tuple[int, int, int]], radial, angular):  # pragma: no cover
+def mul_radial_angular(Rs: rs.TY_RS_STRICT, radial, angular):  # pragma: no cover
     """
     :param Rs: output representation
     :param angular: [..., l * m]
@@ -155,7 +162,7 @@ def legendre(ls, z, y=None):
     return _legendre_genjit(tuple(ls))(z, y)
 
 
-def spherical_harmonics_z(ls, z, y=None):
+def spherical_harmonics_z(Rs, z, y=None):
     """
     the z componant of the spherical harmonics
     (useful to perform fourier transform)
@@ -163,6 +170,10 @@ def spherical_harmonics_z(ls, z, y=None):
     :param z: tensor of shape [...]
     :return: tensor of shape [..., l * m]
     """
+    Rs = rs.simplify(Rs)
+    for _, l, p in Rs:
+        assert p in [0, (-1)**l]
+    ls = [l for mul, l, _ in Rs]
     return legendre(ls, z, y)  # [..., l * m]
 
 
@@ -192,47 +203,48 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # p
     return out  # [..., m]
 
 
-def spherical_harmonics_alpha_beta(ls, alpha, beta):
+def spherical_harmonics_alpha_beta(Rs, alpha, beta):
     """
     spherical harmonics
 
-    :param ls: list of int
+    :param Rs: list of L's
     :param alpha: float or tensor of shape [...]
     :param beta: float or tensor of shape [...]
     :return: tensor of shape [..., m]
     """
-    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and max(ls) <= 10:  # pragma: no cover
+    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
         xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
         try:
-            return spherical_harmonics_xyz_cuda(ls, xyz)
+            return spherical_harmonics_xyz_cuda(Rs, xyz)
         except ImportError:
             pass
 
-    return spherical_harmonics_alpha_z_y(ls, alpha, beta.cos(), beta.sin().abs())
+    return spherical_harmonics_alpha_z_y(Rs, alpha, beta.cos(), beta.sin().abs())
 
 
-def spherical_harmonics_alpha_z_y(ls, alpha, z, y):
+def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
     """
     cpu version of spherical_harmonics_alpha_beta
     """
-    sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
-    shz = spherical_harmonics_z(ls, z.flatten(), y.flatten())  # [z, l * m]
-    out = mul_m_lm(ls, sha, shz)
+    Rs = rs.simplify(Rs)
+    sha = spherical_harmonics_alpha(rs.lmax(Rs), alpha.flatten())  # [z, m]
+    shz = spherical_harmonics_z(Rs, z.flatten(), y.flatten())  # [z, l * m]
+    out = mul_m_lm(Rs, sha, shz)
     return out.reshape(alpha.shape + (shz.shape[1],))
 
 
-def spherical_harmonics_xyz(ls, xyz):
+def spherical_harmonics_xyz(Rs, xyz):
     """
     spherical harmonics
 
-    :param ls: list of int
+    :param Rs: list of L's
     :param xyz: tensor of shape [..., 3]
     :return: tensor of shape [..., m]
     """
 
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and max(ls) <= 10:  # pragma: no cover
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
         try:
-            return spherical_harmonics_xyz_cuda(ls, xyz)
+            return spherical_harmonics_xyz_cuda(Rs, xyz)
         except ImportError:
             pass
 
@@ -242,20 +254,22 @@ def spherical_harmonics_xyz(ls, xyz):
     z = xyz[..., 2]  # [...]
     y = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2)).sqrt()  # [...]
 
-    return spherical_harmonics_alpha_z_y(ls, alpha, z, y)
+    return spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
 
 
-def spherical_harmonics_xyz_cuda(ls, xyz):  # pragma: no cover
+def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
     """
     cuda version of spherical_harmonics_xyz
     """
     from e3nn import cuda_rsh  # pylint: disable=no-name-in-module, import-outside-toplevel
 
+    Rs = rs.simplify(Rs)
+
     *size, _ = xyz.size()
     xyz = xyz.reshape(-1, 3)
     xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
 
-    lmax = max(ls)
+    lmax = rs.lmax(Rs)
     out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
     cuda_rsh.real_spherical_harmonics(out, xyz)
 
@@ -266,6 +280,6 @@ def spherical_harmonics_xyz_cuda(ls, xyz):  # pragma: no cover
     norm_coef = out.new_tensor(norm_coef).unsqueeze(1)
     out.mul_(norm_coef)
 
-    if ls != list(range(lmax + 1)):
-        out = torch.cat([out[l**2: (l + 1)**2] for l in ls])
+    if not rs.are_equal(Rs, list(range(lmax + 1))):
+        out = torch.cat([out[l**2: (l + 1)**2] for mul, l, _ in Rs for _ in range(mul)])
     return out.T.reshape(*size, -1)
