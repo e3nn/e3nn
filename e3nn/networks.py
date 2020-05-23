@@ -198,7 +198,7 @@ class ImageS2Network(torch.nn.Module):
             conv = ImageConvolution(Rs, mul * Rs_act, size, lmax=lmax, fuzzy_pixels=True, padding=size // 2)
 
             # s2 nonlinearity
-            act = S2Activation(Rs_act, swish, res=20 * (lmax + 1))
+            act = S2Activation(Rs_act, swish, res=60)
             Rs = mul * act.Rs_out
 
             pool = LowPassFilter(scale=2.0, stride=2)
@@ -213,20 +213,14 @@ class ImageS2Network(torch.nn.Module):
         :param x: [batch, x, y, z, channel_in]
         :return: [batch, x, y, z, channel_out]
         """
-        from e3nn.util import time_logging
-        t = time_logging.start()
         for conv, act, pool in self.layers:
             x = conv(x)
-            t = time_logging.end('conv', t)
 
             x = x.reshape(*x.shape[:-1], self.mul, rs.dim(act.Rs_in))  # put multiplicity into batch
             x = act(x)
             x = x.reshape(*x.shape[:-2], self.mul * rs.dim(act.Rs_out))  # put back into representation
-            t = time_logging.end('act', t)
 
             x = pool(x)
-            t = time_logging.end('pool', t)
 
         x = self.tail(x)
-        t = time_logging.end('ts', t)
         return x

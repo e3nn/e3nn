@@ -49,8 +49,6 @@ def test_network():
 
 
 def test_image_network():
-    from e3nn.util import time_logging
-    t = time_logging.start()
     torch.set_default_dtype(torch.float64)
 
     Rs = [0, 0, 3]
@@ -66,6 +64,3 @@ def test_image_network():
 
     image = rs.randn(1, 16, 16, 16, Rs)
     model(image)
-
-    t = time_logging.end('test_image_network', t)
-    print(time_logging.text_statistics())
