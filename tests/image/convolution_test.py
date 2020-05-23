@@ -1,66 +1,64 @@
-# pylint: disable=C,E1101,E1102
-import unittest
-
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, protected-access
+import pytest
 import torch
 
-# from e3nn import rs
+from e3nn import rs
 from e3nn.image.convolution import Convolution
 
 
-class Tests(unittest.TestCase):
-    def _test_equivariance(self, f):
-        def rotate(t):
-            # rotate 90 degrees in plane of axes 2 and 3
-            return t.flip(2).transpose(2, 3)
+@pytest.mark.parametrize('fuzzy_pixels', [False, True])
+def test_equivariance(fuzzy_pixels):
+    torch.set_default_dtype(torch.float64)
 
-        def unrotate(t):
-            # undo the rotation by 3 more rotations
-            return rotate(rotate(rotate(t)))
+    f = torch.nn.Sequential(
+        Convolution(
+            Rs_in=[0],
+            Rs_out=[0, 0, 1, 1, 2],
+            size=5,
+            steps=(0.5, 0.5, 0.9),
+            fuzzy_pixels=fuzzy_pixels
+        ),
+        Convolution(
+            Rs_in=[0, 0, 1, 1, 2],
+            Rs_out=[0],
+            size=5,
+            fuzzy_pixels=fuzzy_pixels
+        ),
+    )
 
-        inp = torch.randn(2, 1, 16, 16, 16)
-        inp_r = rotate(inp)
+    def rotate(t):
+        # rotate 90 degrees in plane of axes 2 and 3
+        return t.flip(2).transpose(2, 3)
 
-        diff_inp = (inp - unrotate(inp_r)).abs().max().item()
-        self.assertLess(diff_inp, 1e-10)  # sanity check
+    def unrotate(t):
+        # undo the rotation by 3 more rotations
+        return rotate(rotate(rotate(t)))
 
-        out = f(inp)
-        out_r = f(inp_r)
+    inp = torch.randn(2, 1, 16, 16, 16)
+    inp_r = rotate(inp)
 
-        diff_out = (out - unrotate(out_r)).abs().max().item()
-        self.assertLess(diff_out, 1e-10)
+    diff_inp = (inp - unrotate(inp_r)).abs().max().item()
+    assert diff_inp < 1e-10  # sanity check
 
-    def test_equivariance(self):
-        torch.set_default_dtype(torch.float64)
+    out = f(inp)
+    out_r = f(inp_r)
 
-        f = torch.nn.Sequential(
-            Convolution([(1, 0)], [(2, 0), (2, 1), (1, 2)], size=5, steps=(0.5, 0.5, 0.9)),
-            Convolution([(2, 0), (2, 1), (1, 2)], [(1, 0)], size=5),
-        )
-
-        self._test_equivariance(f)
-
-    # def _test_normalization(self, f):
-    #     batch = 3
-    #     size = 5
-    #     input_size = 15
-    #     Rs_in = [(20, 0), (20, 1), (10, 2)]
-    #     Rs_out = [(2, 0), (2, 1), (2, 2)]
-
-    #     conv = f(Rs_in, Rs_out, size)
-
-    #     x = rs.randn(batch, Rs_in, input_size, input_size, input_size)
-    #     y = conv(x)
-
-    #     self.assertEqual(y.size(1), rs.dim(Rs_out))
-
-    #     y_mean, y_std = y.mean().item(), y.std().item()
-
-    #     self.assertAlmostEqual(y_mean, 0, delta=0.3)
-    #     self.assertAlmostEqual(y_std, 1, delta=0.5)
-
-    # def test_normalization_conv(self):
-    #     self._test_normalization(Convolution)
+    diff_out = (out - unrotate(out_r)).abs().max().item()
+    assert diff_out < 1e-1 if fuzzy_pixels else 1e-10
 
 
-if __name__ == '__main__':
-    unittest.main()
+@pytest.mark.parametrize('fuzzy_pixels', [False, True])
+def test_normalization(fuzzy_pixels):
+    batch = 3
+    size = 5
+    input_size = 15
+    Rs_in = [(20, 0), (20, 1), (10, 2)]
+    Rs_out = [0, 1, 2]
+
+    conv = Convolution(Rs_in, Rs_out, size, lmax=2, fuzzy_pixels=fuzzy_pixels)
+
+    x = rs.randn(batch, Rs_in, input_size, input_size, input_size)
+    y = conv(x)
+
+    assert y.shape[1] == rs.dim(Rs_out)
+    assert y.var().log10().abs() < 1
