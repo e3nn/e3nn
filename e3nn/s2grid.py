@@ -5,12 +5,10 @@ Fourier Transform : sphere (grid) <--> spherical tensor (Rs=[(1, l) for l in ran
 We use the Fast Fourier Transform for specific
 """
 import math
-import os
 
 import lie_learn.spaces.S3 as S3
 import torch
 from e3nn import rsh, o3
-from e3nn.util.cache_file import cached_picklesjar
 from e3nn.util.default_dtype import torch_default_dtype
 
 
@@ -26,7 +24,6 @@ def s2_grid(res_beta, res_alpha):
     return betas, alphas
 
 
-@cached_picklesjar(os.path.join(os.path.dirname(__file__), 'cache/spherical_harmonics_s2_grid'))
 def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, _version=1):
     """
     computes the spherical harmonics on the grid on the sphere
