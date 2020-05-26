@@ -118,6 +118,14 @@ class SphericalTensor:
 
         return cls(s2(val), p_val=p_val, p_arg=p_arg)
 
+    @classmethod
+    def spherical_harmonic(cls, l, m, lmax=None):
+        if lmax is None:
+            lmax = l
+        signal = torch.zeros((lmax + 1)**2)
+        signal[l**2 + l + m] = 1
+        return cls(signal)
+
     def __repr__(self):
         p_str = ""
         if self.p_arg != 0 and self.p_val != 0:
@@ -154,14 +162,14 @@ class SphericalTensor:
             'ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
         return output.reshape((*self.signal.shape[:-1], *alpha.shape))
 
-    def signal_on_grid(self, n=100):
+    def signal_on_grid(self, res=100):
         """
         Evaluate the signal on the sphere
         """
-        s2 = ToS2Grid(self.lmax, res=n, normalization='none')
+        s2 = ToS2Grid(self.lmax, res=res, normalization='none')
         return s2.grid, s2(self.signal)
 
-    def plot(self, n=100, radius=True, center=None, relu=False):
+    def plot(self, res=100, radius=True, center=None, relu=False):
         """
         r, f = self.plot()
 
@@ -175,9 +183,16 @@ class SphericalTensor:
         fig = go.Figure(data=[surface])
         fig.show()
         """
-        r, f = self.signal_on_grid(n)
+        r, f = self.signal_on_grid(res)
         f = f.relu() if relu else f
 
+        # beta: [0, pi]
+        r[0] = r.new_tensor([0, 0, 1])
+        r[-1] = r.new_tensor([0, 0, -1])
+        f[0] = f[0].mean()
+        f[-1] = f[-1].mean()
+
+        # alpha: [0, 2pi]
         r = torch.cat([r, r[:, :1]], dim=1)  # [beta, alpha, 3]
         f = torch.cat([f, f[:, :1]], dim=1)  # [beta, alpha]
 
@@ -185,7 +200,7 @@ class SphericalTensor:
             r *= f.abs().unsqueeze(-1)
 
         if center is not None:
-            r += center.unsqueeze(0).unsqueeze(0)
+            r += center
 
         return r, f
 
