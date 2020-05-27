@@ -38,6 +38,12 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov
-        pip install codecov
-        pytest --cov=./ --durations=5
-        codecov --token=${{ secrets.CODECOV_TOKEN }}
+        #pip install codecov
+        pip install python-coveralls
+        pytest --durations=5 --cov=./
+        #codecov --token=${{ secrets.CODECOV_TOKEN }}
+        coveralls
+    - name: Coveralls GitHub Action
+      uses: coverallsapp/github-action@v1.1.1
+      with:
+        github-token: ${{ secrets.COVERALLS_TOKEN }}
