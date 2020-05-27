@@ -44,7 +44,3 @@ jobs:
         #codecov --token=${{ secrets.CODECOV_TOKEN }}
         coverage run --source=e3nn -m pytest tests/
         COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
-    - name: Coveralls GitHub Action
-      uses: coverallsapp/github-action@v1.1.1
-      with:
-        github-token: ${{ secrets.COVERALLS_TOKEN }}
