@@ -81,10 +81,10 @@ To get the CUDA kernels read the instructions in `INSTALL.md`.
                   Michał Tyszkiewicz and
                   Jes Frellsen},
   title        = {github.com/e3nn/e3nn},
-  month        = mar,
+  month        = may,
   year         = 2020,
   publisher    = {Zenodo},
-  version      = {v0.3-alpha},
+  version      = {0.0.0},
   doi          = {10.5281/zenodo.3723557},
   url          = {https://doi.org/10.5281/zenodo.3723557}
 }
