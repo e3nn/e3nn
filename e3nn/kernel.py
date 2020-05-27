@@ -11,7 +11,8 @@ class Kernel(torch.nn.Module):
     def __init__(self, Rs_in, Rs_out, RadialModel,
                  selection_rule=o3.selection_rule_in_out_sh,
                  normalization='component',
-                 allow_unused_inputs=False):
+                 allow_unused_inputs=False,
+                 allow_zero_outputs=False):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -28,7 +29,8 @@ class Kernel(torch.nn.Module):
         self.selection_rule = selection_rule
         if not allow_unused_inputs:
             self.check_input()
-        self.check_output()
+        if not allow_zero_outputs:
+            self.check_output()
 
         assert normalization in ['norm', 'component'], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization

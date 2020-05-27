@@ -164,6 +164,7 @@ class SphericalTensor:
 
     def signal_on_grid(self, res=100):
         """
+        :return: [..., beta, alpha]
         Evaluate the signal on the sphere
         """
         s2 = ToS2Grid(self.lmax, res=res, normalization='none')
@@ -183,6 +184,8 @@ class SphericalTensor:
         fig = go.Figure(data=[surface])
         fig.show()
         """
+        assert self.signal.dim() == 1
+
         r, f = self.signal_on_grid(res)
         f = f.relu() if relu else f
 

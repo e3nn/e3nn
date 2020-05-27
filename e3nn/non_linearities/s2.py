@@ -57,6 +57,13 @@ class S2Activation(torch.nn.Module):
         self.act = act
         self.random_rot = random_rot
 
+    def __repr__(self):
+        return "{name} ({Rs_in} -> {Rs_out})".format(
+            name=self.__class__.__name__,
+            Rs_in=rs.format_Rs(self.Rs_in),
+            Rs_out=rs.format_Rs(self.Rs_out),
+        )
+
     def forward(self, features):
         '''
         :param features: [..., l * m]
