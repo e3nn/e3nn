@@ -147,7 +147,7 @@ class S2Network(torch.nn.Module):
 
             # linear: learned but don't mix l's
             Rs_act = list(range(lmax + 1))
-            lin = Linear(Rs, mul * Rs_act, allow_unused_inputs=True)
+            lin = Linear(Rs, mul * Rs_act, allow_unused_inputs=True, allow_zero_outputs=True)
 
             # s2 nonlinearity
             act = S2Activation(Rs_act, swish, res=20 * (lmax + 1))

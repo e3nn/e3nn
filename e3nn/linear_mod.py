@@ -28,7 +28,7 @@ class KernelLinear(torch.nn.Module):
 
 
 class Linear(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, allow_unused_inputs=False):
+    def __init__(self, Rs_in, Rs_out, allow_unused_inputs=False, allow_zero_outputs=False):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -40,7 +40,8 @@ class Linear(torch.nn.Module):
         self.Rs_out = rs.convention(Rs_out)
         if not allow_unused_inputs:
             self.check_input()
-        self.check_output()
+        if not allow_zero_outputs:
+            self.check_output()
 
         self.kernel = KernelLinear(self.Rs_in, self.Rs_out)
 
