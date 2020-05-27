@@ -56,7 +56,8 @@ class LearnableTensorSquare(torch.nn.Module):
 
         T = get_sparse_buffer(self, 'T')  # [out, in1 * in2]
         kernel = (T.t() @ self.kernel().T).T.reshape(rs.dim(self.Rs_out), n, n)  # [out, in1, in2]
-        features = torch.einsum('kij,zi,zj->zk', kernel, features, features)
+        features = torch.einsum('zi,zj->zij', features, features)
+        features = torch.einsum('kij,zij->zk', kernel, features)
         return features.reshape(*size, -1)
 
 
