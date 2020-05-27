@@ -38,6 +38,9 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov
-        pip install codecov
-        pytest --cov=./ --durations=5
-        codecov --token=${{ secrets.CODECOV_TOKEN }}
+        #pip install codecov
+        pip install coveralls
+        #pytest --durations=5 --cov=./
+        #codecov --token=${{ secrets.CODECOV_TOKEN }}
+        coverage run --source=e3nn -m pytest tests/
+        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
