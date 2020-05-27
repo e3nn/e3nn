@@ -39,10 +39,11 @@ jobs:
       run: |
         pip install pytest pytest-cov
         #pip install codecov
-        pip install python-coveralls
-        pytest --durations=5 --cov=./
+        pip install coveralls
+        #pytest --durations=5 --cov=./
         #codecov --token=${{ secrets.CODECOV_TOKEN }}
-        coveralls
+        coverage run --source=e3nn -m pytest tests/
+        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
     - name: Coveralls GitHub Action
       uses: coverallsapp/github-action@v1.1.1
       with:
