@@ -86,7 +86,7 @@ def test_plot():
     sph = SphericalTensor.from_geometry(coords, lmax)
 
     n = 16
-    r, f = sph.plot(n=n)
+    r, f = sph.plot(res=n)
     assert r.shape[2] == 3
     assert f.shape[:2] == r.shape[:2]
 
