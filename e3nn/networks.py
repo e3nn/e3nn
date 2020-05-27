@@ -5,7 +5,6 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.kernel import Kernel
-from e3nn.linear import Linear
 from e3nn.non_linearities import GatedBlock, GatedBlockParity
 from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
