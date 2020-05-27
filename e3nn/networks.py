@@ -124,15 +124,9 @@ class GatedConvParityNetwork(torch.nn.Module):
         if 'n_norm' not in kwargs:
             kwargs['n_norm'] = N
 
-        if self.feature_product:
-            for ts, conv, act in self.layers[:-1]:
-                output = ts(output)
-                output = conv(output, *args, **kwargs)
-                output = act(output)
-        else:
-            for conv, act in self.layers[:-1]:
-                output = conv(output, *args, **kwargs)
-                output = act(output)
+        for conv, act in self.layers[:-1]:
+            output = conv(output, *args, **kwargs)
+            output = act(output)
 
         layer = self.layers[-1]
         output = layer(output, *args, **kwargs)
