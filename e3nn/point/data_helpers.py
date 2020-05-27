@@ -26,9 +26,10 @@ def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     N, _ = pos.shape
     atoms = Atoms(symbols=['H'] * N, positions=pos)
     nl = neighborlist.NeighborList(
-        [r_max] * N,
+        [r_max / 2.] * N,  # NeighborList looks for intersecting spheres
         self_interaction=self_interaction,
         bothways=True,
+        skin=0.0,
     )
     nl.update(atoms)
 

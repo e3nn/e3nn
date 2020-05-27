@@ -111,21 +111,25 @@ class GatedConvParityNetwork(torch.nn.Module):
             block = torch.nn.ModuleList([conv, act])
             modules.append(block)
 
-        self.firstlayers = torch.nn.ModuleList(modules)
+        self.layers = torch.nn.ModuleList(modules)
 
         K = partial(K, allow_unused_inputs=True)
-        self.conv = convolution(K(Rs, Rs_out))
+        self.layers.append(convolution(K(Rs, Rs_out)))
+        self.feature_product = feature_product
 
-    def forward(self, features, geometry, n_norm=None):
-        if n_norm is None:
-            n_norm = geometry.shape[1]
+    def forward(self, input, *args, **kwargs):
+        output = input
+        N = args[0].shape[-2]
+        if 'n_norm' not in kwargs:
+            kwargs['n_norm'] = N
 
-        for conv, act in self.firstlayers:
-            features = conv(features, geometry, n_norm=n_norm)
-            features = act(features)
+        for conv, act in self.layers[:-1]:
+            output = conv(output, *args, **kwargs)
+            output = act(output)
 
-        features = self.conv(features, geometry, n_norm=n_norm)
-        return features
+        layer = self.layers[-1]
+        output = layer(output, *args, **kwargs)
+        return output
 
 
 class S2Network(torch.nn.Module):
