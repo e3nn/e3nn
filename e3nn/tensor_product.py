@@ -9,7 +9,7 @@ from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
 
 class LearnableTensorSquare(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, allow_change_output=False):
+    def __init__(self, Rs_in, Rs_out, linear=True, allow_change_output=False, allow_zero_outputs=False):
         super().__init__()
 
         self.Rs_in = rs.simplify(Rs_in)
@@ -18,13 +18,19 @@ class LearnableTensorSquare(torch.nn.Module):
         ls = [l for _, l, _ in self.Rs_out]
         selection_rule = partial(o3.selection_rule, lfilter=lambda l: l in ls)
 
-        Rs_ts, T = rs.tensor_square(self.Rs_in, selection_rule)
+        if linear:
+            Rs_in = [(1, 0, 1)] + self.Rs_in
+        else:
+            Rs_in = self.Rs_in
+        self.linear = linear
+
+        Rs_ts, T = rs.tensor_square(Rs_in, selection_rule)
         register_sparse_buffer(self, 'T', T)  # [out, in1 * in2]
 
         ls = [l for _, l, _ in Rs_ts]
         if allow_change_output:
             self.Rs_out = [(mul, l, p) for mul, l, p in self.Rs_out if l in ls]
-        else:
+        elif not allow_zero_outputs:
             assert all(l in ls for _, l, _ in self.Rs_out)
 
         self.kernel = KernelLinear(Rs_ts, self.Rs_out)  # [out, in, w]
@@ -42,9 +48,14 @@ class LearnableTensorSquare(torch.nn.Module):
         '''
         *size, n = features.size()
         features = features.reshape(-1, n)
+        assert n == rs.dim(self.Rs_in)
+
+        if self.linear:
+            features = torch.cat([features.new_ones(features.shape[0], 1), features], dim=1)
+            n += 1
 
         T = get_sparse_buffer(self, 'T')  # [out, in1 * in2]
-        kernel = (T.t() @ self.kernel().T).T.reshape(rs.dim(self.Rs_out), rs.dim(self.Rs_in), rs.dim(self.Rs_in))  # [out, in1, in2]
+        kernel = (T.t() @ self.kernel().T).T.reshape(rs.dim(self.Rs_out), n, n)  # [out, in1, in2]
         features = torch.einsum('kij,zi,zj->zk', kernel, features, features)
         return features.reshape(*size, -1)
 

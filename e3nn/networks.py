@@ -135,51 +135,32 @@ class S2Network(torch.nn.Module):
 
         Rs = rs.simplify(Rs_in)
         Rs_out = rs.simplify(Rs_out)
+        Rs_act = list(range(lmax + 1))
 
         self.layers = []
 
         for _ in range(layers):
-            # tensor product: nonlinear and mixes the l's
-            tp = rs.TensorSquare(Rs, selection_rule=partial(o3.selection_rule, lmax=lmax))
-
-            # direct sum
-            Rs = Rs + tp.Rs_out
-
-            # linear: learned but don't mix l's
-            Rs_act = list(range(lmax + 1))
-            lin = Linear(Rs, mul * Rs_act, allow_unused_inputs=True, allow_zero_outputs=True)
+            lin = LearnableTensorSquare(Rs, mul * Rs_act, linear=True, allow_zero_outputs=True)
 
             # s2 nonlinearity
             act = S2Activation(Rs_act, swish, res=20 * (lmax + 1))
             Rs = mul * act.Rs_out
 
-            self.layers += [torch.nn.ModuleList([tp, lin, act])]
+            self.layers += [torch.nn.ModuleList([lin, act])]
 
         self.layers = torch.nn.ModuleList(self.layers)
 
-        def lfilter(l):
-            return l in [j for _, j, _ in Rs_out]
-
-        tp = rs.TensorSquare(Rs, selection_rule=partial(o3.selection_rule, lfilter=lfilter))
-        Rs = Rs + tp.Rs_out
-        lin = Linear(Rs, Rs_out, allow_unused_inputs=True)
-        self.tail = torch.nn.ModuleList([tp, lin])
+        self.tail = LearnableTensorSquare(Rs, Rs_out)
 
     def forward(self, x):
-        for tp, lin, act in self.layers:
-            xx = tp(x)
-            x = torch.cat([x, xx], dim=-1)
+        for lin, act in self.layers:
             x = lin(x)
 
             x = x.reshape(*x.shape[:-1], -1, rs.dim(act.Rs_in))  # put multiplicity into batch
             x = act(x)
             x = x.reshape(*x.shape[:-2], -1)  # put back into representation
 
-        tp, lin = self.tail
-        xx = tp(x)
-        x = torch.cat([x, xx], dim=-1)
-        x = lin(x)
-
+        x = self.tail(x)
         return x
 
 
