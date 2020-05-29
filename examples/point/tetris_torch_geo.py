@@ -45,7 +45,7 @@ def main():
 
     x = torch.ones(4, 1)
     Rs_in = [(1, 0)]
-    r_max = 1.
+    r_max = 1.1
     tetris_dataset = []
     for shape, label in zip(tetris, labels):
         data = dh.DataNeighbors(x, Rs_in, shape, r_max, y=torch.tensor([label]))
