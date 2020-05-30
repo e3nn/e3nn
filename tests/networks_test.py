@@ -3,7 +3,7 @@ import torch
 
 from e3nn import o3
 from e3nn import rs
-from e3nn.networks import GatedConvParityNetwork, GatedConvNetwork, ImageS2Network
+from e3nn.networks import GatedConvParityNetwork, GatedConvNetwork, ImageS2Network, S2ParityNetwork
 
 
 def test_parity_network():
@@ -64,3 +64,22 @@ def test_image_network():
 
     image = rs.randn(1, 16, 16, 16, Rs)
     model(image)
+
+
+def test_equivariance_s2parity_network():
+    torch.set_default_dtype(torch.float64)
+    mul = 3
+    Rs_in = [(mul, l, -1) for l in range(3 + 1)]
+    Rs_out = [(mul, l, 1) for l in range(3 + 1)]
+
+    net = S2ParityNetwork(Rs_in, mul, lmax=3, Rs_out=Rs_out)
+
+    abc = o3.rand_angles()
+    D_in = rs.rep(Rs_in, *abc, 1)
+    D_out = rs.rep(Rs_out, *abc, 1)
+
+    fea = rs.randn(10, Rs_in)
+
+    x1 = torch.einsum("ij,zj->zi", D_out, net(fea))
+    x2 = net(torch.einsum("ij,zj->zi", D_in, fea))
+    assert (x1 - x2).norm() < 1e-3 * x1.norm()
