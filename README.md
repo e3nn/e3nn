@@ -6,6 +6,12 @@ E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in 
 
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
 
+## Installation
+
+`pip install e3nn`
+
+To get the CUDA kernels read the instructions in `INSTALL.md`.
+
 ## Example
 ```python
 from functools import partial
@@ -62,12 +68,6 @@ print(features.grad)
   - `e3nn/point` contains points linear operations
   - `e3nn/non_linearities` non linearities operations
 - `examples` simple scripts and experiments
-
-## Installation
-
-`pip install git+https://github.com/e3nn/e3nn`
-
-To get the CUDA kernels read the instructions in `INSTALL.md`.
 
 ## Citing
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
