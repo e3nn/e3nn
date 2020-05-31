@@ -48,9 +48,10 @@ in_geometry = torch.randn(1, n, 3)
 out_geometry = torch.zeros(1, 1, 3)  # One point at the origin
 
 
-norm(conv(features, in_geometry, out_geometry)).backward()
+out = norm(conv(features, in_geometry, out_geometry))
+out.backward()
 
-print(features)
+print(out)
 print(features.grad)
 ```
 
