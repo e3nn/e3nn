@@ -144,7 +144,7 @@ class S2ConvNetwork(torch.nn.Module):
             else:
                 return -1
 
-        Rs_hidden = [(1, l, (-1)**l) for i in range(mul) for l in range(lmax + 1)]
+        Rs_hidden = mul * [(1, l, (-1)**l) for l in range(lmax + 1)]
         representations = [Rs_in]
         representations += [Rs_hidden] * layers
         representations += [Rs_out]
