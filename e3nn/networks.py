@@ -138,17 +138,7 @@ class S2ConvNetwork(torch.nn.Module):
                  kernel=Kernel, convolution=Convolution):
         super().__init__()
 
-<<<<<<< HEAD
         Rs_hidden = [(1, l, (-1)**l) for i in range(mul) for l in range(lmax + 1)]
-=======
-        def parity(l):
-            if l % 2 == 0:
-                return 1
-            else:
-                return -1
-
-        Rs_hidden = mul * [(1, l, (-1)**l) for l in range(lmax + 1)]
->>>>>>> 0a9dfda49c83898315713894b453016099f26935
         representations = [Rs_in]
         representations += [Rs_hidden] * layers
         representations += [Rs_out]
