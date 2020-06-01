@@ -138,12 +138,6 @@ class S2ConvNetwork(torch.nn.Module):
                  kernel=Kernel, convolution=Convolution):
         super().__init__()
 
-        def parity(l):
-            if l % 2 == 0:
-                return 1
-            else:
-                return -1
-
         Rs_hidden = [(1, l, (-1)**l) for i in range(mul) for l in range(lmax + 1)]
         representations = [Rs_in]
         representations += [Rs_hidden] * layers
@@ -156,7 +150,7 @@ class S2ConvNetwork(torch.nn.Module):
         K = partial(kernel, RadialModel=RadialModel, selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
 
         def make_layer(Rs_in, Rs_out):
-            act = S2Activation([(1, l, parity(l)) for l in range(lmax + 1)], sigmoid, lmax_out=lmax, res=20 * (lmax + 1))
+            act = S2Activation([(1, l, (-1)**l) for l in range(lmax + 1)], sigmoid, lmax_out=lmax, res=20 * (lmax + 1))
             conv = convolution(K(Rs_in, Rs_out))
             return torch.nn.ModuleList([conv, act])
 
