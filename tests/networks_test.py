@@ -92,4 +92,3 @@ def test_s2conv_network():
     assert (output - output2).abs().max() < 1e-10 * output.abs().max()
 
     model = S2ConvNetwork(Rs, 4, Rs, lmax)
- 
