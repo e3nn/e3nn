@@ -7,7 +7,8 @@ from e3nn.networks import (
     GatedConvParityNetwork,
     GatedConvNetwork,
     ImageS2Network,
-    S2ConvNetwork
+    S2ConvNetwork,
+    S2ParityNetwork,
 )
 
 
@@ -90,8 +91,8 @@ def test_s2conv_network():
     output2 = ein('ij,zaj->zai', D.T, model(ein('ij,zaj->zai', D, features), ein('ij,zaj->zai', R, geometry)))
 
     assert (output - output2).abs().max() < 1e-10 * output.abs().max()
-    
-    
+
+
 def test_equivariance_s2parity_network():
     torch.set_default_dtype(torch.float64)
     mul = 3
