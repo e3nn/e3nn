@@ -11,7 +11,7 @@ class S2Activation(torch.nn.Module):
         the signal on the sphere is a quasiregular representation of O3
         and we can apply a pointwise operation on these representations
 
-        :param Rs: input representation of the form [(1, l, p0 * u^l) for l in [0, ..., lmax]]
+        :param Rs: input representation of the form [(1, l, p_val * (p_arg)^l) for l in [0, ..., lmax]]
         :param act: activation function
         :param res: resolution of the grid on the sphere (the higher the more accurate)
         :param normalization: either 'norm' or 'component'
@@ -21,33 +21,33 @@ class S2Activation(torch.nn.Module):
         super().__init__()
 
         Rs = rs.simplify(Rs)
-        _, _, p0 = Rs[0]
+        _, _, p_val = Rs[0]
         _, lmax, _ = Rs[-1]
         assert all(mul == 1 for mul, _, _ in Rs)
         assert [l for _, l, _ in Rs] == [l for l in range(lmax + 1)]
-        if all(p == p0 for _, l, p in Rs):
-            u = 1
-        elif all(p == p0 * (-1) ** l for _, l, p in Rs):
-            u = -1
+        if all(p == p_val for _, l, p in Rs):
+            p_arg = 1
+        elif all(p == p_val * (-1) ** l for _, l, p in Rs):
+            p_arg = -1
         else:
             assert False, "the parity of the input is not well defined"
         self.Rs_in = Rs
-        # the input transforms as : A_l ---> p0 * u^l * A_l
-        # the sphere signal transforms as : f(r) ---> p0 * f(u * r)
+        # the input transforms as : A_l ---> p_val * (p_arg)^l * A_l
+        # the sphere signal transforms as : f(r) ---> p_val * f(p_arg * r)
         if lmax_out is None:
             lmax_out = lmax
 
-        if p0 == +1 or p0 == 0:
-            self.Rs_out = [(1, l, p0 * u ** l) for l in range(lmax_out + 1)]
-        if p0 == -1:
+        if p_val == +1 or p_val == 0:
+            self.Rs_out = [(1, l, p_val * p_arg ** l) for l in range(lmax_out + 1)]
+        if p_val == -1:
             x = torch.linspace(0, 10, 256)
             a1, a2 = act(x), act(-x)
             if (a1 - a2).abs().max() < a1.abs().max() * 1e-10:
                 # p_act = 1
-                self.Rs_out = [(1, l, u ** l) for l in range(lmax_out + 1)]
+                self.Rs_out = [(1, l, p_arg ** l) for l in range(lmax_out + 1)]
             elif (a1 + a2).abs().max() < a1.abs().max() * 1e-10:
                 # p_act = -1
-                self.Rs_out = [(1, l, -u ** l) for l in range(lmax_out + 1)]
+                self.Rs_out = [(1, l, -p_arg ** l) for l in range(lmax_out + 1)]
             else:
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")

@@ -90,5 +90,22 @@ def test_s2conv_network():
     output2 = ein('ij,zaj->zai', D.T, model(ein('ij,zaj->zai', D, features), ein('ij,zaj->zai', R, geometry)))
 
     assert (output - output2).abs().max() < 1e-10 * output.abs().max()
+    
+    
+def test_equivariance_s2parity_network():
+    torch.set_default_dtype(torch.float64)
+    mul = 3
+    Rs_in = [(mul, l, -1) for l in range(3 + 1)]
+    Rs_out = [(mul, l, 1) for l in range(3 + 1)]
 
-    model = S2ConvNetwork(Rs, 4, Rs, lmax)
+    net = S2ParityNetwork(Rs_in, mul, lmax=3, Rs_out=Rs_out)
+
+    abc = o3.rand_angles()
+    D_in = rs.rep(Rs_in, *abc, 1)
+    D_out = rs.rep(Rs_out, *abc, 1)
+
+    fea = rs.randn(10, Rs_in)
+
+    x1 = torch.einsum("ij,zj->zi", D_out, net(fea))
+    x2 = net(torch.einsum("ij,zj->zi", D_in, fea))
+    assert (x1 - x2).norm() < 1e-3 * x1.norm()

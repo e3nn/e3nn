@@ -28,7 +28,7 @@ class Norm(torch.nn.Module):
             sub = sub.norm(2, dim=-1)  # [..., u]
 
             if self.normalization == 'component':
-                sub.div_((2 * l + 1) ** 0.5)
+                sub = sub / (2 * l + 1) ** 0.5
 
             output.append(sub)
         assert index == n

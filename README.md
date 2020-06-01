@@ -6,18 +6,23 @@ E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in 
 
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
 
+## Installation
+
+`pip install e3nn`
+
+To get the CUDA kernels read the instructions in `INSTALL.md`.
+
 ## Example
 ```python
 from functools import partial
 
 import torch
 
-from e3nn.non_linearities.rescaled_act import swish
-from e3nn.radial import GaussianRadialModel
-from e3nn.kernel import Kernel
-from e3nn.point.operations import Convolution
+from e3nn import Kernel, rs
 from e3nn.non_linearities.norm import Norm
-from e3nn import rs
+from e3nn.non_linearities.rescaled_act import swish
+from e3nn.point.operations import Convolution
+from e3nn.radial import GaussianRadialModel
 
 # Define the input and output representations
 Rs_in = [(1, 0), (2, 1)]  # Input = One scalar plus two vectors
@@ -28,27 +33,25 @@ RadialModel = partial(GaussianRadialModel, max_radius=3.0, number_of_basis=3, h=
 
 # kernel: composed on a radial part that contains the learned parameters
 #  and an angular part given by the spherical hamonics and the Clebsch-Gordan coefficients
-K = partial(Kernel, RadialModel=RadialModel, normalization='norm')
-
-# Use the kernel to define a convolution operation
-C = partial(Convolution, K)
+K = partial(Kernel, RadialModel=RadialModel)
 
 # Create the convolution module
-conv = C(Rs_in, Rs_out)
+conv = Convolution(K(Rs_in, Rs_out))
 
 # Module to compute the norm of each irreducible component
-norm = Norm(Rs_out, normalization='norm')
+norm = Norm(Rs_out)
 
 
 n = 5  # number of input points
-features = rs.randn(1, n, Rs_in, normalization='norm', requires_grad=True)
+features = rs.randn(1, n, Rs_in, requires_grad=True)
 in_geometry = torch.randn(1, n, 3)
 out_geometry = torch.zeros(1, 1, 3)  # One point at the origin
 
 
-norm(conv(features, in_geometry, out_geometry)).backward()
+out = norm(conv(features, in_geometry, out_geometry))
+out.backward()
 
-print(features)
+print(out)
 print(features.grad)
 ```
 
@@ -62,12 +65,6 @@ print(features.grad)
   - `e3nn/point` contains points linear operations
   - `e3nn/non_linearities` non linearities operations
 - `examples` simple scripts and experiments
-
-## Installation
-
-`pip install git+https://github.com/e3nn/e3nn`
-
-To get the CUDA kernels read the instructions in `INSTALL.md`.
 
 ## Citing
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
