@@ -132,6 +132,56 @@ class GatedConvParityNetwork(torch.nn.Module):
         return output
 
 
+class S2ConvNetwork(torch.nn.Module):
+    def __init__(self, Rs_in, mul, Rs_out, lmax, layers=3,
+                 max_radius=1.0, number_of_basis=3, radial_layers=3,
+                 kernel=Kernel, convolution=Convolution):
+        super().__init__()
+
+        Rs_hidden = [(1, l, (-1)**l) for i in range(mul) for l in range(lmax + 1)]
+        representations = [Rs_in]
+        representations += [Rs_hidden] * layers
+        representations += [Rs_out]
+
+        RadialModel = partial(GaussianRadialModel, max_radius=max_radius,
+                              number_of_basis=number_of_basis, h=100,
+                              L=radial_layers, act=swish)
+
+        K = partial(kernel, RadialModel=RadialModel, selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
+
+        def make_layer(Rs_in, Rs_out):
+            act = S2Activation([(1, l, (-1)**l) for l in range(lmax + 1)], sigmoid, lmax_out=lmax, res=20 * (lmax + 1))
+            conv = convolution(K(Rs_in, Rs_out))
+            return torch.nn.ModuleList([conv, act])
+
+        self.layers = torch.nn.ModuleList([
+            make_layer(Rs_layer_in, Rs_layer_out)
+            for Rs_layer_in, Rs_layer_out in zip(representations[:-2], representations[1:-1])
+        ])
+
+        self.layers.append(convolution(K(representations[-2], representations[-1])))
+        self.mul = mul
+        self.lmax = lmax
+
+    def forward(self, input, *args, **kwargs):
+        output = input
+        N = args[0].shape[-2]
+        if 'n_norm' not in kwargs:
+            kwargs['n_norm'] = N
+
+        for conv, act in self.layers[:-1]:
+            output = conv(output, *args, **kwargs)
+            shape = list(output.shape)
+            # Split multiplicities into new batch
+            output = output.reshape(shape[:-1] + [self.mul, (self.lmax + 1) ** 2])
+            output = act(output)
+            output = output.reshape(shape)
+
+        layer = self.layers[-1]
+        output = layer(output, *args, **kwargs)
+        return output
+
+
 class S2Network(torch.nn.Module):
     def __init__(self, Rs_in, mul, lmax, Rs_out, layers=3):
         super().__init__()
