@@ -669,12 +669,13 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
                 I = torch.eye(mul_out * mul_1).reshape(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
                 i_out, i_1, i_2 = m.nonzero(as_tuple=True)  # slow part
+                m = m[(i_out, i_1, i_2)]
                 i_out += index_out
                 i_1 += index_1
                 i_2 += index_2
                 row.append(i_out)
                 col.append(i_1 * dim_in2 + i_2)
-                val.append(m[(i_out, i_1, i_2)])
+                val.append(m)
 
                 index_2 += dim_2
             index_1 += dim_1
