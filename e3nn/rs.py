@@ -660,19 +660,39 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
         for mul_1, l_1, p_1 in Rs_in1:
             dim_1 = mul_1 * (2 * l_1 + 1)
             for l_2 in selection_rule(l_1, p_1, l_out, p_out):
-                dim_2 = mul_1 * mul_out * (2 * l_2 + 1)
-                C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
-                if normalization == 'component':
-                    C *= (2 * l_out + 1) ** 0.5
-                if normalization == 'norm':
-                    C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
-                I = torch.eye(mul_out * mul_1).reshape(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
-                m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                i_out, i_1, i_2 = m.nonzero(as_tuple=True)  # slow part
-                m = m[(i_out, i_1, i_2)]
-                i_out += index_out
-                i_1 += index_1
-                i_2 += index_2
+                if l_2 == 0:
+                    assert l_out == l_1
+                    l = l_1
+                    dim_2 = mul_1 * mul_out
+                    i_out = []
+                    i_1 = []
+                    i_2 = []
+                    v = 0
+                    for w in range(mul_out):
+                        for u in range(mul_1):
+                            i_out += [(2 * l + 1) * w + m for m in range(2 * l + 1)]
+                            i_1 += [(2 * l + 1) * u + m for m in range(2 * l + 1)]
+                            i_2 += (2 * l + 1) * [v]
+                            v += 1
+                    i_out = index_out + torch.tensor(i_out)
+                    i_1 = index_1 + torch.tensor(i_1)
+                    i_2 = index_2 + torch.tensor(i_2)
+                    m = torch.ones((2 * l + 1) * dim_2) / n_path ** 0.5
+                else:
+                    dim_2 = mul_1 * mul_out * (2 * l_2 + 1)
+                    C = o3.wigner_3j(l_out, l_1, l_2, cached=True)
+                    if normalization == 'component':
+                        C *= (2 * l_out + 1) ** 0.5
+                    if normalization == 'norm':
+                        C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
+                    I = torch.eye(mul_out * mul_1).reshape(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
+                    m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
+                    i_out, i_1, i_2 = m.nonzero(as_tuple=True)  # slow part
+                    m = m[(i_out, i_1, i_2)]
+                    i_out += index_out
+                    i_1 += index_1
+                    i_2 += index_2
+
                 row.append(i_out)
                 col.append(i_1 * dim_in2 + i_2)
                 val.append(m)

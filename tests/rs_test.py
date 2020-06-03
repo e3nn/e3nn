@@ -4,6 +4,7 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.non_linearities.norm import Norm
+from functools import partial
 
 
 def test_convention():
@@ -244,6 +245,20 @@ def test_tensor_product_in_out_normalization(Rs_in1, Rs_out):
         d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
         assert d < 1e-10
 
+
+@pytest.mark.parametrize('Rs_in1, Rs_out', [([(1, 0)], [(2, 0)]), ([(3, 1), (2, 2)], [(1, 1), (2, 2)])])
+def test_tensor_product_in_out_normalization_l0(Rs_in1, Rs_out):
+    with o3.torch_default_dtype(torch.float64):
+        n = rs.dim(Rs_out)
+        I = torch.eye(n)
+
+        _, Q = rs.tensor_product(Rs_in1, partial(o3.selection_rule, lmax=0), Rs_out)
+        d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
+        assert d < 1e-10
+
+        _, Q = rs.tensor_product(partial(o3.selection_rule, lmax=0), Rs_in1, Rs_out)
+        d = ((Q @ Q.t()).to_dense() - I).pow(2).mean().sqrt()
+        assert d < 1e-10
 
 ############################################################################
 
