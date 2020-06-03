@@ -668,13 +668,13 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_out * mul_1).reshape(mul_out, mul_1, mul_out * mul_1) / n_path ** 0.5
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                i_out, i_1, i_2 = m.nonzero().T
+                i_out, i_1, i_2 = m.nonzero(as_tuple=True)  # slow part
                 i_out += index_out
                 i_1 += index_1
                 i_2 += index_2
                 row.append(i_out)
                 col.append(i_1 * dim_in2 + i_2)
-                val.append(m[m != 0])
+                val.append(m[(i_out, i_1, i_2)])
 
                 index_2 += dim_2
             index_1 += dim_1
@@ -691,7 +691,7 @@ def _tensor_product_in_out(Rs_in1, selection_rule, Rs_out, normalization, sorted
         Rs_in2 = simplify(Rs_in2)
         # sorted = perm_mat @ unsorted
         wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in2))
-        wigner_3j_tensor = wigner_3j_tensor @ perm_mat.t()
+        wigner_3j_tensor = wigner_3j_tensor @ perm_mat.t()  # slow part
         wigner_3j_tensor = wigner_3j_tensor.sparse_reshape(-1, dim(Rs_in1) * dim(Rs_in2))
 
     return Rs_in2, wigner_3j_tensor

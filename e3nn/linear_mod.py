@@ -17,7 +17,7 @@ class KernelLinear(torch.nn.Module):
         super().__init__()
 
         selection_rule = partial(o3.selection_rule_in_out_sh, lmax=0)
-        self.tp = rs.TensorProduct(Rs_in, selection_rule, Rs_out, sorted=True)
+        self.tp = rs.TensorProduct(Rs_in, selection_rule, Rs_out, sorted=False)
         self.weight = torch.nn.Parameter(torch.randn(rs.dim(self.tp.Rs_in2)))
 
     def forward(self):
