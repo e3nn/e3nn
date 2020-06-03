@@ -109,6 +109,7 @@ class SphericalTensor:
         positions = positions.reshape(-1, 3)
         values = values.reshape(-1)
         positions /= positions.norm(p=2, dim=1, keepdim=True)
+        assert positions.shape[0] == values.shape[0], "positions and values must have the same number of points"
 
         s2 = FromS2Grid(res=res, lmax=lmax, normalization='none')
         pos = s2.grid

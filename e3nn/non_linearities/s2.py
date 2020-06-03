@@ -68,6 +68,8 @@ class S2Activation(torch.nn.Module):
         '''
         :param features: [..., l * m]
         '''
+        assert features.shape[-1] == rs.dim(self.Rs_in)
+
         if self.random_rot:
             abc = o3.rand_angles()
             features = torch.einsum('ij,...j->...i', rs.rep(self.Rs_in, *abc), features)
