@@ -8,6 +8,8 @@ E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in 
 
 ## Installation
 
+After having installed [pytorch_geometric](https://github.com/rusty1s/pytorch_geometric#installation) run the command:
+
 `pip install e3nn`
 
 To get the CUDA kernels read the instructions in `INSTALL.md`.
