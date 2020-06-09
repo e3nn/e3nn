@@ -1,10 +1,11 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, protected-access
+from functools import partial
+
 import pytest
 import torch
 
 from e3nn import o3, rs
 from e3nn.non_linearities.norm import Norm
-from functools import partial
 
 
 def test_convention():
