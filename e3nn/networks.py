@@ -18,7 +18,8 @@ from e3nn.tensor_product import LearnableTensorSquare
 class GatedConvNetwork(torch.nn.Module):
     def __init__(self, Rs_in, Rs_hidden, Rs_out, lmax, layers=3,
                  max_radius=1.0, number_of_basis=3, radial_layers=3,
-                 feature_product=False, kernel=Kernel, convolution=Convolution):
+                 feature_product=False, kernel=Kernel, convolution=Convolution,
+                 min_radius=0.0):
         super().__init__()
 
         representations = [Rs_in]
@@ -26,6 +27,7 @@ class GatedConvNetwork(torch.nn.Module):
         representations += [Rs_out]
 
         RadialModel = partial(GaussianRadialModel, max_radius=max_radius,
+                              min_radius=min_radius,
                               number_of_basis=number_of_basis, h=100,
                               L=radial_layers, act=swish)
 
@@ -77,12 +79,13 @@ class GatedConvNetwork(torch.nn.Module):
 class GatedConvParityNetwork(torch.nn.Module):
     def __init__(self, Rs_in, mul, Rs_out, lmax, layers=3,
                  max_radius=1.0, number_of_basis=3, radial_layers=3,
-                 feature_product=False, kernel=Kernel, convolution=Convolution):
+                 feature_product=False, kernel=Kernel, convolution=Convolution,
+                 min_radius=0.0):
         super().__init__()
 
         R = partial(GaussianRadialModel, max_radius=max_radius,
                     number_of_basis=number_of_basis, h=100,
-                    L=radial_layers, act=swish)
+                    L=radial_layers, act=swish, min_radius=min_radius)
         K = partial(kernel, RadialModel=R, selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax))
 
         modules = []
