@@ -25,7 +25,7 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
         torch.randint(n_source, size=(n_edge,)),
         torch.randint(n_target, size=(n_edge,)),
     ])
-    size = (n_source, n_target)
+    size = (n_target, n_source)
 
     if n_edge == 0:
         edge_r = torch.zeros(0, 3)
@@ -34,15 +34,15 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
             r_target[j] - r_source[i]
             for i, j in edge_index.T
         ])
-
-    out1 = mp(features, edge_index, edge_r, size)
+    print(features.shape, edge_index.shape, edge_r.shape, size)
+    out1 = mp(features, edge_index, edge_r, size=size)
 
     angles = o3.rand_angles()
     D_in = rs.rep(Rs_in, *angles)
     D_out = rs.rep(Rs_out, *angles)
     R = o3.rot(*angles)
 
-    out2 = mp(features @ D_in.T, edge_index, edge_r @ R.T, size) @ D_out
+    out2 = mp(features @ D_in.T, edge_index, edge_r @ R.T, size=size) @ D_out
 
     assert (out1 - out2).abs().max() < 1e-10
 
