@@ -16,11 +16,8 @@ class CartesianTensor():
 
     def to_irrep_tensor(self):
         basis_change = o3.xyz_vector_basis_to_spherical_basis()
-        new_indices = self.base_indices[self.N:2 * self.N]
-        old_indices = self.base_indices[:self.N]
-        rotation_pairs = "".join([a + b + "," for a, b in zip(new_indices, old_indices)])
-        einsum_str = rotation_pairs + old_indices + "->" + new_indices
-        irrep_basis = torch.einsum(einsum_str, *[basis_change] * self.N, self.tensor)
+        for i in range(self.tensor.dim()):
+            irrep_basis = torch.tensordot(basis_change, self.tensor, dims=([1], [i])).transpose(0, i)
         Rs = [(1, 1)]  # vectors
         Rs_out, Q = rs.reduce_tensor(self.formula, **{i: Rs for i in old_indices})
         irrep_tensor = torch.einsum('ab,b->a', Q, irrep_basis.view(-1))
