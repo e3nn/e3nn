@@ -88,7 +88,6 @@ class SmallConvolution(tg.nn.MessagePassing):
     def message(self, x_j, k):
         N = x_j.shape[0]
         x_j = x_j.view(N, int(self.lin_mul / self.tp_mul), -1)  # Rs_tp1
-        print(x_j.shape, k.shape)
         if k.shape[0] == 0:  # https://github.com/pytorch/pytorch/issues/37628
             return torch.zeros(0, k.shape[1])
         return torch.einsum('eij,egj->egi', k, x_j).reshape(N, -1)
