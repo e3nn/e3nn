@@ -43,22 +43,22 @@ class SmallConvolution(tg.nn.MessagePassing):
                              f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
         self.lin_mul = lin_mul
         self.tp_mul = tp_mul
-        
+
         self.Rs_in = rs.convention(Rs_in)
         self.Rs_out = rs.convention(Rs_out)
-        
+
         lps = [(l, p) for m, l, p in self.Rs_in]
         self.Rs_lin1 = [(1, l, p) for i in range(lin_mul) for l, p in lps]
         self.Rs_tp1 = [(1, l, p) for i in range(tp_mul) for l, p in lps]
-        
+
         lps = [(l, p) for m, l, p in self.Rs_out]
         self.Rs_lin2 = [(1, l, p) for i in range(lin_mul) for l, p in lps]
         self.Rs_tp2 = [(1, l, p) for i in range(tp_mul) for l, p in lps]
-        
+
         self.lin1 = KernelLinear(Rs_in, self.Rs_lin1)
         self.kernel = Kernel(self.Rs_tp1, self.Rs_tp2)
         self.lin2 = KernelLinear(self.Rs_lin2, Rs_out)
-        
+
     def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
         """
         :param features: Tensor of shape [n_target, dim(Rs_in)]
@@ -76,18 +76,18 @@ class SmallConvolution(tg.nn.MessagePassing):
         if size is None:
             N = x[0]
             size = (N, N)
-        x = self.lin1(x) # Rs_in -> Rs_lin1
-        x = x.view(size[0], self.lin_mul % self.tp_mul, -1) # Rs_tp1
-        
+        x = self.lin1(x)  # Rs_in -> Rs_lin1
+        x = x.view(size[0], self.lin_mul % self.tp_mul, -1)  # Rs_tp1
+
         k = self.kernel(edge_r)
         k.div_(n_norm ** 0.5)
-        
-        x = self.propogate(edge_index, size=size, x=x, k=k) # Rs_tp1 -> Rs_tp2
+
+        x = self.propogate(edge_index, size=size, x=x, k=k)  # Rs_tp1 -> Rs_tp2
         x = x.view(size[1], -1)  # Rs_lin2
-        
+
         x = self.lin2(x)  # Rs_lin2 -> Rs_out
 
-    def message(self, x_j, k): 
+    def message(self, x_j, k):
         if k.shape[0] == 0:  # https://github.com/pytorch/pytorch/issues/37628
             return torch.zeros(0, k.shape[1])
         return torch.einsum('eij,ej->ei', k, x_j)
