@@ -9,9 +9,8 @@ class CartesianTensor():
         if self.N > 13:
             raise ValueError("CartesianTensor only supports up to 13 indices.")
         assert tuple(tensor.shape) == tuple(3 for i in range(self.N))
-        self.base_indices = "abcdefghijklmnopqrstuvxyz"
         if formula is None:
-            formula = self.base_indices[:self.N]
+            formula = "abcdefghijklmnopqrstuvxyz"[:self.N]
         self.formula = formula
         self.tensor = tensor
 
