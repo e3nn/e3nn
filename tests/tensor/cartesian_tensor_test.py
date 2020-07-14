@@ -16,3 +16,11 @@ def test_to_irrep(i, j, k):
     cart = CartesianTensor(test_M)
     irrep_tensor = cart.to_irrep_tensor()
     assert(irrep_tensor.tensor.nonzero().reshape(-1) == torch.LongTensor([k]))
+
+
+def test_user_formula():
+    mat = torch.rand(3, 3)
+    symm_mat = (mat + mat.transpose(1, 0)) / 2.
+    cart = CartesianTensor(symm_mat, "ij=ji")
+    irrep_tensor = cart.to_irrep_tensor()
+    assert(irrep_tensor.Rs == [(1, 0, 0), (1, 2, 0)])
