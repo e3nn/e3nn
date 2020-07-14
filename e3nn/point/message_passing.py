@@ -74,20 +74,21 @@ class SmallConvolution(tg.nn.MessagePassing):
         """
         x = features
         if size is None:
-            N = x[0]
+            N = x.shape[0]
             size = (N, N)
-        x = self.lin1(x)  # Rs_in -> Rs_lin1
-        x = x.view(size[0], self.lin_mul % self.tp_mul, -1)  # Rs_tp1
-
+        x = (self.lin1() @ x.transpose(1, 0)).transpose(1, 0)  # Rs_in -> Rs_lin1
         k = self.kernel(edge_r)
         k.div_(n_norm ** 0.5)
 
-        x = self.propogate(edge_index, size=size, x=x, k=k)  # Rs_tp1 -> Rs_tp2
-        x = x.view(size[1], -1)  # Rs_lin2
+        x = self.propagate(edge_index, size=size, x=x, k=k)  # Rs_tp1 -> Rs_tp2
+        x = (self.lin2() @ x.transpose(1, 0)).transpose(1, 0)  # Rs_lin2 -> Rs_out
 
-        x = self.lin2(x)  # Rs_lin2 -> Rs_out
+        return x
 
     def message(self, x_j, k):
+        N = x_j.shape[0]
+        x_j = x_j.view(N, int(self.lin_mul / self.tp_mul), -1)  # Rs_tp1
+        print(x_j.shape, k.shape)
         if k.shape[0] == 0:  # https://github.com/pytorch/pytorch/issues/37628
             return torch.zeros(0, k.shape[1])
-        return torch.einsum('eij,ej->ei', k, x_j)
+        return torch.einsum('eij,egj->egi', k, x_j).reshape(N, -1)
