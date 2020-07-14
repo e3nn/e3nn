@@ -5,13 +5,10 @@ from e3nn import rs, o3
 
 class CartesianTensor():
     def __init__(self, tensor, formula=None):
-        self.N = len(tensor.shape)
-        if self.N > 13:
-            raise ValueError("CartesianTensor only supports up to 13 indices.")
-        assert tuple(tensor.shape) == tuple(3 for i in range(self.N))
-        self.base_indices = "abcdefghijklmnopqrstuvxyz"
+        if tuple(tensor.shape) != tuple(3 for i in range(tensor.dim())):
+            raise ValueError(f"all dimensions of tensor should have shape 3 but tensor has shape {tensor.shape}")
         if formula is None:
-            formula = self.base_indices[:self.N]
+            formula = "abcdefghijklmnopqrstuvxyz"[:tensor.dim()]
         self.formula = formula
         self.tensor = tensor
 
