@@ -36,11 +36,11 @@ class Convolution(tg.nn.MessagePassing):
 
 class SmallConvolution(tg.nn.MessagePassing):
     def __init__(self, Kernel, Rs_in, Rs_out, lin_mul, tp_mul):
-        super(SmallConvolution, self).__init__(aggr='add', flow='target_to_source')
+        super(SmallConvolution, self).__init__(
+            aggr='add', flow='target_to_source')
         if lin_mul % tp_mul != 0:
-            raise ValueError("linear_mul must be divisable"
-                             + " by tensor_product_mul but "
-                             + f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
+            raise ValueError("linear_mul must be divisable" +
+                             " by tensor_product_mul but " + f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
         self.lin_mul = lin_mul
         self.tp_mul = tp_mul
 
@@ -76,12 +76,14 @@ class SmallConvolution(tg.nn.MessagePassing):
         if size is None:
             N = x.shape[0]
             size = (N, N)
-        x = (self.lin1() @ x.transpose(1, 0)).transpose(1, 0)  # Rs_in -> Rs_lin1
+        x = (self.lin1() @ x.transpose(1, 0)).transpose(
+            1, 0)  # Rs_in -> Rs_lin1
         k = self.kernel(edge_r)
         k.div_(n_norm ** 0.5)
 
         x = self.propagate(edge_index, size=size, x=x, k=k)  # Rs_tp1 -> Rs_tp2
-        x = (self.lin2() @ x.transpose(1, 0)).transpose(1, 0)  # Rs_lin2 -> Rs_out
+        x = (self.lin2() @ x.transpose(1, 0)).transpose(
+            1, 0)  # Rs_lin2 -> Rs_out
 
         return x
 
