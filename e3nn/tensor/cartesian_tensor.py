@@ -14,7 +14,7 @@ class CartesianTensor():
 
     def to_irrep_transformation(self):
         dim = self.tensor.dim()
-        change = o3.kron(*[o3.xyz_vector_basis_to_spherical_basis()] * dim)
+        change = o3.kron(*[o3.xyz_to_irreducible_basis()] * dim)
         Rs = [(1, 1)]  # vectors
         old_indices = self.formula.split("=")[0]
         Rs_out, Q = rs.reduce_tensor(self.formula, **{i: Rs for i in old_indices})
