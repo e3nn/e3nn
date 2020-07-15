@@ -56,8 +56,8 @@ class MinimalNetwork(torch.nn.Module):
 
         radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
 
-        self.real_spherical_harmonics = partial(rsh, Rs=representations)
-        self.layer = TensorPassingLayer(Rs_in, Rs_out, radial_model, self)
+        self.real_spherical_harmonics = rsh
+        self.layer = TensorPassingLayer(Rs_in, Rs_out, radial_model, self.coupling_coefficients, self.coupling_coefficients_base_offsets, self.max_l_in, self.device)
 
     def _find_max_l_out_in(self):
         max_l_out = max_l_in = max_l = 0
@@ -101,14 +101,15 @@ class MinimalNetwork(torch.nn.Module):
         self.coupling_coefficients_base_offsets = torch.tensor(tmp_base_offsets_list, dtype=torch.int32, device=self.device)
 
     def forward(self, graph):
-        return self.layer(graph.edge_index, graph.x, graph.edge_attr, self.real_spherical_harmonics(self.rel_vec))
+        Y = self.real_spherical_harmonics(list(range(self.max_l + 1)), graph.rel_vec).contiguous()
+        return self.layer(graph.edge_index, graph.x, graph.edge_attr, Y)
 
 
 class TensorPassingLayer(torch_geometric.nn.MessagePassing):
-    def __init__(self, Rs_in, Rs_out, radial_model, network):
+    def __init__(self, Rs_in, Rs_out, radial_model, coupling_coefficients, coupling_coefficients_base_offsets, max_l_in, device):
         super().__init__()
 
-        self.device = network.device
+        self.device = device
 
         self.Rs_in = Rs_in
         self.Rs_out = Rs_out
@@ -121,8 +122,11 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
         self._calculate_offsets()
         self._calculate_normalization_coefficients()
 
-        self.radial_model = radial_model
-        self.network = network
+        self.radial_model = radial_model(self.R_base_offsets[-1].item())
+
+        self.coupling_coefficients = coupling_coefficients
+        self.coupling_coefficients_base_offsets = coupling_coefficients_base_offsets
+        self.max_l_in = max_l_in
 
     def _calculate_offsets(self):
         from itertools import accumulate
@@ -146,11 +150,11 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
         for i, l_out in enumerate(self.l_out_list):
             num_summed_elements = sum([mul_in * (2 * min(l_out, l_in) + 1) for mul_in, l_in in zip(self.mul_in_list, self.l_in_list)])  # (l_out + l_in) - |l_out - l_in| = 2*min(l_out, l_in)
             for j, (mul_in, l_in) in enumerate(zip(self.mul_in_list, self.l_in_list)):
-                norm_coef[i, j] =  math.sqrt(4 * math.pi) * math.sqrt(2 * l_out + 1) / math.sqrt(num_summed_elements)
+                norm_coef[i, j] = math.sqrt(4 * math.pi) * math.sqrt(2 * l_out + 1) / math.sqrt(num_summed_elements)
 
         self.norm_coef = norm_coef
 
-    def forward(self, features, edge_index, radii, real_spherical_harmonics):
+    def forward(self, edge_index, features, radii, real_spherical_harmonics):
         radial_model_outputs = self.radial_model(radii)
         return self.propagate(edge_index, x=features, rsh=real_spherical_harmonics, rbf=radial_model_outputs)
 
@@ -167,7 +171,7 @@ class TensorMessageFunction(torch.autograd.Function):
 
         msg = tensor_message.forward(
             layer.norm_coef,                                    # W
-            layer.network.coupling_coefficients,                # C
+            layer.coupling_coefficients,                        # C
             F,                                                  # F
             Y,                                                  # Y
             R,                                                  # R
@@ -176,10 +180,10 @@ class TensorMessageFunction(torch.autograd.Function):
             layer.mul_out_list,                                 # u_sizes
             layer.mul_in_list,                                  # v_sizes
             layer.grad_base_offsets,                            # output_base_offsets
-            layer.network.coupling_coefficients_base_offsets,   # C_offsets
+            layer.coupling_coefficients_base_offsets,           # C_offsets
             layer.features_base_offsets,                        # F_base_offsets
             layer.R_base_offsets,                               # R_base_offsets
-            layer.network.max_l_in + 1)                         # l_in_max_net_bound
+            layer.max_l_in + 1)                                 # l_in_max_net_bound
 
         msg = msg.transpose_(0, 1).contiguous()                 # [(l_out, u, i), (a, b)] -> [(a, b), (l_out, u, i)]
 
@@ -198,7 +202,7 @@ class TensorMessageFunction(torch.autograd.Function):
 
         msg_grad_F = tensor_message.backward_F(
             layer.norm_coef,                                    # W
-            layer.network.coupling_coefficients,                # C
+            layer.coupling_coefficients,                        # C
             G,                                                  # G
             Y,                                                  # Y
             R,                                                  # R
@@ -207,16 +211,16 @@ class TensorMessageFunction(torch.autograd.Function):
             layer.mul_out_list,                                 # u_sizes
             layer.mul_in_list,                                  # v_sizes
             layer.features_base_offsets,                        # output_base_offsets
-            layer.network.coupling_coefficients_base_offsets,   # C_offsets
+            layer.coupling_coefficients_base_offsets,           # C_offsets
             layer.grad_base_offsets,                            # G_base_offsets
             layer.R_base_offsets,                               # R_base_offsets
-            layer.network.max_l_in + 1)                         # l_in_max_net_bound
+            layer.max_l_in + 1)                                 # l_in_max_net_bound
 
         msg_grad_F = msg_grad_F.transpose_(0, 1).contiguous()   # [(a, b), (l_in, v, j)]
 
         msg_grad_R = tensor_message.backward_R(
             layer.norm_coef,                                    # W
-            layer.network.coupling_coefficients,                # C
+            layer.coupling_coefficients,                        # C
             G,                                                  # G
             F,                                                  # F
             Y,                                                  # Y
@@ -225,10 +229,10 @@ class TensorMessageFunction(torch.autograd.Function):
             layer.mul_out_list,                                 # u_sizes
             layer.mul_in_list,                                  # v_sizes
             layer.R_base_offsets,                               # output_base_offsets
-            layer.network.coupling_coefficients_base_offsets,   # C_offsets
+            layer.coupling_coefficients_base_offsets,           # C_offsets
             layer.grad_base_offsets,                            # G_base_offsets
             layer.features_base_offsets,                        # F_base_offsets
-            layer.network.max_l_in + 1)                         # l_in_max_net_bound
+            layer.max_l_in + 1)                                 # l_in_max_net_bound
 
         msg_grad_R = msg_grad_R.transpose_(0, 1).contiguous()   # [(a, b), (l_out, l_in, l, u, v)]
 
