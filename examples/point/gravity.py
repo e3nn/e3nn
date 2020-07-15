@@ -23,12 +23,11 @@ class GravityNet(torch.nn.Module):
         sp = rescaled_act.Softplus(beta=5)
         RadialModel = partial(CosineBasisModel, max_radius=max_radius, number_of_basis=num_radial, h=100, L=2, act=sp)
 
-        K = partial(Kernel, RadialModel=RadialModel)
-        self.conv = Convolution(K, [(1, 0)], [(1, 1)])
+        self.conv = Convolution(Kernel([(1, 0)], [(1, 1)], RadialModel))
 
     def forward(self, features, geometry):
         features = self.conv(features, geometry)
-        features = torch.einsum("ij,zaj->zai", (o3.spherical_basis_vector_to_xyz_basis(), features))
+        features = torch.einsum("ij,zaj->zai", (o3.irreducible_basis_to_xyz(), features))
         return features
 
 
@@ -127,7 +126,7 @@ def train(net):
                 output = torch.transpose(output, 0, 1)
 
                 # spherical harmonics are given in y,z,x order
-                output = output @ o3.spherical_basis_vector_to_xyz_basis().t()
+                output = output @ o3.irreducible_basis_to_xyz().t()
 
                 loss = torch.mean((output - val_accels)**2)
             print('Step {0}: validation loss = {1}'.format(step, loss.item()))
