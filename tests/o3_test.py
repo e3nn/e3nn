@@ -64,9 +64,9 @@ class Tests(unittest.TestCase):
 
             self.assertLess((D12 - D1D2).abs().max(), 1e-10 * D12.abs().max())
 
-    def test_xyz_vector_basis_to_spherical_basis(self, ):
+    def test_xyz_to_irreducible_basis(self, ):
         with o3.torch_default_dtype(torch.float64):
-            A = o3.xyz_vector_basis_to_spherical_basis()
+            A = o3.xyz_to_irreducible_basis()
 
             a, b, c = torch.rand(3)
 
@@ -98,8 +98,8 @@ class Tests(unittest.TestCase):
             x2 = o3.kron(m1, o3.kron(m2, m3))
             assert torch.allclose(x1, x2)
 
-    def test_tensor3x3_repr_basis_to_spherical_basis(self):
-        o3.tensor3x3_repr_basis_to_spherical_basis()
+    def test_xyz3x3_to_irreducible_basis(self):
+        o3.xyz3x3_to_irreducible_basis()
 
     def test_intertwiners(self):
         with o3.torch_default_dtype(torch.float64):

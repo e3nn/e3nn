@@ -21,8 +21,6 @@ class Convolution(tg.nn.MessagePassing):
 
         :return: Tensor of shape [n_source, dim(Rs_out)]
         """
-        if size is None:
-            size = features.shape[0]
         k = self.kernel(edge_r)
         k.div_(n_norm ** 0.5)
         return self.propagate(edge_index, size=size, x=features, k=k)
