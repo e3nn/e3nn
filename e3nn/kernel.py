@@ -281,4 +281,4 @@ class KernelFn(torch.autograd.Function):
                             sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum("zuivj,ijk,zk->zuv", grad_K, C, sub_Y)
 
         del ctx
-        return grad_Y, grad_R, None, None, None, None, None
+        return grad_Y, grad_R, None, None, None, None, None, None

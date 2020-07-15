@@ -29,7 +29,7 @@ class Tests(unittest.TestCase):
         R = torch.randn(2, n_path, requires_grad=True)  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
         inputs = (
-            Y, R, kernel.norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.selection_rule, kernel.set_of_l_filters
+            Y, R, kernel.norm_coef, kernel.Rs_in, kernel.Rs_out, kernel.selection_rule, kernel.set_of_l_filters, kernel.groups
         )
         self.assertTrue(torch.autograd.gradcheck(KernelFn.apply, inputs))
 
