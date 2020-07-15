@@ -98,8 +98,8 @@ class Tests(unittest.TestCase):
             x2 = o3.kron(m1, o3.kron(m2, m3))
             assert torch.allclose(x1, x2)
 
-    def test_tensor3x3_repr_basis_to_spherical_basis(self):
-        o3.tensor3x3_repr_basis_to_spherical_basis()
+    def test_xyz3x3_to_irreducible_basis(self):
+        o3.xyz3x3_to_irreducible_basis()
 
     def test_intertwiners(self):
         with o3.torch_default_dtype(torch.float64):

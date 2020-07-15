@@ -386,7 +386,7 @@ def irreducible_basis_to_xyz(check=True):
     return A.type(torch.get_default_dtype())
 
 
-def tensor3x3_repr(a, b, c):
+def xyz3x3_repr(a, b, c):
     """
     representation of 3x3 tensors
     T --> R T R^t
@@ -395,9 +395,9 @@ def tensor3x3_repr(a, b, c):
     return kron(r, r)
 
 
-def tensor3x3_repr_basis_to_spherical_basis():
+def xyz3x3_to_irreducible_basis():
     """
-    to convert a 3x3 tensor transforming with tensor3x3_repr(a, b, c)
+    to convert a 3x3 tensor transforming with xyz3x3_repr(a, b, c)
     into its 1 + 3 + 5 component transforming with irr_repr(0, a, b, c), irr_repr(1, a, b, c), irr_repr(3, a, b, c)
     see assert for usage
     """
@@ -405,14 +405,14 @@ def tensor3x3_repr_basis_to_spherical_basis():
         to1 = torch.tensor([
             [1, 0, 0, 0, 1, 0, 0, 0, 1],
         ], dtype=torch.get_default_dtype())
-        assert all(torch.allclose(irr_repr(0, a, b, c) @ to1, to1 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+        assert all(torch.allclose(irr_repr(0, a, b, c) @ to1, to1 @ xyz3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
         to3 = torch.tensor([
             [0, 0, -1, 0, 0, 0, 1, 0, 0],
             [0, 1, 0, -1, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 1, 0, -1, 0],
         ], dtype=torch.get_default_dtype())
-        assert all(torch.allclose(irr_repr(1, a, b, c) @ to3, to3 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+        assert all(torch.allclose(irr_repr(1, a, b, c) @ to3, to3 @ xyz3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
         to5 = torch.tensor([
             [0, 1, 0, 1, 0, 0, 0, 0, 0],
@@ -421,7 +421,7 @@ def tensor3x3_repr_basis_to_spherical_basis():
             [0, 0, 1, 0, 0, 0, 1, 0, 0],
             [1, 0, 0, 0, -1, 0, 0, 0, 0]
         ], dtype=torch.get_default_dtype())
-        assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ tensor3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
+        assert all(torch.allclose(irr_repr(2, a, b, c) @ to5, to5 @ xyz3x3_repr(a, b, c)) for a, b, c in torch.rand(10, 3))
 
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
