@@ -261,7 +261,7 @@ def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
     """
     cuda version of spherical_harmonics_xyz
     """
-    from e3nn import cuda_rsh  # pylint: disable=no-name-in-module, import-outside-toplevel
+    from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module, import-outside-toplevel
 
     Rs = rs.simplify(Rs)
 
@@ -271,7 +271,7 @@ def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
 
     lmax = rs.lmax(Rs)
     out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
-    cuda_rsh.real_spherical_harmonics(out, xyz)
+    real_spherical_harmonics.real_spherical_harmonics(out, xyz)
 
     # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
     norm_coef = [elem for lh in range((lmax + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
