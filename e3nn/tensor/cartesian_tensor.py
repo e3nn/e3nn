@@ -15,14 +15,11 @@ class CartesianTensor():
     def to_irrep_transformation(self):
         basis_change = o3.xyz_vector_basis_to_spherical_basis()
         dim = self.tensor.dim()
-        change = torch.eye(3 ** dim).reshape(3 ** dim, *[3] * dim)
-        for j in range(3 ** dim):
-            for i in range(dim):
-                change[j] = torch.tensordot(basis_change, change[j], dims=([1], [i])).transpose(0, i)
+        change = o3.kron(*[o3.xyz_vector_basis_to_spherical_basis()] * dim)
         Rs = [(1, 1)]  # vectors
         old_indices = self.formula.split("=")[0]
         Rs_out, Q = rs.reduce_tensor(self.formula, **{i: Rs for i in old_indices})
-        return Rs_out, torch.einsum('ab,cb->ac', Q, change.reshape(3 ** dim, 3 ** dim))
+        return Rs_out, torch.einsum('ab,bc->ac', Q, change.reshape(3 ** dim, 3 ** dim))
 
     def to_irrep_tensor(self):
         Rs_out, Q = self.to_irrep_transformation()
