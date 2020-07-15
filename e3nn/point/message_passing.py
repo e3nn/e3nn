@@ -38,9 +38,9 @@ class SmallConvolution(tg.nn.MessagePassing):
     def __init__(self, Kernel, Rs_in, Rs_out, lin_mul, tp_mul):
         super(SmallConvolution, self).__init__(aggr='add', flow='target_to_source')
         if lin_mul % tp_mul != 0:
-            raise ValueError("linear_mul must be divisable" +
-                             " by tensor_product_mul but " +
-                             f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
+            raise ValueError("linear_mul must be divisable"
+                             + " by tensor_product_mul but "
+                             + f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
         self.lin_mul = lin_mul
         self.tp_mul = tp_mul
 
@@ -87,7 +87,8 @@ class SmallConvolution(tg.nn.MessagePassing):
 
     def message(self, x_j, k):
         N = x_j.shape[0]
-        x_j = x_j.view(N, int(self.lin_mul / self.tp_mul), -1)  # Rs_tp1
+        cout, cin = k.shape[-2:]
+        x_j = x_j.view(N, self.lin_mul // self.tp_mul, cin)  # Rs_tp1
         if k.shape[0] == 0:  # https://github.com/pytorch/pytorch/issues/37628
-            return torch.zeros(0, k.shape[1])
-        return torch.einsum('eij,egj->egi', k, x_j).reshape(N, -1)
+            return torch.zeros(0, (self.lin_mul // self.tp_mul) * cout)
+        return torch.einsum('eij,egj->egi', k, x_j).reshape(N, self.lin_mul // self.tp_mul * cout)
