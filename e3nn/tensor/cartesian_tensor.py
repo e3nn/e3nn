@@ -12,13 +12,19 @@ class CartesianTensor():
         self.formula = formula
         self.tensor = tensor
 
-    def to_irrep_tensor(self):
+    def to_irrep_transformation(self):
         basis_change = o3.xyz_vector_basis_to_spherical_basis()
-        tensor = self.tensor
-        for i in range(self.tensor.dim()):
-            tensor = torch.tensordot(basis_change, tensor, dims=([1], [i])).transpose(0, i)
+        dim = self.tensor.dim()
+        change = torch.eye(3 ** dim).reshape(3 ** dim, *[3] * dim)
+        for j in range(3 ** dim):
+            for i in range(dim):
+                change[j] = torch.tensordot(basis_change, change[j], dims=([1], [i])).transpose(0, i)
         Rs = [(1, 1)]  # vectors
         old_indices = self.formula.split("=")[0]
         Rs_out, Q = rs.reduce_tensor(self.formula, **{i: Rs for i in old_indices})
-        tensor = torch.einsum('ab,b->a', Q, tensor.reshape(-1))
+        return Rs_out, torch.einsum('ab,cb->ac', Q, change.reshape(3 ** dim, 3 ** dim))
+
+    def to_irrep_tensor(self):
+        Rs_out, Q = self.to_irrep_transformation()
+        tensor = torch.einsum('ab,b->a', Q, self.tensor.reshape(-1))
         return IrrepTensor(tensor, Rs_out)
