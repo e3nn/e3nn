@@ -1,5 +1,5 @@
 /*
-    Calculates real spherical harmonics up to L=6 (inclusive) from Cartesian coordinates.
+    Calculates real spherical harmonics up to L=10 (inclusive) from Cartesian coordinates.
     Coordinates x, y, z are expected to form unit length vector.
 */
 
