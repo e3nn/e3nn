@@ -39,8 +39,8 @@ class SmallConvolution(tg.nn.MessagePassing):
         super(SmallConvolution, self).__init__(
             aggr='add', flow='target_to_source')
         if lin_mul % tp_mul != 0:
-            raise ValueError("linear_mul must be divisable" +
-                             " by tensor_product_mul but " + f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
+            raise ValueError(
+                "linear_mul must be divisable" + " by tensor_product_mul but " + f"{lin_mul} % {tp_mul} = {lin_mul % tp_mul}")
         self.lin_mul = lin_mul
         self.tp_mul = tp_mul
 
