@@ -358,7 +358,7 @@ def __wigner_3j(l1, l2, l3, _version=1):  # pragma: no cover
 # Change of basis
 ################################################################################
 
-def xyz_vector_basis_to_spherical_basis(check=True):
+def xyz_to_irreducible_basis(check=True):
     """
     to convert a vector [x, y, z] transforming with rot(a, b, c)
     into a vector transforming with irr_repr(1, a, b, c)
@@ -371,13 +371,13 @@ def xyz_vector_basis_to_spherical_basis(check=True):
     return A.type(torch.get_default_dtype())
 
 
-def spherical_basis_vector_to_xyz_basis(check=True):
+def irreducible_basis_to_xyz(check=True):
     """
     to convert a vector transforming with irr_repr(1, a, b, c)
     into a vector [x, y, z] transforming with rot(a, b, c)
     see assert for usage
 
-    Inverse of xyz_vector_basis_to_spherical_basis
+    Inverse of xyz_to_irreducible_basis
     """
     with torch_default_dtype(torch.float64):
         A = torch.tensor([[0, 0, 1], [1, 0, 0], [0, 1, 0]], dtype=torch.float64)

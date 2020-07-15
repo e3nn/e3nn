@@ -13,7 +13,7 @@ class CartesianTensor():
         self.tensor = tensor
 
     def to_irrep_tensor(self):
-        basis_change = o3.xyz_vector_basis_to_spherical_basis()
+        basis_change = o3.xyz_to_irreducible_basis()
         tensor = self.tensor
         for i in range(self.tensor.dim()):
             tensor = torch.tensordot(basis_change, tensor, dims=([1], [i])).transpose(0, i)

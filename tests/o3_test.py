@@ -64,9 +64,9 @@ class Tests(unittest.TestCase):
 
             self.assertLess((D12 - D1D2).abs().max(), 1e-10 * D12.abs().max())
 
-    def test_xyz_vector_basis_to_spherical_basis(self, ):
+    def test_xyz_to_irreducible_basis(self, ):
         with o3.torch_default_dtype(torch.float64):
-            A = o3.xyz_vector_basis_to_spherical_basis()
+            A = o3.xyz_to_irreducible_basis()
 
             a, b, c = torch.rand(3)
 
