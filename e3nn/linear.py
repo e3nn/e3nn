@@ -7,10 +7,11 @@ from e3nn import rs
 
 
 class KernelLinear(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out):
+    def __init__(self, Rs_in, Rs_out, groups=1):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
+        :param groups: similar to groups in torch.nn.Conv2d
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
         """
@@ -21,12 +22,17 @@ class KernelLinear(torch.nn.Module):
         n_path = 0
 
         for mul_out, l_out, p_out in self.Rs_out:
+            assert mul_out % groups == 0
+
             for mul_in, l_in, p_in in self.Rs_in:
+                assert mul_in % groups == 0
+
                 if (l_out, p_out) == (l_in, p_in):
                     # compute the number of degrees of freedom
-                    n_path += mul_out * mul_in
+                    n_path += mul_out * mul_in // groups
 
         self.weight = torch.nn.Parameter(torch.randn(n_path))
+        self.groups = groups
 
     def forward(self):
         """
@@ -37,26 +43,31 @@ class KernelLinear(torch.nn.Module):
 
         begin_out = 0
         for mul_out, l_out, p_out in self.Rs_out:
-            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-            begin_out += mul_out * (2 * l_out + 1)
+            mul_out = mul_out // self.groups
 
-            n_path = 0
+            for g in range(self.groups):
+                s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+                begin_out += mul_out * (2 * l_out + 1)
 
-            begin_in = 0
-            for mul_in, l_in, p_in in self.Rs_in:
-                s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                begin_in += mul_in * (2 * l_in + 1)
+                n_path = 0
 
-                if (l_out, p_out) == (l_in, p_in):
-                    weight = self.weight[begin_w: begin_w + mul_out * mul_in].reshape(mul_out, mul_in)  # [mul_out, mul_in]
-                    begin_w += mul_out * mul_in
+                begin_in = 0
+                for mul_in, l_in, p_in in self.Rs_in:
+                    mul_in = mul_in // self.groups
 
-                    eye = torch.eye(2 * l_in + 1, dtype=self.weight.dtype, device=self.weight.device)
-                    kernel[s_out, s_in] = torch.einsum('uv,ij->uivj', weight, eye).reshape(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1))
-                    n_path += mul_in
+                    s_in = slice(begin_in + g * mul_in * (2 * l_in + 1), begin_in + (g + 1) * mul_in * (2 * l_in + 1))
+                    begin_in += self.groups * mul_in * (2 * l_in + 1)
 
-            if n_path > 0:
-                kernel[s_out] /= math.sqrt(n_path)
+                    if (l_out, p_out) == (l_in, p_in):
+                        weight = self.weight[begin_w: begin_w + mul_out * mul_in].reshape(mul_out, mul_in)  # [mul_out, mul_in]
+                        begin_w += mul_out * mul_in
+
+                        eye = torch.eye(2 * l_in + 1, dtype=self.weight.dtype, device=self.weight.device)
+                        kernel[s_out, s_in] = torch.einsum('uv,ij->uivj', weight, eye).reshape(mul_out * (2 * l_out + 1), mul_in * (2 * l_in + 1))
+                        n_path += mul_in
+
+                if n_path > 0:
+                    kernel[s_out] /= math.sqrt(n_path)
 
         return kernel
 

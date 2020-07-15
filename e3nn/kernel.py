@@ -12,13 +12,15 @@ class Kernel(torch.nn.Module):
                  selection_rule=o3.selection_rule_in_out_sh,
                  normalization='component',
                  allow_unused_inputs=False,
-                 allow_zero_outputs=False):
+                 allow_zero_outputs=False,
+                 groups=1):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
         :param RadialModel: Class(d), trainable model: R -> R^d
         :param selection_rule: function of signature (l_in, p_in, l_out, p_out) -> [l_filter]
         :param normalization: either 'norm' or 'component'
+        :param groups: similar to groups in torch.nn.Conv2d
         representation order = nonnegative integer
         parity = 0 (no parity), 1 (even), -1 (odd)
         """
@@ -52,12 +54,16 @@ class Kernel(torch.nn.Module):
         set_of_l_filters = set()
 
         for i, (mul_out, l_out, p_out) in enumerate(self.Rs_out):
+            assert mul_out % groups == 0
+
             # consider that we sum a bunch of [lambda_(m_out)] vectors
             # we need to count how many of them we sum in order to normalize the network
             num_summed_elements = 0
             for mul_in, l_in, p_in in self.Rs_in:
+                assert mul_in % groups == 0
+
                 l_filters = self.selection_rule(l_in, p_in, l_out, p_out)
-                num_summed_elements += mul_in * len(l_filters)
+                num_summed_elements += mul_in // groups * len(l_filters)
 
             for j, (mul_in, l_in, p_in) in enumerate(self.Rs_in):
                 # normalization assuming that each terms are of order 1 and uncorrelated
@@ -69,7 +75,7 @@ class Kernel(torch.nn.Module):
                     assert all(p_in * (-1) ** l == p_out for l in l_filters), "selection_rule must return l's compatible with SH parity"
 
                 # compute the number of degrees of freedom
-                n_path += mul_out * mul_in * len(l_filters)
+                n_path += mul_out * mul_in // groups * len(l_filters)
 
                 # create the set of all spherical harmonics orders needed
                 set_of_l_filters = set_of_l_filters.union(l_filters)
@@ -79,8 +85,9 @@ class Kernel(torch.nn.Module):
         self.R = RadialModel(n_path)
         self.set_of_l_filters = sorted(set_of_l_filters)
         self.register_buffer('norm_coef', norm_coef)
+        self.groups = groups
 
-        self.linear = KernelLinear(self.Rs_in, self.Rs_out)
+        self.linear = KernelLinear(self.Rs_in, self.Rs_out, groups=groups)
 
     def __repr__(self):
         return "{name} ({Rs_in} -> {Rs_out})".format(
@@ -121,9 +128,9 @@ class Kernel(torch.nn.Module):
         R = self.R(radii[radii > r_eps])  # [batch, l_out * l_in * mul_out * mul_in * l_filter]
 
         if custom_backward:
-            kernel1 = KernelFn.apply(Y, R, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
+            kernel1 = KernelFn.apply(Y, R, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters, self.groups)
         else:
-            kernel1 = kernel_fn_forward(Y, R, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters)
+            kernel1 = kernel_fn_forward(Y, R, self.norm_coef, self.Rs_in, self.Rs_out, self.selection_rule, self.set_of_l_filters, self.groups)
 
         # (2) Case r = 0
 
@@ -136,7 +143,7 @@ class Kernel(torch.nn.Module):
         return kernel.reshape(*size, *kernel2.shape)
 
 
-def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
+def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters, groups):
     """
     :param Y: tensor [batch, l_filter * m_filter]
     :param R: tensor [batch, l_out * l_in * mul_out * mul_in * l_filter]
@@ -154,36 +161,41 @@ def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_f
 
     begin_out = 0
     for i, (mul_out, l_out, p_out) in enumerate(Rs_out):
-        s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-        begin_out += mul_out * (2 * l_out + 1)
+        mul_out = mul_out // groups
 
-        begin_in = 0
-        for j, (mul_in, l_in, p_in) in enumerate(Rs_in):
-            s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-            begin_in += mul_in * (2 * l_in + 1)
+        for g in range(groups):
+            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+            begin_out += mul_out * (2 * l_out + 1)
 
-            l_filters = selection_rule(l_in, p_in, l_out, p_out)
-            if not l_filters:
-                continue
+            begin_in = 0
+            for j, (mul_in, l_in, p_in) in enumerate(Rs_in):
+                mul_in = mul_in // groups
 
-            # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
-            n = mul_out * mul_in * len(l_filters)
-            sub_R = R[:, begin_R: begin_R + n].reshape(batch, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
-            begin_R += n
+                s_in = slice(begin_in + g * mul_in * (2 * l_in + 1), begin_in + (g + 1) * mul_in * (2 * l_in + 1))
+                begin_in += groups * mul_in * (2 * l_in + 1)
 
-            # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
-            K = 0
-            for k, l_filter in enumerate(l_filters):
-                tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
-                sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
+                l_filters = selection_rule(l_in, p_in, l_out, p_out)
+                if not l_filters:
+                    continue
 
-                C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
+                # extract the subset of the `R` that corresponds to the couple (l_out, l_in)
+                n = mul_out * mul_in * len(l_filters)
+                sub_R = R[:, begin_R: begin_R + n].reshape(batch, mul_out, mul_in, len(l_filters))  # [batch, mul_out, mul_in, l_filter]
+                begin_R += n
 
-                # note: The multiplication with `sub_R` could also be done outside of the for loop
-                K += norm_coef[i, j] * torch.einsum("ijk,zk,zuv->zuivj", (C, sub_Y, sub_R[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
+                # note: I don't know if we can vectorize this for loop because [l_filter * m_filter] cannot be put into [l_filter, m_filter]
+                K = 0
+                for k, l_filter in enumerate(l_filters):
+                    tmp = sum(2 * l + 1 for l in set_of_l_filters if l < l_filter)
+                    sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
 
-            if not isinstance(K, int):
-                kernel[:, s_out, s_in] = K.reshape_as(kernel[:, s_out, s_in])
+                    C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=kernel)  # [m_out, m_in, m]
+
+                    # note: The multiplication with `sub_R` could also be done outside of the for loop
+                    K += norm_coef[i, j] * torch.einsum("ijk,zk,zuv->zuivj", (C, sub_Y, sub_R[..., k]))  # [batch, mul_out, m_out, mul_in, m_in]
+
+                if not isinstance(K, int):
+                    kernel[:, s_out, s_in] = K.reshape_as(kernel[:, s_out, s_in])
     return kernel
 
 
@@ -193,12 +205,13 @@ class KernelFn(torch.autograd.Function):
     https://slides.com/mariogeiger/backward/
     """
     @staticmethod
-    def forward(ctx, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
+    def forward(ctx, Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters, groups):
         f"""{kernel_fn_forward.__doc__}"""
         ctx.Rs_in = Rs_in
         ctx.Rs_out = Rs_out
         ctx.selection_rule = selection_rule
         ctx.set_of_l_filters = set_of_l_filters
+        ctx.groups = groups
 
         # save necessary tensors for backward
         saved_Y = saved_R = None
@@ -210,7 +223,7 @@ class KernelFn(torch.autograd.Function):
             saved_Y = Y
         ctx.save_for_backward(saved_Y, saved_R, norm_coef)
 
-        return kernel_fn_forward(Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.selection_rule, ctx.set_of_l_filters)
+        return kernel_fn_forward(Y, R, norm_coef, ctx.Rs_in, ctx.Rs_out, ctx.selection_rule, ctx.set_of_l_filters, ctx.groups)
 
     @staticmethod
     def backward(ctx, grad_kernel):  # pragma: no cover
@@ -227,40 +240,45 @@ class KernelFn(torch.autograd.Function):
 
         begin_out = 0
         for i, (mul_out, l_out, p_out) in enumerate(ctx.Rs_out):
-            s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
-            begin_out += mul_out * (2 * l_out + 1)
+            mul_out = mul_out // ctx.groups
 
-            begin_in = 0
-            for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
-                s_in = slice(begin_in, begin_in + mul_in * (2 * l_in + 1))
-                begin_in += mul_in * (2 * l_in + 1)
+            for g in range(ctx.groups):
+                s_out = slice(begin_out, begin_out + mul_out * (2 * l_out + 1))
+                begin_out += mul_out * (2 * l_out + 1)
 
-                l_filters = ctx.selection_rule(l_in, p_in, l_out, p_out)
-                if not l_filters:
-                    continue
+                begin_in = 0
+                for j, (mul_in, l_in, p_in) in enumerate(ctx.Rs_in):
+                    mul_in = mul_in // ctx.groups
 
-                n = mul_out * mul_in * len(l_filters)
-                if grad_Y is not None:
-                    sub_R = R[:, begin_R: begin_R + n].reshape(
-                        -1, mul_out, mul_in, len(l_filters)
-                    )  # [batch, mul_out, mul_in, l_filter]
-                if grad_R is not None:
-                    sub_grad_R = grad_R[:, begin_R: begin_R + n].reshape(
-                        -1, mul_out, mul_in, len(l_filters)
-                    )  # [batch, mul_out, mul_in, l_filter]
-                begin_R += n
+                    s_in = slice(begin_in + g * mul_in * (2 * l_in + 1), begin_in + (g + 1) * mul_in * (2 * l_in + 1))
+                    begin_in += ctx.groups * mul_in * (2 * l_in + 1)
 
-                grad_K = grad_kernel[:, s_out, s_in].reshape(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
+                    l_filters = ctx.selection_rule(l_in, p_in, l_out, p_out)
+                    if not l_filters:
+                        continue
 
-                for k, l_filter in enumerate(l_filters):
-                    tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
-                    C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
-
+                    n = mul_out * mul_in * len(l_filters)
                     if grad_Y is not None:
-                        grad_Y[:, tmp: tmp + 2 * l_filter + 1] += norm_coef[i, j] * torch.einsum("zuivj,ijk,zuv->zk", grad_K, C, sub_R[..., k])
+                        sub_R = R[:, begin_R: begin_R + n].reshape(
+                            -1, mul_out, mul_in, len(l_filters)
+                        )  # [batch, mul_out, mul_in, l_filter]
                     if grad_R is not None:
-                        sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
-                        sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum("zuivj,ijk,zk->zuv", grad_K, C, sub_Y)
+                        sub_grad_R = grad_R[:, begin_R: begin_R + n].reshape(
+                            -1, mul_out, mul_in, len(l_filters)
+                        )  # [batch, mul_out, mul_in, l_filter]
+                    begin_R += n
+
+                    grad_K = grad_kernel[:, s_out, s_in].reshape(-1, mul_out, 2 * l_out + 1, mul_in, 2 * l_in + 1)
+
+                    for k, l_filter in enumerate(l_filters):
+                        tmp = sum(2 * l + 1 for l in ctx.set_of_l_filters if l < l_filter)
+                        C = o3.wigner_3j(l_out, l_in, l_filter, cached=True, like=grad_kernel)  # [m_out, m_in, m]
+
+                        if grad_Y is not None:
+                            grad_Y[:, tmp: tmp + 2 * l_filter + 1] += norm_coef[i, j] * torch.einsum("zuivj,ijk,zuv->zk", grad_K, C, sub_R[..., k])
+                        if grad_R is not None:
+                            sub_Y = Y[:, tmp: tmp + 2 * l_filter + 1]  # [batch, m]
+                            sub_grad_R[..., k] = norm_coef[i, j] * torch.einsum("zuivj,ijk,zk->zuv", grad_K, C, sub_Y)
 
         del ctx
         return grad_Y, grad_R, None, None, None, None, None
