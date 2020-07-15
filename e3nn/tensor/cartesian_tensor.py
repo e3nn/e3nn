@@ -13,7 +13,6 @@ class CartesianTensor():
         self.tensor = tensor
 
     def to_irrep_transformation(self):
-        basis_change = o3.xyz_vector_basis_to_spherical_basis()
         dim = self.tensor.dim()
         change = o3.kron(*[o3.xyz_vector_basis_to_spherical_basis()] * dim)
         Rs = [(1, 1)]  # vectors
