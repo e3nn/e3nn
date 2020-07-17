@@ -1,8 +1,6 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
-import itertools
 from functools import partial
 
-import pytest
 import torch
 
 from e3nn import o3, rs
@@ -10,6 +8,7 @@ from e3nn.kernel import Kernel
 from e3nn.point.message_passing import Convolution
 from e3nn.radial import ConstantRadialModel
 from e3nn.point.depthwise import DepthwiseConvolution
+
 
 def test_equivariance():
     torch.set_default_dtype(torch.float64)
