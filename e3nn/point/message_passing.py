@@ -4,9 +4,10 @@ import torch_geometric as tg
 
 
 class Convolution(tg.nn.MessagePassing):
-    def __init__(self, kernel):
+    def __init__(self, kernel, groups=1):
         super(Convolution, self).__init__(aggr='add', flow='target_to_source')
         self.kernel = kernel
+        self.groups = groups
 
     def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
         """
@@ -26,6 +27,9 @@ class Convolution(tg.nn.MessagePassing):
         return self.propagate(edge_index, size=size, x=features, k=k)
 
     def message(self, x_j, k):
+        N = x_j.shape[0]
+        cout, cin = k.shape[-2:]
+        x_j = x_j.view(N, self.groups, cin)  # Rs_tp1
         if k.shape[0] == 0:  # https://github.com/pytorch/pytorch/issues/37628
-            return torch.zeros(0, k.shape[1])
-        return torch.einsum('eij,ej->ei', k, x_j)
+            return torch.zeros(0, self.groups * cout)
+        return torch.einsum('eij,egj->egi', k, x_j).reshape(N, self.groups * cout)
