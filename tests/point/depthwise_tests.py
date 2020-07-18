@@ -1,6 +1,4 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
-from functools import partial
-
 import torch
 
 from e3nn import o3, rs
@@ -21,12 +19,6 @@ def test_equivariance():
     Rs_mid1 = [(5, 0), (1, 1)]
     Rs_mid2 = [(5, 0), (1, 1), (1, 2)]
     Rs_out = [(5, 1), (3, 2)]
-
-    Rs_in = rs.convention(Rs_in)
-    Rs_out = rs.convention(Rs_out)
-    Rs_mid1 = rs.convention(Rs_mid1)
-    Rs_mid2 = rs.convention(Rs_mid2)
-    print(Rs_in, Rs_out)
 
     convolution = lambda Rs_in, Rs_out: Convolution(Kernel(Rs_in, Rs_out, ConstantRadialModel))
     groups = 4
