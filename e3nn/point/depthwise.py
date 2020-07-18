@@ -16,7 +16,7 @@ class DepthwiseConvolution(torch.nn.Module):
         self.act_in = act_in
 
         act_mid = GatedBlock(Rs_mid2, scalar_activation, gate_activation)
-        self.conv = convolution(Rs_mid1, act_mid.Rs_in)
+        self.conv = convolution(Rs_mid1, groups * act_mid.Rs_in)
         self.act_mid = act_mid
 
         act_out = GatedBlock(Rs_out, scalar_activation, gate_activation)

@@ -4,6 +4,7 @@ import torch
 from e3nn import o3, rs
 from e3nn.kernel import Kernel
 from e3nn.point.message_passing import Convolution
+from e3nn.point.operations import Convolution as Convolution2
 from e3nn.radial import ConstantRadialModel
 from e3nn.point.depthwise import DepthwiseConvolution
 
@@ -51,5 +52,32 @@ def test_equivariance():
     R = o3.rot(*angles)
 
     out2 = mp(features @ D_in.T, edge_index, edge_r @ R.T, size=size) @ D_out
+
+    assert (out1 - out2).abs().max() < 1e-10
+
+
+def test_equivariance2():
+    torch.set_default_dtype(torch.float64)
+
+    Rs_in = [(3, 0), (0, 1)]
+    Rs_mid1 = [(5, 0), (1, 1)]
+    Rs_mid2 = [(5, 0), (1, 1), (1, 2)]
+    Rs_out = [(5, 1), (3, 2)]
+
+    convolution = lambda Rs_in, Rs_out: Convolution2(Kernel(Rs_in, Rs_out, ConstantRadialModel))
+    groups = 4
+    mp = DepthwiseConvolution(Rs_in, Rs_out, Rs_mid1, Rs_mid2, groups, convolution)
+
+    features = rs.randn(1, 4, Rs_in)
+    geometry = torch.randn(1, 4, 3)
+
+    out1 = mp(features, geometry)
+
+    angles = o3.rand_angles()
+    D_in = rs.rep(Rs_in, *angles)
+    D_out = rs.rep(Rs_out, *angles)
+    R = o3.rot(*angles)
+
+    out2 = mp(features @ D_in.T, geometry @ R.T) @ D_out
 
     assert (out1 - out2).abs().max() < 1e-10

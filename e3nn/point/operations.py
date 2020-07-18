@@ -26,12 +26,13 @@ class Convolution(torch.nn.Module):
         k = self.kernel(rb - ra, custom_backward=custom_backward_kernel, r_eps=r_eps)  # [batch, a, b, i, j]
         k.div_(n_norm ** 0.5)
 
+        k = k.reshape(*k.shape[:3], groups, k.shape[3] // groups, k.shape[4])  # [batch, a, b, group, i, j]
         features = features.reshape(*features.shape[:2], groups, features.shape[2] // groups)  # [batch, b, goup, j]
 
         if custom_backward_conv:
             features = ConvolutionEinsumFn.apply(k, features)  # [batch, point, groups, channel]
         else:
-            features = torch.einsum("zabij,zbgj->zagi", k, features)  # [batch, point, groups, channel]
+            features = torch.einsum("zabgij,zbgj->zagi", k, features)  # [batch, point, groups, channel]
 
         return features.reshape(*features.shape[:2], groups * features.shape[3])  # [batch, point, groups * channel]
 
@@ -45,14 +46,14 @@ class ConvolutionEinsumFn(torch.autograd.Function):
         :param features: tensor [batch, in_point, group, l_in * mul_in * m_in]
         """
         ctx.save_for_backward(k, features)
-        return torch.einsum("zabij,zbgj->zagi", k, features)  # [batch, point, channel]
+        return torch.einsum("zabgij,zbgj->zagi", k, features)  # [batch, point, channel]
 
     @staticmethod
     def backward(ctx, grad_output):  # pragma: no cover
         k, features = ctx.saved_tensors
         del ctx
-        grad_k = torch.einsum("zagi,zbgj->zabij", grad_output, features)
-        grad_features = torch.einsum("zabij,zai->zbj", k, grad_output)
+        grad_k = torch.einsum("zagi,zbgj->zabgij", grad_output, features)
+        grad_features = torch.einsum("zabgij,zagi->zbgj", k, grad_output)
         return grad_k, grad_features
 
 
