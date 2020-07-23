@@ -136,6 +136,15 @@ class Kernel(torch.nn.Module):
         return kernel.reshape(*size, *kernel2.shape)
 
 
+class GroupKernel(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, kernel, groups):
+        super().__init__()
+        self.kernels = [kernel(Rs_in, Rs_out) for i in range(groups)]
+
+    def forward(self, *args, **kwargs):
+        return torch.stack([ker(*args, **kwargs) for ker in self.kernels], dim=-3)  # [..., group, cout, cin]
+
+
 def kernel_fn_forward(Y, R, norm_coef, Rs_in, Rs_out, selection_rule, set_of_l_filters):
     """
     :param Y: tensor [batch, l_filter * m_filter]

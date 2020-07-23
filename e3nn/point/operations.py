@@ -30,6 +30,8 @@ class Convolution(torch.nn.Module):
 
         if custom_backward_conv:
             features = ConvolutionEinsumFn.apply(k, features)  # [batch, point, groups, channel]
+        elif k.dim() == 6 and k.shape[-3] == groups:
+            features = torch.einsum("zabgij,zbgj->zagi", k, features)
         else:
             features = torch.einsum("zabij,zbgj->zagi", k, features)  # [batch, point, groups, channel]
 
