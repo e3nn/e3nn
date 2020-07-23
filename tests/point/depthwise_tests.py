@@ -1,8 +1,9 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
 import torch
+from functools import partial
 
 from e3nn import o3, rs
-from e3nn.kernel import Kernel
+from e3nn.kernel import Kernel, GroupKernel
 from e3nn.point.message_passing import Convolution
 from e3nn.radial import ConstantRadialModel
 from e3nn.point.depthwise import DepthwiseConvolution
@@ -21,8 +22,11 @@ def test_equivariance():
     Rs_out = [(5, 1), (3, 2)]
 
     convolution = lambda Rs_in, Rs_out: Convolution(Kernel(Rs_in, Rs_out, ConstantRadialModel))
+    convolution_groups = lambda Rs_in, Rs_out: Convolution(
+        GroupKernel(Rs_in, Rs_out, partial(Kernel, RadialModel=ConstantRadialModel), groups))
     groups = 4
     mp = DepthwiseConvolution(Rs_in, Rs_out, Rs_mid1, Rs_mid2, groups, convolution)
+    mp_groups = DepthwiseConvolution(Rs_in, Rs_out, Rs_mid1, Rs_mid2, groups, convolution_groups)
 
     features = rs.randn(n_target, Rs_in)
 
@@ -44,6 +48,7 @@ def test_equivariance():
         ])
     print(features.shape, edge_index.shape, edge_r.shape, size)
     out1 = mp(features, edge_index, edge_r, size=size)
+    out1_groups = mp_groups(features, edge_index, edge_r, size=size) 
 
     angles = o3.rand_angles()
     D_in = rs.rep(Rs_in, *angles)
@@ -51,5 +56,7 @@ def test_equivariance():
     R = o3.rot(*angles)
 
     out2 = mp(features @ D_in.T, edge_index, edge_r @ R.T, size=size) @ D_out
+    out2_groups = mp_groups(features @ D_in.T, edge_index, edge_r @ R.T, size=size) @ D_out
 
     assert (out1 - out2).abs().max() < 1e-10
+    assert (out1_groups - out2_groups).abs().max() < 1e-10

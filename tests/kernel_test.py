@@ -4,8 +4,8 @@ from functools import partial
 
 import torch
 
-from e3nn import o3, rsh
-from e3nn.kernel import Kernel, KernelFn
+from e3nn import o3, rsh, rs
+from e3nn.kernel import Kernel, KernelFn, GroupKernel
 from e3nn.radial import ConstantRadialModel
 
 
@@ -60,6 +60,20 @@ class TestCompare(unittest.TestCase):
 
             assert all(torch.all(a == b) for a, b in zip(K.parameters(), K.parameters())), self.msg
             self.assertTrue(torch.allclose(new_features, check_new_features))
+
+
+def test_group_kernel():
+    kernel = partial(Kernel, RadialModel=ConstantRadialModel)
+    Rs_in = [(5, 0, 1), (4, 1, -1)]
+    Rs_out = [(3, 0, 1), (5, 1, -1)]
+    groups = 4
+    gkernel = GroupKernel(Rs_in, Rs_out, kernel, groups)
+
+    N = 7
+    input = torch.randn(N, 3)
+    output = gkernel(input)
+    assert output.dim() == 4  # [N, g, cout, cin]
+    assert tuple(output.shape) == (N, groups, rs.dim(Rs_out), rs.dim(Rs_in))
 
 
 if __name__ == '__main__':
