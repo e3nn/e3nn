@@ -48,7 +48,7 @@ def test_equivariance():
         ])
     print(features.shape, edge_index.shape, edge_r.shape, size)
     out1 = mp(features, edge_index, edge_r, size=size)
-    out1_groups = mp_groups(features, edge_index, edge_r, size=size) 
+    out1_groups = mp_groups(features, edge_index, edge_r, size=size)
 
     angles = o3.rand_angles()
     D_in = rs.rep(Rs_in, *angles)
