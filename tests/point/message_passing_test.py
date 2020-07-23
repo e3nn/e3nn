@@ -52,11 +52,12 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
 
     out2 = mp(features @ D_in.T, edge_index, edge_r @ R.T, size=size) @ D_out
     out2_groups = mp(features2 @ D_in_groups.T, edge_index, edge_r @ R.T, size=size, groups=groups) @ D_out_groups
-    out2_kernel_groups = mp_group(features2 @ D_in_groups.T, edge_index, edge_r @ R.T, size=size, groups=groups) @ D_out_groups 
+    out2_kernel_groups = mp_group(features2 @ D_in_groups.T, edge_index, edge_r @ R.T, size=size, groups=groups) @ D_out_groups
 
     assert (out1 - out2).abs().max() < 1e-10
     assert (out1_groups - out2_groups).abs().max() < 1e-10
     assert (out1_kernel_groups - out2_kernel_groups).abs().max() < 1e-10
+
 
 def test_flow():
     """
