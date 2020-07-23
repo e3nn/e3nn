@@ -31,4 +31,6 @@ class Convolution(tg.nn.MessagePassing):
         x_j = x_j.view(N, groups, cin)  # Rs_tp1
         if k.shape[0] == 0:  # https://github.com/pytorch/pytorch/issues/37628
             return torch.zeros(0, groups * cout)
+        if k.dim() == 4 and k.shape[1] == groups:  # kernel has group dimension
+           return torch.einsum('egij,egj->egi', k, x_j).reshape(N, groups * cout)
         return torch.einsum('eij,egj->egi', k, x_j).reshape(N, groups * cout)
