@@ -77,8 +77,6 @@ class DepthwiseConvolutionParity(torch.nn.Module):
         self.lin_in = linear(Rs_in, act_in.Rs_in)
         self.act_in = act_in
 
-        print(act_in.Rs_in, groups * Rs_mid1)
-
         # Kernel with GatedBlock
         scalars = [(mul, l, p) for (mul, l, p) in Rs_mid2 if l == 0]
         act_scalars = [(mul, scalar_activation if p == 1 else tanh) for mul, l, p in scalars]
