@@ -9,6 +9,7 @@ from e3nn.networks import (
     ImageS2Network,
     S2ConvNetwork,
     S2ParityNetwork,
+    DepthwiseNetwork,
 )
 
 
@@ -110,3 +111,44 @@ def test_equivariance_s2parity_network():
     x1 = torch.einsum("ij,zj->zi", D_out, net(fea))
     x2 = net(torch.einsum("ij,zj->zi", D_in, fea))
     assert (x1 - x2).norm() < 1e-3 * x1.norm()
+
+
+def test_equivariance_depthwise_network():
+    from functools import partial
+    from e3nn.radial import ConstantRadialModel
+    from e3nn.kernel import Kernel, GroupKernel
+    from e3nn.point.message_passing import Convolution
+    torch.set_default_dtype(torch.float64)
+
+    Rs_in = [(3, 0, 1), (2, 1, -1)]
+    Rs_out = [(2, 2, 1)]
+    Rs_hidden = [(5, 0, 1), (5, 0, -1), (3, 1, 1), (3, 1, -1), (3, 2, 1), (3, 2, -1)]
+    groups = 4
+    lmax = max([l for m, l, p in Rs_hidden])
+
+    kernel = partial(Kernel, RadialModel=ConstantRadialModel,
+                     selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax),
+                     allow_unused_inputs=True)
+    K = lambda Rs_in, Rs_out: GroupKernel(Rs_in, Rs_out, kernel, groups)
+    convolution = lambda Rs_in, Rs_out: Convolution(K(Rs_in, Rs_out))
+
+    model = DepthwiseNetwork(Rs_in, Rs_out, Rs_hidden, convolution, groups)
+
+    N = 7
+    n_norm = 1
+    features = torch.randn(N, rs.dim(Rs_in))
+    edge_index = torch.randint(low=0, high=N, size=(2, 4))
+    edge_attr = torch.rand(edge_index.shape[-1], 3)
+
+    output = model(features, edge_index, edge_attr, n_norm=n_norm)
+
+    angles = o3.rand_angles()
+    D_in = rs.rep(Rs_in, *angles, 1)
+    D_out = rs.rep(Rs_out, *angles, 1)
+    R = -o3.rot(*angles)
+    ein = torch.einsum
+    output2 = ein('ij,aj->ai', D_out.T, model(ein('ij,aj->ai', D_in, features), edge_index, ein('ij,aj->ai', R, edge_attr), n_norm=n_norm))
+    # Something is wrong with the network because it often will output all zeros for random input data.
+    print(output.max(), output2.max())
+    print((output - output2).abs().max())
+    assert (output - output2).abs().max() < 1e-10 * output.abs().max()

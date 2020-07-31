@@ -380,5 +380,4 @@ class DepthwiseNetwork(torch.nn.Module):
         output = input
         for layer in self.layers:
             output = layer(output, *args, **kwargs)
-            print(output.max())
         return output
