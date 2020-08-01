@@ -270,16 +270,9 @@ def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
     xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
 
     lmax = rs.lmax(Rs)
-    out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
-    real_spherical_harmonics.real_spherical_harmonics(out, xyz)
-
-    # (-1)^L same as (pi-theta) -> (-1)^(L+m) and 'quantum' norm (-1)^m combined  # h - halved
-    norm_coef = [elem for lh in range((lmax + 1) // 2) for elem in [1.] * (4 * lh + 1) + [-1.] * (4 * lh + 3)]
-    if lmax % 2 == 0:
-        norm_coef.extend([1.] * (2 * lmax + 1))
-    norm_coef = out.new_tensor(norm_coef).unsqueeze(1)
-    out.mul_(norm_coef)
+    out = real_spherical_harmonics.real_spherical_harmonics(xyz, lmax)
+    real_spherical_harmonics.e3nn_normalization(out)  # (-1)^L, which is the same as (pi-theta) -> (-1)^(L+m) combined with 'quantum' norm (-1)^m
 
     if not rs.are_equal(Rs, list(range(lmax + 1))):
-        out = torch.cat([out[l**2: (l + 1)**2] for mul, l, _ in Rs for _ in range(mul)])
+        out = torch.cat([out[l**2: (l + 1)**2] for (mul, l, _) in Rs])
     return out.T.reshape(*size, -1)

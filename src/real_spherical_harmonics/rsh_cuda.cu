@@ -429,35 +429,35 @@ shAnA<T>, shAn9<T>, shAn8<T>, shAn7<T>, shAn6<T>, shAn5<T>, shAn4<T>, shAn3<T>, 
     __restrict__ makes a promise that underlying data can be accessed only with this pointer.
 */
 template<typename T>
-__global__ void rsh_cuda_kernel(const T* const __restrict__ radii, T* const __restrict__ Ys, const size_t batch_size) {
-	const size_t entry_pos = blockDim.x*blockIdx.x + threadIdx.x;                           // position of entry in batch
-	if (entry_pos >= batch_size) return;                                                    // early terminate if outside the batch - last warp (of threads) can be only partially filled
+__global__ void rsh_cuda_kernel(const T* const __restrict__ xyz, T* const __restrict__ output, const size_t n_entries) {
+	const size_t entry_pos = blockDim.x*blockIdx.x + threadIdx.x;                   // position of entry
+	if (entry_pos >= n_entries) return;                                             // terminate early if out-of-bound - last warp (of threads) can be partially filled
 
-	const T x = radii[3*entry_pos];                                                         // "strided memory access" is generally not nice and severely drops throughput
-	const T y = radii[3*entry_pos+1];                                                       // padding to 4 and packing in double4 (single read transaction) showed no noticeable improvement (is scale to0 small measure?)
-	const T z = radii[3*entry_pos+2];                                                       // 100+ GB/s of throughput would be great, but even 3 GB/s does not make a bottleneck
+	const T x = xyz[3*entry_pos];                                                   // "strided memory access" is generally not nice and severely drops throughput
+	const T y = xyz[3*entry_pos+1];                                                 // padding to 4 and packing in double4 (single read transaction) showed no noticeable improvement (is scale to0 small measure?)
+	const T z = xyz[3*entry_pos+2];                                                 // 100+ GB/s of throughput would be great, but even 3 GB/s does not make a bottleneck
 
-    Ys[blockIdx.y*batch_size + entry_pos] = fptr<T>[blockIdx.y](x, y, z);                   // select and apply function, store result to the "global memory"
+    output[blockIdx.y*n_entries + entry_pos] = fptr<T>[blockIdx.y](x, y, z);        // select and apply function, store result to the "global memory"
 }
 
 
 void real_spherical_harmonics_cuda(
-        torch::Tensor Ys,
-        torch::Tensor radii) {
-    const size_t filters    = Ys.size(0);
-    const size_t batch_size = radii.size(0);
+        torch::Tensor output,
+        torch::Tensor xyz) {
+    const size_t lm_size    = output.size(0);
+    const size_t n_entries  = xyz.size(0);
 
     const size_t threads_per_block = 32;                                                    // warp size in contemporary GPUs is 32 threads, this variable should be a multiple of warp size
-    dim3 numBlocks((batch_size + threads_per_block - 1)/threads_per_block, filters, 1);     // batch_size/threads_per_block is fractional in general case - round it up
+    dim3 numBlocks((n_entries + threads_per_block - 1)/threads_per_block, lm_size, 1);      // n_entries/threads_per_block is fractional in general case - round it up
 
-    if (radii.dtype() == torch::kFloat64) {
+    if (xyz.dtype() == torch::kFloat64) {
         rsh_cuda_kernel<double><<<numBlocks, threads_per_block>>>(
-            (const double*) radii.data_ptr(), (double*) Ys.data_ptr(), batch_size
+            (const double*) xyz.data_ptr(), (double*) output.data_ptr(), n_entries
         );
     }
-    else {                                                                                  // check in C++ binding guarantee that data type is either double (float64) or float (float32)
+    else {                                                                                  // check in C++ binding guarantees that data type is either double (float64) or float (float32)
         rsh_cuda_kernel<float><<<numBlocks, threads_per_block>>>(
-            (const float*) radii.data_ptr(), (float*) Ys.data_ptr(), batch_size
+            (const float*) xyz.data_ptr(), (float*) output.data_ptr(), n_entries
         );
     }
 }
