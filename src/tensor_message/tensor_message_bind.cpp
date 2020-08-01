@@ -91,7 +91,8 @@ torch::Tensor forward(
     const uint32_t l_out_ui_size = (uint32_t) output_base_offsets[output_base_offsets.size(0)-1].item<int32_t>();
     const uint32_t ab_size = (uint32_t) F.size(1);
 
-    torch::Tensor output = torch::empty({l_out_ui_size, ab_size}, W.options()); // |(l_out, u, i), (a, b)|
+    // setting initial state to zeros is actually important - value is accumulated via atomicAdd
+    torch::Tensor output = torch::zeros({l_out_ui_size, ab_size}, W.options()); // |(l_out, u, i), (a, b)|
 
     forward_cuda(output, W, C, F, Y, R,
                 L_out_list, L_in_list, u_sizes, v_sizes,
@@ -132,7 +133,7 @@ torch::Tensor backward_F(
     const uint32_t lin_vj_size = (uint32_t) output_base_offsets[output_base_offsets.size(0)-1].item<int32_t>();
     const uint32_t ab_size = (uint32_t) G.size(1);
 
-    torch::Tensor output = torch::empty({lin_vj_size, ab_size}, W.options());   // |(l_in, v, j), (a, b)|
+    torch::Tensor output = torch::zeros({lin_vj_size, ab_size}, W.options());   // |(l_in, v, j), (a, b)|
 
     backward_F_cuda(output, W, C, G, Y, R,
                     L_out_list, L_in_list, u_sizes, v_sizes,
@@ -173,7 +174,7 @@ torch::Tensor backward_R(
     const uint32_t lout_lin_luv = (uint32_t) output_base_offsets[output_base_offsets.size(0)-1].item<int32_t>();
     const uint32_t ab_size      = (uint32_t) F.size(1);
 
-    torch::Tensor output = torch::empty({lout_lin_luv, ab_size}, W.options());   // |(l_out, l_in, l, u, v), (a, b)|
+    torch::Tensor output = torch::zeros({lout_lin_luv, ab_size}, W.options());   // |(l_out, l_in, l, u, v), (a, b)|
 
     backward_R_cuda(output, W, C, G, F, Y,
                     L_out_list, L_in_list, u_sizes, v_sizes,
