@@ -264,7 +264,7 @@ def get_flat_coupling_coefficients(max_l_out, max_l_in, dtype=None, device=None)
 
     # allocate memory
     coupling_coefficients = torch.empty(total_size, dtype=dtype, device=device)
-    offsets = torch.empty((max_l_out, max_l_in), dtype=torch.int32, device=device)     # int32 forced for compatibility with CUDA code
+    offsets = torch.empty((max_l_out+1, max_l_in+1), dtype=torch.int32, device=device)     # int32 forced for compatibility with CUDA code
 
     # fill in values
     running_offset = 0
