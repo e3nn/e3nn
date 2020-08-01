@@ -242,6 +242,43 @@ def direct_sum(*matrices):
 # 3j symbol
 ################################################################################
 
+def get_flat_coupling_coefficients(max_l_out, max_l_in, dtype=None, device=None):
+    """
+    Construct 1D tensor of coupling coefficients via stacking flattened wigner_3j symbols:
+        0 <= l1 <= max_l_out
+        0 <= l2 <= max_l_in
+    and 2D tensor of offsets [max_l_out, max_l_in].
+    Offset indicates start of the segment in 1D corresponding to the block of wigner 3j symbols for the same l_out, l_in.
+    """
+    assert isinstance(max_l_out, int)
+    assert isinstance(max_l_in, int)
+
+    # set defaults if necessary
+    dtype = dtype or torch.get_default_dtype()
+    device = device or torch.device('cpu')
+
+    # total_size = sum^{max_l_out}_{x=0} sum^{max_l_in}_{y=0} sum^{x+y}_{z=|x-y|} (2*x+1)*(2*y+1)*(2*z+1)  ->  summed analytically
+    x_tmp = 2*max_l_out + 2
+    y_tmp = 2*max_l_in + 2
+    total_size = (x_tmp*(x_tmp*x_tmp-1) * y_tmp*(y_tmp*y_tmp-1)) // 36
+
+    # allocate memory
+    coupling_coefficients = torch.empty(total_size, dtype=dtype, device=device)
+    offsets = torch.empty((max_l_out, max_l_in), dtype=torch.int32, device=device)     # int32 forced for compatibility with CUDA code
+
+    # fill in values
+    running_offset = 0
+    for l_out in range(max_l_out + 1):
+        for l_in in range(max_l_in + 1):
+            offsets[l_out, l_in] = running_offset
+            for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
+                wigner_3j_size = (2 * l_out + 1) * (2 * l_in + 1) * (2 * l_f + 1)
+                coupling_coefficients[running_offset:running_offset + wigner_3j_size] = wigner_3j(l_out, l_in, l_f, dtype=dtype, device=device).reshape(-1)
+                running_offset += wigner_3j_size
+
+    return coupling_coefficients, offsets
+
+
 def wigner_3j(l1, l2, l3, cached=False, dtype=None, device=None, like=None):
     """
     Computes the 3-j symbol

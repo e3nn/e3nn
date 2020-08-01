@@ -14,8 +14,7 @@ void forward_cuda(
         torch::Tensor output_base_offsets,
         torch::Tensor C_offsets,
         torch::Tensor F_base_offsets,
-        torch::Tensor R_base_offsets,
-        const uint32_t l_in_max_net_bound);
+        torch::Tensor R_base_offsets);
 
 void backward_F_cuda(
         torch::Tensor output,
@@ -31,8 +30,7 @@ void backward_F_cuda(
         torch::Tensor output_base_offsets,
         torch::Tensor C_offsets,
         torch::Tensor G_base_offsets,
-        torch::Tensor R_base_offsets,
-        const uint32_t l_in_max_net_bound);
+        torch::Tensor R_base_offsets);
 
 void backward_R_cuda(
         torch::Tensor output,
@@ -48,8 +46,7 @@ void backward_R_cuda(
         torch::Tensor output_base_offsets,
         torch::Tensor C_offsets,
         torch::Tensor G_base_offsets,
-        torch::Tensor F_base_offsets,
-        const uint32_t l_in_max_net_bound);
+        torch::Tensor F_base_offsets);
 
 // C++ interface
 
@@ -75,8 +72,7 @@ torch::Tensor forward(
         torch::Tensor output_base_offsets,
         torch::Tensor C_offsets,
         torch::Tensor F_base_offsets,
-        torch::Tensor R_base_offsets,
-        const uint32_t l_in_max_net_bound
+        torch::Tensor R_base_offsets
 ){
     CHECK_FLOAT_INPUT(W);
     CHECK_FLOAT_INPUT(C);
@@ -92,15 +88,14 @@ torch::Tensor forward(
     CHECK_INT_INPUT(F_base_offsets);
     CHECK_INT_INPUT(R_base_offsets);
 
-    const uint32_t lout_ui_size = (uint32_t) output_base_offsets[output_base_offsets.size(0)-1].item<int32_t>();
+    const uint32_t l_out_ui_size = (uint32_t) output_base_offsets[output_base_offsets.size(0)-1].item<int32_t>();
     const uint32_t ab_size = (uint32_t) F.size(1);
 
-    torch::Tensor output = torch::zeros({lout_ui_size, ab_size}, W.options()); // |(l_out, u, i), (a, b)|
+    torch::Tensor output = torch::zeros({l_out_ui_size, ab_size}, W.options()); // |(l_out, u, i), (a, b)|
 
     forward_cuda(output, W, C, F, Y, R,
-                           L_out_list, L_in_list, u_sizes, v_sizes,
-                           output_base_offsets, C_offsets, F_base_offsets, R_base_offsets,
-                           (uint32_t) l_in_max_net_bound);
+                L_out_list, L_in_list, u_sizes, v_sizes,
+                output_base_offsets, C_offsets, F_base_offsets, R_base_offsets);
     return output;
 }
 
@@ -118,8 +113,7 @@ torch::Tensor backward_F(
         torch::Tensor output_base_offsets,
         torch::Tensor C_offsets,
         torch::Tensor G_base_offsets,
-        torch::Tensor R_base_offsets,
-        const int32_t l_in_max_net_bound
+        torch::Tensor R_base_offsets
 ){
     CHECK_FLOAT_INPUT(W);
     CHECK_FLOAT_INPUT(C);
@@ -141,9 +135,8 @@ torch::Tensor backward_F(
     torch::Tensor output = torch::zeros({lin_vj_size, ab_size}, W.options());   // |(l_in, v, j), (a, b)|
 
     backward_F_cuda(output, W, C, G, Y, R,
-                              L_out_list, L_in_list, u_sizes, v_sizes,
-                              output_base_offsets, C_offsets, G_base_offsets, R_base_offsets,
-                              (uint32_t) l_in_max_net_bound);
+                    L_out_list, L_in_list, u_sizes, v_sizes,
+                    output_base_offsets, C_offsets, G_base_offsets, R_base_offsets);
     return output;
 }
 
@@ -161,8 +154,7 @@ torch::Tensor backward_R(
         torch::Tensor output_base_offsets,
         torch::Tensor C_offsets,
         torch::Tensor G_base_offsets,
-        torch::Tensor F_base_offsets,
-        const int32_t l_in_max_net_bound
+        torch::Tensor F_base_offsets
 ){
     CHECK_FLOAT_INPUT(W);
     CHECK_FLOAT_INPUT(C);
@@ -179,14 +171,13 @@ torch::Tensor backward_R(
     CHECK_INT_INPUT(F_base_offsets);
 
     const uint32_t lout_lin_luv = (uint32_t) output_base_offsets[output_base_offsets.size(0)-1].item<int32_t>();
-    const uint32_t ab_size    = (uint32_t) F.size(1);
+    const uint32_t ab_size      = (uint32_t) F.size(1);
 
     torch::Tensor output = torch::zeros({lout_lin_luv, ab_size}, W.options());   // |(l_out, l_in, l, u, v), (a, b)|
 
     backward_R_cuda(output, W, C, G, F, Y,
                     L_out_list, L_in_list, u_sizes, v_sizes,
-                    output_base_offsets, C_offsets, G_base_offsets, F_base_offsets,
-                    (uint32_t) l_in_max_net_bound);
+                    output_base_offsets, C_offsets, G_base_offsets, F_base_offsets);
     return output;
 }
 

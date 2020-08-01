@@ -411,10 +411,10 @@ void forward_cuda(
 		torch::Tensor output_base_offsets,
 		torch::Tensor C_offsets,
 		torch::Tensor F_base_offsets,
-		torch::Tensor R_base_offsets,
-		const uint32_t l_in_max_net_bound
+		torch::Tensor R_base_offsets
 ){
-    const uint32_t ab_size = F.size(1);
+    const uint32_t ab_size              = (uint32_t) F.size(1);
+    const uint32_t l_in_max_net_bound   = (uint32_t) C_offsets.size(1);
 
     const uint32_t* const __restrict__ L_out_list_ptr          = (uint32_t*) L_out_list.data_ptr();
     const uint32_t* const __restrict__ L_in_list_ptr           = (uint32_t*) L_in_list.data_ptr();
@@ -470,10 +470,10 @@ void backward_F_cuda(
 		torch::Tensor output_base_offsets,
 		torch::Tensor C_offsets,
 		torch::Tensor G_base_offsets,
-		torch::Tensor R_base_offsets,
-		const uint32_t l_in_max_net_bound
+		torch::Tensor R_base_offsets
 ){
-    const uint32_t ab_size = G.size(1);
+    const uint32_t ab_size              = (uint32_t) G.size(1);
+    const uint32_t l_in_max_net_bound   = (uint32_t) C_offsets.size(1);
 
     const uint32_t* const __restrict__ L_out_list_ptr          = (uint32_t*) L_out_list.data_ptr();
     const uint32_t* const __restrict__ L_in_list_ptr           = (uint32_t*) L_in_list.data_ptr();
@@ -517,22 +517,22 @@ void backward_F_cuda(
 
 void backward_R_cuda(
         torch::Tensor output,		        // allocated in higher level wrapper
-		torch::Tensor W,                    // layer specific, stored in Hub
-		torch::Tensor C,					// object is network wide (sampling is layer specific), stored in Hub
+		torch::Tensor W,                    // layer specific
+		torch::Tensor C,					// network wide (sampling is layer specific)
 		torch::Tensor G,					// passed by pipeline backward pipeline
 		torch::Tensor F,					// layer specific, stored in buffer for backward pass during forward pass
-		torch::Tensor Y,					// object is network wide (sampling is layer specific), stored in Hub
-		torch::Tensor L_out_list,			// layer specific, stored in Hub
-		torch::Tensor L_in_list,			// layer specific, stored in Hub
-		torch::Tensor u_sizes,				// layer specific, stored in Hub
-		torch::Tensor v_sizes,				// layer specific, stored in Hub
-		torch::Tensor output_base_offsets,	// network wide, stored in Hub
-		torch::Tensor C_offsets,			// network wide, stored in Hub
-		torch::Tensor G_base_offsets,		// layer specific, stored in Hub
-		torch::Tensor F_base_offsets, 		// layer specific, stored in Hub
-		const uint32_t l_in_max_net_bound	// network wide, stored in Hub
+		torch::Tensor Y,					// object is network wide (sampling is layer specific)
+		torch::Tensor L_out_list,			// layer specific
+		torch::Tensor L_in_list,			// layer specific
+		torch::Tensor u_sizes,				// layer specific
+		torch::Tensor v_sizes,				// layer specific
+		torch::Tensor output_base_offsets,	// network wide
+		torch::Tensor C_offsets,			// network wide
+		torch::Tensor G_base_offsets,		// layer specific
+		torch::Tensor F_base_offsets 		// layer specific
 ) {
-    const uint32_t ab_size = F.size(1);
+    const uint32_t ab_size            = (uint32_t) F.size(1);
+    const uint32_t l_in_max_net_bound = (uint32_t) C_offsets.size(1);
 
     const uint32_t* const __restrict__ L_out_list_ptr          = (uint32_t*) L_out_list.data_ptr();
     const uint32_t* const __restrict__ L_in_list_ptr           = (uint32_t*) L_in_list.data_ptr();

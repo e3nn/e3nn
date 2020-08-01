@@ -2,7 +2,9 @@
 import torch
 import torch_geometric
 
+# dev
 from e3nn import tensor_message
+from e3nn.o3 import get_flat_coupling_coefficients
 
 
 class Convolution(torch_geometric.nn.MessagePassing):
@@ -34,7 +36,7 @@ class Convolution(torch_geometric.nn.MessagePassing):
 
 
 class MinimalNetwork(torch.nn.Module):
-    def __init__(self, representations, device):
+    def __init__(self, representations):
         super().__init__()
 
         from functools import partial
@@ -45,11 +47,12 @@ class MinimalNetwork(torch.nn.Module):
 
         assert len(representations) == 2, "Only minimal networks here"
 
-        self.device = device
-
         self.representations = representations
         self._find_max_l_out_in()
-        self._calculate_coupling_coefficients_and_offsets()
+
+        coupling_coefficients, coupling_coefficients_offsets = get_flat_coupling_coefficients(self.max_l_out, self.max_l_in)
+        self.register_buffer('coupling_coefficients', coupling_coefficients)
+        self.register_buffer('coupling_coefficients_offsets', coupling_coefficients_offsets)
 
         Rs_in = representations[0]
         Rs_out = representations[-1]
@@ -57,7 +60,7 @@ class MinimalNetwork(torch.nn.Module):
         radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
 
         self.real_spherical_harmonics = rsh
-        self.layer = TensorPassingLayer(Rs_in, Rs_out, radial_model, self.coupling_coefficients, self.coupling_coefficients_base_offsets, self.max_l_in, self.device)
+        self.layer = TensorPassingLayer(Rs_in, Rs_out, radial_model, self.coupling_coefficients, self.coupling_coefficients_offsets, self.device)
 
     def _find_max_l_out_in(self):
         max_l_out = max_l_in = max_l = 0
@@ -77,36 +80,13 @@ class MinimalNetwork(torch.nn.Module):
         self.max_l_in = max_l_in
         self.max_l = max_l
 
-    def _calculate_coupling_coefficients_and_offsets(self):
-        from e3nn.o3 import wigner_3j
-
-        tmp_base_offsets_list = []
-        tmp_position = 0
-        for l_out in range(self.max_l_out + 1):
-            for l_in in range(self.max_l_in + 1):
-                tmp_base_offsets_list.append(tmp_position)
-                for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
-                    tmp_position += (2 * l_out + 1) * (2 * l_in + 1) * (2 * l_f + 1)
-
-        self.coupling_coefficients = torch.zeros(tmp_position, device=self.device)      # last tmp_cg_pos (not stored in offsets) = size
-
-        for l_out in range(self.max_l_out + 1):
-            for l_in in range(self.max_l_in + 1):
-                tmp_base_pos = tmp_base_offsets_list[l_out * (self.max_l_in + 1) + l_in]
-                for l_f in range(abs(l_out - l_in), l_out + l_in + 1):
-                    tmp_flat = wigner_3j(l_out, l_in, l_f).contiguous().view(-1).type(torch.get_default_dtype()).to(self.device)
-                    self.coupling_coefficients[tmp_base_pos:tmp_base_pos + tmp_flat.shape[0]] = tmp_flat
-                    tmp_base_pos += tmp_flat.shape[0]
-
-        self.coupling_coefficients_base_offsets = torch.tensor(tmp_base_offsets_list, dtype=torch.int32, device=self.device)
-
     def forward(self, graph):
         Y = self.real_spherical_harmonics(list(range(self.max_l + 1)), graph.rel_vec).contiguous()
         return self.layer(graph.edge_index, graph.x, graph.edge_attr, Y)
 
 
 class TensorPassingLayer(torch_geometric.nn.MessagePassing):
-    def __init__(self, Rs_in, Rs_out, radial_model, coupling_coefficients, coupling_coefficients_base_offsets, max_l_in, device):
+    def __init__(self, Rs_in, Rs_out, radial_model, coupling_coefficients, coupling_coefficients_offsets, device):
         super().__init__()
 
         self.device = device
@@ -125,8 +105,7 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
         self.radial_model = radial_model(self.R_base_offsets[-1].item())
 
         self.coupling_coefficients = coupling_coefficients
-        self.coupling_coefficients_base_offsets = coupling_coefficients_base_offsets
-        self.max_l_in = max_l_in
+        self.coupling_coefficients_offsets = coupling_coefficients_offsets
 
     def _calculate_offsets(self):
         from itertools import accumulate
@@ -180,7 +159,7 @@ class TensorMessageFunction(torch.autograd.Function):
             layer.mul_out_list,                                 # u_sizes
             layer.mul_in_list,                                  # v_sizes
             layer.grad_base_offsets,                            # output_base_offsets
-            layer.coupling_coefficients_base_offsets,           # C_offsets
+            layer.coupling_coefficients_offsets,                # C_offsets
             layer.features_base_offsets,                        # F_base_offsets
             layer.R_base_offsets,                               # R_base_offsets
             layer.max_l_in + 1)                                 # l_in_max_net_bound
@@ -211,7 +190,7 @@ class TensorMessageFunction(torch.autograd.Function):
             layer.mul_out_list,                                 # u_sizes
             layer.mul_in_list,                                  # v_sizes
             layer.features_base_offsets,                        # output_base_offsets
-            layer.coupling_coefficients_base_offsets,           # C_offsets
+            layer.coupling_coefficients_offsets,                # C_offsets
             layer.grad_base_offsets,                            # G_base_offsets
             layer.R_base_offsets,                               # R_base_offsets
             layer.max_l_in + 1)                                 # l_in_max_net_bound
@@ -229,7 +208,7 @@ class TensorMessageFunction(torch.autograd.Function):
             layer.mul_out_list,                                 # u_sizes
             layer.mul_in_list,                                  # v_sizes
             layer.R_base_offsets,                               # output_base_offsets
-            layer.coupling_coefficients_base_offsets,           # C_offsets
+            layer.coupling_coefficients_offsets,                # C_offsets
             layer.grad_base_offsets,                            # G_base_offsets
             layer.features_base_offsets,                        # F_base_offsets
             layer.max_l_in + 1)                                 # l_in_max_net_bound
