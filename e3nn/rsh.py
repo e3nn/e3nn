@@ -274,5 +274,5 @@ def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
     real_spherical_harmonics.e3nn_normalization(out)  # (-1)^L, which is the same as (pi-theta) -> (-1)^(L+m) combined with 'quantum' norm (-1)^m
 
     if not rs.are_equal(Rs, list(range(lmax + 1))):
-        out = torch.cat([out[l**2: (l + 1)**2] for (mul, l, _) in Rs])
-    return out.T.reshape(*size, -1)
+        out = torch.cat([out[l*l:(l+1)*(l+1)] for (mul, l, _) in Rs])
+    return out.t().reshape(*size, -1)
