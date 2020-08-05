@@ -164,7 +164,7 @@ def legendre(ls, z, y=None):
 
 def spherical_harmonics_z(Rs, z, y=None):
     """
-    the z componant of the spherical harmonics
+    the z component of the spherical harmonics
     (useful to perform fourier transform)
 
     :param z: tensor of shape [...]
@@ -180,7 +180,7 @@ def spherical_harmonics_z(Rs, z, y=None):
 @torch.jit.script
 def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # pragma: no cover
     """
-    the alpha (x, y) componant of the spherical harmonics
+    the alpha (x, y) component of the spherical harmonics
     (useful to perform fourier transform)
 
     :param alpha: tensor of shape [...]
