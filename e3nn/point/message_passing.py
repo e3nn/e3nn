@@ -66,6 +66,8 @@ class MinimalNetwork(torch.nn.Module):
         radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
 
         self.layer = TensorPassingLayer(Rs_in, Rs_out, radial_model, self.coupling_coefficients, self.coupling_coefficients_offsets)
+        # self.layer2
+        # self.layer3
 
     def _find_max_l_out_in(self):
         max_l_out = max_l_in = max_l = 0

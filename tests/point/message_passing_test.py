@@ -9,6 +9,34 @@ from e3nn.kernel import Kernel
 from e3nn.point.message_passing import Convolution
 from e3nn.radial import ConstantRadialModel
 
+# dev
+# from e3nn.point.message_passing import TensorPassingLayer
+# from e3nn.o3 import get_flat_coupling_coefficients
+
+"""
+@pytest.mark.parametrize('Rs_in, Rs_out, n_source, n_target, n_edge', itertools.product([[1]], [[2]], [2, 3], [1, 3], [0, 3]))
+def test_equivariance_tensor_passing_layer(Rs_in, Rs_out, n_source, n_target, n_edge):
+    torch.set_default_dtype(torch.float64)
+
+    max_l_out = max([l_out for (_, l_out, *_) in Rs_out])
+    max_l_in = max([l_in for (_, l_in, *_) in Rs_in])
+    max_l = max_l_out + max_l_in
+
+    coupling_coefficients, coupling_coefficients_offsets = get_flat_coupling_coefficients(max_l_out, max_l_in)
+    layer = TensorPassingLayer(Rs_in, Rs_out, ConstantRadialModel, coupling_coefficients, coupling_coefficients_offsets)
+
+    features = rs.randn(n_target, Rs_in)
+
+    r_source = torch.randn(n_source, 3)
+    r_target = torch.randn(n_target, 3)
+
+    edge_index = torch.stack([
+        torch.randint(n_source, size=(n_edge,)),
+        torch.randint(n_target, size=(n_edge,)),
+    ])
+    size = (n_target, n_source)
+"""
+
 
 @pytest.mark.parametrize('Rs_in, Rs_out, n_source, n_target, n_edge', itertools.product([[1]], [[2]], [2, 3], [1, 3], [0, 3]))
 def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
