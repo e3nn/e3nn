@@ -236,7 +236,7 @@ class MoleculeDataset(Dataset):
     def __init__(self, root, file_names, file_to_graph_func, properties_filepath=None, transform=None, pre_transform=None, pre_filter=None, allowed_file_types=["xyz"]+["gjf", "g03", "g09", "com", "inp"]+["json", "mson", "yaml"]+["out", "lis", "log"]+["pdb", "mol", "mdl", "sdf", "sd", "ml2", "sy2", "mol2", "cml", "mrv"]):
         self.allowed_file_types = allowed_file_types
         self.file_names = self.filter_files(file_names)
-        self._processed_file_names = self.process_file_names(self)
+        self._processed_file_names = self.process_file_names()
         
         self.file_to_graph_func = file_to_graph_func
         self.properties_filepath = properties_filepath
