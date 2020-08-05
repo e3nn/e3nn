@@ -95,7 +95,7 @@ def transpose_mul(Rs, cmul=-1):
 
 def cut(features, *Rss, dim_=-1):
     """
-    Cut `feaures` according to the list of Rs
+    Cut `features` according to the list of Rs
     """
     index = 0
     outputs = []
@@ -220,7 +220,7 @@ def mul_dim(Rs: TY_RS_LOOSE) -> int:
 def dim(Rs: TY_RS_LOOSE) -> int:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
-    :return: dimention of the representation
+    :return: dimension of the representation
     """
     Rs = convention(Rs)
     return sum(mul * (2 * l + 1) for mul, l, _ in Rs)
