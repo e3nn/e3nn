@@ -137,3 +137,18 @@ def test_sh_equivariance():
             DrY = o3.irr_repr(l, alpha, beta, gamma) @ Y
 
             assert (Yrx - DrY).abs().max() < 1e-10 * Y.abs().max()
+
+
+def test_rsh_backwardable():
+    lmax = 10
+    Rs = [(1, l) for l in range(lmax + 1)]
+
+    xyz = torch.tensor([0., 0., 1.], requires_grad=True)
+    sph = rsh.spherical_harmonics_xyz(Rs, xyz, eps=0)
+    sph.norm(2, -1).mean().backward()
+    assert torch.allclose(torch.isnan(xyz.grad).nonzero(), torch.LongTensor([[0], [1], [2]]))
+
+    xyz = torch.tensor([0., 0., 1.], requires_grad=True)
+    sph = rsh.spherical_harmonics_xyz(Rs, xyz, eps=1e-10)
+    sph.norm(2, -1).mean().backward()
+    assert torch.allclose(torch.isnan(xyz.grad).nonzero(), torch.LongTensor([[]]))

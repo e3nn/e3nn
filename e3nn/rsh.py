@@ -233,13 +233,20 @@ def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
     return out.reshape(alpha.shape + (shz.shape[1],))
 
 
-def spherical_harmonics_xyz(Rs, xyz):
+def spherical_harmonics_xyz(Rs, xyz, eps=0.):
     """
     spherical harmonics
 
     :param Rs: list of L's
     :param xyz: tensor of shape [..., 3]
+    :param eps: epsilon for denominator of atan2
     :return: tensor of shape [..., m]
+
+    The eps parameter is only to be used when backpropogating to coordinates xyz.
+    To determine a stable eps value, we recommend benchmarking against numerical
+    gradients before setting this parameter. Use the smallest epsilon that prevents NaNs.
+    For some cases, we have used 1e-10. Your case may require a different value.
+    Use this option with care.
     """
 
     if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
@@ -248,11 +255,12 @@ def spherical_harmonics_xyz(Rs, xyz):
         except ImportError:
             pass
 
-    xyz = xyz / torch.norm(xyz, 2, dim=-1, keepdim=True)
+    norm = torch.norm(xyz, 2, dim=-1, keepdim=True)
+    xyz = xyz / (norm + eps)
 
-    alpha = torch.atan2(xyz[..., 1], xyz[..., 0])  # [...]
+    alpha = torch.atan2(xyz[..., 1], xyz[..., 0] + eps)  # [...]
     z = xyz[..., 2]  # [...]
-    y = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2)).sqrt()  # [...]
+    y = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2) + eps).sqrt()  # [...]
 
     return spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
 

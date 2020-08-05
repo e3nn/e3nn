@@ -12,13 +12,15 @@ class CartesianTensor():
         self.formula = formula
         self.tensor = tensor
 
-    def to_irrep_tensor(self):
-        basis_change = o3.xyz_to_irreducible_basis()
-        tensor = self.tensor
-        for i in range(self.tensor.dim()):
-            tensor = torch.tensordot(basis_change, tensor, dims=([1], [i])).transpose(0, i)
+    def to_irrep_transformation(self):
+        dim = self.tensor.dim()
+        change = o3.kron(*[o3.xyz_to_irreducible_basis()] * dim)
         Rs = [(1, 1)]  # vectors
         old_indices = self.formula.split("=")[0]
         Rs_out, Q = rs.reduce_tensor(self.formula, **{i: Rs for i in old_indices})
-        tensor = torch.einsum('ab,b->a', Q, tensor.reshape(-1))
+        return Rs_out, torch.einsum('ab,bc->ac', Q, change.reshape(3 ** dim, 3 ** dim))
+
+    def to_irrep_tensor(self):
+        Rs_out, Q = self.to_irrep_transformation()
+        tensor = torch.einsum('ab,b->a', Q, self.tensor.reshape(-1))
         return IrrepTensor(tensor, Rs_out)
