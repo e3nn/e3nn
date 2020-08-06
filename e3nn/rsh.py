@@ -198,7 +198,7 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # p
         math.sqrt(2) * sin,
         torch.ones_like(alpha),
         math.sqrt(2) * cos,
-    ], dim=-1)
+    ], dim=alpha.ndim-1)
 
     return out  # [..., m]
 
