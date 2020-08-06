@@ -234,6 +234,30 @@ def lmax(Rs: TY_RS_LOOSE) -> int:
     return max(l for mul, l, _ in convention(Rs) if mul > 0)
 
 
+def extract_mul(Rs: TY_RS_STRICT) -> List[int]:
+    """
+    :param Rs: list of triplet (multiplicity, representation order, parity)
+    :return: list of multiplicities
+    """
+    return [mul for (mul, _, _) in Rs]
+
+
+def extract_l(Rs: TY_RS_STRICT) -> List[int]:
+    """
+    :param Rs: list of triplet (multiplicity, representation order, parity)
+    :return: list of representation orders
+    """
+    return [l for (_, l, _) in Rs]
+
+
+def extract_parity(Rs: TY_RS_STRICT) -> List[int]:
+    """
+    :param Rs: list of triplet (multiplicity, representation order, parity)
+    :return: list of representation orders
+    """
+    return [p for (_, _, p) in Rs]
+
+
 def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     """
     :param Rs: list of triplet (multiplicity, representation order, [parity])
