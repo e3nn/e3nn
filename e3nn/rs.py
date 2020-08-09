@@ -585,7 +585,7 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).reshape(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                i_out, i_1, i_2 = m.nonzero().T
+                i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
                 i_out += index_out
                 i_1 += index_1
                 i_2 += index_2
@@ -770,7 +770,7 @@ def tensor_square(
 
         for l_out in selection_rule(l_1, p_1, l_1, p_1):
             I = torch.eye(mul_1**2).reshape(mul_1**2, mul_1, mul_1)
-            uv = I.nonzero()[:, 1:]
+            uv = I.nonzero(as_tuple=False)[:, 1:]
             if l_out % 2 == 0:
                 I = I[uv[:, 0] <= uv[:, 1]]
             else:
@@ -786,7 +786,7 @@ def tensor_square(
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_1 + 1) ** 0.5
             dim_out = I.shape[0] * (2 * l_out + 1)
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_1)
-            i_out, i_1, i_2 = m.nonzero().T
+            i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
             i_out += index_out
             i_1 += index_1
             i_2 += index_1
@@ -809,7 +809,7 @@ def tensor_square(
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 dim_out = I.shape[0] * (2 * l_out + 1)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                i_out, i_1, i_2 = m.nonzero().T
+                i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
                 i_out += index_out
                 i_1 += index_1
                 i_2 += index_2
@@ -931,7 +931,7 @@ def elementwise_tensor_product(
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-            i_out, i_1, i_2 = m.nonzero().T
+            i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
             i_out += index_out
             i_1 += index_1
             i_2 += index_2
