@@ -68,7 +68,7 @@ class TensorPassingContext(torch.nn.Module, ABC):
         self.register_buffer('coupling_coefficients', coupling_coefficients)
         self.register_buffer('coupling_coefficients_offsets', coupling_coefficients_offsets)
 
-        self.named_buffers_pointer = self.partial(self.named_buffers, recurse=False)
+        self.named_buffers_pointer = partial(self.named_buffers, recurse=False)
 
 
 class TensorPassingHomogenous(TensorPassingContext):
@@ -138,6 +138,9 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
 
     def message(self, x_j, rsh, rbm):
         return tensor_msg(x_j, rsh, rbm, self)
+
+    def message_and_aggregate(self, adj_t):
+        raise NotImplementedError("Use separated message and aggregation")
 
 
 class TensorMessageFunction(torch.autograd.Function):
