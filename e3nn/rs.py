@@ -155,7 +155,7 @@ def rearrange(Rs_in, Rs_out):
     return b.t() @ a
 
 
-def sort(Rs: TY_RS_LOOSE) -> SparseTensor:
+def sort(Rs: TY_RS_LOOSE):
     """
     :return: (Rs_out, permutation_matrix)
     stable sorting of the representation by (l, p)
