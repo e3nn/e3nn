@@ -9,7 +9,14 @@ import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
 from e3nn import rs
+from e3nn.rs import TY_RS_STRICT, TY_RS_LOOSE
 from e3nn.util.eval_code import eval_code
+
+try:
+    from e3nn import real_spherical_harmonics
+    rsh_no_cuda = False
+except ImportError:
+    rsh_no_cuda = True
 
 
 def spherical_harmonics_expand_matrix(ls, like=None):
@@ -203,6 +210,29 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # p
     return out  # [..., m]
 
 
+def spherical_harmonics_alpha_z_y(Rs: TY_RS_STRICT, alpha, z, y):
+    """
+    cpu version of spherical_harmonics_alpha_beta
+    """
+    sha = spherical_harmonics_alpha(rs.lmax(Rs), alpha.flatten())  # [z, m]
+    shz = spherical_harmonics_z(Rs, z.flatten(), y.flatten())  # [z, l * m]
+    out = mul_m_lm(Rs, sha, shz)
+    return out.reshape(alpha.shape + (shz.shape[1],))
+
+
+def spherical_harmonics_xyz_cuda(Rs: TY_RS_STRICT, xyz):  # pragma: no cover
+    """
+    cuda version of spherical_harmonics_xyz
+    """
+    lmax = rs.lmax(Rs)
+    out = real_spherical_harmonics.real_spherical_harmonics(xyz, lmax)  # real spherical harmonics are calculated for all L's up to lmax (inclusive) due to performance reasons (CUDA)
+    real_spherical_harmonics.e3nn_normalization(out)  # (-1)^L, which is the same as (pi-theta) -> (-1)^(L+m) combined with 'quantum' norm (-1)^m
+
+    if not rs.are_equal(Rs, list(range(lmax + 1))):
+        out = torch.cat([out[l*l:(l+1)*(l+1)] for l in rs.extract_l(Rs)])
+    return out.t()
+
+
 def spherical_harmonics_alpha_beta(Rs, alpha, beta):
     """
     spherical harmonics
@@ -212,28 +242,16 @@ def spherical_harmonics_alpha_beta(Rs, alpha, beta):
     :param beta: float or tensor of shape [...]
     :return: tensor of shape [..., m]
     """
-    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
-        xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
-        try:
-            return spherical_harmonics_xyz_cuda(Rs, xyz)
-        except ImportError:
-            pass
-
-    return spherical_harmonics_alpha_z_y(Rs, alpha, beta.cos(), beta.sin().abs())
-
-
-def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
-    """
-    cpu version of spherical_harmonics_alpha_beta
-    """
     Rs = rs.simplify(Rs)
-    sha = spherical_harmonics_alpha(rs.lmax(Rs), alpha.flatten())  # [z, m]
-    shz = spherical_harmonics_z(Rs, z.flatten(), y.flatten())  # [z, l * m]
-    out = mul_m_lm(Rs, sha, shz)
-    return out.reshape(alpha.shape + (shz.shape[1],))
+    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and rs.lmax(Rs) <= 10 and not rsh_no_cuda:  # pragma: no cover
+        xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
+        rsh = spherical_harmonics_xyz_cuda(Rs, xyz)
+    else:
+        rsh = spherical_harmonics_alpha_z_y(Rs, alpha, beta.cos(), beta.sin().abs())
+    return rsh
 
 
-def spherical_harmonics_xyz(Rs, xyz, eps=0.):
+def spherical_harmonics_xyz(Rs, xyz, expect_normalized=False):
     """
     spherical harmonics
 
@@ -248,39 +266,22 @@ def spherical_harmonics_xyz(Rs, xyz, eps=0.):
     For some cases, we have used 1e-10. Your case may require a different value.
     Use this option with care.
     """
-
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
-        try:
-            return spherical_harmonics_xyz_cuda(Rs, xyz)
-        except ImportError:
-            pass
-
-    norm = torch.norm(xyz, 2, dim=-1, keepdim=True)
-    xyz = xyz / (norm + eps)
-
-    alpha = torch.atan2(xyz[..., 1], xyz[..., 0] + eps)  # [...]
-    z = xyz[..., 2]  # [...]
-    y = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2) + eps).sqrt()  # [...]
-
-    return spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
-
-
-def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
-    """
-    cuda version of spherical_harmonics_xyz
-    """
-    from e3nn import real_spherical_harmonics  # pylint: disable=no-name-in-module, import-outside-toplevel
-
     Rs = rs.simplify(Rs)
 
     *size, _ = xyz.size()
     xyz = xyz.reshape(-1, 3)
-    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
 
-    lmax = rs.lmax(Rs)
-    out = real_spherical_harmonics.real_spherical_harmonics(xyz, lmax)  # real spherical harmonics are calculated for all L's up to lmax (inclusive) due to performance reasons (CUDA)
-    real_spherical_harmonics.e3nn_normalization(out)  # (-1)^L, which is the same as (pi-theta) -> (-1)^(L+m) combined with 'quantum' norm (-1)^m
+    if not expect_normalized:
+        xyz = torch.nn.functional.normalize(xyz, p=2, dim=-1)
 
-    if not rs.are_equal(Rs, list(range(lmax + 1))):
-        out = torch.cat([out[l*l:(l+1)*(l+1)] for (mul, l, _) in Rs])
-    return out.t().reshape(*size, -1)
+    # use cuda implementation if possible, otherwise use cpu implementation
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10 and not rsh_no_cuda:
+        rsh = spherical_harmonics_xyz_cuda(Rs, xyz)
+    else:
+        alpha = torch.atan2(xyz[:, 1], xyz[:, 0])
+        z = xyz[:, 2]
+        y = (xyz[:, 0].pow(2) + xyz[:, 1].pow(2)).sqrt()
+        rsh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
+    return rsh.reshape(*size, rs.irrep_dim(Rs))
+
+
