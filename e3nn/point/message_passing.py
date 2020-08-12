@@ -56,7 +56,9 @@ class TensorPassingContext(torch.nn.Module, ABC):
         super().__init__()
 
         self.user_representations = [rs.convention(Rs) for Rs in representations]
-        self.internal_representations = [rs.simplify(sorted_Rs) for Rs in self.user_representations for (sorted_Rs, _) in rs.sort(Rs)]
+        self.internal_representations = [rs.simplify(rs.sort(Rs)[0]) for Rs in self.user_representations]
+        self.input_representations = self.internal_representations[:-1]
+        self.output_representations = self.internal_representations[1:]
 
         max_l_per_layer = [rs.lmax(Rs) for Rs in self.internal_representations]
 
@@ -72,27 +74,29 @@ class TensorPassingContext(torch.nn.Module, ABC):
 
 
 class TensorPassingHomogenous(TensorPassingContext):
-    def __init__(self, representations, radial_model):
+    def __init__(self, representations, radial_model, gate=torch.nn.Identity):
         super().__init__(representations)
 
-        # radial_model = partial(GaussianRadialModel, max_radius=3.2, min_radius=0.7, number_of_basis=10, h=100, L=3, act=swish)
         self.model = torch.nn.ModuleList([
-            TensorPassingLayer(Rs_in, Rs_out, radial_model, self.named_buffers_pointer) for (Rs_in, Rs_out) in self.internal_representations
+            TensorPassingLayer(Rs_in, Rs_out, self.named_buffers_pointer, radial_model, gate) for (Rs_in, Rs_out) in zip(self.input_representations, self.output_representations)
         ])
 
     def forward(self, graph):
-        Y = spherical_harmonics_xyz(list(range(self.max_l + 1)), graph.rel_vec).contiguous()
         features = graph.x
-
         for layer in self.model:
-            features = layer(graph.edge_index, features, graph.abs_distances, Y)
-
+            features = layer(graph.edge_index, features, graph.abs_distances, graph.rel_vec)
         return features
 
 
 class TensorPassingLayer(torch_geometric.nn.MessagePassing):
-    def __init__(self, Rs_in, Rs_out, radial_model, named_buffers_pointer):
+    def __init__(self, Rs_in, Rs_out, named_buffers_pointer, radial_model, gate=torch.nn.Identity):
         super().__init__()
+
+        self.gate = gate(Rs_out)
+        if not isinstance(gate, torch.nn.Identity):
+            # TODO: calculate number of additional l=0 filters for gates and prepend it to Rs_out
+            # implement as method in gate
+            pass
 
         self.Rs_in = Rs_in
         self.Rs_out = Rs_out
@@ -123,6 +127,7 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
         return R_base_offsets, grad_base_offsets, features_base_offsets
 
     def _calculate_normalization_coefficients(self):
+        # TODO: allow other choice of normalization
         norm_coef = torch.empty((len(self.l_out_list), len(self.l_in_list)))
         for i, l_out in enumerate(self.l_out_list):
             num_summed_elements = sum([mul_in * (2 * min(l_out, l_in) + 1) for mul_in, l_in in zip(self.mul_in_list, self.l_in_list)])  # (l_out + l_in) - |l_out - l_in| = 2*min(l_out, l_in)
@@ -138,6 +143,9 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
 
     def message(self, x_j, rsh, rbm):
         return tensor_msg(x_j, rsh, rbm, self)
+
+    def update(self, inputs):
+        return self.gate(inputs)
 
     def message_and_aggregate(self, adj_t):
         raise NotImplementedError("Use separated message and aggregation")
