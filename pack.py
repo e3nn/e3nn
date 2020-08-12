@@ -1,6 +1,8 @@
 import os
 import re
 from setuptools import find_packages
+from torch.utils.cpp_extension import CUDAExtension
+from setup_helper import BuildRDCExtension
 
 # Recommendations from https://packaging.python.org/
 here = os.path.abspath(os.path.dirname(__file__))
@@ -22,6 +24,23 @@ def find_version(*file_paths):
     raise RuntimeError("Unable to find version string.")
 
 
+ext_modules = [
+    CUDAExtension('e3nn.real_spherical_harmonics',
+                  sources=['src/real_spherical_harmonics/rsh_bind.cpp',
+                           'src/real_spherical_harmonics/rsh_cuda.cu',
+                           'src/real_spherical_harmonics/e3nn_normalization_cuda.cu'],
+                  extra_compile_args={'cxx': ['-std=c++14'],
+                                      'nvcc': ['-std=c++14']}),
+    CUDAExtension('e3nn.tensor_message',
+                    sources=[
+                            'src/tensor_message/link_tensor_message_cuda.cu',
+                            'src/tensor_message/tensor_message_cuda.cu',
+                            'src/tensor_message/tensor_message_bind.cpp'],
+                    extra_compile_args={'nvcc': ['-std=c++14', '-rdc=true', '-lcudadevrt'],
+                                        'cxx': ['-std=c++14']},
+                    libraries=['cudadevrt'])
+]
+
 KWARGS = dict(
     name='e3nn',
     version=find_version("e3nn", "__init__.py"),
@@ -31,6 +50,8 @@ KWARGS = dict(
     long_description_content_type='text/markdown',
     url='https://e3nn.org',
     packages=find_packages(exclude=["tests.*", "tests"]),
+    ext_modules=ext_modules,
+    cmdclass={'build_ext': BuildRDCExtension},
     install_requires=[
         'lie_learn',
         'scipy',

@@ -27,7 +27,7 @@ __global__ void forward_child_cuda_kernel(
 		const uint32_t,
 		const uint32_t
 );
-
+ 
 template<typename T>
 __global__ void backward_F_child_cuda_kernel(
               T*        const __restrict__,
