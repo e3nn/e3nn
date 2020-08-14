@@ -62,8 +62,8 @@ class TensorPassingContext(torch.nn.Module, ABC):
 
         max_l_per_layer = [rs.lmax(Rs) for Rs in self.internal_representations]
 
-        self.max_l_out = rs.lmax(max_l_per_layer[:-1])
-        self.max_l_in = rs.lmax(max_l_per_layer[1:])
+        self.max_l_out = rs.lmax(max_l_per_layer[1:])
+        self.max_l_in = rs.lmax(max_l_per_layer[:-1])
         self.max_l = rs.lmax([l_in + l_out for (l_in, l_out) in zip(max_l_per_layer[:-1], max_l_per_layer[1:])])
 
         coupling_coefficients, coupling_coefficients_offsets = get_flat_coupling_coefficients(self.max_l_out, self.max_l_in)
