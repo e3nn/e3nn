@@ -215,9 +215,10 @@ class WeightedTensorProduct(torch.nn.Module):
         """
         *size, n = features_1.size()
         features_1 = features_1.reshape(-1, n)
-        assert n == rs.dim(self.Rs_in1)
+        assert n == rs.dim(self.Rs_in1), f"{n} is not {rs.dim(self.Rs_in1)}"
         *size2, n = features_2.size()
         features_2 = features_2.reshape(-1, n)
+        assert n == rs.dim(self.Rs_in2), f"{n} is not {rs.dim(self.Rs_in2)}"
         assert size == size2
         weights = weights.reshape(-1, self.nweight)
 
