@@ -102,11 +102,11 @@ class QM9(torch.utils.data.Dataset):
         'ϵ_gap Ha Gap (ϵLUMO−ϵHOMO)',
         'R^2 a^2_0 Electronic spatial extent',
         'zpve Ha Zero point vibrational energy',
-        'U_0 Ha Internal energy at 0 K',
-        'U Ha Internal energy at 298.15 K',
-        'H Ha Enthalpy at 298.15 K',
-        'G Ha Free energy at 298.15 K',
-        'C_v cal/(molK) Heat capacity at 298.15 K',
+        'U_0 Ha Internal energy at 0K',
+        'U Ha Internal energy at 298.15K',
+        'H Ha Enthalpy at 298.15K',
+        'G Ha Free energy at 298.15K',
+        'C_v cal/(molK) Heat capacity at 298.15K',
     ]
 
     def __init__(self, root, transform=None):
