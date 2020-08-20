@@ -32,10 +32,16 @@ ext_modules = [
                   extra_compile_args={'cxx': ['-std=c++14'],
                                       'nvcc': ['-std=c++14']}),
     CUDAExtension('e3nn.tensor_message',
-                    sources=[
-                            'src/tensor_message/link_tensor_message_cuda.cu',
+                    sources=['src/tensor_message/link_tensor_message_cuda.cu',
                             'src/tensor_message/tensor_message_cuda.cu',
                             'src/tensor_message/tensor_message_bind.cpp'],
+                    extra_compile_args={'nvcc': ['-std=c++14', '-rdc=true', '-lcudadevrt'],
+                                        'cxx': ['-std=c++14']},
+                    libraries=['cudadevrt']),
+    CUDAExtension('e3nn.tensor_block_cuda',
+                    sources=['src/tensor_block/link_tensor_block_cuda.cu',
+                             'src/tensor_block/tensor_block_cuda.cu',
+                             'src/tensor_block/tensor_block_bind.cpp'],
                     extra_compile_args={'nvcc': ['-std=c++14', '-rdc=true', '-lcudadevrt'],
                                         'cxx': ['-std=c++14']},
                     libraries=['cudadevrt'])
