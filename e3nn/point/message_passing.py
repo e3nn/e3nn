@@ -94,18 +94,19 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
 
         self.gate = gate(Rs_out)
         if not isinstance(gate, torch.nn.Identity):
-            # TODO: calculate number of additional l=0 filters for gates and prepend it to Rs_out
-            # implement as method in gate
-            pass
+            self.Rs_pre_gate = self.gate.Rs_in
+        else:
+            self.Rs_pre_gate = Rs_out
 
         self.Rs_in = Rs_in
         self.Rs_out = Rs_out
-        self.max_l = rs.lmax(Rs_in) + rs.lmax(Rs_out)
 
-        self.register_buffer('l_out_list',      torch.tensor(rs.extract_l(Rs_out),      dtype=torch.int32))
-        self.register_buffer('l_in_list',       torch.tensor(rs.extract_l(Rs_in),       dtype=torch.int32))
-        self.register_buffer('mul_out_list',    torch.tensor(rs.extract_mul(Rs_out),    dtype=torch.int32))
-        self.register_buffer('mul_in_list',     torch.tensor(rs.extract_mul(Rs_in),     dtype=torch.int32))
+        self.max_l = rs.lmax(self.Rs_in) + rs.lmax(self.Rs_pre_gate)
+
+        self.register_buffer('l_out_list',      torch.tensor(rs.extract_l(self.Rs_pre_gate),    dtype=torch.int32))
+        self.register_buffer('l_in_list',       torch.tensor(rs.extract_l(self.Rs_in),          dtype=torch.int32))
+        self.register_buffer('mul_out_list',    torch.tensor(rs.extract_mul(self.Rs_pre_gate),  dtype=torch.int32))
+        self.register_buffer('mul_in_list',     torch.tensor(rs.extract_mul(self.Rs_in),        dtype=torch.int32))
 
         R_base_offsets, grad_base_offsets, features_base_offsets = self._calculate_offsets()
         self.register_buffer('R_base_offsets',          torch.tensor(R_base_offsets,        dtype=torch.int32))
