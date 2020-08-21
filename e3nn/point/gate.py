@@ -25,8 +25,8 @@ class Gate(torch.nn.Module):
         self.register_buffer('tensor_offsets', torch.tensor([0] + list(accumulate(mul * (2*l + 1) for (mul, l) in zip(self.mul_sizes, self.L_list))), dtype=torch.int32))
         self.register_buffer('gate_offsets', torch.tensor([0] + list(accumulate(self.mul_sizes)), dtype=torch.int32))
 
-        self.scalar_act = scalar_act()
-        self.tensor_act = tensor_act()
+        self.scalar_act = scalar_act
+        self.tensor_act = tensor_act
 
     def forward(self, x):
         batch_size = x.size(0)
