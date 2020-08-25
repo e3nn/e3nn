@@ -1,7 +1,9 @@
 '''
 Cache in files
 '''
-import fcntl
+if os.name == 'posix':
+    import fcntl
+
 import glob
 import os
 import sys
@@ -27,7 +29,8 @@ class FileSystemMutex:
         if it is already locked, it waits (blocking function)
         '''
         self.handle = open(self.filename, 'w')
-        fcntl.lockf(self.handle, fcntl.LOCK_EX)
+        if os.name == 'posix':
+            fcntl.lockf(self.handle, fcntl.LOCK_EX)
         self.handle.write("{}\n".format(os.getpid()))
         self.handle.flush()
 
@@ -37,7 +40,8 @@ class FileSystemMutex:
         '''
         if self.handle is None:
             raise RuntimeError()
-        fcntl.lockf(self.handle, fcntl.LOCK_UN)
+        if os.name == 'posix':
+            fcntl.lockf(self.handle, fcntl.LOCK_UN)
         self.handle.close()
         self.handle = None
 
