@@ -3,7 +3,7 @@ import torch
 
 from e3nn import o3
 from e3nn import rs
-from e3nn.variable_networks import VariableParityNetwork
+from variable_networks import VariableParityNetwork
 
 
 def test_variable_parity_network():
@@ -12,7 +12,7 @@ def test_variable_parity_network():
     ends_lmax = 3
     Rs = [(1, l, 1) for l in range(ends_lmax + 1)]
     lmaxes = [3,2,1,2,3]
-    muls = [[3,2,1],[3,2],3,[2,2],[1,1,1]]
+    muls = [[4,3,2,1],[4,3,2],[4,3],[2,2,2],[1,1,1,1]]
     model = VariableParityNetwork(Rs, Rs, lmaxes=lmaxes, muls=muls,  feature_product=True)
 
     features = rs.randn(1, 4, Rs)

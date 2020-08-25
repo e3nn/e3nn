@@ -50,7 +50,7 @@ class VariableParityNetwork(torch.nn.Module):
             scalars = [(m, l, p) for m, l, p in [(mul[0], 0, +1), (mul[0], 0, -1)] if rs.haslinearpath(Rs, l, p)]
             act_scalars = [(m, swish if p == 1 else tanh) for m, l, p in scalars]
 
-            nonscalars = [(m, l, p) for (l,m) in enumerate(muls) for p in [+1, -1] if rs.haslinearpath(Rs, l, p)]
+            nonscalars = [(m, l, p) for (l,m) in enumerate(mul) for p in [+1, -1] if rs.haslinearpath(Rs, l, p)]
             gates = [(rs.mul_dim(nonscalars), 0, +1)]
             act_gates = [(-1, sigmoid)]
 
