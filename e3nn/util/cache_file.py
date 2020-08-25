@@ -1,11 +1,11 @@
 '''
 Cache in files
 '''
+import glob
+import os
 if os.name == 'posix':
     import fcntl
 
-import glob
-import os
 import sys
 from functools import lru_cache, wraps
 from itertools import count, chain
