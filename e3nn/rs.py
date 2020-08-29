@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin, arguments-differ
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin, arguments-differ, abstract-method
 """
 Some functions related to SO3 and his usual representations
 
@@ -990,15 +990,16 @@ class ElementwiseTensorProduct(torch.nn.Module):
         return features.T.reshape(*size, d_out)
 
 
-def _is_representation(D, eps):
-    I = D(0, 0, 0)
+def _is_representation(D, eps, with_parity=False):
+    e = (0, 0, 0, 0) if with_parity else (0, 0, 0)
+    I = D(*e)
     if not torch.allclose(I, I @ I):
         return False
 
-    g1 = o3.rand_angles()
-    g2 = o3.rand_angles()
+    g1 = o3.rand_angles() + (0,) if with_parity else o3.rand_angles()
+    g2 = o3.rand_angles() + (0,) if with_parity else o3.rand_angles()
 
-    g12 = o3.compose(*g1, *g2)
+    g12 = o3.compose_with_parity(*g1, *g2) if with_parity else o3.compose(*g1, *g2)
     D12 = D(*g12)
 
     D1D2 = D(*g1) @ D(*g2)
@@ -1051,10 +1052,15 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
             if len(formulas) == n:
                 break
 
+        has_parity = None
         for i in kw_Rs:
             Rs = convention(kw_Rs[i])
-            if not all(p == 0 for _, _, p in Rs):
-                raise RuntimeError(f'{format_Rs(Rs)} parity support is not implemented')
+            if has_parity is None:
+                has_parity = any(p != 0 for _, _, p in Rs)
+            if not has_parity and not all(p == 0 for _, _, p in Rs):
+                raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
+            if has_parity and any(p == 0 for _, _, p in Rs):
+                raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
             kw_Rs[i] = Rs
 
         for _s, p in formulas:
@@ -1099,25 +1105,26 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
         if d_sym == 0:
             return [], torch.zeros(d_sym, d)
 
-        def representation(alpha, beta, gamma):
-            m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
+        def representation(alpha, beta, gamma, parity=None):
+            m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma, parity) for i in f0))
             return Q @ m @ Q.T
 
-        assert _is_representation(representation, eps)
+        assert _is_representation(representation, eps, has_parity)
 
         Rs_out = []
         A = Q.clone()
         for l in range(int((d_sym - 1) // 2) + 1):
-            if 2 * l + 1 > d_sym - dim(Rs_out):
-                break
+            for p in [-1, 1] if has_parity else [0]:
+                if 2 * l + 1 > d_sym - dim(Rs_out):
+                    break
 
-            mul, B, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
-            A = o3.direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
-            A = _round_sqrt(A, eps)
-            Rs_out += [(mul, l)]
+                mul, B, representation = o3.reduce(representation, partial(rep, [(1, l, p)]), eps, has_parity)
+                A = o3.direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
+                A = _round_sqrt(A, eps)
+                Rs_out += [(mul, l, p)]
 
-            if dim(Rs_out) == d_sym:
-                break
+                if dim(Rs_out) == d_sym:
+                    break
 
         if dim(Rs_out) != d_sym:
             raise RuntimeError(f'unable to decompose into irreducible representations')

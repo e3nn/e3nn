@@ -294,3 +294,9 @@ def test_reduce_tensor_antisymmetric_L2():
 def test_reduce_tensor_elasticity_tensor():
     Rs, _Q = rs.reduce_tensor('ijkl=jikl=klij', i=[(1, 1)])
     assert rs.dim(Rs) == 21
+
+
+def test_reduce_tensor_elasticity_tensor_parity():
+    Rs, _Q = rs.reduce_tensor('ijkl=jikl=klij', i=[(1, 1, -1)])
+    assert all(p == 1 for (_, _, p) in Rs)
+    assert rs.dim(Rs) == 21
