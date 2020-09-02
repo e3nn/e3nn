@@ -141,7 +141,7 @@ def compose_with_parity(a1, b1, c1, p1, a2, b2, c2, p2):
     """
     (a, b, c, p) = (a1, b1, c1, p1) composed with (a2, b2, c2, p2)
     """
-    return *compose(a1, b1, c1, a2, b2, c2), (p1 + p2) % 2
+    return compose(a1, b1, c1, a2, b2, c2) + ((p1 + p2) % 2,)
 
 
 def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
