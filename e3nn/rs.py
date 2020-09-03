@@ -1094,6 +1094,8 @@ def reduce_tensor(formula, eps=1e-10, has_parity=None, **kw_Rs):
                     frozenset({(-s, x) for s, x in xs})
                 }))
 
+        base = sorted([sorted([sorted(xs) for xs in x]) for x in base])  # requested for python 3.7 but not for 3.8 (probably a bug in 3.7)
+
         d_sym = len(base)
         d = len(full_base)
         Q = torch.zeros(d_sym, d)
