@@ -1017,7 +1017,7 @@ def _round_sqrt(x, eps):
     return x
 
 
-def reduce_tensor(formula, eps=1e-10, **kw_Rs):
+def reduce_tensor(formula, eps=1e-10, has_parity=None, **kw_Rs):
     """
     Usage
     Rs, Q = rs.reduce_tensor('ijkl=jikl=ikjl=ijlk', i=[(1, 1)])
@@ -1052,16 +1052,19 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
             if len(formulas) == n:
                 break
 
-        has_parity = None
         for i in kw_Rs:
-            Rs = convention(kw_Rs[i])
-            if has_parity is None:
-                has_parity = any(p != 0 for _, _, p in Rs)
-            if not has_parity and not all(p == 0 for _, _, p in Rs):
-                raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
-            if has_parity and any(p == 0 for _, _, p in Rs):
-                raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
-            kw_Rs[i] = Rs
+            if not callable(kw_Rs[i]):
+                Rs = convention(kw_Rs[i])
+                if has_parity is None:
+                    has_parity = any(p != 0 for _, _, p in Rs)
+                if not has_parity and not all(p == 0 for _, _, p in Rs):
+                    raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
+                if has_parity and any(p == 0 for _, _, p in Rs):
+                    raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
+                kw_Rs[i] = Rs
+
+        if has_parity is None:
+            raise RuntimeError(f'please specify the argument `has_parity`')
 
         for _s, p in formulas:
             f = "".join(f0[i] for i in p)
@@ -1077,7 +1080,8 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
             if i not in kw_Rs:
                 raise RuntimeError(f'index {i} has not Rs associated to it')
 
-        full_base = list(itertools.product(*(range(dim(kw_Rs[i])) for i in f0)))
+        e = (0, 0, 0, 0) if has_parity else (0, 0, 0)
+        full_base = list(itertools.product(*(range(len(kw_Rs[i](*e)) if callable(kw_Rs[i]) else dim(kw_Rs[i])) for i in f0)))
 
         base = set()
         for x in full_base:
@@ -1106,7 +1110,14 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
             return [], torch.zeros(d_sym, d)
 
         def representation(alpha, beta, gamma, parity=None):
-            m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma, parity) for i in f0))
+            def re(r):
+                if callable(r):
+                    if has_parity:
+                        return r(alpha, beta, gamma, parity)
+                    return r(alpha, beta, gamma)
+                return rep(r, alpha, beta, gamma, parity)
+
+            m = o3.kron(*(re(kw_Rs[i]) for i in f0))
             return Q @ m @ Q.T
 
         assert _is_representation(representation, eps, has_parity)

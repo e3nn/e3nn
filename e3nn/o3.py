@@ -219,6 +219,11 @@ def kron(*matrices):
     for m in matrices:
         assert m.dim() == 2
 
+    if len(matrices) == 0:
+        return torch.ones(1, 1)
+    if len(matrices) == 1:
+        return matrices[0]
+
     x, y, *matrices = matrices
     z = torch.einsum("ij,kl->ikjl", x, y).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
