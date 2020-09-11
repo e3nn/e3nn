@@ -17,7 +17,7 @@ from e3nn import o3, perm
 from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
-TY_RS_LOOSE = List[Union[int, Tuple[int, int], Tuple[int, int, int]]]
+TY_RS_LOOSE = Union[List[Union[int, Tuple[int, int], Tuple[int, int, int]]], int]
 TY_RS_STRICT = List[Tuple[int, int, int]]
 
 
@@ -239,6 +239,9 @@ def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: conventional version of the same list which always includes parity
     """
+    if isinstance(Rs, int):
+        return [(1, Rs, 0)]
+
     out = []
     for r in Rs:
         if isinstance(r, int):
