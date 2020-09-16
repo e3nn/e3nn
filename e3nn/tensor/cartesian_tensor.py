@@ -15,7 +15,7 @@ class CartesianTensor():
     def to_irrep_transformation(self):
         dim = self.tensor.dim()
         change = o3.kron(*[o3.xyz_to_irreducible_basis()] * dim)
-        Rs = [(1, 1)]  # vectors
+        Rs = [(1, 1, -1)]  # vectors
         old_indices = self.formula.split("=")[0]
         Rs_out, Q = rs.reduce_tensor(self.formula, **{i: Rs for i in old_indices})
         return Rs_out, torch.einsum('ab,bc->ac', Q, change.reshape(3 ** dim, 3 ** dim))

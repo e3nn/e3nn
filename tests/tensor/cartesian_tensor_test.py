@@ -23,4 +23,4 @@ def test_user_formula():
     symm_mat = (mat + mat.transpose(1, 0)) / 2.
     cart = CartesianTensor(symm_mat, "ij=ji")
     irrep_tensor = cart.to_irrep_tensor()
-    assert(irrep_tensor.Rs == [(1, 0, 0), (1, 2, 0)])
+    assert(irrep_tensor.Rs == [(1, 0, 1), (1, 2, 1)])
