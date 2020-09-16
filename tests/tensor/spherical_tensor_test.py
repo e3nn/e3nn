@@ -4,6 +4,7 @@ import torch
 from e3nn import o3, rs
 from e3nn.tensor.spherical_tensor import spherical_harmonics_dirac, SphericalTensor, projection, adjusted_projection
 from e3nn.tensor.fourier_tensor import FourierTensor
+from e3nn.tensor.irrep_tensor import IrrepTensor
 
 
 def test_sh_dirac():
@@ -152,3 +153,24 @@ def test_mul_and_dot():
     assert rs.are_equal(new_sph.Rs, [(rs.mul_dim(sph1.Rs), 0, 0)])
 
     sph1.dot(sph2)
+
+
+def test_from_irrep_tensor():
+    irrep = IrrepTensor(torch.randn(6), Rs=[(2, 1, 0)])
+    try:
+        SphericalTensor.from_irrep_tensor(irrep)
+    except:
+        pass  # Exception was raised
+    else:
+        raise AssertionError("ValueError was not raised.")
+
+    irrep = IrrepTensor(torch.randn(6), Rs=[(1, 1, 1), (1, 1, -1)])
+    try:
+        SphericalTensor.from_irrep_tensor(irrep)
+    except:
+        pass  # Exception was raised
+    else:
+        raise AssertionError("ValueError was not raised.")
+
+    irrep = IrrepTensor(torch.randn(8), Rs=[(1, 0, 0), (1, 3, 0)])
+    SphericalTensor.from_irrep_tensor(irrep)
