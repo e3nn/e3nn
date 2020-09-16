@@ -256,8 +256,7 @@ class SphericalTensor:
         mul, Ls, p  = zip(*Rs)
         if max(mul) > 1:
             raise ValueError(
-                "Cannot have multiplicity greater than 1 for any L. "
-                + "This tensor has a simplified Rs of {}".format(Rs)
+                "Cannot have multiplicity greater than 1 for any L. This tensor has a simplified Rs of {}".format(Rs)
             )
         Lmax = max(Ls)
         sorted_tensor = torch.einsum('ij,...j->...i', perm.to_dense(), irrep_tensor.tensor)
