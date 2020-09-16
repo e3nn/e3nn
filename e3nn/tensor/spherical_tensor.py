@@ -247,3 +247,24 @@ class SphericalTensor:
         # Better handle mismatch of features indices
         tp = rs.TensorProduct(self.Rs, other.Rs, o3.selection_rule)
         return IrrepTensor(tp(self.signal, other.signal), tp.Rs_out)
+
+    @classmethod
+    def from_irrep_tensor(cls, irrep_tensor):
+        Rs_remove_p = [(mul, L) for mul, L, p in irrep_tensor.Rs]
+        Rs, perm = rs.sort(Rs_remove_p)
+        Rs = rs.simplify(Rs)
+        mul, Ls, p  = zip(*Rs)
+        if max(mul) > 1:
+            raise ValueError(
+                "Cannot have multiplicity greater than 1 for any L. This tensor has a simplified Rs of {}".format(Rs)
+            )
+        Lmax = max(Ls)
+        sorted_tensor = torch.einsum('ij,...j->...i', perm.to_dense(), irrep_tensor.tensor)
+        signal = torch.zeros((Lmax + 1)**2)
+        Rs_idx = 0
+        for L in range(Lmax + 1):
+            if Rs[Rs_idx][1] == L:
+                ten_slice = slice(rs.dim(Rs[:Rs_idx]), rs.dim(Rs[:Rs_idx + 1]))
+                signal[L ** 2: (L + 1) ** 2] = sorted_tensor[ten_slice]
+                Rs_idx += 1
+        return cls(signal)
