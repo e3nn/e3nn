@@ -172,5 +172,9 @@ def test_from_irrep_tensor():
     else:
         raise AssertionError("ValueError was not raised.")
 
-    irrep = IrrepTensor(torch.randn(8), Rs=[(1, 0, 0), (1, 3, 0)])
-    SphericalTensor.from_irrep_tensor(irrep)
+    irrep = IrrepTensor(torch.ones(8), Rs=[(1, 0, 0), (1, 3, 0)])
+    sph = SphericalTensor.from_irrep_tensor(irrep)
+    compare = torch.zeros(16)
+    compare[0] = 1.
+    compare[-7:] = 1.
+    assert torch.allclose(sph.signal, compare)

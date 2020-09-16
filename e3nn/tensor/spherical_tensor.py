@@ -264,7 +264,7 @@ class SphericalTensor:
         signal = torch.zeros((Lmax + 1)**2)
         Rs_idx = 0
         for L in range(Lmax + 1):
-            if Rs[Rs_idx][2] == L:
+            if Rs[Rs_idx][1] == L:
                 ten_slice = slice(rs.dim(Rs[:Rs_idx]), rs.dim(Rs[:Rs_idx + 1]))
                 signal[L ** 2: (L + 1) ** 2] = sorted_tensor[ten_slice]
                 Rs_idx += 1
