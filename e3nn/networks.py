@@ -88,6 +88,21 @@ class GatedConvNetwork(torch.nn.Module):
             K(representations[-2], representations[-1])))
 
     def forward(self, input, *args, **kwargs):
+        """Consult the convolution operation used to initalize this class for specifics on what input should be given.
+
+        Args:
+            input ([torch.tensor with dtype=torch.float64]): input tensor with shape [batch, N, C] if default or [N, C] if e3nn.point.message_passing.Convolution
+
+        Examples::
+
+            ## Example for e3nn.point.message_passing.Convolution
+
+            n_norm = 6  # Normalization of convolution to keep variance of output close to 1. Typically, this is equal to slightly larger than the dataset average for number of nearest neighbors.
+            data = dh.DataNeighbors(features, Rs_in, pos, r_max, y=target)
+            # data.x is input with shape [num_nodes, channels], data.edge_index has shape [2, num_edges], data.edge_attr stores relative distance vectors and has shape [num_edges, 3 (xyz)]
+            output = model(data.x, data.edge_index, data.edge_attr, n_norm=n_norm)
+            loss = ((output - target) ** 2).mean()
+        """
         output = input
         N = args[0].shape[-2]
         if 'n_norm' not in kwargs:
@@ -183,6 +198,21 @@ class GatedConvParityNetwork(torch.nn.Module):
         self.layers.append(convolution(K(Rs, Rs_out)))
 
     def forward(self, input, *args, **kwargs):
+        """Consult the convolution operation used to initalize this class for specifics on what input should be given.
+
+        Args:
+            input ([torch.tensor with dtype=torch.float64]): input tensor with shape [batch, N, C] if default or [N, C] if e3nn.point.message_passing.Convolution
+
+        Examples::
+
+            ## Example for e3nn.point.message_passing.Convolution
+
+            n_norm = 6  # Normalization of convolution to keep variance of output close to 1. Typically, this is equal to slightly larger than the dataset average for number of nearest neighbors.
+            data = dh.DataNeighbors(features, Rs_in, pos, r_max, y=target)
+            # data.x is input with shape [num_nodes, channels], data.edge_index has shape [2, num_edges], data.edge_attr stores relative distance vectors and has shape [num_edges, 3 (xyz)]
+            output = model(data.x, data.edge_index, data.edge_attr, n_norm=n_norm)
+            loss = ((output - target) ** 2).mean()
+        """
         output = input
         N = args[0].shape[-2]
         if 'n_norm' not in kwargs:
