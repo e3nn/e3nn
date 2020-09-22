@@ -547,7 +547,7 @@ def orthonormalize(
         if x.norm() > eps:
             x = x / x.norm()
             x[x.abs() < eps] = torch.zeros(())
-            x *= x[x.nonzero()[0, 0]].sign()
+            x *= x[x.nonzero(as_tuple=False)[0, 0]].sign()
             base += [x]
 
     expand = []
@@ -557,7 +557,7 @@ def orthonormalize(
         if x.norm() > eps:
             x /= x.norm()
             x[x.abs() < eps] = torch.zeros(())
-            x *= x[x.nonzero()[0, 0]].sign()
+            x *= x[x.nonzero(as_tuple=False)[0, 0]].sign()
             expand += [x]
 
     base = torch.stack(base) if len(base) > 0 else torch.zeros(0, dim)
