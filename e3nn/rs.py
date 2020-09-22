@@ -500,6 +500,9 @@ class TensorProduct(torch.nn.Module):
         d_in1 = dim(self.Rs_in1)
         d_in2 = dim(self.Rs_in2)
         size_2 = features_2.shape[:-1]
+        if d_in2 == 0:
+            return features_2.new_zeros(*size_2, d_out, d_in1)
+
         features_2 = features_2.reshape(-1, d_in2)
 
         mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
@@ -516,6 +519,9 @@ class TensorProduct(torch.nn.Module):
         d_in1 = dim(self.Rs_in1)
         d_in2 = dim(self.Rs_in2)
         size_1 = features_1.shape[:-1]
+        if d_in1 == 0:
+            return features_1.new_zeros(*size_1, d_out, d_in2)
+
         features_1 = features_1.reshape(-1, d_in1)
 
         mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
