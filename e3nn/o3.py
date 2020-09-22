@@ -24,8 +24,12 @@ def rot_z(gamma, dtype=None, device=None):
     """
     Rotation around Z axis
     """
+    if dtype is None:
+        dtype = torch.get_default_dtype()
     if not torch.is_tensor(gamma):
         gamma = torch.tensor(gamma, dtype=dtype, device=device)
+    else:
+        gamma = gamma.to(dtype=dtype, device=device)
 
     return torch.stack([
         torch.stack([gamma.cos(),
@@ -44,8 +48,12 @@ def rot_y(beta, dtype=None, device=None):
     """
     Rotation around Y axis
     """
+    if dtype is None:
+        dtype = torch.get_default_dtype()
     if not torch.is_tensor(beta):
         beta = torch.tensor(beta, dtype=dtype, device=device)
+    else:
+        beta = beta.to(dtype=dtype, device=device)
 
     return torch.stack([
         torch.stack([beta.cos(),
