@@ -271,7 +271,7 @@ def spherical_harmonics_xyz(Rs, xyz):
 
     # rotate back
     sh[s] = sh[s] @ _rep_zx(tuple(Rs), xyz.dtype, xyz.device)
-    return sh.reshape(*size, -1)
+    return sh.reshape(*size, sh.shape[1])
 
 
 def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
@@ -299,4 +299,5 @@ def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
 
     if not rs.are_equal(Rs, list(range(lmax + 1))):
         out = torch.cat([out[l**2: (l + 1)**2] for mul, l, _ in Rs for _ in range(mul)])
-    return out.T.reshape(*size, -1)
+
+    return out.T.reshape(*size, out.shape[0])
