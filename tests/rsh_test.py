@@ -1,9 +1,9 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
 import math
+from functools import partial
+
 import torch
-
 from e3nn import o3, rsh
-
 
 
 def test_scipy_spherical_harmonics():
@@ -143,12 +143,9 @@ def test_rsh_backwardable():
     lmax = 10
     Rs = [(1, l) for l in range(lmax + 1)]
 
-    xyz = torch.tensor([0., 0., 1.], requires_grad=True)
-    sph = rsh.spherical_harmonics_xyz(Rs, xyz, eps=0)
-    sph.norm(2, -1).mean().backward()
-    assert torch.allclose(torch.isnan(xyz.grad).nonzero(), torch.LongTensor([[0], [1], [2]]))
-
-    xyz = torch.tensor([0., 0., 1.], requires_grad=True)
-    sph = rsh.spherical_harmonics_xyz(Rs, xyz, eps=1e-10)
-    sph.norm(2, -1).mean().backward()
-    assert torch.allclose(torch.isnan(xyz.grad).nonzero(), torch.LongTensor([[]]))
+    xyz = torch.tensor([
+        [0., 0., 1.],
+        [1.0, 0, 0],
+        [0.0, 1.0, 0],
+    ], requires_grad=True, dtype=torch.float64)
+    assert torch.autograd.gradcheck(partial(rsh.spherical_harmonics_xyz, Rs), (xyz,), check_undefined_grad=False)

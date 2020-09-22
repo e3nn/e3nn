@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, arguments-differ
 """
 Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
@@ -8,7 +8,7 @@ from functools import lru_cache
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
-from e3nn import rs
+from e3nn import rs, o3
 from e3nn.util.eval_code import eval_code
 
 
@@ -233,21 +233,32 @@ def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
     return out.reshape(alpha.shape + (shz.shape[1],))
 
 
-def spherical_harmonics_xyz(Rs, xyz, eps=0.):
+@lru_cache()
+def _rot_xz(dtype, device):
+    return torch.stack([
+        torch.eye(3, dtype=dtype, device=device),
+        o3.rot(0, math.pi / 2, 0, dtype=dtype, device=device)
+    ])
+
+
+@lru_cache()
+def _rep_zx(Rs, dtype, device):
+    o = torch.zeros((), dtype=dtype, device=device)
+    return torch.stack([
+        rs.rep(Rs, o, o, o),
+        rs.rep(Rs, o, -math.pi / 2, o)
+    ])
+
+
+def spherical_harmonics_xyz(Rs, xyz):
     """
     spherical harmonics
 
     :param Rs: list of L's
     :param xyz: tensor of shape [..., 3]
-    :param eps: epsilon for denominator of atan2
     :return: tensor of shape [..., m]
-
-    The eps parameter is only to be used when backpropogating to coordinates xyz.
-    To determine a stable eps value, we recommend benchmarking against numerical
-    gradients before setting this parameter. Use the smallest epsilon that prevents NaNs.
-    For some cases, we have used 1e-10. Your case may require a different value.
-    Use this option with care.
     """
+    Rs = rs.simplify(Rs)
 
     if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
         try:
@@ -255,14 +266,23 @@ def spherical_harmonics_xyz(Rs, xyz, eps=0.):
         except ImportError:
             pass
 
-    norm = torch.norm(xyz, 2, dim=-1, keepdim=True)
-    xyz = xyz / (norm + eps)
+    *size, _ = xyz.shape
+    xyz = xyz.reshape(-1, 3)
+    xyz = xyz / torch.norm(xyz, 2, dim=1, keepdim=True)
 
-    alpha = torch.atan2(xyz[..., 1], xyz[..., 0] + eps)  # [...]
-    z = xyz[..., 2]  # [...]
-    y = (xyz[..., 0].pow(2) + xyz[..., 1].pow(2) + eps).sqrt()  # [...]
+    # if z > x, rotate x-axis with z-axis
+    s = xyz[:, 2].abs() > xyz[:, 0].abs()
+    xyz = torch.bmm(_rot_xz(xyz.dtype, xyz.device)[s.long()], xyz.reshape(-1, 3, 1)).reshape(-1, 3)
 
-    return spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
+    alpha = torch.atan2(xyz[:, 1], xyz[:, 0])
+    z = xyz[:, 2]
+    y = (xyz[:, 0].pow(2) + xyz[:, 1].pow(2)).sqrt()
+
+    sh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
+
+    # rotate back
+    sh = torch.bmm(_rep_zx(tuple(Rs), xyz.dtype, xyz.device)[s.long()], sh.reshape(*sh.shape, 1))
+    return sh.reshape(*size, -1)
 
 
 def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
