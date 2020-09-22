@@ -20,12 +20,12 @@ from e3nn.util.cache_file import cached_picklesjar
 from e3nn.util.default_dtype import torch_default_dtype
 
 
-def rot_z(gamma):
+def rot_z(gamma, dtype=None, device=None):
     """
     Rotation around Z axis
     """
     if not torch.is_tensor(gamma):
-        gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
+        gamma = torch.tensor(gamma, dtype=dtype, device=device)
 
     return torch.stack([
         torch.stack([gamma.cos(),
@@ -40,12 +40,12 @@ def rot_z(gamma):
     ], dim=-2)
 
 
-def rot_y(beta):
+def rot_y(beta, dtype=None, device=None):
     """
     Rotation around Y axis
     """
     if not torch.is_tensor(beta):
-        beta = torch.tensor(beta, dtype=torch.get_default_dtype())
+        beta = torch.tensor(beta, dtype=dtype, device=device)
 
     return torch.stack([
         torch.stack([beta.cos(),
@@ -65,11 +65,11 @@ def rot_y(beta):
 # is proportional to
 # [x, y, z]
 
-def rot(alpha, beta, gamma):
+def rot(alpha, beta, gamma, dtype=None, device=None):
     """
     ZYZ Euler angles rotation
     """
-    return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)
+    return rot_z(alpha, dtype, device) @ rot_y(beta, dtype, device) @ rot_z(gamma, dtype, device)
 
 
 def rand_rot():
