@@ -8,7 +8,7 @@ from functools import lru_cache
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
-from e3nn import rs, o3
+from e3nn import rs
 from e3nn.util.eval_code import eval_code
 
 
