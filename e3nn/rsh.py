@@ -234,20 +234,9 @@ def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
 
 
 @lru_cache()
-def _rot_xz(dtype, device):
-    return torch.stack([
-        torch.eye(3, dtype=dtype, device=device),
-        o3.rot(0, math.pi / 2, 0, dtype=dtype, device=device)
-    ])
-
-
-@lru_cache()
 def _rep_zx(Rs, dtype, device):
     o = torch.zeros((), dtype=dtype, device=device)
-    return torch.stack([
-        rs.rep(Rs, o, o, o),
-        rs.rep(Rs, o, -math.pi / 2, o)
-    ])
+    return rs.rep(Rs, o, -math.pi / 2, o)
 
 
 def spherical_harmonics_xyz(Rs, xyz):
@@ -272,7 +261,7 @@ def spherical_harmonics_xyz(Rs, xyz):
 
     # if z > x, rotate x-axis with z-axis
     s = xyz[:, 2].abs() > xyz[:, 0].abs()
-    xyz = torch.bmm(_rot_xz(xyz.dtype, xyz.device)[s.long()], xyz.reshape(-1, 3, 1)).reshape(-1, 3)
+    xyz[s] = xyz[s] @ xyz.new_tensor([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
 
     alpha = torch.atan2(xyz[:, 1], xyz[:, 0])
     z = xyz[:, 2]
@@ -281,7 +270,7 @@ def spherical_harmonics_xyz(Rs, xyz):
     sh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
 
     # rotate back
-    sh = torch.bmm(_rep_zx(tuple(Rs), xyz.dtype, xyz.device)[s.long()], sh.reshape(*sh.shape, 1))
+    sh[s] = sh[s] @ _rep_zx(tuple(Rs), xyz.dtype, xyz.device)
     return sh.reshape(*size, -1)
 
 
