@@ -546,21 +546,21 @@ def orthonormalize(
             x -= torch.dot(x, y) * y
         if x.norm() > eps:
             x = x / x.norm()
-            x[x.abs() < eps] = torch.zeros(())
+            x[x.abs() < eps] = x.new_zeros(())
             x *= x[x.nonzero()[0, 0]].sign()
             base += [x]
 
     expand = []
-    for x in torch.eye(dim):
+    for x in torch.eye(dim, device=vecs.device, dtype=vecs.dtype):
         for y in base + expand:
             x -= torch.dot(x, y) * y
         if x.norm() > eps:
             x /= x.norm()
-            x[x.abs() < eps] = torch.zeros(())
+            x[x.abs() < eps] = x.new_zeros(())
             x *= x[x.nonzero()[0, 0]].sign()
             expand += [x]
 
-    base = torch.stack(base) if len(base) > 0 else torch.zeros(0, dim)
-    expand = torch.stack(expand) if len(expand) > 0 else torch.zeros(0, dim)
+    base = torch.stack(base) if len(base) > 0 else vecs.new_zeros(0, dim)
+    expand = torch.stack(expand) if len(expand) > 0 else vecs.new_zeros(0, dim)
 
     return base, expand
