@@ -1026,7 +1026,7 @@ def _round_sqrt(x, eps):
     return x
 
 
-def reduce_tensor(formula, eps=1e-10, has_parity=None, **kw_Rs):
+def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
     """
     Usage
     Rs, Q = rs.reduce_tensor('ijkl=jikl=ikjl=ijlk', i=[(1, 1)])

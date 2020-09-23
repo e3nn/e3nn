@@ -446,7 +446,7 @@ def xyz3x3_to_irreducible_basis():
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
-def intertwiners(D1, D2, eps=1e-10, with_parity=False):
+def intertwiners(D1, D2, eps=1e-9, with_parity=False):
     """
     Compute a basis of the vector space of matrices A such that
     D1(g) A = A D2(g) for all g in O(3)
@@ -484,7 +484,7 @@ def intertwiners(D1, D2, eps=1e-10, with_parity=False):
     return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
 
-def reduce(D, D_small, eps=1e-10, with_parity=False):
+def reduce(D, D_small, eps=1e-9, with_parity=False):
     """
     Given a "big" representation and a "small" representation
     computes how many times the small appears in the big one and return:
@@ -525,7 +525,7 @@ def reduce(D, D_small, eps=1e-10, with_parity=False):
 @torch.jit.script
 def orthonormalize(
         vecs: torch.Tensor,
-        eps: float = 1e-10
+        eps: float = 1e-9
 ) -> Tuple[torch.Tensor, torch.Tensor]:  # pragma: no cover
     """
     :param vecs: tensor of shape [n, m] with n <= m
@@ -544,7 +544,7 @@ def orthonormalize(
     for x in vecs:
         for y in base:
             x -= torch.dot(x, y) * y
-        if x.norm() > eps:
+        if x.norm() > 2 * eps:
             x = x / x.norm()
             x[x.abs() < eps] = x.new_zeros(())
             x *= x[x.nonzero()[0, 0]].sign()
@@ -554,7 +554,7 @@ def orthonormalize(
     for x in torch.eye(dim, device=vecs.device, dtype=vecs.dtype):
         for y in base + expand:
             x -= torch.dot(x, y) * y
-        if x.norm() > eps:
+        if x.norm() > 2 * eps:
             x /= x.norm()
             x[x.abs() < eps] = x.new_zeros(())
             x *= x[x.nonzero()[0, 0]].sign()
