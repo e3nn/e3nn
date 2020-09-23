@@ -21,16 +21,16 @@ class GatedConvNetwork(torch.nn.Module):
     This network architecture should be used if you only want to be equivariant to rotations and translations but not inversion. GatedBlock acts on irreps of SO(3), meaning it does not include parity. If you want mirror symmetry and inversion, use GatedConvParityNetwork which handles the full irreps of O(3).
 
     Args:
-        Rs_in ([rs.TY_RS_STRICT]): Representation list of input data. Parity must be omitted or set to 0.
-        Rs_hidden ([rs.TY_RS_STRICT]): Representation list of intermediate data. Parity must be omitted or set to 0.
-        Rs_out ([rs.TY_RS_STRICT]): Representation list of output data. Parity must be omitted or set to 0.
-        lmax ([int > 0]): Maximum L used for spherical harmonic in kernel.
+        Rs_in (rs.TY_RS_STRICT): Representation list of input data. Parity must be omitted or set to 0.
+        Rs_hidden (rs.TY_RS_STRICT): Representation list of intermediate data. Parity must be omitted or set to 0.
+        Rs_out (rs.TY_RS_STRICT): Representation list of output data. Parity must be omitted or set to 0.
+        lmax (int > 0): Maximum L used for spherical harmonic in kernel.
         layers (int, optional): Number of convolution + GatedBlock layers. Defaults to 3.
         max_radius (float, optional): Maximum radius of radial basis functions. Used to initialize RadialFunction for kernel. Defaults to 1.0.
         number_of_basis (int, optional): Number of spaced Gaussian radial basis functions used for RadialFunction. Defaults to 3.
         radial_layers (int, optional): Number of dense layers applied to radial basis functions to create RadialFunction. Defaults to 3.
-        kernel ([type], optional): Equivariant kernel class. Defaults to e3nn.kernel.Kernel.
-        convolution ([type], optional): Equivariant convoltion operation. Defaults to e3nn.point.operations.Convolution. For torch_geometric.data.Data input use e3nn.point.message_passing.Convolution.
+        kernel (kernel class, optional): Equivariant kernel class. Defaults to e3nn.kernel.Kernel.
+        convolution (convolution class, optional): Equivariant convoltion operation. Defaults to e3nn.point.operations.Convolution. For torch_geometric.data.Data input use e3nn.point.message_passing.Convolution.
         min_radius (float, optional): Minimum radius of radial basis functions. Used to initialize RadialFunction for kernel. Defaults to 0.0.
 
     Example::
@@ -91,7 +91,7 @@ class GatedConvNetwork(torch.nn.Module):
         """Consult the convolution operation used to initalize this class for specifics on what input should be given.
 
         Args:
-            input ([torch.tensor with dtype=torch.float64]): input tensor with shape [batch, N, C] if default or [N, C] if e3nn.point.message_passing.Convolution
+            input (torch.tensor with dtype=torch.float64): input tensor with shape [batch, N, C] if default or [N, C] if e3nn.point.message_passing.Convolution
 
         Examples::
 
@@ -123,16 +123,16 @@ class GatedConvParityNetwork(torch.nn.Module):
     This network architecture should be used if you want to be fully equivariant to rotations, translations, and inversion (including mirrors).
 
     Args:
-        Rs_in ([rs.TY_RS_STRICT]): Representation list of input data. Must have parity specified (1 for even, -1 for odd).
-        mul ([int >0]): multiplicity of irreps of intermediate data.
-        Rs_out ([rs.TY_RS_STRICT]): Representation list of output data. Must have parity specified (1 for even, -1 for odd).
-        lmax ([int > 0]): Maximum L used for spherical harmonic in kernel and sets max L for intermediate data.
+        Rs_in (rs.TY_RS_STRICT): Representation list of input data. Must have parity specified (1 for even, -1 for odd).
+        mul (int > 0): multiplicity of irreps of intermediate data.
+        Rs_out (rs.TY_RS_STRICT): Representation list of output data. Must have parity specified (1 for even, -1 for odd).
+        lmax (int > 0): Maximum L used for spherical harmonic in kernel and sets max L for intermediate data.
         layers (int, optional): Number of convolution + GatedBlock layers. Defaults to 3.
         max_radius (float, optional): Maximum radius of radial basis functions. Used to initialize RadialFunction for kernel. Defaults to 1.0.
         number_of_basis (int, optional): Number of spaced Gaussian radial basis functions used for RadialFunction. Defaults to 3.
         radial_layers (int, optional): Number of dense layers applied to radial basis functions to create RadialFunction. Defaults to 3.
-        kernel ([type], optional): Equivariant kernel class. Defaults to e3nn.kernel.Kernel.
-        convolution ([type], optional): Equivariant convoltion operation. Defaults to e3nn.point.operations.Convolution. For torch_geometric.data.Data input use e3nn.point.message_passing.Convolution.
+        kernel (kernel class, optional): Equivariant kernel class. Defaults to e3nn.kernel.Kernel.
+        convolution (convolution class, optional): Equivariant convolution operation. Defaults to e3nn.point.operations.Convolution. For torch_geometric.data.Data input use e3nn.point.message_passing.Convolution.
         min_radius (float, optional): Minimum radius of radial basis functions. Used to initialize RadialFunction for kernel. Defaults to 0.0.
 
     Example::
@@ -201,7 +201,7 @@ class GatedConvParityNetwork(torch.nn.Module):
         """Consult the convolution operation used to initalize this class for specifics on what input should be given.
 
         Args:
-            input ([torch.tensor with dtype=torch.float64]): input tensor with shape [batch, N, C] if default or [N, C] if e3nn.point.message_passing.Convolution
+            input (torch.tensor with dtype=torch.float64): input tensor with shape [batch, N, C] if default or [N, C] if e3nn.point.message_passing.Convolution
 
         Examples::
 
@@ -272,8 +272,7 @@ class S2ConvNetwork(torch.nn.Module):
             output = conv(output, *args, **kwargs)
             shape = list(output.shape)
             # Split multiplicities into new batch
-            output = output.reshape(
-                shape[:-1] + [self.mul, (self.lmax + 1) ** 2])
+            output = output.reshape(shape[:-1] + [self.mul, (self.lmax + 1) ** 2])
             output = act(output)
             output = output.reshape(shape)
 
