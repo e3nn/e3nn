@@ -17,7 +17,7 @@ def test_parity_network():
 
     lmax = 3
     Rs = [(1, l, 1) for l in range(lmax + 1)]
-    model = GatedConvParityNetwork(Rs, 4, Rs, lmax, feature_product=True)
+    model = GatedConvParityNetwork(Rs, 4, Rs, lmax)
 
     features = rs.randn(1, 4, Rs)
     geometry = torch.randn(1, 4, 3)
@@ -38,7 +38,7 @@ def test_network():
 
     lmax = 3
     Rs = [(1, l) for l in range(lmax + 1)]
-    model = GatedConvNetwork(Rs, 4 * Rs, Rs, lmax, feature_product=True)
+    model = GatedConvNetwork(Rs, 4 * Rs, Rs, lmax)
 
     features = rs.randn(1, 4, Rs)
     geometry = torch.randn(1, 4, 3)
