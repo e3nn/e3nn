@@ -479,7 +479,7 @@ def intertwiners(D1, D2, eps=1e-9, with_parity=False):
         d /= 4
         if d.abs().max() < eps:
             solutions.append((d.norm(), A))
-    solutions = [A for _, A in sorted(solutions)]
+    solutions = [A for _, A in sorted(solutions, key=lambda x: x[0])]
 
     return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
