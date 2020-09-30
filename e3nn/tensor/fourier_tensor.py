@@ -72,6 +72,25 @@ class FourierTensor:
         new_cls.radial_model = radial_model
         return new_cls
 
+    def plotly_surface(self, box_length, center=None, n=30,
+                       radial_model=None, relu=True):
+        """
+        To use as follow
+        ```
+        import plotly.graph_objects as go
+        surface = go.Surface(**self.plotly_surface())
+        fig = go.Figure(data=[surface])
+        fig.show()
+        ```
+        """
+        r, f = self.plot(box_length, center, n, radial_model, relu)
+        return dict(
+            x=r[:, :, 0].numpy(),
+            y=r[:, :, 1].numpy(),
+            z=r[:, :, 2].numpy(),
+            surfacecolor=f.numpy(),
+        )
+
     def plot(self, box_length, center=None, n=30,
              radial_model=None, relu=True):
         muls, _ls, _ps = zip(*self.Rs)

@@ -171,19 +171,27 @@ class SphericalTensor:
         s2 = ToS2Grid(self.lmax, res=res, normalization='none')
         return s2.grid, s2(self.signal)
 
-    def plot(self, res=100, radius=True, center=None, relu=False):
+    def plotly_surface(self, res=100, radius=True, center=None, relu=False):
         """
-        r, f = self.plot()
-
+        To use as follow
+        ```
         import plotly.graph_objects as go
-        surface = go.Surface(
+        surface = go.Surface(**self.plotly_surface())
+        fig = go.Figure(data=[surface])
+        fig.show()
+        ```
+        """
+        r, f = self.plot(res, radius, center, relu)
+        return dict(
             x=r[:, :, 0].numpy(),
             y=r[:, :, 1].numpy(),
             z=r[:, :, 2].numpy(),
             surfacecolor=f.numpy(),
         )
-        fig = go.Figure(data=[surface])
-        fig.show()
+
+    def plot(self, res=100, radius=True, center=None, relu=False):
+        """
+        Returns `(r, f)` of shapes `[beta, alpha, 3]` and `[beta, alpha]`
         """
         assert self.signal.dim() == 1
 
