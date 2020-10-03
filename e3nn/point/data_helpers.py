@@ -228,7 +228,7 @@ class DataEdgeNeighbors(tg.data.Data):
         super(DataEdgeNeighbors, self).__init__(
             x=x, edge_x=edge_x, edge_index=edge_index, edge_edge_index=edge_edge_index,
             edge_attr=edge_attr, edge_edge_attr=edge_edge_attr, pos=pos, Rs_in=Rs_in,
-            Rs_in_edge=Rs_in_edge, **kwargs)
+            Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
 
 
 class DataEdgePeriodicNeighbors(tg.data.Data):
@@ -265,4 +265,4 @@ class DataEdgePeriodicNeighbors(tg.data.Data):
         super(DataEdgePeriodicNeighbors, self).__init__(
             x=x, edge_x=edge_x, edge_index=edge_index, edge_edge_index=edge_edge_index,
             edge_attr=edge_attr, edge_edge_attr=edge_edge_attr, pos=pos, Rs_in=Rs_in,
-            Rs_in_edge=Rs_in_edge, **kwargs)
+            Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
