@@ -84,13 +84,13 @@ class TensorPassingHomogenous(TensorPassingContext):
     def forward(self, graph):
         features = graph.x
         for layer in self.model:
-            features = layer(graph.edge_index, features, graph.abs_distances, graph.rel_vec)
+            features = layer(graph.edge_index, features, graph.abs_distances, graph.rel_vec, graph.norm)
         return features
 
 
 class TensorPassingLayer(torch_geometric.nn.MessagePassing):
     def __init__(self, Rs_in, Rs_out, named_buffers_pointer, radial_model, gate=torch.nn.Identity):
-        super().__init__()
+        super().__init__(aggr='add', flow='target_to_source')
 
         self.gate = gate(Rs_out)
         if not isinstance(gate, torch.nn.Identity):
@@ -137,13 +137,13 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
 
         return norm_coef
 
-    def forward(self, edge_index, features, abs_distances, rel_vectors):
+    def forward(self, edge_index, features, abs_distances, rel_vectors, norm):
         radial_model_outputs = self.radial_model(abs_distances)
         real_spherical_harmonics = spherical_harmonics_xyz(list(range(self.max_l + 1)), rel_vectors)
-        return self.propagate(edge_index, x=features, rsh=real_spherical_harmonics, rbm=radial_model_outputs)
+        return self.propagate(edge_index, x=features, rsh=real_spherical_harmonics, rbm=radial_model_outputs, norm=norm)
 
-    def message(self, x_j, rsh, rbm):
-        return tensor_msg(x_j, rsh, rbm, self)
+    def message(self, x_j, rsh, rbm, norm):
+        return norm.unsqueeze(1) * tensor_msg(x_j, rsh, rbm, self)
 
     def update(self, inputs):
         return self.gate(inputs)
