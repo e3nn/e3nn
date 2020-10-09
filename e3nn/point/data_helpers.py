@@ -163,8 +163,8 @@ def get_edge_edges_and_index(edge_index, symmetric_edges=False):
                     [[target1, source1], [target2, source2]]
                 )
     if symmetric_edges:
-        distinct_edges = list(set(map(tuple, np.sort(edge_index.transpose(1, 0).numpy(), axis=-1).tolist())))
-        edge_index_dict = dict(zip(distinct_edges, range(len(distinct_edges))))
+        distinct_edges = sorted(set(map(tuple, edge_index.transpose(1, 0).numpy().tolist())))
+        edge_index_dict = collections.OrderedDict(zip(distinct_edges, range(len(distinct_edges))))
         edge_edge_index = [
             [edge_index_dict[tuple(sorted(edge1))], edge_index_dict[tuple(sorted(edge2))]]
             for edge1, edge2 in edge_edges
