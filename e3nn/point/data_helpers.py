@@ -4,7 +4,6 @@ import torch_geometric as tg
 from e3nn import rs, o3
 from ase import Atoms, neighborlist
 from pymatgen.core.structure import Structure
-import numpy as np
 
 
 def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
