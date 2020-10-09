@@ -4,6 +4,7 @@ import torch_geometric as tg
 from e3nn import rs, o3
 from ase import Atoms, neighborlist
 from pymatgen.core.structure import Structure
+import collections
 
 
 def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
@@ -162,14 +163,17 @@ def get_edge_edges_and_index(edge_index, symmetric_edges=False):
                     [[target1, source1], [target2, source2]]
                 )
     if symmetric_edges:
-        distinct_edges = sorted(set(map(tuple, edge_index.transpose(1, 0).numpy().tolist())))
+        distinct_edges = sorted(set(map(tuple,
+                                        torch.sort(edge_index.transpose(1, 0),
+                                                   dim=-1)[0].numpy().tolist())))
+        print(distinct_edges)
         edge_index_dict = collections.OrderedDict(zip(distinct_edges, range(len(distinct_edges))))
         edge_edge_index = [
             [edge_index_dict[tuple(sorted(edge1))], edge_index_dict[tuple(sorted(edge2))]]
             for edge1, edge2 in edge_edges
         ]
     else:
-        edge_index_dict = dict(zip(map(tuple, edge_index.transpose(1, 0).numpy()), range(edge_index.shape[-1])))
+        edge_index_dict = collections.OrderedDict(zip(map(tuple, edge_index.transpose(1, 0).numpy()), range(edge_index.shape[-1])))
         edge_edge_index = [
             [edge_index_dict[tuple(edge1)], edge_index_dict[tuple(edge2)]]
             for edge1, edge2 in edge_edges

@@ -48,7 +48,7 @@ def test_get_edge_edges_and_index():
     edge_index_dict_symm, _, edge_edge_index_symm = dh.get_edge_edges_and_index(edge_index, symmetric_edges=True)
 
     check1 = {(0, 0): 0, (0, 1): 1, (0, 2): 2, (1, 0): 3, (1, 1): 4, (1, 2): 5, (2, 0): 6, (2, 1): 7, (2, 2): 8}
-    check2 = {(0, 1): 0, (1, 2): 1, (0, 0): 2, (1, 1): 3, (2, 2): 4, (0, 2): 5}
+    check2 = {(0, 0): 0, (0, 1): 1, (0, 2): 2, (1, 1): 3, (1, 2): 4, (2, 2): 5}
 
     assert edge_index_dict_asym == check1
     assert edge_index_dict_symm == check2
