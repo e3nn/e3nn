@@ -93,7 +93,7 @@ class TensorPassingLayer(torch_geometric.nn.MessagePassing):
         super().__init__(aggr='add', flow='target_to_source')
 
         self.gate = gate(Rs_out)
-        if not isinstance(gate, torch.nn.Identity):
+        if not isinstance(self.gate, torch.nn.Identity):
             self.Rs_pre_gate = self.gate.Rs_in
         else:
             self.Rs_pre_gate = Rs_out
