@@ -17,7 +17,7 @@ from e3nn import o3, perm
 from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
-TY_RS_LOOSE = Union[List[Union[int, Tuple[int, int], Tuple[int, int, int]]], int]
+TY_RS_LOOSE = Union[List[Union[int, Tuple[int, int], Tuple[int, int, int]]], int, Tuple[int, int], Tuple[int, int, int]]
 TY_RS_STRICT = List[Tuple[int, int, int]]
 
 
@@ -127,6 +127,9 @@ class TransposeToMulL(torch.nn.Module):
         )
 
     def forward(self, features):
+        """
+        :param features: Tensor of shape [..., n]
+        """
         *size, n = features.size()
         features = features.reshape(-1, n)
 
@@ -239,8 +242,8 @@ def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: conventional version of the same list which always includes parity
     """
-    if isinstance(Rs, int):
-        return [(1, Rs, 0)]
+    if isinstance(Rs, int) or isinstance(Rs, tuple):
+        Rs = [Rs]
 
     out = []
     for r in Rs:
@@ -250,6 +253,8 @@ def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
             (mul, l), p = r, 0
         elif len(r) == 3:
             mul, l, p = r
+        else:
+            raise AssertionError
 
         assert isinstance(mul, int) and mul >= 0
         assert isinstance(l, int) and l >= 0

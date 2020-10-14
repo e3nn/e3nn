@@ -236,7 +236,7 @@ def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
 @lru_cache()
 def _rep_zx(Rs, dtype, device):
     o = torch.zeros((), dtype=dtype, device=device)
-    return rs.rep(Rs, o, -math.pi / 2, o)
+    return rs.rep(list(Rs), o, -math.pi / 2, o)
 
 
 def spherical_harmonics_xyz(Rs, xyz):
