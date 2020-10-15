@@ -1017,6 +1017,7 @@ def _is_representation(D, eps, with_parity=False):
 
 
 def _round_sqrt(x, eps):
+    # round off x assuming it contains terms of the form +-1/sqrt(N)
     x[x.abs() < eps] = 0
     x = x.sign() / x.pow(2)
     x = x.div(eps).round().mul(eps)
@@ -1034,6 +1035,7 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
     Q = tensor of shape [15, 81]
     """
     with torch_default_dtype(torch.float64):
+        # reformat `formulas` and make checks
         formulas = [
             (-1 if f.startswith('-') else 1, f.replace('-', ''))
             for f in formula.split('=')
@@ -1047,9 +1049,13 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
             if len(f0) != len(f):
                 raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
 
+        # `formulas` is a list of (sign, permutation of indices)
+        # each formula can be viewed as a permutation of the original formula
         formulas = {(s, tuple(f.index(i) for i in f0)) for s, f in formulas}  # set of generators (permutations)
 
-        # create the entire group
+        # they can be composed, for instance if you have ijk=jik=ikj
+        # you also have ijk=jki
+        # applying all possible compositions creates an entire group
         while True:
             n = len(formulas)
             formulas = formulas.union([(s, perm.inverse(p)) for s, p in formulas])
@@ -1059,8 +1065,9 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
                 for s2, p2 in formulas
             ])
             if len(formulas) == n:
-                break
+                break  # we break when the set is stable => it is now a group \o/
 
+        # lets clean the `kw_Rs` before checking that they are compatible with the formulas
         for i in kw_Rs:
             if not callable(kw_Rs[i]):
                 Rs = convention(kw_Rs[i])
@@ -1075,6 +1082,7 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
         if has_parity is None:
             raise RuntimeError(f'please specify the argument `has_parity`')
 
+        # here we check that each index has one and only one representation
         for _s, p in formulas:
             f = "".join(f0[i] for i in p)
             for i, j in zip(f0, f):
@@ -1090,12 +1098,19 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
                 raise RuntimeError(f'index {i} has not Rs associated to it')
 
         e = (0, 0, 0, 0) if has_parity else (0, 0, 0)
-        full_base = list(itertools.product(*(range(len(kw_Rs[i](*e)) if callable(kw_Rs[i]) else dim(kw_Rs[i])) for i in f0)))
+        dims = {i: len(kw_Rs[i](*e)) if callable(kw_Rs[i]) else dim(kw_Rs[i]) for i in f0}  # dimension of each index
+        full_base = list(itertools.product(*(range(dims[i]) for i in f0)))  # (0, 0, 0), (0, 0, 1), (0, 0, 2), ... (3, 3, 3)
+        # len(full_base) degrees of freedom in an unconstrained tensor
 
+        # but there is constraints given by the group `formulas`
+        # For instance if `ij=-ji`, then 00=-00, 01=-01 and so on
         base = set()
         for x in full_base:
+            # T[x] is a coefficient of the tensor T and is related to other coefficient T[y]
+            # if x and y are related by a formula
             xs = {(s, tuple(x[i] for i in p)) for s, p in formulas}
-            # s * T[x] all equal for (s, x) in xs
+            # s * T[x] are all equal for all (s, x) in xs
+            # if T[x] = -T[x] it is then equal to 0 and we lose this degree of freedom
             if not (-1, x) in xs:
                 # the sign is arbitrary, put both possibilities
                 base.add(frozenset({
@@ -1103,8 +1118,12 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
                     frozenset({(-s, x) for s, x in xs})
                 }))
 
+        # len(base) is the number of degrees of freedom in the tensor.
+        # Now we want to decompose these degrees of freedom into irreps
+
         base = sorted([sorted([sorted(xs) for xs in x]) for x in base])  # requested for python 3.7 but not for 3.8 (probably a bug in 3.7)
 
+        # First we compute the change of basis (projection) between full_base and base
         d_sym = len(base)
         d = len(full_base)
         Q = torch.zeros(d_sym, d)
@@ -1120,6 +1139,7 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
         if d_sym == 0:
             return [], torch.zeros(d_sym, d)
 
+        # We project the representation on the basis `base`
         def representation(alpha, beta, gamma, parity=None):
             def re(r):
                 if callable(r):
@@ -1131,8 +1151,10 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
             m = o3.kron(*(re(kw_Rs[i]) for i in f0))
             return Q @ m @ Q.T
 
+        # And check that after this projection it is still a representation
         assert _is_representation(representation, eps, has_parity)
 
+        # The rest of the code simply extract the irreps present in this representation
         Rs_out = []
         A = Q.clone()
         for l in range(int((d_sym - 1) // 2) + 1):
