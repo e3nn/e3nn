@@ -7,6 +7,8 @@ from e3nn.networks import (
     GatedConvParityNetwork,
     GatedConvNetwork,
     ImageS2Network,
+    ImageGatedConvNetwork,
+    ImageGatedConvParityNetwork,
     S2ConvNetwork,
     S2ParityNetwork,
 )
@@ -54,7 +56,7 @@ def test_network():
     assert (output - output2).abs().max() < 1e-10 * output.abs().max()
 
 
-def test_image_network():
+def test_image_s2_network():
     torch.set_default_dtype(torch.float64)
 
     Rs = [0, 0, 3]
@@ -65,6 +67,42 @@ def test_image_network():
         lmax=6,
         Rs_out=Rs,
         size=5,
+        layers=3
+    )
+
+    image = rs.randn(1, 16, 16, 16, Rs)
+    model(image)
+
+
+def test_image_gated_conv_network():
+    torch.set_default_dtype(torch.float64)
+
+    Rs = [0, 0, 3]
+
+    model = ImageGatedConvNetwork(
+        Rs_in=Rs,
+        Rs_hidden=[0, 1, 2, 3],
+        Rs_out=Rs,
+        size=5,
+        lmax=6,
+        layers=3
+    )
+
+    image = rs.randn(1, 16, 16, 16, Rs)
+    model(image)
+
+
+def test_image_gated_conv_parity_network():
+    torch.set_default_dtype(torch.float64)
+
+    Rs = [(2, 0, 1), (1, 1, -1)]
+
+    model = ImageGatedConvParityNetwork(
+        Rs_in=Rs,
+        mul=3,
+        Rs_out=Rs,
+        size=5,
+        lmax=6,
         layers=3
     )
 

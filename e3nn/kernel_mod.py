@@ -1,4 +1,5 @@
-# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ, no-member, pointless-statement, unbalanced-tuple-unpacking
+# pylint: disable=missing-docstring, line-too-long, invalid-name, arguments-differ
+# pylint: disable=no-member, pointless-statement, unbalanced-tuple-unpacking, abstract-method
 import math
 
 import torch
@@ -105,7 +106,10 @@ class Kernel(torch.nn.Module):
 
 
 class FrozenKernel(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, RadialModel, r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, normalization='component'):
+    def __init__(self, Rs_in, Rs_out, RadialModel,
+                 r, r_eps=0, selection_rule=o3.selection_rule_in_out_sh, normalization='component',
+                 allow_unused_inputs=False,
+                 allow_zero_outputs=False):
         """
         :param Rs_in: list of triplet (multiplicity, representation order, parity)
         :param Rs_out: list of triplet (multiplicity, representation order, parity)
@@ -122,7 +126,10 @@ class FrozenKernel(torch.nn.Module):
 
         self.Rs_in = rs.convention(Rs_in)
         self.Rs_out = rs.convention(Rs_out)
-        self.check_input_output(selection_rule)
+        if not allow_unused_inputs:
+            self.check_input(selection_rule)
+        if not allow_zero_outputs:
+            self.check_output(selection_rule)
 
         *self.size, xyz = r.size()
         assert xyz == 3
@@ -157,11 +164,12 @@ class FrozenKernel(torch.nn.Module):
             Rs_out=rs.format_Rs(self.Rs_out),
         )
 
-    def check_input_output(self, selection_rule):
+    def check_output(self, selection_rule):
         for _, l_out, p_out in self.Rs_out:
             if not any(selection_rule(l_in, p_in, l_out, p_out) for _, l_in, p_in in self.Rs_in):
                 raise ValueError("warning! the output (l={}, p={}) cannot be generated".format(l_out, p_out))
 
+    def check_input(self, selection_rule):
         for _, l_in, p_in in self.Rs_in:
             if not any(selection_rule(l_in, p_in, l_out, p_out) for _, l_out, p_out in self.Rs_out):
                 raise ValueError("warning! the input (l={}, p={}) cannot be used".format(l_in, p_in))

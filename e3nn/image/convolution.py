@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, redefined-builtin, missing-docstring, line-too-long, no-member, invalid-name
+# pylint: disable=arguments-differ, redefined-builtin, missing-docstring, line-too-long, no-member, invalid-name, abstract-method
 import math
 from functools import partial
 
@@ -11,7 +11,7 @@ from e3nn.radial import CosineBasisModel
 
 
 class Convolution(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, size, steps=(1, 1, 1), lmax=None, fuzzy_pixels=False, **kwargs):
+    def __init__(self, Rs_in, Rs_out, size, steps=(1, 1, 1), lmax=None, fuzzy_pixels=False, allow_unused_inputs=False, allow_zero_outputs=False, **kwargs):
         super().__init__()
 
         r = torch.linspace(-1, 1, size)
@@ -30,7 +30,9 @@ class Convolution(torch.nn.Module):
             R,
             r,
             selection_rule=partial(o3.selection_rule_in_out_sh, lmax=lmax),
-            normalization='component'
+            normalization='component',
+            allow_unused_inputs=allow_unused_inputs,
+            allow_zero_outputs=allow_zero_outputs,
         )
         self.kwargs = kwargs
 

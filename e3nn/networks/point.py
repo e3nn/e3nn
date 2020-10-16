@@ -1,4 +1,4 @@
-# pylint: disable=no-member, arguments-differ, redefined-builtin, missing-docstring, line-too-long, invalid-name
+# pylint: disable=no-member, arguments-differ, redefined-builtin, missing-docstring, line-too-long, invalid-name, abstract-method
 from functools import partial
 
 import torch
@@ -9,10 +9,7 @@ from e3nn.non_linearities import GatedBlock, GatedBlockParity
 from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
-from e3nn.image.convolution import Convolution as ImageConvolution
-from e3nn.image.filter import LowPassFilter
 from e3nn.radial import GaussianRadialModel
-from e3nn.tensor_product import LearnableTensorSquare
 
 
 class GatedConvNetwork(torch.nn.Module):
@@ -171,7 +168,7 @@ class GatedConvParityNetwork(torch.nn.Module):
 
         modules = []
 
-        Rs = Rs_in
+        Rs = rs.convention(Rs_in)
         for _ in range(layers):
             scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1),
                                                      (mul, 0, -1)] if rs.haslinearpath(Rs, l, p)]
@@ -279,133 +276,3 @@ class S2ConvNetwork(torch.nn.Module):
         layer = self.layers[-1]
         output = layer(output, *args, **kwargs)
         return output
-
-
-class S2Network(torch.nn.Module):
-    def __init__(self, Rs_in, mul, lmax, Rs_out, layers=3):
-        super().__init__()
-
-        Rs = self.Rs_in = rs.simplify(Rs_in)
-        self.Rs_out = rs.simplify(Rs_out)
-        self.act = S2Activation(list(range(lmax + 1)),
-                                swish, res=20 * (lmax + 1))
-
-        self.layers = []
-
-        for _ in range(layers):
-            lin = LearnableTensorSquare(
-                Rs, mul * self.act.Rs_in, linear=True, allow_zero_outputs=True)
-
-            # s2 nonlinearity
-            Rs = mul * self.act.Rs_out
-
-            self.layers += [lin]
-
-        self.layers = torch.nn.ModuleList(self.layers)
-
-        self.tail = LearnableTensorSquare(Rs, self.Rs_out)
-
-    def forward(self, x):
-        for lin in self.layers:
-            x = lin(x)
-
-            # put multiplicity into batch
-            x = x.reshape(*x.shape[:-1], -1, rs.dim(self.act.Rs_in))
-            x = self.act(x)
-            x = x.reshape(*x.shape[:-2], -1)  # put back into representation
-
-        x = self.tail(x)
-        return x
-
-
-class S2ParityNetwork(torch.nn.Module):
-    def __init__(self, Rs_in, mul, lmax, Rs_out, layers=3):
-        super().__init__()
-
-        Rs = self.Rs_in = rs.simplify(Rs_in)
-        self.Rs_out = rs.simplify(Rs_out)
-
-        def make_act(p_val, p_arg, act):
-            Rs = [(1, l, p_val * p_arg**l) for l in range(lmax + 1)]
-            return S2Activation(Rs, act, res=20 * (lmax + 1))
-
-        self.act1, self.act2 = make_act(1, -1, swish), make_act(-1, -1, tanh)
-        self.mul = mul
-
-        self.layers = []
-
-        for _ in range(layers):
-            Rs_out = mul * (self.act1.Rs_in + self.act2.Rs_in)
-            lin = LearnableTensorSquare(
-                Rs, Rs_out, linear=True, allow_zero_outputs=True)
-
-            # s2 nonlinearity
-            Rs = mul * (self.act1.Rs_out + self.act2.Rs_out)
-
-            self.layers += [lin]
-
-        self.layers = torch.nn.ModuleList(self.layers)
-
-        self.tail = LearnableTensorSquare(Rs, self.Rs_out)
-
-    def forward(self, x):
-        for lin in self.layers:
-            x = lin(x)
-
-            # put multiplicity into batch
-            x = x.reshape(*x.shape[:-1], self.mul, -1)
-            x1 = x.narrow(-1, 0, rs.dim(self.act1.Rs_in))
-            x2 = x.narrow(-1, rs.dim(self.act1.Rs_in), rs.dim(self.act2.Rs_in))
-            x1 = self.act1(x1)
-            x2 = self.act2(x2)
-            x = torch.cat([x1, x2], dim=-1)
-            x = x.reshape(*x.shape[:-2], -1)  # put back into representation
-
-        x = self.tail(x)
-        return x
-
-
-class ImageS2Network(torch.nn.Module):
-    def __init__(self, Rs_in, mul, lmax, Rs_out, size=5, layers=3):
-        super().__init__()
-
-        Rs = rs.simplify(Rs_in)
-        Rs_out = rs.simplify(Rs_out)
-        Rs_act = list(range(lmax + 1))
-
-        self.mul = mul
-        self.layers = []
-
-        for _ in range(layers):
-            conv = ImageConvolution(
-                Rs, mul * Rs_act, size, lmax=lmax, fuzzy_pixels=True, padding=size // 2)
-
-            # s2 nonlinearity
-            act = S2Activation(Rs_act, swish, res=60)
-            Rs = mul * act.Rs_out
-
-            pool = LowPassFilter(scale=2.0, stride=2)
-
-            self.layers += [torch.nn.ModuleList([conv, act, pool])]
-
-        self.layers = torch.nn.ModuleList(self.layers)
-        self.tail = LearnableTensorSquare(Rs, Rs_out)
-
-    def forward(self, x):
-        """
-        :param x: [batch, x, y, z, channel_in]
-        :return: [batch, x, y, z, channel_out]
-        """
-        for conv, act, pool in self.layers:
-            x = conv(x)
-
-            # put multiplicity into batch
-            x = x.reshape(*x.shape[:-1], self.mul, rs.dim(act.Rs_in))
-            x = act(x)
-            # put back into representation
-            x = x.reshape(*x.shape[:-2], self.mul * rs.dim(act.Rs_out))
-
-            x = pool(x)
-
-        x = self.tail(x)
-        return x
