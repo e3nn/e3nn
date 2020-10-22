@@ -1,3 +1,4 @@
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, missing-docstring, arguments-differ
 import torch
 from e3nn.tensor.irrep_tensor import IrrepTensor
 from e3nn import rs, o3

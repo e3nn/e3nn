@@ -131,6 +131,9 @@ class TransposeToMulL(torch.nn.Module):
         )
 
     def forward(self, features):
+        """
+        ...
+        """
         *size, n = features.size()
         features = features.reshape(-1, n)
 
@@ -1038,6 +1041,7 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
     Rs = 0,2,4
     Q = tensor of shape [15, 81]
     """
+    dtype = torch.get_default_dtype()
     with torch_default_dtype(torch.float64):
         # reformat `formulas` and make checks
         formulas = [
@@ -1141,7 +1145,7 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
         assert torch.allclose(Q @ Q.T, torch.eye(d_sym))
 
         if d_sym == 0:
-            return [], torch.zeros(d_sym, d)
+            return [], torch.zeros(d_sym, d).to(dtype=dtype)
 
         # We project the representation on the basis `base`
         def representation(alpha, beta, gamma, parity=None):
@@ -1176,4 +1180,5 @@ def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
 
         if dim(Rs_out) != d_sym:
             raise RuntimeError(f'unable to decompose into irreducible representations')
-        return simplify(Rs_out), A
+
+        return simplify(Rs_out), A.to(dtype=dtype)
