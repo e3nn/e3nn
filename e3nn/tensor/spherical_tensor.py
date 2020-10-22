@@ -163,15 +163,15 @@ class SphericalTensor:
             'ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
         return output.reshape((*self.signal.shape[:-1], *alpha.shape))
 
-    def signal_on_grid(self, res=100):
+    def signal_on_grid(self, res=100, normalization='none'):
         """
         :return: [..., beta, alpha]
         Evaluate the signal on the sphere
         """
-        s2 = ToS2Grid(self.lmax, res=res, normalization='none')
+        s2 = ToS2Grid(self.lmax, res=res, normalization=normalization)
         return s2.grid, s2(self.signal)
 
-    def plotly_surface(self, res=100, radius=True, center=None, relu=False):
+    def plotly_surface(self, res=100, radius=True, center=None, relu=False, normalization='none'):
         """
         To use as follow
         ```
@@ -181,7 +181,7 @@ class SphericalTensor:
         fig.show()
         ```
         """
-        r, f = self.plot(res, radius, center, relu)
+        r, f = self.plot(res, radius, center, relu, normalization)
         return dict(
             x=r[:, :, 0].numpy(),
             y=r[:, :, 1].numpy(),
@@ -189,13 +189,13 @@ class SphericalTensor:
             surfacecolor=f.numpy(),
         )
 
-    def plot(self, res=100, radius=True, center=None, relu=False):
+    def plot(self, res=100, radius=True, center=None, relu=False, normalization='none'):
         """
         Returns `(r, f)` of shapes `[beta, alpha, 3]` and `[beta, alpha]`
         """
         assert self.signal.dim() == 1
 
-        r, f = self.signal_on_grid(res)
+        r, f = self.signal_on_grid(res, normalization)
         f = f.relu() if relu else f
 
         # beta: [0, pi]
@@ -261,7 +261,7 @@ class SphericalTensor:
         Rs_remove_p = [(mul, L) for mul, L, p in irrep_tensor.Rs]
         Rs, perm = rs.sort(Rs_remove_p)
         Rs = rs.simplify(Rs)
-        mul, Ls, p  = zip(*Rs)
+        mul, Ls, _ = zip(*Rs)
         if max(mul) > 1:
             raise ValueError(
                 "Cannot have multiplicity greater than 1 for any L. This tensor has a simplified Rs of {}".format(Rs)
