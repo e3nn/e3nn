@@ -65,7 +65,7 @@ def main():
 
     for step in range(50):
         N, _ = batch.x.shape
-        out = f(batch.x, batch.edge_index, batch.edge_attr, size=N, batch=batch.batch)
+        out = f(batch.x, batch.edge_index, batch.edge_attr, batch=batch.batch)
         loss = torch.nn.functional.cross_entropy(out, batch.y)
         optimizer.zero_grad()
         loss.backward()
@@ -73,7 +73,7 @@ def main():
 
         acc = out.cpu().argmax(1).eq(labels).double().mean().item()
 
-        out = f(batch.x, batch.edge_index, batch.edge_attr, size=N, batch=batch.batch)
+        out = f(batch.x, batch.edge_index, batch.edge_attr, batch=batch.batch)
 
         r_tetris, _ = get_dataset()
 
@@ -85,7 +85,7 @@ def main():
         r_batch = Batch.from_data_list(r_tetris_dataset)
         r_batch = r_batch.to(device)
 
-        r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr, size=N, batch=r_batch.batch)
+        r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr, batch=r_batch.batch)
 
         print("step={} loss={:.2e} accuracy={:.2f} equivariance error={:.1e}".format(step, loss.item(), acc, (out - r_out).pow(2).mean().sqrt().item()))
 
