@@ -411,13 +411,14 @@ def tensor_product(
     # Rs_in1 x Rs_in2 -> Rs_out
     torch.einsum('kij,i,j->k', Q, A, B)
     """
-    if isinstance(input1, list) and isinstance(input2, list):
+
+    if callable(output):
         return _tensor_product_in_in(input1, input2, output, normalization, sorted)
 
-    if isinstance(input1, list) and isinstance(output, list):
+    if callable(input2):
         return _tensor_product_in_out(input1, input2, output, normalization, sorted)
 
-    if isinstance(input2, list) and isinstance(output, list):
+    if callable(input1):
         Rs_in1, Q = _tensor_product_in_out(input2, input1, output, normalization, sorted)
         # [out, in2 * in1] -> [out, in1 * in2]
         row, col, val = Q.coo()
