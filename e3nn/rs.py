@@ -441,17 +441,17 @@ class TensorProduct(torch.nn.Module):
 
         Rs, mat = tensor_product(input1, input2, output, normalization, sorted)
 
-        if not isinstance(input1, list):
+        if callable(input1):
             self.Rs_in1 = Rs
             self.Rs_in2 = convention(input2)
             self.Rs_out = convention(output)
             self._complete = 'in1'
-        if not isinstance(input2, list):
+        if callable(input2):
             self.Rs_in1 = convention(input1)
             self.Rs_in2 = Rs
             self.Rs_out = convention(output)
             self._complete = 'in2'
-        if not isinstance(output, list):
+        if callable(output):
             self.Rs_in1 = convention(input1)
             self.Rs_in2 = convention(input2)
             self.Rs_out = Rs
