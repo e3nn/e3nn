@@ -39,7 +39,7 @@ class Convolution(tg.nn.MessagePassing):
 
 
 class WTPConv(tg.nn.MessagePassing):
-    def __init__(self, Rs_in, Rs_out, lmax, RadialModel, selection_rule=o3.selection_rule, normalization='component', groups=1):
+    def __init__(self, Rs_in, Rs_out, Rs_sh, RadialModel, selection_rule=o3.selection_rule, normalization='component', groups=1):
         """
         :param Rs_in:  input representation
         :param lmax:   spherical harmonic representation
@@ -47,10 +47,9 @@ class WTPConv(tg.nn.MessagePassing):
         :param RadialModel: model constructor
         """
         super().__init__(aggr='add', flow='target_to_source')
-        Rs_y = [(1, l, (-1)**l) for l in range(0, lmax + 1)]
-        self.tp = WeightedTensorProduct(Rs_in, Rs_y, Rs_out, selection_rule, normalization, groups, weight=False)
+        self.tp = WeightedTensorProduct(Rs_in, Rs_sh, Rs_out, selection_rule, normalization, groups, weight=False)
         self.rm = RadialModel(self.tp.nweight)
-        self.Rs_y = Rs_y
+        self.Rs_sh = Rs_sh
         self.normalization = normalization
 
     def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
@@ -66,17 +65,17 @@ class WTPConv(tg.nn.MessagePassing):
 
         :return: Tensor of shape [n_source, dim(Rs_out)]
         """
-        y = rsh.spherical_harmonics_xyz(self.Rs_y, edge_r, self.normalization)  # [num_messages, dim(Rs_y)]
-        y.div_(n_norm ** 0.5)
+        sh = rsh.spherical_harmonics_xyz(self.Rs_sh, edge_r, self.normalization)  # [num_messages, dim(Rs_sh)]
+        sh.div_(n_norm ** 0.5)
 
         w = self.rm(edge_r.norm(dim=1))  # [num_messages, nweight]
 
-        return self.propagate(edge_index, size=size, x=features, y=y, w=w)
+        return self.propagate(edge_index, size=size, x=features, sh=sh, w=w)
 
-    def message(self, x_j, y, w):
+    def message(self, x_j, sh, w):
         """
         :param x_j: [num_messages, dim(Rs_in)]
-        :param y:   [num_messages, dim(Rs_y)]
+        :param sh:  [num_messages, dim(Rs_sh)]
         :param w:   [num_messages, nweight]
         """
-        return self.tp(x_j, y, w)
+        return self.tp(x_j, sh, w)

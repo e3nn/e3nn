@@ -13,8 +13,15 @@ from e3nn.networks import GatedConvNetwork
 from e3nn.point.message_passing import Convolution, WTPConv
 
 
-def convolution(Rs_in, Rs_out, lmax, RadialModel):
+# convolution using a kernel
+def convolution1(Rs_in, Rs_out, lmax, RadialModel):
     return Convolution(Kernel(Rs_in, Rs_out, RadialModel, partial(o3.selection_rule_in_out_sh, lmax=lmax)))
+
+
+# convolution using WTP i.e. jited einsums
+def convolution2(Rs_in, Rs_out, lmax, RadialModel):
+    Rs_sh = [(1, l, (-1)**l) for l in range(0, lmax + 1)]
+    return WTPConv(Rs_in, Rs_out, Rs_sh, RadialModel)
 
 
 def get_dataset():
@@ -51,8 +58,7 @@ def main():
     Rs_out = [(len(tetris), 0)]
     lmax = 3
 
-    # f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=convolution)
-    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=WTPConv)
+    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=convolution2)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)
