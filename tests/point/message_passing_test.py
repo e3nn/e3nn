@@ -7,7 +7,7 @@ import torch
 
 from e3nn import o3, rs
 from e3nn.kernel import Kernel, GroupKernel
-from e3nn.point.message_passing import Convolution
+from e3nn.point.message_passing import Convolution, WTPConv
 from e3nn.radial import ConstantRadialModel
 
 
@@ -29,7 +29,7 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
         torch.randint(n_source, size=(n_edge,)),
         torch.randint(n_target, size=(n_edge,)),
     ])
-    size = (n_target, n_source)
+    size = (n_source, n_target)
 
     if n_edge == 0:
         edge_r = torch.zeros(0, 3)
@@ -57,6 +57,35 @@ def test_equivariance(Rs_in, Rs_out, n_source, n_target, n_edge):
     assert (out1 - out2).abs().max() < 1e-10
     assert (out1_groups - out2_groups).abs().max() < 1e-10
     assert (out1_kernel_groups - out2_kernel_groups).abs().max() < 1e-10
+
+
+@pytest.mark.parametrize('Rs_in, Rs_out, n_source, n_target, n_edge', itertools.product([[1]], [[2]], [2, 3], [1, 3], [0, 3]))
+def test_equivariance_wtp(Rs_in, Rs_out, n_source, n_target, n_edge):
+    torch.set_default_dtype(torch.float64)
+
+    mp = WTPConv(Rs_in, Rs_out, 3, ConstantRadialModel)
+
+    features = rs.randn(n_target, Rs_in)
+
+    edge_index = torch.stack([
+        torch.randint(n_source, size=(n_edge,)),
+        torch.randint(n_target, size=(n_edge,)),
+    ])
+    size = (n_source, n_target)
+
+    edge_r = torch.randn(n_edge, 3)
+
+    print(features.shape, edge_index.shape, edge_r.shape, size)
+    out1 = mp(features, edge_index, edge_r, size=size)
+
+    angles = o3.rand_angles()
+    D_in = rs.rep(Rs_in, *angles)
+    D_out = rs.rep(Rs_out, *angles)
+    R = o3.rot(*angles)
+
+    out2 = mp(features @ D_in.T, edge_index, edge_r @ R.T, size=size) @ D_out
+
+    assert (out1 - out2).abs().max() < 1e-10
 
 
 def test_flow():

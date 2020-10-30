@@ -232,5 +232,8 @@ class WeightedTensorProduct(torch.nn.Module):
 
         wigners = [getattr(self, arg) for arg in self.wigners_names]
 
+        if features_1.shape[0] == 0:
+            return torch.zeros(*size, rs.dim(self.Rs_out))
+
         features = self.main(*wigners, features_1, features_2, weight)
         return features.reshape(*size, -1)
