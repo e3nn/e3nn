@@ -53,7 +53,12 @@ class ImageGatedConvParityNetwork(torch.nn.Module):
             nonscalars = [(mul, l, p) for l in range(1, lmax + 1)
                           for p in [+1, -1] if rs.haslinearpath(Rs, l, p)]
             gates = [(rs.mul_dim(nonscalars), 0, +1)]
-            act_gates = [(-1, sigmoid)]
+            if rs.haslinearpath(Rs, 0, +1):
+                gates = [(rs.mul_dim(nonscalars), 0, +1)]
+                act_gates = [(-1, sigmoid)]
+            else:
+                gates = [(rs.mul_dim(nonscalars), 0, -1)]
+                act_gates = [(-1, tanh)]
 
             act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
             conv = Convolution(Rs, act.Rs_in, size, lmax=lmax, fuzzy_pixels=True, padding=size // 2)

@@ -115,12 +115,12 @@ CODE
 
 
 class WeightedTensorProduct(torch.nn.Module):
-    def __init__(self, Rs_in1, Rs_in2, Rs_out, selection_rule=o3.selection_rule, normalization='component', groups=1):
+    def __init__(self, Rs_in1, Rs_in2, Rs_out, selection_rule=o3.selection_rule, normalization='component', groups=1, weight=True):
         super().__init__()
 
-        self.Rs_in1 = rs.convention(Rs_in1)
-        self.Rs_in2 = rs.convention(Rs_in2)
-        self.Rs_out = rs.convention(Rs_out)
+        self.Rs_in1 = rs.simplify(Rs_in1)
+        self.Rs_in2 = rs.simplify(Rs_in2)
+        self.Rs_out = rs.simplify(Rs_out)
 
         code = ""
 
@@ -206,10 +206,13 @@ class WeightedTensorProduct(torch.nn.Module):
         x = x.replace("ARGS", args)
         x = x.replace("CODE", code)
 
+        self.code = x
         self.main = eval_code(x).main
         self.nweight = index_w
+        if weight:
+            self.weight = torch.nn.Parameter(torch.randn(self.nweight))
 
-    def forward(self, features_1, features_2, weights):
+    def forward(self, features_1, features_2, weight=None):
         """
         :return:         tensor [..., channel]
         """
@@ -220,9 +223,14 @@ class WeightedTensorProduct(torch.nn.Module):
         features_2 = features_2.reshape(-1, n)
         assert n == rs.dim(self.Rs_in2), f"{n} is not {rs.dim(self.Rs_in2)}"
         assert size == size2
-        weights = weights.reshape(-1, self.nweight)
+
+        if weight is None:
+            weight = self.weight
+        weight = weight.reshape(-1, self.nweight)
+        if weight.shape[0] == 1:
+            weight = weight.repeat(features_1.shape[0], 1)
 
         wigners = [getattr(self, arg) for arg in self.wigners_names]
 
-        features = self.main(*wigners, features_1, features_2, weights)
+        features = self.main(*wigners, features_1, features_2, weight)
         return features.reshape(*size, -1)
