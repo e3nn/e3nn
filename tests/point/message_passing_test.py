@@ -65,6 +65,8 @@ def test_equivariance_wtp(Rs_in, Rs_out, n_source, n_target, n_edge):
     size = (n_target, n_source)
 
     edge_r = torch.randn(n_edge, 3)
+    if n_edge > 1:
+        edge_r[0] = 0
 
     out1 = mp(features, edge_index, edge_r, size=size)
 

@@ -1,6 +1,4 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable, abstract-method
-import math
-
 import torch
 import torch_geometric as tg
 from e3nn import o3, rsh
@@ -53,6 +51,7 @@ class WTPConv(tg.nn.MessagePassing):
         self.tp = WeightedTensorProduct(Rs_in, Rs_y, Rs_out, selection_rule, normalization, groups, weight=False)
         self.rm = RadialModel(self.tp.nweight)
         self.Rs_y = Rs_y
+        self.normalization = normalization
 
     def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
         """
@@ -67,11 +66,11 @@ class WTPConv(tg.nn.MessagePassing):
 
         :return: Tensor of shape [n_source, dim(Rs_out)]
         """
-        edge_d = edge_r.norm(dim=1)
-        y = math.sqrt(4 * math.pi) * rsh.spherical_harmonics_xyz(self.Rs_y, edge_r)  # [num_messages, dim(Rs_y)]
-        y[edge_d == 0, 1:] = 0
-        w = self.rm(edge_r.norm(dim=1))  # [num_messages, nweight]
+        y = rsh.spherical_harmonics_xyz(self.Rs_y, edge_r, self.normalization)  # [num_messages, dim(Rs_y)]
         y.div_(n_norm ** 0.5)
+
+        w = self.rm(edge_r.norm(dim=1))  # [num_messages, nweight]
+
         return self.propagate(edge_index, size=size, x=features, y=y, w=w)
 
     def message(self, x_j, y, w):

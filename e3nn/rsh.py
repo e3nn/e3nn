@@ -215,7 +215,7 @@ def spherical_harmonics_alpha_beta(Rs, alpha, beta):
     if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
         xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
         try:
-            return spherical_harmonics_xyz_cuda(Rs, xyz)
+            return _spherical_harmonics_xyz_cuda(Rs, xyz)
         except ImportError:
             pass
 
@@ -239,7 +239,7 @@ def _rep_zx(Rs, dtype, device):
     return rs.rep(Rs, o, -math.pi / 2, o)
 
 
-def spherical_harmonics_xyz(Rs, xyz):
+def spherical_harmonics_xyz(Rs, xyz, normalization='none'):
     """
     spherical harmonics
 
@@ -248,43 +248,46 @@ def spherical_harmonics_xyz(Rs, xyz):
     :return: tensor of shape [..., m]
     """
     Rs = rs.simplify(Rs)
-
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
-        try:
-            return spherical_harmonics_xyz_cuda(Rs, xyz)
-        except ImportError:
-            pass
-
     *size, _ = xyz.shape
     xyz = xyz.reshape(-1, 3)
     xyz = xyz / torch.norm(xyz, 2, dim=1, keepdim=True)
 
-    # if z > x, rotate x-axis with z-axis
-    s = xyz[:, 2].abs() > xyz[:, 0].abs()
-    xyz[s] = xyz[s] @ xyz.new_tensor([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
+    sh = None
 
-    alpha = torch.atan2(xyz[:, 1], xyz[:, 0])
-    z = xyz[:, 2]
-    y = (xyz[:, 0].pow(2) + xyz[:, 1].pow(2)).sqrt()
+    if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10:  # pragma: no cover
+        try:
+            sh = _spherical_harmonics_xyz_cuda(Rs, xyz)
+        except ImportError:
+            pass
 
-    sh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
+    if sh is None:
+        # if z > x, rotate x-axis with z-axis
+        s = xyz[:, 2].abs() > xyz[:, 0].abs()
+        xyz[s] = xyz[s] @ xyz.new_tensor([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
 
-    # rotate back
-    sh[s] = sh[s] @ _rep_zx(tuple(Rs), xyz.dtype, xyz.device)
+        alpha = torch.atan2(xyz[:, 1], xyz[:, 0])
+        z = xyz[:, 2]
+        y = xyz[:, :2].norm(dim=1)
+
+        sh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
+
+        # rotate back
+        sh[s] = sh[s] @ _rep_zx(tuple(Rs), xyz.dtype, xyz.device)
+
+    sh[torch.isnan(xyz).any(1)] = math.sqrt(1 / (4 * math.pi)) * torch.cat([sh.new_ones(1) if l == 0 else sh.new_zeros(2 * l + 1) for mul, l, p in Rs for _ in range(mul)])
+
+    if normalization == 'component':
+        sh.mul_(math.sqrt(4 * math.pi))
+    if normalization == 'norm':
+        sh.mul_(torch.cat([math.sqrt(4 * math.pi / (2 * l + 1)) * sh.new_ones(2 * l + 1) for mul, l, p in Rs for _ in range(mul)]))
     return sh.reshape(*size, sh.shape[1])
 
 
-def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
+def _spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
     """
     cuda version of spherical_harmonics_xyz
     """
     from e3nn import cuda_rsh  # pylint: disable=no-name-in-module, import-outside-toplevel
-
-    Rs = rs.simplify(Rs)
-
-    *size, _ = xyz.size()
-    xyz = xyz.reshape(-1, 3)
-    xyz = xyz / torch.norm(xyz, 2, -1, keepdim=True)
 
     lmax = rs.lmax(Rs)
     out = xyz.new_empty(((lmax + 1)**2, xyz.size(0)))  # [ filters, batch_size]
@@ -300,4 +303,4 @@ def spherical_harmonics_xyz_cuda(Rs, xyz):  # pragma: no cover
     if not rs.are_equal(Rs, list(range(lmax + 1))):
         out = torch.cat([out[l**2: (l + 1)**2] for mul, l, _ in Rs for _ in range(mul)])
 
-    return out.T.reshape(*size, out.shape[0])
+    return out.T
