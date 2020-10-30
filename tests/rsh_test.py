@@ -84,6 +84,12 @@ def test_sh_norm():
         d = s - 1 / (4 * math.pi)
         assert d.pow(2).mean().sqrt() < 1e-10
 
+        n = rsh.spherical_harmonics_xyz(3, torch.randn(3), 'norm').norm()
+        assert abs(n - 1) < 1e-10
+
+        n = rsh.spherical_harmonics_xyz(3, torch.randn(3), 'component').norm()
+        assert abs(n - 7**0.5) < 1e-10
+
 
 def test_sh_closure():
     """
