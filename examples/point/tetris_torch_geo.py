@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, arguments-differ
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, arguments-differ, abstract-method
 import torch
 from torch_geometric.data import Batch
 from torch_scatter import scatter_add
@@ -27,35 +27,22 @@ def get_dataset():
     return tetris, labels
 
 
-class SumNetwork(torch.nn.Module):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.network = GatedConvNetwork(*args, **kwargs)
-
-    def forward(self, *args, batch=None, **kwargs):
-        output = self.network(*args, **kwargs)
-        return scatter_add(output, batch, dim=0)
-
-
 def main():
     torch.set_default_dtype(torch.float64)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    tetris, labels = get_dataset()
-
     x = torch.ones(4, 1)
-    Rs_in = [(1, 0)]
+    Rs_in = [0]
     r_max = 1.1
-    tetris_dataset = []
-    for shape, label in zip(tetris, labels):
-        data = dh.DataNeighbors(x, Rs_in, shape, r_max, y=torch.tensor([label]))
-        tetris_dataset.append(data)
+
+    tetris, labels = get_dataset()
+    tetris_dataset = [dh.DataNeighbors(x, Rs_in, shape, r_max, y=label) for shape, label in zip(tetris, labels)]
 
     Rs_hidden = [(16, 0), (16, 1), (16, 2)]
     Rs_out = [(len(tetris), 0)]
     lmax = 3
 
-    f = SumNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=Convolution)
+    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=Convolution)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)
@@ -64,28 +51,23 @@ def main():
     optimizer = torch.optim.Adam(f.parameters(), lr=3e-3)
 
     for step in range(50):
-        N, _ = batch.x.shape
-        out = f(batch.x, batch.edge_index, batch.edge_attr, batch=batch.batch)
+        out = f(batch.x, batch.edge_index, batch.edge_attr)
+        out = scatter_add(out, batch.batch, dim=0)
+
+        acc = out.cpu().argmax(1).eq(labels).double().mean().item()
+
+        r_tetris_dataset = [dh.DataNeighbors(x, Rs_in, shape, r_max, y=label) for shape, label in zip(*get_dataset())]
+        r_batch = Batch.from_data_list(r_tetris_dataset)
+        r_batch = r_batch.to(device)
+
+        with torch.no_grad():
+            r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr)
+            r_out = scatter_add(r_out, r_batch.batch, dim=0)
+
         loss = torch.nn.functional.cross_entropy(out, batch.y)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        acc = out.cpu().argmax(1).eq(labels).double().mean().item()
-
-        out = f(batch.x, batch.edge_index, batch.edge_attr, batch=batch.batch)
-
-        r_tetris, _ = get_dataset()
-
-        r_tetris_dataset = []
-        for shape, label in zip(r_tetris, labels):
-            data = dh.DataNeighbors(x, Rs_in, shape, r_max, y=torch.tensor([label]))
-            r_tetris_dataset.append(data)
-
-        r_batch = Batch.from_data_list(r_tetris_dataset)
-        r_batch = r_batch.to(device)
-
-        r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr, batch=r_batch.batch)
 
         print("step={} loss={:.2e} accuracy={:.2f} equivariance error={:.1e}".format(step, loss.item(), acc, (out - r_out).pow(2).mean().sqrt().item()))
 

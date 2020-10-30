@@ -1,13 +1,102 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable
-import torch
-import torch_geometric as tg
-from e3nn import rs, o3
-from ase import Atoms, neighborlist
-from pymatgen.core.structure import Structure
 import collections
 
+import torch
+import torch_geometric as tg
+from ase import Atoms, neighborlist
+from pymatgen.core.structure import Structure
 
-def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
+from e3nn import o3, rs
+from e3nn.tensor import SphericalTensor
+
+
+class DataNeighbors(tg.data.Data):
+    def __init__(self, x, Rs_in, pos, r_max, self_interaction=True, **kwargs):
+        edge_index, edge_attr = _neighbor_list_and_relative_vec(pos, r_max, self_interaction)
+        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, Rs_in=Rs_in, **kwargs)
+
+
+class DataPeriodicNeighbors(tg.data.Data):
+    def __init__(self, x, Rs_in, pos, lattice, r_max, self_interaction=True, **kwargs):
+        edge_index, edge_attr = _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction)
+        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, lattice=lattice, Rs_in=Rs_in, **kwargs)
+
+
+class DataEdgeNeighbors(tg.data.Data):
+    """Constructs graph to perform edge convolutions.
+
+    Symmetric edges have not yet been implemented for this class.
+
+    Args:
+        x (torch.tensor shape [N, rs.dim(Rs_in)]): Node features.
+        Rs_in (rs.TY_RS_STRICT): Representation list of input.
+        pos (torch.tensor shape [N, 3]): Cartesian coordinates of nodes.
+        r_max (float): Radial cutoff for edges.
+        lmax (int > 0): Maximum L to use for SphericalTensor projection of radial distance vectors
+        self_interaction (bool, optional): Include self interactions of nodes. Defaults to True.
+        symmetric_edges (bool, optional): Constrain edge features to be symmetric in node index. Defaults to False.
+        self_edge (float, optional): L=0 feature for self edges. Defaults to 1.
+    """
+    def __init__(self, x, Rs_in, pos, r_max, lmax,
+                 self_interaction=True, symmetric_edges=False, self_edge=1., **kwargs):
+        edge_index, edge_attr = _neighbor_list_and_relative_vec(pos, r_max, self_interaction)
+        edge_index_dict, edge_edges, edge_edge_index = _get_edge_edges_and_index(edge_index, symmetric_edges=symmetric_edges)
+        edge_edge_attr = []
+        for _, edge2 in edge_edges:
+            target2, source2 = edge2
+            edge_edge_attr.append(
+                pos[source2] - pos[target2]
+            )
+
+        edge_edge_index = torch.LongTensor(edge_edge_index).transpose(0, 1)
+        edge_edge_attr = torch.stack(edge_edge_attr, dim=0)
+
+        edge_x, Rs_in_edge = _initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=self_edge)
+
+        super(DataEdgeNeighbors, self).__init__(
+            x=x, edge_x=edge_x, edge_index=edge_index, edge_edge_index=edge_edge_index,
+            edge_attr=edge_attr, edge_edge_attr=edge_edge_attr, pos=pos, Rs_in=Rs_in,
+            Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
+
+
+class DataEdgePeriodicNeighbors(tg.data.Data):
+    """Constructs periodic graph to perform edge convolutions.
+
+    symmetric_edges has not yet been implemented for this class.
+
+    Args:
+        x (torch.tensor shape [N, rs.dim(Rs_in)]): Node features.
+        Rs_in (rs.TY_RS_STRICT): Representation list of input.
+        pos (torch.tensor shape [N, 3]): Cartesian coordinates of nodes.
+        lattice (torch.tensor shape [3, 3]): Lattice vectors of unit cell.
+        r_max (float): Radial cutoff for edges.
+        lmax (int > 0): Maximum L to use for SphericalTensor projection of radial distance vectors
+        self_interaction (bool, optional): Include self interactions of nodes. Defaults to True.
+        self_edge (float, optional): L=0 feature for self edges. Defaults to 1.
+    """
+    def __init__(self, x, Rs_in, pos, lattice, r_max, lmax,
+                 self_interaction=True, self_edge=1., **kwargs):
+        edge_index, edge_attr = _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction)
+        edge_index_dict, edge_edges, edge_edge_index = _get_edge_edges_and_index(edge_index, symmetric_edges=False)
+        edge_edge_attr = []
+        for _, edge2 in edge_edges:
+            target2, source2 = edge2
+            edge_edge_attr.append(
+                pos[source2] - pos[target2]
+            )
+
+        edge_edge_index = torch.LongTensor(edge_edge_index).transpose(0, 1)
+        edge_edge_attr = torch.stack(edge_edge_attr, dim=0)
+
+        edge_x, Rs_in_edge = _initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=self_edge)
+
+        super(DataEdgePeriodicNeighbors, self).__init__(
+            x=x, edge_x=edge_x, edge_index=edge_index, edge_edge_index=edge_edge_index,
+            edge_attr=edge_attr, edge_edge_attr=edge_edge_attr, pos=pos, Rs_in=Rs_in,
+            Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
+
+
+def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     """
     Create neighbor list (edge_index) and relative vectors (edge_attr)
     based on radial cutoff.
@@ -50,7 +139,7 @@ def neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
 
 
-def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True, r_min=1e-8):
+def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True, r_min=1e-8):
     """
     Create neighbor list (edge_index) and relative vectors (edge_attr)
     based on radial cutoff and periodic lattice.
@@ -97,7 +186,7 @@ def neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction
     return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
 
 
-def initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=1., symmetric_edges=False):
+def _initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=1., symmetric_edges=False):
     """Initialize edge features of DataEdgeNeighbors using node features and SphericalTensor.
 
     Args:
@@ -113,7 +202,6 @@ def initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=1., symmetr
         edge_x: Edge features.
         Rs_edge (rs.TY_RS_STRICT): Representation list of edge features.
     """
-    from e3nn.tensor import SphericalTensor
     edge_x = []
     if symmetric_edges:
         Rs, Q = rs.reduce_tensor('ij=ji', i=Rs_in)
@@ -143,7 +231,7 @@ def initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=1., symmetr
     return edge_x, tp_kernel.Rs_out
 
 
-def get_edge_edges_and_index(edge_index, symmetric_edges=False):
+def _get_edge_edges_and_index(edge_index, symmetric_edges=False):
     """Given edge_index, construct edge_edges and edge_edge_index.
 
     Args:
@@ -179,93 +267,3 @@ def get_edge_edges_and_index(edge_index, symmetric_edges=False):
             for edge1, edge2 in edge_edges
         ]
     return edge_index_dict, edge_edges, edge_edge_index
-
-
-class DataNeighbors(tg.data.Data):
-    def __init__(self, x, Rs_in, pos, r_max, self_interaction=True, **kwargs):
-        edge_index, edge_attr = neighbor_list_and_relative_vec(
-            pos, r_max, self_interaction)
-        super(DataNeighbors, self).__init__(
-            x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, Rs_in=Rs_in, **kwargs)
-
-
-class DataPeriodicNeighbors(tg.data.Data):
-    def __init__(self, x, Rs_in, pos, lattice, r_max, self_interaction=True, **kwargs):
-        edge_index, edge_attr = neighbor_list_and_relative_vec_lattice(
-            pos, lattice, r_max, self_interaction)
-        super(DataPeriodicNeighbors, self).__init__(
-            x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, lattice=lattice, Rs_in=Rs_in, **kwargs)
-
-
-class DataEdgeNeighbors(tg.data.Data):
-    """Constructs graph to perform edge convolutions.
-
-    Symmetric edges have not yet been implemented for this class.
-
-    Args:
-        x (torch.tensor shape [N, rs.dim(Rs_in)]): Node features.
-        Rs_in (rs.TY_RS_STRICT): Representation list of input.
-        pos (torch.tensor shape [N, 3]): Cartesian coordinates of nodes.
-        r_max (float): Radial cutoff for edges.
-        lmax (int > 0): Maximum L to use for SphericalTensor projection of radial distance vectors
-        self_interaction (bool, optional): Include self interactions of nodes. Defaults to True.
-        symmetric_edges (bool, optional): Constrain edge features to be symmetric in node index. Defaults to False.
-        self_edge (float, optional): L=0 feature for self edges. Defaults to 1.
-    """
-    def __init__(self, x, Rs_in, pos, r_max, lmax,
-                 self_interaction=True, symmetric_edges=False, self_edge=1., **kwargs):
-        edge_index, edge_attr = neighbor_list_and_relative_vec(pos, r_max, self_interaction)
-        edge_index_dict, edge_edges, edge_edge_index = get_edge_edges_and_index(edge_index, symmetric_edges=symmetric_edges)
-        edge_edge_attr = []
-        for _, edge2 in edge_edges:
-            target2, source2 = edge2
-            edge_edge_attr.append(
-                pos[source2] - pos[target2]
-            )
-
-        edge_edge_index = torch.LongTensor(edge_edge_index).transpose(0, 1)
-        edge_edge_attr = torch.stack(edge_edge_attr, dim=0)
-
-        edge_x, Rs_in_edge = initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=self_edge)
-
-        super(DataEdgeNeighbors, self).__init__(
-            x=x, edge_x=edge_x, edge_index=edge_index, edge_edge_index=edge_edge_index,
-            edge_attr=edge_attr, edge_edge_attr=edge_edge_attr, pos=pos, Rs_in=Rs_in,
-            Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
-
-
-class DataEdgePeriodicNeighbors(tg.data.Data):
-    """Constructs periodic graph to perform edge convolutions.
-
-    symmetric_edges has not yet been implemented for this class.
-
-    Args:
-        x (torch.tensor shape [N, rs.dim(Rs_in)]): Node features.
-        Rs_in (rs.TY_RS_STRICT): Representation list of input.
-        pos (torch.tensor shape [N, 3]): Cartesian coordinates of nodes.
-        lattice (torch.tensor shape [3, 3]): Lattice vectors of unit cell.
-        r_max (float): Radial cutoff for edges.
-        lmax (int > 0): Maximum L to use for SphericalTensor projection of radial distance vectors
-        self_interaction (bool, optional): Include self interactions of nodes. Defaults to True.
-        self_edge (float, optional): L=0 feature for self edges. Defaults to 1.
-    """
-    def __init__(self, x, Rs_in, pos, lattice, r_max, lmax,
-                 self_interaction=True, self_edge=1., **kwargs):
-        edge_index, edge_attr = neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction)
-        edge_index_dict, edge_edges, edge_edge_index = get_edge_edges_and_index(edge_index, symmetric_edges=False)
-        edge_edge_attr = []
-        for _, edge2 in edge_edges:
-            target2, source2 = edge2
-            edge_edge_attr.append(
-                pos[source2] - pos[target2]
-            )
-
-        edge_edge_index = torch.LongTensor(edge_edge_index).transpose(0, 1)
-        edge_edge_attr = torch.stack(edge_edge_attr, dim=0)
-
-        edge_x, Rs_in_edge = initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=self_edge)
-
-        super(DataEdgePeriodicNeighbors, self).__init__(
-            x=x, edge_x=edge_x, edge_index=edge_index, edge_edge_index=edge_edge_index,
-            edge_attr=edge_attr, edge_edge_attr=edge_edge_attr, pos=pos, Rs_in=Rs_in,
-            Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
