@@ -1,12 +1,19 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, arguments-differ, abstract-method
+from functools import partial
+
 import torch
 from torch_geometric.data import Batch
 from torch_scatter import scatter_add
 
 import e3nn.point.data_helpers as dh
+from e3nn import o3
+from e3nn.kernel import Kernel
 from e3nn.networks import GatedConvNetwork
-from e3nn.o3 import rand_rot
 from e3nn.point.message_passing import Convolution
+
+
+def convolution(Rs_in, Rs_out, lmax, RadialModel):
+    return Convolution(Kernel(Rs_in, Rs_out, RadialModel, partial(o3.selection_rule_in_out_sh, lmax=lmax)))
 
 
 def get_dataset():
@@ -22,7 +29,7 @@ def get_dataset():
     labels = torch.arange(len(tetris))
 
     # apply random rotation
-    tetris = torch.einsum('ij,zaj->zai', rand_rot(), tetris)
+    tetris = torch.einsum('ij,zaj->zai', o3.rand_rot(), tetris)
 
     return tetris, labels
 
@@ -30,6 +37,7 @@ def get_dataset():
 def main():
     torch.set_default_dtype(torch.float64)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(device)
 
     x = torch.ones(4, 1)
     Rs_in = [0]
@@ -42,7 +50,7 @@ def main():
     Rs_out = [(len(tetris), 0)]
     lmax = 3
 
-    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=Convolution)
+    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=convolution)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)

@@ -12,6 +12,10 @@ from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
 
 
+def _default_convolution(Rs_in, Rs_out, lmax, RadialModel):
+    return Convolution(Kernel(Rs_in, Rs_out, RadialModel, partial(o3.selection_rule_in_out_sh, lmax=lmax)))
+
+
 class GatedConvNetwork(torch.nn.Module):
     """A basic network architecture that alternates between Convolutions and GatedBlock nonlinearities.
 
@@ -55,7 +59,7 @@ class GatedConvNetwork(torch.nn.Module):
 
     def __init__(self, Rs_in, Rs_hidden, Rs_out, lmax, layers=3,
                  max_radius=1.0, number_of_basis=3, radial_layers=3,
-                 kernel=Kernel, convolution=Convolution,
+                 convolution=_default_convolution,
                  min_radius=0.0):
         super().__init__()
 
@@ -68,12 +72,9 @@ class GatedConvNetwork(torch.nn.Module):
                               number_of_basis=number_of_basis, h=100,
                               L=radial_layers, act=swish)
 
-        K = partial(kernel, RadialModel=RadialModel, selection_rule=partial(
-            o3.selection_rule_in_out_sh, lmax=lmax))
-
         def make_layer(Rs_in, Rs_out):
             act = GatedBlock(Rs_out, swish, sigmoid)
-            conv = convolution(K(Rs_in, act.Rs_in))
+            conv = convolution(Rs_in, act.Rs_in, lmax, RadialModel)
             return torch.nn.ModuleList([conv, act])
 
         self.layers = torch.nn.ModuleList([
@@ -81,8 +82,7 @@ class GatedConvNetwork(torch.nn.Module):
             for Rs_layer_in, Rs_layer_out in zip(representations[:-2], representations[1:-1])
         ])
 
-        self.layers.append(convolution(
-            K(representations[-2], representations[-1])))
+        self.layers.append(convolution(representations[-2], representations[-1], lmax, RadialModel))
 
     def forward(self, input, *args, **kwargs):
         """Consult the convolution operation used to initalize this class for specifics on what input should be given.
