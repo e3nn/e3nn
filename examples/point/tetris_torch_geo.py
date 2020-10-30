@@ -1,5 +1,6 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring, arguments-differ, abstract-method
 from functools import partial
+import time
 
 import torch
 from torch_geometric.data import Batch
@@ -9,7 +10,7 @@ import e3nn.point.data_helpers as dh
 from e3nn import o3
 from e3nn.kernel import Kernel
 from e3nn.networks import GatedConvNetwork
-from e3nn.point.message_passing import Convolution
+from e3nn.point.message_passing import Convolution, WTPConv
 
 
 def convolution(Rs_in, Rs_out, lmax, RadialModel):
@@ -50,7 +51,8 @@ def main():
     Rs_out = [(len(tetris), 0)]
     lmax = 3
 
-    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=convolution)
+    # f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=convolution)
+    f = GatedConvNetwork(Rs_in, Rs_hidden, Rs_out, lmax, convolution=WTPConv)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)
@@ -58,6 +60,7 @@ def main():
 
     optimizer = torch.optim.Adam(f.parameters(), lr=3e-3)
 
+    wall = time.perf_counter()
     for step in range(50):
         out = f(batch.x, batch.edge_index, batch.edge_attr)
         out = scatter_add(out, batch.batch, dim=0)
@@ -77,7 +80,8 @@ def main():
         loss.backward()
         optimizer.step()
 
-        print("step={} loss={:.2e} accuracy={:.2f} equivariance error={:.1e}".format(step, loss.item(), acc, (out - r_out).pow(2).mean().sqrt().item()))
+        print("wall={:.1f} step={} loss={:.2e} accuracy={:.2f} equivariance error={:.1e}".format(
+            time.perf_counter() - wall, step, loss.item(), acc, (out - r_out).pow(2).mean().sqrt().item()))
 
 
 if __name__ == '__main__':
