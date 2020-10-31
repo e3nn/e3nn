@@ -7,7 +7,7 @@ from torch_geometric.data import Batch
 from torch_scatter import scatter_add
 
 import e3nn.point.data_helpers as dh
-from e3nn import o3
+from e3nn import o3, rsh
 from e3nn.kernel import Kernel
 from e3nn.networks import GatedConvNetwork
 from e3nn.point.message_passing import Convolution, WTPConv
@@ -63,12 +63,13 @@ def main():
 
     batch = Batch.from_data_list(tetris_dataset)
     batch = batch.to(device)
+    sh = rsh.spherical_harmonics_xyz(list(range(lmax + 1)), batch.edge_attr, 'component')
 
     optimizer = torch.optim.Adam(f.parameters(), lr=3e-3)
 
     wall = time.perf_counter()
     for step in range(50):
-        out = f(batch.x, batch.edge_index, batch.edge_attr)
+        out = f(batch.x, batch.edge_index, batch.edge_attr, sh=sh)
         out = scatter_add(out, batch.batch, dim=0)
 
         acc = out.cpu().argmax(1).eq(labels).double().mean().item()
@@ -76,9 +77,10 @@ def main():
         r_tetris_dataset = [dh.DataNeighbors(x, Rs_in, shape, r_max, y=label) for shape, label in zip(*get_dataset())]
         r_batch = Batch.from_data_list(r_tetris_dataset)
         r_batch = r_batch.to(device)
+        r_sh = rsh.spherical_harmonics_xyz(list(range(lmax + 1)), r_batch.edge_attr, 'component')
 
         with torch.no_grad():
-            r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr)
+            r_out = f(r_batch.x, r_batch.edge_index, r_batch.edge_attr, sh=r_sh)
             r_out = scatter_add(r_out, r_batch.batch, dim=0)
 
         loss = torch.nn.functional.cross_entropy(out, batch.y)

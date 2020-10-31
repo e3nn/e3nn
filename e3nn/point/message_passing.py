@@ -52,7 +52,7 @@ class WTPConv(tg.nn.MessagePassing):
         self.Rs_sh = Rs_sh
         self.normalization = normalization
 
-    def forward(self, features, edge_index, edge_r, size=None, n_norm=1):
+    def forward(self, features, edge_index, edge_r, sh=None, size=None, n_norm=1):
         """
         :param features: Tensor of shape [n_target, dim(Rs_in)]
         :param edge_index: LongTensor of shape [2, num_messages]
@@ -60,15 +60,17 @@ class WTPConv(tg.nn.MessagePassing):
                            edge_index[1] = targets (neighbors)
         :param edge_r: Tensor of shape [num_messages, 3]
                        edge_r = position_target - position_source
+        :param sh: Tensor of shape [num_messages, dim(Rs_sh)]
         :param size: (n_target, n_source) or None
         :param n_norm: typical number of targets per source
 
         :return: Tensor of shape [n_source, dim(Rs_out)]
         """
-        sh = rsh.spherical_harmonics_xyz(self.Rs_sh, edge_r, self.normalization)  # [num_messages, dim(Rs_sh)]
-        sh.div_(n_norm ** 0.5)
+        if sh is None:
+            sh = rsh.spherical_harmonics_xyz(self.Rs_sh, edge_r, self.normalization)  # [num_messages, dim(Rs_sh)]
 
         w = self.rm(edge_r.norm(dim=1))  # [num_messages, nweight]
+        w.div_(n_norm ** 0.5)
 
         return self.propagate(edge_index, size=size, x=features, sh=sh, w=w)
 
