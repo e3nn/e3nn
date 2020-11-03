@@ -68,9 +68,9 @@ class WTPConv(tg.nn.MessagePassing):
         """
         if sh is None:
             sh = rsh.spherical_harmonics_xyz(self.Rs_sh, edge_r, self.normalization)  # [num_messages, dim(Rs_sh)]
+        sh = sh / n_norm**0.5
 
         w = self.rm(edge_r.norm(dim=1))  # [num_messages, nweight]
-        w.div_(n_norm ** 0.5)
 
         return self.propagate(edge_index, size=size, x=features, sh=sh, w=w)
 
