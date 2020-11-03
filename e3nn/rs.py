@@ -111,6 +111,17 @@ def cut(features, *Rss, dim_=-1):
     return outputs
 
 
+def split_by_mul(Rs: TY_RS_LOOSE):
+    """
+    Example `split_by_mul([(1, 1), (2, 2)]) = [[(1, 1)], [(1, 2)], [(1, 2)]]`
+    """
+    Rs = simplify(Rs)
+
+    for mul, l, p in Rs:
+        for _ in range(mul):
+            yield [(1, l, p)]
+
+
 class TransposeToMulL(torch.nn.Module):
     """
     [(mul, 1), (mul, 2)]  ->  mul * [(1, 1), (1, 2)]
