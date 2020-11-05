@@ -53,7 +53,7 @@ class GatedConvNetwork(torch.nn.Module):
         model = GatedConvNetwork(**model_kwargs)
     """
 
-    def __init__(self, Rs_in, Rs_hidden, Rs_out, lmax, layers=3,
+    def __init__(self, Rs_in, Rs_hidden, Rs_out, lmax=3, layers=3,
                  max_radius=1.0, number_of_basis=3, radial_layers=3,
                  kernel=Kernel, convolution=Convolution,
                  min_radius=0.0):
