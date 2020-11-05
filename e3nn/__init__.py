@@ -1,6 +1,6 @@
 # pylint: disable=missing-docstring
-from .kernel import Kernel
-from .rs import TensorProduct, TensorSquare
+from . import rs, o3
+from . import networks
 
 __version__ = "0.1.0"
-__all__ = ['Kernel', 'TensorProduct', 'TensorSquare']
+__all__ = ['rs', 'o3', 'networks']

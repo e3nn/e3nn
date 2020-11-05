@@ -10,8 +10,50 @@ from e3nn.non_linearities.rescaled_act import sigmoid, swish, tanh
 from e3nn.non_linearities.s2 import S2Activation
 from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
+from e3nn.util.deprecation import deprecated
 
 
+class GatedNetwork(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, mul, lmax, layer, layers=3):
+        super().__init__()
+
+        modules = []
+
+        Rs = rs.convention(Rs_in)
+        for _ in range(layers):
+            scalars = [(mul, l, p) for mul, l, p in [(mul, 0, +1),
+                                                     (mul, 0, -1)] if rs.haslinearpath(Rs, l, p)]
+            act_scalars = [(mul, swish if p == 1 else tanh)
+                           for mul, l, p in scalars]
+
+            nonscalars = [(mul, l, p) for l in range(1, lmax + 1)
+                          for p in [+1, -1] if rs.haslinearpath(Rs, l, p)]
+            if rs.haslinearpath(Rs, 0, +1):
+                gates = [(rs.mul_dim(nonscalars), 0, +1)]
+                act_gates = [(-1, sigmoid)]
+            else:
+                gates = [(rs.mul_dim(nonscalars), 0, -1)]
+                act_gates = [(-1, tanh)]
+
+            act = GatedBlockParity(scalars, act_scalars, gates, act_gates, nonscalars)
+            lay = layer(Rs, act.Rs_in)
+
+            Rs = act.Rs_out
+
+            modules += [torch.nn.ModuleList([lay, act])]
+
+        self.layers = torch.nn.ModuleList(modules)
+        self.layers.append(layer(Rs, Rs_out))
+
+    def forward(self, x, *args, **kwargs):
+        for lay, act in self.layers[:-1]:
+            x = lay(x, *args, **kwargs)
+            x = act(x)
+
+        return self.layers[-1](x, *args, **kwargs)
+
+
+@deprecated
 class GatedConvNetwork(torch.nn.Module):
     """A basic network architecture that alternates between Convolutions and GatedBlock nonlinearities.
 
@@ -114,6 +156,7 @@ class GatedConvNetwork(torch.nn.Module):
         return output
 
 
+@deprecated
 class GatedConvParityNetwork(torch.nn.Module):
     """A basic network architecture that alternates between Convolutions and GatedBlockParity nonlinearities.
 
