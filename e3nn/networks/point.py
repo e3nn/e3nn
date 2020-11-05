@@ -12,22 +12,6 @@ from e3nn.point.operations import Convolution
 from e3nn.radial import GaussianRadialModel
 
 
-def _default_radial_model(d):
-    return GaussianRadialModel(
-        d,
-        max_radius=1.0,
-        min_radius=0.0,
-        number_of_basis=3,
-        h=100,
-        L=3,
-        act=swish
-    )
-
-
-def _default_convolution(Rs_in, Rs_out):
-    return Convolution(Kernel(Rs_in, Rs_out, _default_radial_model, partial(o3.selection_rule_in_out_sh, lmax=3)))
-
-
 class GatedConvNetwork(torch.nn.Module):
     """A basic network architecture that alternates between Convolutions and GatedBlock nonlinearities.
 
@@ -37,8 +21,14 @@ class GatedConvNetwork(torch.nn.Module):
         Rs_in (rs.TY_RS_STRICT): Representation list of input data. Parity must be omitted or set to 0.
         Rs_hidden (rs.TY_RS_STRICT): Representation list of intermediate data. Parity must be omitted or set to 0.
         Rs_out (rs.TY_RS_STRICT): Representation list of output data. Parity must be omitted or set to 0.
+        lmax (int > 0): Maximum L used for spherical harmonic in kernel.
         layers (int, optional): Number of convolution + GatedBlock layers. Defaults to 3.
+        max_radius (float, optional): Maximum radius of radial basis functions. Used to initialize RadialFunction for kernel. Defaults to 1.0.
+        number_of_basis (int, optional): Number of spaced Gaussian radial basis functions used for RadialFunction. Defaults to 3.
+        radial_layers (int, optional): Number of dense layers applied to radial basis functions to create RadialFunction. Defaults to 3.
+        kernel (kernel class, optional): Equivariant kernel class. Defaults to e3nn.kernel.Kernel.
         convolution (convolution class, optional): Equivariant convoltion operation. Defaults to e3nn.point.operations.Convolution. For torch_geometric.data.Data input use e3nn.point.message_passing.Convolution.
+        min_radius (float, optional): Minimum radius of radial basis functions. Used to initialize RadialFunction for kernel. Defaults to 0.0.
 
     Example::
 
@@ -54,22 +44,36 @@ class GatedConvNetwork(torch.nn.Module):
             'Rs_in': Rs_in,
             'Rs_hidden': Rs_hidden,
             'Rs_out': Rs_out,
+            'lmax': 2,  # Includes spherical harmonics 0, 1, and 2
             'layers': 3,  # 3 * (conv + nonlin) + conv layers
+            'max_radius': r_max,  # Should match whatever is used to generate edges with e3nn.data.DataNeighbors or e3nn.data.DataPeriodicNeighbors
+            'number_of_basis': 10,
         }
 
         model = GatedConvNetwork(**model_kwargs)
     """
 
-    def __init__(self, Rs_in, Rs_hidden, Rs_out, layers=3, convolution=_default_convolution):
+    def __init__(self, Rs_in, Rs_hidden, Rs_out, lmax, layers=3,
+                 max_radius=1.0, number_of_basis=3, radial_layers=3,
+                 kernel=Kernel, convolution=Convolution,
+                 min_radius=0.0):
         super().__init__()
 
         representations = [Rs_in]
         representations += [Rs_hidden] * layers
         representations += [Rs_out]
 
+        RadialModel = partial(GaussianRadialModel, max_radius=max_radius,
+                              min_radius=min_radius,
+                              number_of_basis=number_of_basis, h=100,
+                              L=radial_layers, act=swish)
+
+        K = partial(kernel, RadialModel=RadialModel, selection_rule=partial(
+            o3.selection_rule_in_out_sh, lmax=lmax))
+
         def make_layer(Rs_in, Rs_out):
             act = GatedBlock(Rs_out, swish, sigmoid)
-            conv = convolution(Rs_in, act.Rs_in)
+            conv = convolution(K(Rs_in, act.Rs_in))
             return torch.nn.ModuleList([conv, act])
 
         self.layers = torch.nn.ModuleList([
@@ -77,7 +81,8 @@ class GatedConvNetwork(torch.nn.Module):
             for Rs_layer_in, Rs_layer_out in zip(representations[:-2], representations[1:-1])
         ])
 
-        self.layers.append(convolution(representations[-2], representations[-1]))
+        self.layers.append(convolution(
+            K(representations[-2], representations[-1])))
 
     def forward(self, input, *args, **kwargs):
         """Consult the convolution operation used to initalize this class for specifics on what input should be given.
