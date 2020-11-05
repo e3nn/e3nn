@@ -40,7 +40,7 @@ def test_network():
 
     lmax = 3
     Rs = [(1, l) for l in range(lmax + 1)]
-    model = GatedConvNetwork(Rs, 4 * Rs, Rs, lmax)
+    model = GatedConvNetwork(Rs, 4 * Rs, Rs)
 
     features = rs.randn(1, 4, Rs)
     geometry = torch.randn(1, 4, 3)
