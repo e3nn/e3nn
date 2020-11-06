@@ -20,7 +20,8 @@ from functools import partial
 
 import torch
 
-from e3nn import Kernel, rs
+from e3nn import rs
+from e3nn.kernel import Kernel
 from e3nn.non_linearities.norm import Norm
 from e3nn.non_linearities.rescaled_act import swish
 from e3nn.point.operations import Convolution
@@ -95,8 +96,8 @@ print(features.grad)
 
 Euclidean neural networks (e3nn) Copyright (c) 2020, The Regents of the
 University of California, through Lawrence Berkeley National Laboratory
-(subject to receipt of any required approvals from the U.S. Dept. of Energy), 
-Ecole Polytechnique Federale de Lausanne (EPFL), Free University of Berlin 
+(subject to receipt of any required approvals from the U.S. Dept. of Energy),
+Ecole Polytechnique Federale de Lausanne (EPFL), Free University of Berlin
 and Kostiantyn Lapchevskyi. All rights reserved.
 
 If you have questions about your rights to use or distribute this software,
@@ -107,5 +108,5 @@ NOTICE.  This Software was developed under funding from the U.S. Department
 of Energy and the U.S. Government consequently retains certain rights.  As
 such, the U.S. Government has been granted for itself and others acting on
 its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the
-Software to reproduce, distribute copies to the public, prepare derivative 
+Software to reproduce, distribute copies to the public, prepare derivative
 works, and perform publicly and display publicly, and to permit others to do so.

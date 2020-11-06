@@ -4,7 +4,8 @@ from functools import partial
 
 import torch
 
-from e3nn import Kernel, rs
+from e3nn import rs
+from e3nn.kernel import Kernel
 from e3nn.non_linearities.norm import Norm
 from e3nn.non_linearities.rescaled_act import swish
 from e3nn.point.operations import Convolution
