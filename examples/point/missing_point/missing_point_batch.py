@@ -1,3 +1,4 @@
+"""
 import torch
 import torch.utils.data
 import e3nn
@@ -160,13 +161,13 @@ class MissingPointNet(torch.nn.Module):
 
 
 def inference(net, shape, types, mask, remove_indices):
-    """
+    '''
     net: network
     shape: tensor of shape [B, N_max, 3]
     types: tensor of shape [B, N_max, atom_types]
     mask: tensor of shape [B, N_max] indicating which atoms are present in an example
     remove_indices: List of shape [B, 1] Which atom is to be removed
-    """
+    '''
     N_max = shape.shape[-2]
     batch = shape.shape[0]
     stay_indices = get_stay_indices(N_max, remove_indices)
@@ -512,6 +513,4 @@ for i, atom_number in enumerate(species_list):
 
 # In[ ]:
 
-
-
-
+"""
