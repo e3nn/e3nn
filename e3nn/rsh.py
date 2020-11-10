@@ -250,7 +250,9 @@ def spherical_harmonics_xyz(Rs, xyz, normalization='none'):
     Rs = rs.simplify(Rs)
     *size, _ = xyz.shape
     xyz = xyz.reshape(-1, 3)
-    xyz = xyz / torch.norm(xyz, 2, dim=1, keepdim=True)
+    d = torch.norm(xyz, 2, dim=1)
+    xyz = xyz[d > 0]
+    xyz = xyz / d[d > 0, None]
 
     sh = None
 
@@ -274,7 +276,11 @@ def spherical_harmonics_xyz(Rs, xyz, normalization='none'):
         # rotate back
         sh[s] = sh[s] @ _rep_zx(tuple(Rs), xyz.dtype, xyz.device)
 
-    sh[torch.isnan(xyz).any(1)] = math.sqrt(1 / (4 * math.pi)) * torch.cat([sh.new_ones(1) if l == 0 else sh.new_zeros(2 * l + 1) for mul, l, p in Rs for _ in range(mul)])
+    if len(d) > len(sh):
+        out = sh.new_zeros(len(d), sh.shape[1])
+        out[d == 0] = math.sqrt(1 / (4 * math.pi)) * torch.cat([sh.new_ones(1) if l == 0 else sh.new_zeros(2 * l + 1) for mul, l, p in Rs for _ in range(mul)])
+        out[d > 0] = sh
+        sh = out
 
     if normalization == 'component':
         sh.mul_(math.sqrt(4 * math.pi))
