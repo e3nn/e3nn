@@ -115,7 +115,7 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     \vec{r}_{source, target}
     """
     N, _ = pos.shape
-    atoms = Atoms(symbols=['H'] * N, positions=pos)
+    atoms = Atoms(symbols=['H'] * N, positions=pos.detach().numpy())
     nl = neighborlist.NeighborList(
         [r_max / 2.] * N,  # NeighborList looks for intersecting spheres
         self_interaction=self_interaction,
