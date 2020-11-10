@@ -8,7 +8,7 @@ from torch_scatter import scatter_add
 
 import e3nn.point.data_helpers as dh
 from e3nn import o3, rsh
-from e3nn.networks import GatedNetwork
+from e3nn.networks import GatedNetwork, make_gated_block
 from e3nn.non_linearities.rescaled_act import swish
 from e3nn.point.message_passing import WTPConv
 from e3nn.radial import GaussianRadialModel
@@ -71,7 +71,7 @@ def main():
     Rs_out = [(1, 0, -1), (6, 0, 1)]
     lmax = 3
 
-    f = GatedNetwork(Rs_in, Rs_out, 8, lmax, convolution, 2)
+    f = GatedNetwork(Rs_in, Rs_out, convolution, partial(make_gated_block, mul=8, lmax=lmax), 2)
     f = f.to(device)
 
     batch = Batch.from_data_list(tetris_dataset)

@@ -2,6 +2,7 @@
 from .point import GatedConvNetwork, GatedConvParityNetwork, S2ConvNetwork, GatedNetwork
 from .image import ImageS2Network, ImageGatedConvNetwork, ImageGatedConvParityNetwork
 from .s2 import S2Network, S2ParityNetwork
+from .gate import make_gated_block
 
 __all__ = [
     'GatedNetwork',
@@ -13,4 +14,5 @@ __all__ = [
     'ImageGatedConvParityNetwork',
     'S2Network',
     'S2ParityNetwork',
+    'make_gated_block',
 ]
