@@ -15,9 +15,9 @@ def test_data_helpers():
     x = torch.randn(N, rs.dim(Rs_in))
     r_max = 1
     dh._neighbor_list_and_relative_vec_lattice(pos, lattice, r_max)
-    dh.DataPeriodicNeighbors(x, Rs_in, pos, lattice, r_max)
+    dh.DataPeriodicNeighbors(x, pos, lattice, r_max)
     dh._neighbor_list_and_relative_vec(pos, r_max)
-    dh.DataNeighbors(x, Rs_in, pos, r_max)
+    dh.DataNeighbors(x, pos, r_max)
 
 
 def test_silicon_neighbors():
