@@ -14,15 +14,33 @@ from e3nn.util.deprecation import deprecated
 from e3nn.networks.gate import make_gated_block
 
 
-class GatedNetwork(torch.nn.Module):
-    def __init__(self, Rs_in, Rs_out, layer, gate=make_gated_block, layers=3):
+def GatedNetwork(Rs_in, Rs_out, mul, lmax, layers=3, min_radius=0.0, max_radius=1.0, radial_basis=3, radial_neurons=100, radial_layers=2, radial_act=swish):
+    def layer(Rs1, Rs2):
+        R = partial(
+            GaussianRadialModel,
+            max_radius=max_radius,
+            number_of_basis=radial_basis,
+            h=radial_neurons,
+            L=radial_layers,
+            act=radial_act,
+            min_radius=min_radius
+        )
+        k = Kernel(Rs1, Rs2, R, partial(o3.selection_rule_in_out_sh, lmax=lmax), allow_unused_inputs=True)
+        return Convolution(k)
+    def activation(Rs):
+        return make_gated_block(Rs, mul, lmax)
+    return MLNetwork(Rs_in, Rs_out, layer, activation, layers)
+
+
+class MLNetwork(torch.nn.Module):
+    def __init__(self, Rs_in, Rs_out, layer, activation, layers=3):
         super().__init__()
 
         modules = []
 
         Rs = rs.convention(Rs_in)
         for _ in range(layers):
-            act = gate(Rs)
+            act = activation(Rs)
             lay = layer(Rs, act.Rs_in)
 
             Rs = act.Rs_out

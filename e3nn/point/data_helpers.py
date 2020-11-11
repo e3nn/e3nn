@@ -11,15 +11,15 @@ from e3nn.tensor import SphericalTensor
 
 
 class DataNeighbors(tg.data.Data):
-    def __init__(self, x, Rs_in, pos, r_max, self_interaction=True, **kwargs):
+    def __init__(self, x, pos, r_max, self_interaction=True, **kwargs):
         edge_index, edge_attr = _neighbor_list_and_relative_vec(pos, r_max, self_interaction)
-        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, Rs_in=Rs_in, **kwargs)
+        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, **kwargs)
 
 
 class DataPeriodicNeighbors(tg.data.Data):
-    def __init__(self, x, Rs_in, pos, lattice, r_max, self_interaction=True, **kwargs):
+    def __init__(self, x, pos, lattice, r_max, self_interaction=True, **kwargs):
         edge_index, edge_attr = _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction)
-        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, lattice=lattice, Rs_in=Rs_in, **kwargs)
+        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, lattice=lattice, **kwargs)
 
 
 class DataEdgeNeighbors(tg.data.Data):
@@ -115,7 +115,8 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     \vec{r}_{source, target}
     """
     N, _ = pos.shape
-    atoms = Atoms(symbols=['H'] * N, positions=pos.detach().numpy())
+    assert _ == 3
+    atoms = Atoms(symbols=['H'] * N, positions=pos.cpu().detach().numpy())
     nl = neighborlist.NeighborList(
         [r_max / 2.] * N,  # NeighborList looks for intersecting spheres
         self_interaction=self_interaction,
@@ -128,14 +129,12 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     geo_list = []
 
     for i, p in enumerate(pos):
-        indices = nl.get_neighbors(i)[0]
+        indices, _displacements = nl.get_neighbors(i)
         if self_interaction:
+            assert indices[-1] == i
             indices = indices[:-1]  # Remove extra self edge
-        cart = pos[indices]
-        indices = torch.LongTensor([[i, target] for target in indices])
-        dist = cart - p
-        nei_list.append(indices)
-        geo_list.append(dist)
+        nei_list.append(torch.LongTensor([[i, target] for target in indices]))
+        geo_list.append(pos[indices] - p)
     return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
 
 
