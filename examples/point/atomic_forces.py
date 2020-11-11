@@ -77,7 +77,7 @@ def main():
 
     optim = torch.optim.Adam(f.parameters(), lr=1e-2)
 
-    def step():
+    def step(i):
         r = geometry[tr].detach().clone()
         r.requires_grad_(True)
 
@@ -86,19 +86,17 @@ def main():
         out = f(batch.x, batch.edge_index, batch.edge_attr, n_norm=2)
         out = scatter_add(out, batch.batch, dim=0)
 
-        out.sum().backward(create_graph=True)
-
-        pred_forces = r.grad
+        pred_forces, = torch.autograd.grad(out.sum(), r, create_graph=True)
 
         loss = (pred_forces - forces[tr]).pow(2).sum(2).mean()
-        print(loss.item())
+        print('loss {} = {}'.format(i, loss.item()))
 
         optim.zero_grad()
         loss.backward()
         optim.step()
 
-    for _ in range(100):
-        step()
+    for i in range(50):
+        step(i)
 
     r = geometry[te].detach().clone()
     r.requires_grad_(True)
@@ -113,7 +111,7 @@ def main():
     pred_forces = r.grad
 
     loss = (pred_forces - forces[te]).pow(2).sum(2).mean()
-    print(loss.item())
+    print("test loss=", loss.item())
 
 
     plt.figure(figsize=(13, 13))
