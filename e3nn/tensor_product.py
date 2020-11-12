@@ -250,6 +250,14 @@ class CustomWeightedTensorProduct(torch.nn.Module):
             normalization: str = 'component',
             weight: bool = True
         ):
+        """
+        Create a Tensor Product operation that has each of his path weighted by a parameter.
+        `instr` is a list of instructions.
+        An instruction if of the form (i_1, i_2, i_out, mode)
+        it means "Put `Rs_in1[i_1] otimes Rs_in2[i_2] into Rs_out[i_out]"
+        `mode` determines the way the multiplicities are treated.
+        The default mode should be 'uvw', meaning that all paths are created.
+        """
 
         super().__init__()
 
@@ -266,36 +274,39 @@ class CustomWeightedTensorProduct(torch.nn.Module):
         instr = sorted(instr)  # for optimization
 
         last_s1, last_s2, last_ss = None, None, None
-        for i, j, k, mode in instr:
-            mul_1, l_1, p_1 = self.Rs_in1[i]
-            mul_2, l_2, p_2 = self.Rs_in2[j]
-            mul_out, l_out, p_out = self.Rs_out[k]
+        for i_1, i_2, i_out, mode in instr:
+            mul_1, l_1, p_1 = self.Rs_in1[i_1]
+            mul_2, l_2, p_2 = self.Rs_in2[i_2]
+            mul_out, l_out, p_out = self.Rs_out[i_out]
             dim_1 = mul_1 * (2 * l_1 + 1)
             dim_2 = mul_2 * (2 * l_2 + 1)
             dim_out = mul_out * (2 * l_out + 1)
-            index_1 = rs.dim(self.Rs_in1[:i])
-            index_2 = rs.dim(self.Rs_in2[:j])
-            index_out = rs.dim(self.Rs_out[:k])
+            index_1 = rs.dim(self.Rs_in1[:i_1])
+            index_2 = rs.dim(self.Rs_in2[:i_2])
+            index_out = rs.dim(self.Rs_out[:i_out])
 
             assert p_1 * p_2 == p_out
             assert abs(l_1 - l_2) <= l_out <= l_1 + l_2
 
-            if last_s1 != i:
-                code += f"    s1 = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1}, {2 * l_1 + 1})\n"
-                last_s1 = i
+            if dim_1 == 0 or dim_2 == 0 or dim_out == 0:
+                continue
 
-            if last_s2 != j:
+            if last_s1 != i_1:
+                code += f"    s1 = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1}, {2 * l_1 + 1})\n"
+                last_s1 = i_1
+
+            if last_s2 != i_2:
                 code += f"    s2 = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
-                last_s2 = j
+                last_s2 = i_2
 
             assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu']
 
-            if last_ss != (i, j, mode[:2]):
+            if last_ss != (i_1, i_2, mode[:2]):
                 if mode[:2] == 'uv':
                     code += f"    ss = ein('zui,zvj->zuvij', s1, s2)\n"
                 if mode[:2] == 'uu':
                     code += f"    ss = ein('zui,zuj->zuij', s1, s2)\n"
-                last_ss = (i, j, mode[:2])
+                last_ss = (i_1, i_2, mode[:2])
 
             wigners.add((l_1, l_2, l_out))
 

@@ -55,9 +55,9 @@ def test_weighted_tensor_product():
 def test_custom_weighted_tensor_product():
     torch.set_default_dtype(torch.float64)
 
-    Rs_in1 = rs.simplify([1] * 20 + [2] * 4)
-    Rs_in2 = rs.simplify([0] * 10 + [1] * 10 + [2] * 4)
-    Rs_out = rs.simplify([0] * 3 + [1] * 4)
+    Rs_in1 = [(20, 1), (4, 2)]
+    Rs_in2 = [(10, 0), (10, 1), (4, 2)]
+    Rs_out = [(3, 0), (4, 1)]
 
     instr = [
         (0, 1, 0, 'uvw'),
