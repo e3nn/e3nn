@@ -1,7 +1,8 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
 import torch
 from e3nn import o3, rs
-from e3nn.tensor_product import (LearnableTensorProduct, LearnableTensorSquare,
+from e3nn.tensor_product import (CustomWeightedTensorProduct,
+                                 LearnableTensorProduct, LearnableTensorSquare,
                                  WeightedTensorProduct)
 
 
@@ -40,12 +41,39 @@ def test_weighted_tensor_product():
 
     x1 = rs.randn(20, Rs_in1)
     x2 = rs.randn(20, Rs_in2)
-    w = torch.randn(20, tp.nweight, requires_grad=True)
 
     angles = o3.rand_angles()
 
-    z1 = tp(x1, x2, w) @ rs.rep(Rs_out, *angles).T
-    z2 = tp(x1 @ rs.rep(Rs_in1, *angles).T, x2 @ rs.rep(Rs_in2, *angles).T, w)
+    z1 = tp(x1, x2) @ rs.rep(Rs_out, *angles).T
+    z2 = tp(x1 @ rs.rep(Rs_in1, *angles).T, x2 @ rs.rep(Rs_in2, *angles).T)
+
+    z1.sum().backward()
+
+    assert torch.allclose(z1, z2)
+
+
+def test_custom_weighted_tensor_product():
+    torch.set_default_dtype(torch.float64)
+
+    Rs_in1 = rs.simplify([1] * 20 + [2] * 4)
+    Rs_in2 = rs.simplify([0] * 10 + [1] * 10 + [2] * 4)
+    Rs_out = rs.simplify([0] * 3 + [1] * 4)
+
+    instr = [
+        (0, 1, 0, 'uvw'),
+        (1, 2, 1, 'uuu'),
+        (0, 1, 1, 'uvw'),
+    ]
+
+    tp = CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr)
+
+    x1 = rs.randn(20, Rs_in1)
+    x2 = rs.randn(20, Rs_in2)
+
+    angles = o3.rand_angles()
+
+    z1 = tp(x1, x2) @ rs.rep(Rs_out, *angles).T
+    z2 = tp(x1 @ rs.rep(Rs_in1, *angles).T, x2 @ rs.rep(Rs_in2, *angles).T)
 
     z1.sum().backward()
 
