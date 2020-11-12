@@ -1,6 +1,7 @@
 # pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, redefined-builtin, abstract-method
 from functools import partial
 from typing import List, Tuple
+import math
 
 import torch
 from e3nn import o3, rs
@@ -238,6 +239,29 @@ class WeightedTensorProduct(torch.nn.Module):
 
         features = self.main(*wigners, features_1, features_2, weight)
         return features.reshape(*size, -1)
+
+
+def GroupedWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, groups=None, normalization='component', own_weight=True):
+    Rs_in1 = rs.convention(Rs_in1)
+    Rs_in2 = rs.convention(Rs_in2)
+    Rs_out = rs.convention(Rs_out)
+
+    if groups is None:
+        groups = math.inf
+    groups = min(groups, min(mul for mul, _, _ in Rs_in1), min(mul for mul, _, _ in Rs_out))
+
+    Rs_in1 = [(mul // groups + (g < mul % groups), l, p) for mul, l, p in Rs_in1 for g in range(groups)]
+    Rs_out = [(mul // groups + (g < mul % groups), l, p) for mul, l, p in Rs_out for g in range(groups)]
+
+    instr = [
+        (i_1, i_2, i_out, 'uvw')
+        for i_1, (_, l_1, p_1) in enumerate(Rs_in1)
+        for i_2, (_, l_2, p_2) in enumerate(Rs_in2)
+        for i_out, (_, l_out, p_out) in enumerate(Rs_out)
+        if abs(l_1 - l_2) <= l_out <= l_1 + l_2 and p_1 * p_2 == p_out
+        if i_1 % groups == i_out % groups
+    ]
+    return CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr, normalization, own_weight)
 
 
 class CustomWeightedTensorProduct(torch.nn.Module):
