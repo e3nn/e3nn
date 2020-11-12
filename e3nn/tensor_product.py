@@ -248,7 +248,7 @@ class CustomWeightedTensorProduct(torch.nn.Module):
             Rs_out: rs.TY_RS_LOOSE,
             instr: List[Tuple[int, int, int, str]],
             normalization: str = 'component',
-            weight: bool = True
+            own_weight: bool = True
         ):
         """
         Create a Tensor Product operation that has each of his path weighted by a parameter.
@@ -299,7 +299,7 @@ class CustomWeightedTensorProduct(torch.nn.Module):
                 code += f"    s2 = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
                 last_s2 = i_2
 
-            assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu']
+            assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
             if last_ss != (i_1, i_2, mode[:2]):
                 if mode[:2] == 'uv':
@@ -354,6 +354,15 @@ class CustomWeightedTensorProduct(torch.nn.Module):
                 for pos in range(index_out, index_out + dim_out):
                     count[pos] += 1
 
+            if mode == 'uvuv':
+                assert mul_1 * mul_2 == mul_out
+                dim_w = mul_1 * mul_2
+                code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2})\n"
+                code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuv,ijk,zuvij->zuvk', sw, C{l_1}_{l_2}_{l_out}, ss).reshape(batch, {dim_out})\n"
+
+                for pos in range(index_out, index_out + dim_out):
+                    count[pos] += 1
+
             index_w += dim_w
             code += "\n"
 
@@ -390,7 +399,7 @@ class CustomWeightedTensorProduct(torch.nn.Module):
         self.code = x
         self.main = eval_code(x).main
         self.nweight = index_w
-        if weight:
+        if own_weight:
             self.weight = torch.nn.Parameter(torch.randn(self.nweight))
 
     def __repr__(self):
