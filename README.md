@@ -58,6 +58,9 @@ print(out)
 print(features.grad)
 ```
 
+Example for point cloud: [tetris](https://github.com/e3nn/e3nn/blob/master/examples/point/tetris_torch_geo.py)
+
+
 ## Hierarchy
 
 - `e3nn` contains the library
