@@ -1,7 +1,7 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable, abstract-method
 import torch
 import torch_geometric as tg
-from e3nn import o3, rsh
+from e3nn import rsh, rs
 from e3nn.tensor_product import WeightedTensorProduct
 
 
@@ -39,7 +39,7 @@ class Convolution(tg.nn.MessagePassing):
 
 
 class WTPConv(tg.nn.MessagePassing):
-    def __init__(self, Rs_in, Rs_out, Rs_sh, RadialModel, selection_rule=o3.selection_rule, normalization='component', groups=1):
+    def __init__(self, Rs_in, Rs_out, Rs_sh, RadialModel, normalization='component'):
         """
         :param Rs_in:  input representation
         :param lmax:   spherical harmonic representation
@@ -47,7 +47,10 @@ class WTPConv(tg.nn.MessagePassing):
         :param RadialModel: model constructor
         """
         super().__init__(aggr='add', flow='target_to_source')
-        self.tp = WeightedTensorProduct(Rs_in, Rs_sh, Rs_out, selection_rule, normalization, groups, weight=False)
+        self.Rs_in = rs.simplify(Rs_in)
+        self.Rs_out = rs.simplify(Rs_out)
+
+        self.tp = WeightedTensorProduct(Rs_in, Rs_sh, Rs_out, normalization, own_weight=False)
         self.rm = RadialModel(self.tp.nweight)
         self.Rs_sh = Rs_sh
         self.normalization = normalization
