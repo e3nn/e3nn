@@ -3,7 +3,7 @@ import torch
 from e3nn import o3, rs
 from e3nn.tensor_product import (CustomWeightedTensorProduct,
                                  LearnableTensorProduct, LearnableTensorSquare,
-                                 WeightedTensorProduct)
+                                 GroupedWeightedTensorProduct)
 
 
 def test_learnable_tensor_square_normalization():
@@ -37,7 +37,7 @@ def test_weighted_tensor_product():
     Rs_in2 = rs.simplify([0] * 10 + [1] * 10 + [2] * 5)
     Rs_out = rs.simplify([0] * 3 + [1] * 4)
 
-    tp = WeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, groups=2)
+    tp = GroupedWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out)
 
     x1 = rs.randn(20, Rs_in1)
     x2 = rs.randn(20, Rs_in2)
