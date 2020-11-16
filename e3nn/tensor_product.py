@@ -173,6 +173,8 @@ class CustomWeightedTensorProduct(torch.nn.Module):
 
         super().__init__()
 
+        assert normalization in ['component', 'norm']
+
         self.Rs_in1 = rs.convention(Rs_in1)
         self.Rs_in2 = rs.convention(Rs_in2)
         self.Rs_out = rs.convention(Rs_out)
@@ -201,6 +203,44 @@ class CustomWeightedTensorProduct(torch.nn.Module):
             assert abs(l_1 - l_2) <= l_out <= l_1 + l_2
 
             if dim_1 == 0 or dim_2 == 0 or dim_out == 0:
+                continue
+
+            code += f"    # {l_1} x {l_2} = {l_out}\n"
+
+            if (l_1, l_2, l_out) == (0, 0, 0) and mode == 'uvw' and normalization in ['component', 'norm']:
+                # optimized code for special case
+                # C0_0_0 = 1
+                code += f"    s1_ = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1})\n"
+                code += f"    s2_ = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2})\n"
+                dim_w = mul_1 * mul_2 * mul_out
+                code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out})\n"
+                index_w += dim_w
+                code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zu,zv->zw', sw, s1_, s2_)\n"
+                code += "\n"
+                continue
+
+            if (l_1, l_2, l_out) == (0, 1, 1) and mode == 'uvw' and normalization == 'component':
+                # optimized code for special case
+                # C0_1_1 = eye(3)
+                code += f"    s1_ = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1})\n"
+                code += f"    s2_ = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, 3)\n"
+                dim_w = mul_1 * mul_2 * mul_out
+                code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out})\n"
+                index_w += dim_w
+                code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zu,zvi->zwi', sw, s1_, s2_).reshape(batch, {dim_out})\n"
+                code += "\n"
+                continue
+
+            if (l_1, l_2, l_out) == (1, 0, 1) and mode == 'uvw' and normalization == 'component':
+                # optimized code for special case
+                # C1_0_1 = eye(3)
+                code += f"    s1_ = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1}, 3)\n"
+                code += f"    s2_ = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2})\n"
+                dim_w = mul_1 * mul_2 * mul_out
+                code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out})\n"
+                index_w += dim_w
+                code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zui,zv->zwi', sw, s1_, s2_).reshape(batch, {dim_out})\n"
+                code += "\n"
                 continue
 
             if last_s1 != i_1:
