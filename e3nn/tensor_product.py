@@ -117,9 +117,9 @@ CODE
 
 
 def WeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, normalization='component', own_weight=True):
-    Rs_in1 = rs.convention(Rs_in1)
-    Rs_in2 = rs.convention(Rs_in2)
-    Rs_out = rs.convention(Rs_out)
+    Rs_in1 = rs.simplify(Rs_in1)
+    Rs_in2 = rs.simplify(Rs_in2)
+    Rs_out = rs.simplify(Rs_out)
 
     instr = [
         (i_1, i_2, i_out, 'uvw')
@@ -219,7 +219,12 @@ class CustomWeightedTensorProduct(torch.nn.Module):
             assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
             if _specialized_code:
-                # optimized code for special case
+                # optimized code for special cases:
+                # 0 x 0 = 0
+                # 0 x L = L
+                # L x 0 = L
+                # L x L = 0
+                # 1 x 1 = 1
 
                 if (l_1, l_2, l_out) == (0, 0, 0) and mode == 'uvw' and normalization in ['component', 'norm']:
                     code += f"    s1_ = s1.reshape(batch, {mul_1})\n"
@@ -258,8 +263,8 @@ class CustomWeightedTensorProduct(torch.nn.Module):
                         count[pos] += mul_1 * mul_2
                     continue
 
-                if (l_1, l_2, l_out) == (1, 1, 0) and mode == 'uvw' and normalization == 'component':
-                    # C1_1_0 = eye(3) / sqrt(3)
+                if l_1 == l_2 and l_out == 0 and mode == 'uvw' and normalization == 'component':
+                    # Cl_l_0 = eye(3) / sqrt(2L+1)
                     dim_w = mul_1 * mul_2 * mul_out
                     code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out}).div({(2 * l_1 + 1)**0.5})\n"
                     index_w += dim_w
