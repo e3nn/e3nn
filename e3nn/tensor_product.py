@@ -197,7 +197,7 @@ class CustomWeightedTensorProduct(torch.nn.Module):
         for i_2, (mul_2, l_2, p_2) in enumerate(self.Rs_in2):
             index_2 = rs.dim(self.Rs_in2[:i_2])
             dim_2 = mul_2 * (2 * l_2 + 1)
-            code += f"    x2_{i_2} = x1[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
+            code += f"    x2_{i_2} = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
         code += f"\n"
 
         last_ss = None
