@@ -78,3 +78,27 @@ def test_custom_weighted_tensor_product():
     z1.sum().backward()
 
     assert torch.allclose(z1, z2)
+
+
+def test_custom_weighted_tensor_product2():
+    torch.set_default_dtype(torch.float64)
+
+    Rs_in1 = [(2, l) for l in [0, 1, 2]]
+    Rs_in2 = [(3, l) for l in [0, 1, 2]]
+    Rs_out = [(2, l) for l in [0, 1, 2]]
+
+    instr = [
+        (i1, i2, i3, 'uvw')
+        for i1, (_, l1) in enumerate(Rs_in1)
+        for i2, (_, l2) in enumerate(Rs_in2)
+        for i3, (_, l3) in enumerate(Rs_out)
+        if abs(l1 - l2) <= l3 <= l1 + l2
+    ]
+
+    tp1 = CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr)
+    tp2 = CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr, own_weight=False, _specialized_code=False)
+
+    x1 = rs.randn(2, Rs_in1)
+    x2 = rs.randn(2, Rs_in2)
+
+    assert torch.allclose(tp1(x1, x2), tp2(x1, x2, tp1.weight))
