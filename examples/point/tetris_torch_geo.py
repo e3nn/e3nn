@@ -99,7 +99,7 @@ def main():
             time.perf_counter() - wall, step, loss.item(), acc, (out - r_out).pow(2).mean().sqrt().item()))
 
     print(labels.numpy().round(1))
-    print(out.detach().numpy().round(1))
+    print(out.detach().cpu().numpy().round(1))
 
 
 if __name__ == '__main__':
