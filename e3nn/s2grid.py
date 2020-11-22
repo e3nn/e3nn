@@ -8,6 +8,7 @@ import math
 
 import lie_learn.spaces.S3 as S3
 import torch
+import torch.fft
 from e3nn import rsh, o3
 from e3nn.util.default_dtype import torch_default_dtype
 
@@ -63,6 +64,11 @@ def complete_lmax_res(lmax, res_beta, res_alpha):
 
 def irfft(x, res):
     """
+    ```
+    _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
+    x = torch.randn(2 * lmax + 1)
+    s2grid.irfft(x, res) == sha @ x
+    ```
     :param x: tensor of shape [..., m]
     :return: tensor of shape [..., alpha]
     """
@@ -76,7 +82,7 @@ def irfft(x, res):
     ], dim=-1)
     assert x.shape[1] == res
     l = res // 2
-    x = torch.stack([
+    x = torch.complex(
         torch.cat([
             x[:, l:l + 1],
             x[:, l + 1:].div(math.sqrt(2))
@@ -85,23 +91,28 @@ def irfft(x, res):
             torch.zeros_like(x[:, :1]),
             x[:, :l].flip(-1).div(-math.sqrt(2)),
         ], dim=1),
-    ], dim=-1)
-    x = torch.irfft(x, 1) * res
+    )
+    x = torch.fft.irfft(x, n=res, dim=1) * res
     return x.reshape(*size, res)
 
 
 def rfft(x, l):
     """
+    ```
+    _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
+    x = torch.randn(res)
+    s2grid.rfft(x, lmax) == x @ sha
+    ```
     :param x: tensor of shape [..., alpha]
     :return: tensor of shape [..., m]
     """
     *size, res = x.shape
     x = x.reshape(-1, res)
-    x = torch.rfft(x, 1)
+    x = torch.fft.rfft(x, dim=1)
     x = torch.cat([
-        x[:, 1:l + 1, 1].flip(1).mul(-math.sqrt(2)),
-        x[:, :1, 0],
-        x[:, 1:l + 1, 0].mul(math.sqrt(2)),
+        x[:, 1:l + 1].imag.flip(1).mul(-math.sqrt(2)),
+        x[:, :1].real,
+        x[:, 1:l + 1].real.mul(math.sqrt(2)),
     ], dim=1)
     return x.reshape(*size, 2 * l + 1)
 
