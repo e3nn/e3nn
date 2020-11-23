@@ -106,7 +106,7 @@ _tensor_product_code = """
 import torch
 
 @torch.jit.script
-def main(ARGS, x1: torch.Tensor, x2: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+def main(ARGSx1: torch.Tensor, x2: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
     batch = x1.shape[0]
     out = x1.new_zeros((batch, DIM))
     ein = torch.einsum
@@ -117,9 +117,9 @@ CODE
 
 
 def WeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, normalization='component', own_weight=True):
-    Rs_in1 = rs.convention(Rs_in1)
-    Rs_in2 = rs.convention(Rs_in2)
-    Rs_out = rs.convention(Rs_out)
+    Rs_in1 = rs.simplify(Rs_in1)
+    Rs_in2 = rs.simplify(Rs_in2)
+    Rs_out = rs.simplify(Rs_out)
 
     instr = [
         (i_1, i_2, i_out, 'uvw')
@@ -160,7 +160,8 @@ class CustomWeightedTensorProduct(torch.nn.Module):
             Rs_out: rs.TY_RS_LOOSE,
             instr: List[Tuple[int, int, int, str]],
             normalization: str = 'component',
-            own_weight: bool = True
+            own_weight: bool = True,
+            _specialized_code=True,
         ):
         """
         Create a Tensor Product operation that has each of his path weighted by a parameter.
@@ -172,6 +173,8 @@ class CustomWeightedTensorProduct(torch.nn.Module):
         """
 
         super().__init__()
+
+        assert normalization in ['component', 'norm']
 
         self.Rs_in1 = rs.convention(Rs_in1)
         self.Rs_in2 = rs.convention(Rs_in2)
@@ -185,7 +188,20 @@ class CustomWeightedTensorProduct(torch.nn.Module):
 
         instr = sorted(instr)  # for optimization
 
-        last_s1, last_s2, last_ss = None, None, None
+        for i_1, (mul_1, l_1, p_1) in enumerate(self.Rs_in1):
+            index_1 = rs.dim(self.Rs_in1[:i_1])
+            dim_1 = mul_1 * (2 * l_1 + 1)
+            code += f"    x1_{i_1} = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1}, {2 * l_1 + 1})\n"
+        code += f"\n"
+
+        for i_2, (mul_2, l_2, p_2) in enumerate(self.Rs_in2):
+            index_2 = rs.dim(self.Rs_in2[:i_2])
+            dim_2 = mul_2 * (2 * l_2 + 1)
+            code += f"    x2_{i_2} = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
+        code += f"\n"
+
+        last_ss = None
+
         for i_1, i_2, i_out, mode in instr:
             mul_1, l_1, p_1 = self.Rs_in1[i_1]
             mul_2, l_2, p_2 = self.Rs_in2[i_2]
@@ -203,15 +219,83 @@ class CustomWeightedTensorProduct(torch.nn.Module):
             if dim_1 == 0 or dim_2 == 0 or dim_out == 0:
                 continue
 
-            if last_s1 != i_1:
-                code += f"    s1 = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1}, {2 * l_1 + 1})\n"
-                last_s1 = i_1
-
-            if last_s2 != i_2:
-                code += f"    s2 = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
-                last_s2 = i_2
+            code += f"    # {l_1} x {l_2} = {l_out}\n"
+            code += f"    s1 = x1_{i_1}\n"
+            code += f"    s2 = x2_{i_2}\n"
 
             assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
+
+            if _specialized_code:
+                # optimized code for special cases:
+                # 0 x 0 = 0
+                # 0 x L = L
+                # L x 0 = L
+                # L x L = 0
+                # 1 x 1 = 1
+
+                if (l_1, l_2, l_out) == (0, 0, 0) and mode == 'uvw' and normalization in ['component', 'norm']:
+                    code += f"    s1 = s1.reshape(batch, {mul_1})\n"
+                    code += f"    s2 = s2.reshape(batch, {mul_2})\n"
+                    dim_w = mul_1 * mul_2 * mul_out
+                    code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out})\n"
+                    index_w += dim_w
+                    code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zu,zv->zw', sw, s1, s2)\n"
+                    code += "\n"
+
+                    for pos in range(index_out, index_out + dim_out):
+                        count[pos] += mul_1 * mul_2
+                    continue
+
+                if l_1 == 0 and l_2 == l_out and mode == 'uvw' and normalization == 'component':
+                    code += f"    s1 = s1.reshape(batch, {mul_1})\n"
+                    dim_w = mul_1 * mul_2 * mul_out
+                    code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out})\n"
+                    index_w += dim_w
+                    code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zu,zvi->zwi', sw, s1, s2).reshape(batch, {dim_out})\n"
+                    code += "\n"
+
+                    for pos in range(index_out, index_out + dim_out):
+                        count[pos] += mul_1 * mul_2
+                    continue
+
+                if l_2 == 0 and l_1 == l_out and mode == 'uvw' and normalization == 'component':
+                    code += f"    s2 = s2.reshape(batch, {mul_2})\n"
+                    dim_w = mul_1 * mul_2 * mul_out
+                    code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out})\n"
+                    index_w += dim_w
+                    code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zui,zv->zwi', sw, s1, s2).reshape(batch, {dim_out})\n"
+                    code += "\n"
+
+                    for pos in range(index_out, index_out + dim_out):
+                        count[pos] += mul_1 * mul_2
+                    continue
+
+                if l_1 == l_2 and l_out == 0 and mode == 'uvw' and normalization == 'component':
+                    # Cl_l_0 = eye(3) / sqrt(2L+1)
+                    dim_w = mul_1 * mul_2 * mul_out
+                    code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out}).div({(2 * l_1 + 1)**0.5})\n"
+                    index_w += dim_w
+                    code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zui,zvi->zw', sw, s1, s2).reshape(batch, {dim_out})\n"
+                    code += "\n"
+
+                    for pos in range(index_out, index_out + dim_out):
+                        count[pos] += mul_1 * mul_2
+                    continue
+
+                if (l_1, l_2, l_out) == (1, 1, 1) and mode == 'uvw' and normalization == 'component':
+                    # C1_1_1 = levi-civita / sqrt(2)
+                    code += f"    s1 = s1.reshape(batch, {mul_1}, 1, {2 * l_1 + 1})\n"
+                    code += f"    s2 = s2.reshape(batch, 1, {mul_2}, {2 * l_2 + 1})\n"
+                    code += f"    s1, s2 = torch.broadcast_tensors(s1, s2)\n"
+                    dim_w = mul_1 * mul_2 * mul_out
+                    code += f"    sw = w[:, {index_w}:{index_w+dim_w}].reshape(batch, {mul_1}, {mul_2}, {mul_out}).div({2**0.5})\n"
+                    index_w += dim_w
+                    code += f"    out[:, {index_out}:{index_out+dim_out}] += ein('zuvw,zuvi->zwi', sw, torch.cross(s1, s2, dim=3)).reshape(batch, {dim_out})\n"
+                    code += "\n"
+
+                    for pos in range(index_out, index_out + dim_out):
+                        count[pos] += mul_1 * mul_2
+                    continue
 
             if last_ss != (i_1, i_2, mode[:2]):
                 if mode[:2] == 'uv':
@@ -292,6 +376,8 @@ class CustomWeightedTensorProduct(torch.nn.Module):
         wigners = sorted(wigners)
         self.wigners_names = [f"C{l_1}_{l_2}_{l_3}" for l_1, l_2, l_3 in wigners]
         args = ", ".join(f"{arg}: torch.Tensor" for arg in self.wigners_names)
+        if args:
+            args += ', '
 
         for arg, (l_1, l_2, l_out) in zip(self.wigners_names, wigners):
             wig = o3.wigner_3j(l_1, l_2, l_out)
