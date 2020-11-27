@@ -523,7 +523,7 @@ def reduce(D, D_small, eps=1e-9, with_parity=False):
         g = (5.5407, 1.3256, 2.8139, 1)
     else:
         g = (5.5407, 1.3256, 2.8139)
-    assert (bigA @ D(*g) @ bigA.T - direct_sum(D_small(*g), D_rest(*g))).abs().max() < eps
+    assert (bigA @ D(*g) @ bigA.T - direct_sum(*[D_small(*g)] * n + [D_rest(*g)])).abs().max() < eps
     return n, bigA, D_rest
 
 
