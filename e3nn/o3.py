@@ -519,6 +519,11 @@ def reduce(D, D_small, eps=1e-9, with_parity=False):
         n += 1
         D_rest = change_and_remove(bigA, D, n * dim_small)
 
+    if with_parity:
+        g = (5.5407, 1.3256, 2.8139, 1)
+    else:
+        g = (5.5407, 1.3256, 2.8139)
+    assert (bigA @ D(*g) @ bigA.T - direct_sum(D_small(*g), D_rest(*g))).abs().max() < eps
     return n, bigA, D_rest
 
 
@@ -547,7 +552,6 @@ def orthonormalize(
         if x.norm() > 2 * eps:
             x = x / x.norm()
             x[x.abs() < eps] = x.new_zeros(())
-            x *= x[x.nonzero()[0, 0]].sign()
             base += [x]
 
     expand = []
