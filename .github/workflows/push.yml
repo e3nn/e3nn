@@ -28,10 +28,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install wheel
         pip install torch==1.7.0+cpu torchvision==0.8.1+cpu torchaudio==0.7.0 -f https://download.pytorch.org/whl/torch_stable.html
-        pip install torch-scatter==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
-        pip install torch-sparse==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
-        pip install torch-cluster==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
-        pip install torch-spline-conv==latest+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
+        pip install torch-scatter==2.0.5+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
+        pip install torch-sparse==0.6.8+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
+        pip install torch-cluster==1.5.8+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
+        pip install torch-spline-conv==1.2.0+cpu -f https://pytorch-geometric.com/whl/torch-1.7.0.html
         pip install .
     - name: Test with pytest
       run: |
