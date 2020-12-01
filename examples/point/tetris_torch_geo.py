@@ -41,7 +41,7 @@ def get_dataset():
     return tetris, labels
 
 
-def forward(f, shapes, Rs_sh, lmax, device):
+def forward(f, shapes, Rs_sh, device):
     r_max = 1.1
     x = torch.ones(4, 1)
     batch = Batch.from_data_list([DataNeighbors(x, shape, r_max, self_interaction=False) for shape in shapes])
@@ -83,7 +83,7 @@ def main():
 
     wall = time.perf_counter()
     for step in range(100):
-        out = forward(f, tetris, Rs_sh, lmax, device)
+        out = forward(f, tetris, Rs_sh, device)
 
         acc = out.cpu().round().eq(labels).double().mean().item()
 
