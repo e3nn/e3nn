@@ -171,9 +171,8 @@ def spherical_harmonics_z(Rs, z, y=None):
     :return: tensor of shape [..., l * m]
     """
     Rs = rs.simplify(Rs)
-    for _, l, p in Rs:
-        assert p in [0, (-1)**l]
-    ls = [l for mul, l, _ in Rs]
+    assert all(p in [0, (-1)**l] for _, l, p in Rs)
+    ls = [l for mul, l, _ in Rs for _ in range(mul)]
     return legendre(ls, z, y)  # [..., l * m]
 
 
