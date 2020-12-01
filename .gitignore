@@ -16,3 +16,4 @@ mutex
 *.jpeg
 
 *.npz
+e3nn/*.so
