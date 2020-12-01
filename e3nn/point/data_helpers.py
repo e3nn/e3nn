@@ -97,22 +97,27 @@ class DataEdgePeriodicNeighbors(tg.data.Data):
 
 
 def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
-    """
-    Create neighbor list (edge_index) and relative vectors (edge_attr)
-    based on radial cutoff.
+    """Create neighbor list and neighbor vectors based on radial cutoff.
 
-    :param pos: torch.tensor of coordinates with shape (N, 3)
-    :param r_max: float of radial cutoff
-    :param self_interaction: whether or not to include self edge
+    Create neighbor list (``edge_index``) and relative vectors
+    (``edge_attr``) based on radial cutoff.
 
-    :return: list of edges [(2, num_edges)], Tensor of relative vectors [num_edges, 3]
+    Edges are given by the following convention:
+    - ``edge_index[0]`` is the *source* (convolution center).
+    - ``edge_index[1]`` is the *target* (neighbor).
 
-    edges are given by the convention
-    edge_list[0] = source (convolution center)
-    edge_list[1] = target (neighbor)
+    Thus, ``edge_index`` has the same convention as the relative vectors:
+    :math:`\\vec{r}_{source, target}`
 
-    Thus, the edge_list has the same convention vector notation for relative vectors
-    \vec{r}_{source, target}
+    Args:
+        pos (torch.tensor shape [N, 3]): Positional coordinates.
+        r_max (float): Radial cutoff distance for neighbor finding.
+        self_interaction (bool): Whether or not to include self-edges in the neighbor list.
+
+    Returns:
+        edge_index (torch.tensor shape [2, num_edges]): List of edges.
+        edge_attr (torch.tensor shape [num_edges, 3]): Relative vectors corresponding to each edge.
+
     """
     N, _ = pos.shape
     assert _ == 3
@@ -135,28 +140,37 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
             indices = indices[:-1]  # Remove extra self edge
         nei_list.append(torch.LongTensor([[i, target] for target in indices]))
         geo_list.append(pos[indices] - p)
-    return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
+    edge_index = torch.cat(nei_list, dim=0).transpose(1, 0)
+    edge_attr = torch.cat(geo_list, dim=0)
+    return edge_index, edge_attr
 
 
 def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True, r_min=1e-8):
-    """
-    Create neighbor list (edge_index) and relative vectors (edge_attr)
-    based on radial cutoff and periodic lattice.
+    """Create neighbor list and neighbor vectors based on radial cutoff and periodic lattice.
 
-    :param pos: torch.tensor of coordinates with shape (N, 3)
-    :param r_max: float of radial cutoff
-    :param self_interaction: whether or not to include self edge
+    Create neighbor list (``edge_index``) and relative vectors
+    (``edge_attr``) based on radial cutoff.
 
-    :return: list of edges [(2, num_edges)], Tensor of relative vectors [num_edges, 3]
+    Edges are given by the following convention:
+    - ``edge_index[0]`` is the *source* (convolution center).
+    - ``edge_index[1]`` is the *target* (neighbor).
 
-    edges are given by the convention
-    edge_list[0] = source (convolution center)
-    edge_list[1] = target (neighbor index)
+    Thus, ``edge_index`` has the same convention as the relative vectors:
+    :math:`\\vec{r}_{source, target}`
 
-    Thus, the edge_list has the same convention vector notation for relative vectors
-    \vec{r}_{source, target}
+    Relative vectors are given for the different images of the neighbor point within ``r_max``.
 
-    Relative vectors are given for the different images of the neighbor atom within r_max.
+    Args:
+        pos (torch.tensor shape [N, 3]): Positional coordinates.
+        lattice (torch.tensor shape [3, 3]): Lattice vectors.
+        r_max (float): Radial cutoff distance for neighbor finding.
+        self_interaction (bool): Whether or not to include self-edges in the neighbor list.
+        r_min (float): Numerical tolerance for determining if points coincide.
+
+    Returns:
+        edge_index (torch.tensor shape [2, num_edges]): List of edges.
+        edge_attr (torch.tensor shape [num_edges, 3]): Relative vectors corresponding to each edge.
+
     """
     N, _ = pos.shape
     structure = Structure(lattice, ['H'] * N, pos, coords_are_cartesian=True)
@@ -182,7 +196,10 @@ def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interactio
             dist = torch.cat([self_dist, dist], dim=0)
         nei_list.append(indices)
         geo_list.append(dist)
-    return torch.cat(nei_list, dim=0).transpose(1, 0), torch.cat(geo_list, dim=0)
+
+    edge_index = torch.cat(nei_list, dim=0).transpose(1, 0)
+    edge_attr = torch.cat(geo_list, dim=0)
+    return edge_index, edge_attr
 
 
 def _initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=1., symmetric_edges=False):
