@@ -41,12 +41,13 @@ def get_dataset():
     return tetris, labels
 
 
-def forward(f, shapes, lmax, device):
+def forward(f, shapes, Rs_sh, device):
     r_max = 1.1
     x = torch.ones(4, 1)
     batch = Batch.from_data_list([DataNeighbors(x, shape, r_max, self_interaction=False) for shape in shapes])
     batch = batch.to(device)
-    sh = rsh.spherical_harmonics_xyz(list(range(lmax + 1)), batch.edge_attr, 'component')
+    # Pre-compute the spherical harmonics and re-use them in each convolution
+    sh = rsh.spherical_harmonics_xyz(Rs_sh, batch.edge_attr, 'component')
     out = f(batch.x, batch.edge_index, batch.edge_attr, sh=sh, n_norm=3)
     out = scatter_add(out, batch.batch, dim=0)
     out = torch.tanh(out)
@@ -82,13 +83,13 @@ def main():
 
     wall = time.perf_counter()
     for step in range(100):
-        out = forward(f, tetris, lmax, device)
+        out = forward(f, tetris, Rs_sh, device)
 
         acc = out.cpu().round().eq(labels).double().mean().item()
 
         with torch.no_grad():
             shapes, _ = get_dataset()
-            r_out = forward(f, shapes, lmax, device)
+            r_out = forward(f, shapes, Rs_sh, lmax, device)
 
         loss = (out - labels.to(device=out.device)).pow(2).mean()
         optimizer.zero_grad()
