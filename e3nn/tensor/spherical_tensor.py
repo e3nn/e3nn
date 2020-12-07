@@ -1,10 +1,12 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, missing-docstring, arguments-differ
 import math
+from math import pi
 
+import scipy.signal
 import torch
 
 from e3nn import o3, rs, rsh
-from e3nn.s2grid import ToS2Grid, FromS2Grid
+from e3nn.s2grid import FromS2Grid, ToS2Grid
 from e3nn.tensor.irrep_tensor import IrrepTensor
 
 
@@ -13,7 +15,7 @@ def spherical_harmonics_dirac(vectors, lmax):
     approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
     the higher is lmax the better is the approximation
     """
-    return 4 * math.pi / (lmax + 1)**2 * rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors)
+    return 4 * pi / (lmax + 1)**2 * rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors)
 
 
 def projection(vectors, lmax):
@@ -24,6 +26,20 @@ def projection(vectors, lmax):
     coeff = spherical_harmonics_dirac(vectors, lmax)  # [..., l * m]
     radii = vectors.norm(2, dim=-1, keepdim=True)  # [...]
     return coeff * radii
+
+
+def _find_peaks_2d(x):
+    iii = []
+    for i in range(x.shape[0]):
+        jj, _ = scipy.signal.find_peaks(x[i, :])
+        iii += [(i, j) for j in jj]
+
+    jjj = []
+    for j in range(x.shape[1]):
+        ii, _ = scipy.signal.find_peaks(x[:, j])
+        jjj += [(i, j) for i in ii]
+
+    return list(set(iii).intersection(set(jjj)))
 
 
 def adjusted_projection(vectors, lmax):
@@ -276,3 +292,29 @@ class SphericalTensor:
                 signal[L ** 2: (L + 1) ** 2] = sorted_tensor[ten_slice]
                 Rs_idx += 1
         return cls(signal)
+
+    def find_peaks(self, res=100):
+        x1, f1 = self.signal_on_grid(res)
+
+        abc = pi / 2, pi / 2, pi / 2
+        R = o3.rot(*abc)
+        D = rs.rep(self.Rs, *abc)
+
+        rtensor = SphericalTensor(D @ self.signal)
+        rx2, f2 = rtensor.signal_on_grid(res)
+        x2 = torch.einsum('ij,baj->bai', R.T, rx2)
+
+        ij = _find_peaks_2d(f1)
+        x1p = torch.stack([x1[i, j] for i, j in ij])
+        f1p = torch.stack([f1[i, j] for i, j in ij])
+
+        ij = _find_peaks_2d(f2)
+        x2p = torch.stack([x2[i, j] for i, j in ij])
+        f2p = torch.stack([f2[i, j] for i, j in ij])
+
+        # Union of the results
+        mask = torch.cdist(x1p, x2p) < 2 * pi / res
+        x = torch.cat([x1p[mask.sum(1) == 0], x2p])
+        f = torch.cat([f1p[mask.sum(1) == 0], f2p])
+
+        return x, f
