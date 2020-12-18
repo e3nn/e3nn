@@ -6,6 +6,13 @@ from e3nn import rs
 
 torch.set_default_dtype(torch.float64)
 
+def edge_index_set_equiv(a, b):
+    """Compare edge_index arrays in an unordered way."""
+    # [[0, 1], [1, 0]] -> {(0, 1), (1, 0)}
+    a = a.numpy() # numpy gives ints when iterated, tensor gives non-identical scalar tensors.
+    b = b.numpy()
+    return set(zip(a[0], a[1])) == set(zip(b[0], b[1]))
+
 
 def test_data_helpers():
     N = 7
@@ -18,6 +25,78 @@ def test_data_helpers():
     dh.DataPeriodicNeighbors(x, pos, lattice, r_max)
     dh._neighbor_list_and_relative_vec(pos, r_max)
     dh.DataNeighbors(x, pos, r_max)
+
+
+def test_from_ase():
+    import ase.build
+    # Non-periodic
+    atoms = ase.build.molecule('CH3CHO')
+    data = dh.DataNeighbors.from_ase(atoms, r_max = 2.)
+    assert data.x.shape == (len(atoms), 3) # 3 species in this atoms
+    # periodic
+    atoms = ase.build.bulk('Cu', 'fcc', a=3.6, cubic=True)
+    data = dh.DataNeighbors.from_ase(atoms, r_max = 2.5)
+    assert data.x.shape == (len(atoms), 1) # one species
+
+
+def test_relative_vecs():
+    coords = torch.tensor([
+        [0, 0, 0],
+        [1.11646617, 0.7894608, 1.93377613]
+    ])
+    r_max = 2.5
+    data = dh.DataNeighbors(
+        x = torch.zeros(size = (len(coords), 1)),
+        pos = coords,
+        r_max = r_max,
+    )
+    edge_index_true = torch.LongTensor([
+        [0, 0, 1, 1],
+        [0, 1, 0, 1]
+    ])
+    assert edge_index_set_equiv(data.edge_index, edge_index_true)
+    assert torch.allclose(
+        coords[1] - coords[0],
+        data.edge_attr[
+            (data.edge_index[0] == 0) & (data.edge_index[1] == 1)
+        ][0]
+    )
+    assert torch.allclose(
+        coords[0] - coords[1],
+        data.edge_attr[
+            (data.edge_index[0] == 1) & (data.edge_index[1] == 0)
+        ][0]
+    )
+
+
+def test_self_interaction():
+    coords = torch.tensor([
+        [0, 0, 0],
+        [1.11646617, 0.7894608, 1.93377613]
+    ])
+    r_max = 2.5
+    data_no_si = dh.DataNeighbors(
+        x = torch.zeros(size = (len(coords), 1)),
+        pos = coords,
+        r_max = r_max,
+        self_interaction = False,
+    )
+    true_no_si = torch.LongTensor([
+        [0, 1],
+        [1, 0]
+    ])
+    assert edge_index_set_equiv(data_no_si.edge_index, true_no_si)
+    data_si = dh.DataNeighbors(
+        x = torch.zeros(size = (len(coords), 1)),
+        pos = coords,
+        r_max = r_max,
+        self_interaction = True
+    )
+    true_si = torch.LongTensor([
+        [0, 0, 1, 1],
+        [0, 1, 0, 1]
+    ])
+    assert edge_index_set_equiv(data_si.edge_index, true_si)
 
 
 def test_silicon_neighbors():
@@ -36,7 +115,15 @@ def test_silicon_neighbors():
         [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0]
     ])
-    torch.allclose(edge_index, edge_index_true)
+    assert edge_index_set_equiv(edge_index, edge_index_true)
+    data = dh.DataNeighbors(
+        x = torch.zeros(size = (len(coords), 1)),
+        pos = coords,
+        r_max = r_max,
+        cell = lattice,
+        pbc = True,
+    )
+    assert edge_index_set_equiv(data.edge_index, edge_index_true)
 
 
 def test_get_edge_edges_and_index():
