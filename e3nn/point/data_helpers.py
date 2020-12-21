@@ -3,23 +3,79 @@ import collections
 
 import torch
 import torch_geometric as tg
-from ase import Atoms, neighborlist
-from pymatgen.core.structure import Structure
+import numpy as np
+import ase.neighborlist
 
 from e3nn import o3, rs
 from e3nn.tensor import SphericalTensor
 
 
 class DataNeighbors(tg.data.Data):
-    def __init__(self, x, pos, r_max, self_interaction=True, **kwargs):
-        edge_index, edge_attr = _neighbor_list_and_relative_vec(pos, r_max, self_interaction)
+    """Builds a graph from points with features for message passing convolutions.
+
+    Wraps ``_neighbor_list_and_relative_vec``; see it for edge conventions.
+
+    Args:
+        x (torch.Tensor shape [N, M]): per-node M-dimensional features.
+        pos (torch.Tensor shape [N, 3]): node positions.
+        r_max (float): neighbor cutoff radius.
+        cell (ase.Cell/ndarray [3,3], optional): cell (box) for the points. Defaults to ``None``.
+        pbc (bool or 3-tuple of bool, optional): whether to apply periodic boundary conditions to all or each of the three cell vector directions. Defaults to ``False``.
+        self_interaction (bool, optional): whether to include self edges for points. Defaults to ``True``.
+        **kwargs (optional): other attributes to pass to the ``torch_geometric.data.Data`` constructor.
+    """
+    def __init__(self, x, pos, r_max, cell=None, pbc=False, self_interaction=True, **kwargs):
+        edge_index, edge_attr = _neighbor_list_and_relative_vec(
+            pos,
+            r_max,
+            self_interaction=self_interaction,
+            cell=cell,
+            pbc=pbc
+        )
+        if cell is not None:
+            # For compatability: the old DataPeriodicNeighbors put the cell
+            # in the Data object as `lattice`.
+            kwargs['lattice'] = cell
         super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, **kwargs)
 
+    @classmethod
+    def from_ase(cls, atoms, r_max, features=None, **kwargs):
+        """Build a ``DataNeighbors`` from an ``ase.Atoms`` object.
 
-class DataPeriodicNeighbors(tg.data.Data):
+        Respects ``atoms``'s ``pbc`` and ``cell``.
+
+        Args:
+            atoms (ase.Atoms): the input.
+            r_max (float): neighbor cutoff radius.
+            features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the default), uses a one-hot encoding of the species present in ``atoms``.
+            **kwargs (optional): other arguments for the ``DataNeighbors`` constructor.
+        Returns:
+            A ``DataNeighbors``.
+        """
+        if features is None:
+            _, species_ids = np.unique(atoms.get_atomic_numbers(), return_inverse=True)
+            features = torch.nn.functional.one_hot(torch.as_tensor(species_ids)).to(dtype=torch.get_default_dtype())
+        return cls(
+            x=features,
+            pos=torch.as_tensor(atoms.positions),
+            r_max=r_max,
+            cell=atoms.get_cell(),
+            pbc=atoms.pbc,
+            **kwargs
+        )
+
+
+class DataPeriodicNeighbors(DataNeighbors):
+    """Compatability wrapper for ``DataNeighbors``.
+
+    Arguments are the same as ``DataNeighbors``, but ``lattice`` is accepted
+    as an alias for ``cell`` and ``pbc`` is always set to ``True``.
+    """
     def __init__(self, x, pos, lattice, r_max, self_interaction=True, **kwargs):
-        edge_index, edge_attr = _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction)
-        super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, lattice=lattice, **kwargs)
+        super().__init__(
+            x=x, pos=pos, cell=lattice, pbc=True, r_max=r_max,
+            self_interaction=self_interaction, **kwargs
+        )
 
 
 class DataEdgeNeighbors(tg.data.Data):
@@ -96,7 +152,7 @@ class DataEdgePeriodicNeighbors(tg.data.Data):
             Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
 
 
-def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
+def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None, pbc=False):
     """Create neighbor list and neighbor vectors based on radial cutoff.
 
     Create neighbor list (``edge_index``) and relative vectors
@@ -110,8 +166,10 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
     :math:`\\vec{r}_{source, target}`
 
     Args:
-        pos (torch.tensor shape [N, 3]): Positional coordinates.
+        pos (shape [N, 3]): Positional coordinate; Tensor or numpy array. If Tensor, must be detached & on CPU.
         r_max (float): Radial cutoff distance for neighbor finding.
+        cell (numpy shape [3, 3]): Cell for periodic boundary conditions. Ignored if ``pbc == False``.
+        pbc (bool or 3-tuple of bool): Whether the system is periodic in each of the three cell dimensions.
         self_interaction (bool): Whether or not to include self-edges in the neighbor list.
 
     Returns:
@@ -119,87 +177,43 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True):
         edge_attr (torch.tensor shape [num_edges, 3]): Relative vectors corresponding to each edge.
 
     """
-    N, _ = pos.shape
-    assert _ == 3
-    atoms = Atoms(symbols=['H'] * N, positions=pos.cpu().detach().numpy())
-    nl = neighborlist.NeighborList(
-        [r_max / 2.] * N,  # NeighborList looks for intersecting spheres
+    if isinstance(pbc, bool):
+        pbc = (pbc,)*3
+    if cell is None:
+        # ASE will "complete" this correctly.
+        cell = np.zeros((3, 3))
+    cell = ase.geometry.complete_cell(cell)
+
+    first_idex, second_idex, displacements = ase.neighborlist.primitive_neighbor_list(
+        'ijD',
+        pbc,
+        np.asarray(cell),
+        np.asarray(pos),
+        cutoff=r_max,
         self_interaction=self_interaction,
-        bothways=True,
-        skin=0.0,
+        use_scaled_positions=False
     )
-    nl.update(atoms)
-
-    nei_list = []
-    geo_list = []
-
-    for i, p in enumerate(pos):
-        indices, _displacements = nl.get_neighbors(i)
-        if self_interaction:
-            assert indices[-1] == i
-            indices = indices[:-1]  # Remove extra self edge
-        nei_list.append(torch.LongTensor([[i, target] for target in indices]))
-        geo_list.append(pos[indices] - p)
-    edge_index = torch.cat(nei_list, dim=0).transpose(1, 0)
-    edge_attr = torch.cat(geo_list, dim=0)
+    edge_index = torch.vstack((
+        torch.LongTensor(first_idex),
+        torch.LongTensor(second_idex)
+    ))
+    edge_attr = torch.as_tensor(displacements)
     return edge_index, edge_attr
 
 
-def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True, r_min=1e-8):
+def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True):
     """Create neighbor list and neighbor vectors based on radial cutoff and periodic lattice.
 
-    Create neighbor list (``edge_index``) and relative vectors
-    (``edge_attr``) based on radial cutoff.
-
-    Edges are given by the following convention:
-    - ``edge_index[0]`` is the *source* (convolution center).
-    - ``edge_index[1]`` is the *target* (neighbor).
-
-    Thus, ``edge_index`` has the same convention as the relative vectors:
-    :math:`\\vec{r}_{source, target}`
-
-    Relative vectors are given for the different images of the neighbor point within ``r_max``.
-
-    Args:
-        pos (torch.tensor shape [N, 3]): Positional coordinates.
-        lattice (torch.tensor shape [3, 3]): Lattice vectors.
-        r_max (float): Radial cutoff distance for neighbor finding.
-        self_interaction (bool): Whether or not to include self-edges in the neighbor list.
-        r_min (float): Numerical tolerance for determining if points coincide.
-
-    Returns:
-        edge_index (torch.tensor shape [2, num_edges]): List of edges.
-        edge_attr (torch.tensor shape [num_edges, 3]): Relative vectors corresponding to each edge.
-
+    Compatability wrapper around ``_neighbor_list_and_relative_vec``.
+    Prefer to use ``_neighbor_list_and_relative_vec`` directly in new code.
     """
-    N, _ = pos.shape
-    structure = Structure(lattice, ['H'] * N, pos, coords_are_cartesian=True)
-
-    nei_list = []
-    geo_list = []
-
-    neighbors = structure.get_all_neighbors(
+    return _neighbor_list_and_relative_vec(
+        pos,
         r_max,
-        include_index=True,
-        include_image=True,
-        numerical_tol=r_min
+        cell=lattice,
+        pbc=True,
+        self_interaction=self_interaction
     )
-    for i, (site, neis) in enumerate(zip(structure, neighbors)):
-        indices, cart = zip(*[(n.index, n.coords) for n in neis])
-        cart = torch.tensor(cart)
-        indices = torch.LongTensor([[i, target] for target in indices])
-        dist = cart - torch.tensor(site.coords)
-        if self_interaction:
-            self_index = torch.LongTensor([[i, i]])
-            indices = torch.cat([self_index, indices], dim=0)
-            self_dist = pos.new_zeros(1, 3, dtype=dist.dtype)
-            dist = torch.cat([self_dist, dist], dim=0)
-        nei_list.append(indices)
-        geo_list.append(dist)
-
-    edge_index = torch.cat(nei_list, dim=0).transpose(1, 0)
-    edge_attr = torch.cat(geo_list, dim=0)
-    return edge_index, edge_attr
 
 
 def _initialize_edges(x, Rs_in, pos, edge_index_dict, lmax, self_edge=1., symmetric_edges=False):
