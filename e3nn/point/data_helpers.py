@@ -6,7 +6,6 @@ import torch
 import torch_geometric as tg
 import numpy as np
 import ase.neighborlist
-from pymatgen.core.structure import Structure
 
 from e3nn import o3, rs
 from e3nn.tensor import SphericalTensor
