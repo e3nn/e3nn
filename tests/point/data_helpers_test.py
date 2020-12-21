@@ -59,7 +59,7 @@ def test_relative_vecs():
     ])
     r_max = 2.5
     data = dh.DataNeighbors(
-        x=torch.zeros(size = (len(coords), 1)),
+        x=torch.zeros(size=(len(coords), 1)),
         pos=coords,
         r_max=r_max,
     )
@@ -89,7 +89,7 @@ def test_self_interaction():
     ])
     r_max = 2.5
     data_no_si = dh.DataNeighbors(
-        x=torch.zeros(size = (len(coords), 1)),
+        x=torch.zeros(size=(len(coords), 1)),
         pos=coords,
         r_max=r_max,
         self_interaction=False,
@@ -100,7 +100,7 @@ def test_self_interaction():
     ])
     assert edge_index_set_equiv(data_no_si.edge_index, true_no_si)
     data_si = dh.DataNeighbors(
-        x=torch.zeros(size = (len(coords), 1)),
+        x=torch.zeros(size=(len(coords), 1)),
         pos=coords,
         r_max=r_max,
         self_interaction=True
@@ -130,7 +130,7 @@ def test_silicon_neighbors():
     ])
     assert edge_index_set_equiv(edge_index, edge_index_true)
     data = dh.DataNeighbors(
-        x=torch.zeros(size = (len(coords), 1)),
+        x=torch.zeros(size=(len(coords), 1)),
         pos=coords,
         r_max=r_max,
         cell=lattice,
