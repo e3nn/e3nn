@@ -1,6 +1,5 @@
 # pylint: disable=arguments-differ, redefined-builtin, missing-docstring, no-member, invalid-name, line-too-long, not-callable
 import collections
-from functools import partial
 
 import torch
 import torch_geometric as tg
@@ -9,10 +8,22 @@ import ase.neighborlist
 
 from e3nn import o3, rs
 from e3nn.tensor import SphericalTensor
-from e3nn.util.deprecation import deprecated
 
 
 class DataNeighbors(tg.data.Data):
+    """Builds a graph from points with features for message passing convolutions.
+
+    Wraps ``_neighbor_list_and_relative_vec``; see it for edge conventions.
+
+    Args:
+        x (torch.Tensor shape [N, M]): per-node M-dimensional features.
+        pos (torch.Tensor shape [N, 3]): node positions.
+        r_max (float): neighbor cutoff radius.
+        cell (ase.Cell/ndarray [3,3], optional): cell (box) for the points. Defaults to ``None``.
+        pbc (bool or 3-tuple of bool, optional): whether to apply periodic boundary conditions to all or each of the three cell vector directions. Defaults to ``False``.
+        self_interaction (bool, optional): whether to include self edges for points. Defaults to ``True``.
+        **kwargs (optional): other attributes to pass to the ``torch_geometric.data.Data`` constructor.
+    """
     def __init__(self, x, pos, r_max, cell = None, pbc = False, self_interaction=True, **kwargs):
         edge_index, edge_attr = _neighbor_list_and_relative_vec(
             pos,
@@ -29,12 +40,24 @@ class DataNeighbors(tg.data.Data):
 
     @classmethod
     def from_ase(cls, atoms, r_max, features = None, **kwargs):
+        """Build a ``DataNeighbors`` from an ``ase.Atoms`` object.
+
+        Respects ``atoms``'s ``pbc`` and ``cell``.
+
+        Args:
+            atoms (ase.Atoms): the input.
+            r_max (float): neighbor cutoff radius.
+            features (torch.Tensor shape [N, M], optional): per-atom M-dimensional feature vectors. If ``None`` (the default), uses a one-hot encoding of the species present in ``atoms``.
+            **kwargs (optional): other arguments for the ``DataNeighbors`` constructor.
+        Returns:
+            A ``DataNeighbors``.
+        """
         if features is None:
             _, species_ids = np.unique(atoms.get_atomic_numbers(), return_inverse = True)
             features = torch.nn.functional.one_hot(torch.as_tensor(species_ids)).to(dtype = torch.get_default_dtype())
         return cls(
             x = features,
-            pos = atoms.positions,
+            pos = torch.as_tensor(atoms.positions),
             r_max = r_max,
             cell = atoms.get_cell(complete = True),
             pbc = atoms.pbc,
@@ -43,6 +66,11 @@ class DataNeighbors(tg.data.Data):
 
 
 class DataPeriodicNeighbors(DataNeighbors):
+    """Compatability wrapper for ``DataNeighbors``.
+
+    Arguments are the same as ``DataNeighbors``, but ``lattice`` is accepted
+    as an alias for ``cell`` and ``pbc`` is always set to ``True``.
+    """
     def __init__(self, x, pos, lattice, r_max, self_interaction=True, **kwargs):
         super().__init__(
             x=x, pos=pos, cell=lattice, pbc = True, r_max=r_max,
