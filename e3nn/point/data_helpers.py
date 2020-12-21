@@ -24,13 +24,13 @@ class DataNeighbors(tg.data.Data):
         self_interaction (bool, optional): whether to include self edges for points. Defaults to ``True``.
         **kwargs (optional): other attributes to pass to the ``torch_geometric.data.Data`` constructor.
     """
-    def __init__(self, x, pos, r_max, cell = None, pbc = False, self_interaction=True, **kwargs):
+    def __init__(self, x, pos, r_max, cell=None, pbc=False, self_interaction=True, **kwargs):
         edge_index, edge_attr = _neighbor_list_and_relative_vec(
             pos,
             r_max,
-            self_interaction = self_interaction,
-            cell = cell,
-            pbc = pbc
+            self_interaction=self_interaction,
+            cell=cell,
+            pbc=pbc
         )
         if cell is not None:
             # For compatability: the old DataPeriodicNeighbors put the cell
@@ -39,7 +39,7 @@ class DataNeighbors(tg.data.Data):
         super().__init__(x=x, edge_index=edge_index, edge_attr=edge_attr, pos=pos, **kwargs)
 
     @classmethod
-    def from_ase(cls, atoms, r_max, features = None, **kwargs):
+    def from_ase(cls, atoms, r_max, features=None, **kwargs):
         """Build a ``DataNeighbors`` from an ``ase.Atoms`` object.
 
         Respects ``atoms``'s ``pbc`` and ``cell``.
@@ -53,14 +53,14 @@ class DataNeighbors(tg.data.Data):
             A ``DataNeighbors``.
         """
         if features is None:
-            _, species_ids = np.unique(atoms.get_atomic_numbers(), return_inverse = True)
-            features = torch.nn.functional.one_hot(torch.as_tensor(species_ids)).to(dtype = torch.get_default_dtype())
+            _, species_ids = np.unique(atoms.get_atomic_numbers(), return_inverse=True)
+            features = torch.nn.functional.one_hot(torch.as_tensor(species_ids)).to(dtype=torch.get_default_dtype())
         return cls(
-            x = features,
-            pos = torch.as_tensor(atoms.positions),
-            r_max = r_max,
-            cell = atoms.get_cell(complete = True),
-            pbc = atoms.pbc,
+            x=features,
+            pos=torch.as_tensor(atoms.positions),
+            r_max=r_max,
+            cell=atoms.get_cell(),
+            pbc=atoms.pbc,
             **kwargs
         )
 
@@ -73,8 +73,8 @@ class DataPeriodicNeighbors(DataNeighbors):
     """
     def __init__(self, x, pos, lattice, r_max, self_interaction=True, **kwargs):
         super().__init__(
-            x=x, pos=pos, cell=lattice, pbc = True, r_max=r_max,
-            self_interaction = self_interaction, **kwargs
+            x=x, pos=pos, cell=lattice, pbc=True, r_max=r_max,
+            self_interaction=self_interaction, **kwargs
         )
 
 
@@ -152,7 +152,7 @@ class DataEdgePeriodicNeighbors(tg.data.Data):
             Rs_in_edge=Rs_in_edge, edge_index_dict=edge_index_dict, **kwargs)
 
 
-def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell = None, pbc = False):
+def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None, pbc=False):
     """Create neighbor list and neighbor vectors based on radial cutoff.
 
     Create neighbor list (``edge_index``) and relative vectors
@@ -189,9 +189,9 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell = No
         pbc,
         np.asarray(cell),
         np.asarray(pos),
-        cutoff = r_max,
-        self_interaction = self_interaction,
-        use_scaled_positions = False
+        cutoff=r_max,
+        self_interaction=self_interaction,
+        use_scaled_positions=False
     )
     edge_index = torch.vstack((
         torch.LongTensor(first_idex),
@@ -210,9 +210,9 @@ def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interactio
     return _neighbor_list_and_relative_vec(
         pos,
         r_max,
-        cell = lattice,
-        pbc = (True,)*3,
-        self_interaction = self_interaction
+        cell=lattice,
+        pbc=True,
+        self_interaction=self_interaction
     )
 
 
