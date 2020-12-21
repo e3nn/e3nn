@@ -42,6 +42,7 @@ class DataNeighbors(tg.data.Data):
             **kwargs
         )
 
+
 class DataPeriodicNeighbors(DataNeighbors):
     def __init__(self, x, pos, lattice, r_max, self_interaction=True, **kwargs):
         super().__init__(

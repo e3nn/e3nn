@@ -39,6 +39,18 @@ def test_from_ase():
     assert data.x.shape == (len(atoms), 1) # one species
 
 
+def test_some_periodic():
+    import ase.build
+    # monolayer in xy,
+    atoms = ase.build.fcc111('Al', size=(3, 3, 1), vacuum = 0.0)
+    data = dh.DataNeighbors.from_ase(atoms, r_max = 2.9) # first shell dist is 2.864A
+    # Check number of neighbors:
+    _, neighbor_count = np.unique(data.edge_index[0].numpy(), return_counts = True)
+    assert (neighbor_count == 7).all() # 6 neighbors + self interaction
+    # Check not periodic in z
+    assert torch.allclose(data.edge_attr[:, 2], torch.zeros(data.num_edges))
+
+
 def test_relative_vecs():
     coords = torch.tensor([
         [0, 0, 0],
