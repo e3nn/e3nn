@@ -310,35 +310,6 @@ template<typename T, int L, int abs_M> __device__ __forceinline__ T p_z(const T 
 
 
 /*
-    Partial derivatives of normalized coordinates over Cartesian basis, e.g.: xn = x/r
-    In regards to input arguments, throughout this file {x, y, z} correspond to normalized version.
-*/
-template<typename T, char axis> __device__ __forceinline__ T dxn_d(const T x, const T y, const T z) {
-    T output;
-    if (axis == 'x')       output = 1 - x*x;
-    else if (axis == 'y')  output = -x*y;
-    else /* axis == 'z' */ output = -x*z;
-    return output;
-}
-
-template<typename T, char axis> __device__ __forceinline__ T dyn_d(const T x, const T y, const T z) {
-    T output;
-    if (axis == 'x')       output = -y*x;
-    else if (axis == 'y')  output = 1 - y*y;
-    else /* axis == 'z' */ output = -y*z;
-    return output;
-}
-
-template<typename T, char axis> __device__ __forceinline__ T dzn_d(const T x, const T y, const T z) {
-    T output;
-    if (axis == 'x')       output = -z*x;
-    else if (axis == 'y')  output = -z*y;
-    else /* axis == 'z' */ output = 1 - z*z;
-    return output;
-}
-
-
-/*
     Extra coef TODO: doc
 */
 template<typename T, int L, int M> __device__ constexpr T DRSH_C() {
@@ -371,32 +342,23 @@ template<typename T, int L, int M> __device__ T rsh(const T x, const T y, const 
 
 
 /*
-    Partial derivatives of real spherical harmonics with respect to Cartesian coordinates. 
+    Partial derivatives of real spherical harmonics with respect to normalized Cartesian coordinates.
 */
 template<typename T, int L, int M> __device__ void drsh(T* const __restrict__ output, const T x, const T y, const T z, const size_t entry_pos, const size_t n_entries) {
     if (M > 0) {
-        const T mul_shared = M * p_z<T, L, M>(z);
-        const T mul_xn =  f_phi<T, M - 1, 'r'>(x, y) * mul_shared;
-        const T mul_yn = -f_phi<T, M - 1, 'i'>(x, y) * mul_shared;
-        const T mul_zn = DRSH_C<T, L, M>() * p_z<T, L, M + 1>(z) * f_phi<T, M, 'r'>(x, y);
-        output[entry_pos]               = mul_xn * dxn_d<T, 'x'>(x, y, z) + mul_yn * dyn_d<T, 'x'>(x, y, z) + mul_zn * dzn_d<T, 'x'>(x, y, z);
-        output[n_entries + entry_pos]   = mul_xn * dxn_d<T, 'y'>(x, y, z) + mul_yn * dyn_d<T, 'y'>(x, y, z) + mul_zn * dzn_d<T, 'y'>(x, y, z);
-        output[2*n_entries + entry_pos] = mul_xn * dxn_d<T, 'z'>(x, y, z) + mul_yn * dyn_d<T, 'z'>(x, y, z) + mul_zn * dzn_d<T, 'z'>(x, y, z);
+        output[entry_pos]               =  M * p_z<T, L, M>(z) * f_phi<T, M - 1, 'r'>(x, y);
+        output[n_entries + entry_pos]   = -M * p_z<T, L, M>(z) * f_phi<T, M - 1, 'i'>(x, y);
+        output[2*n_entries + entry_pos] = DRSH_C<T, L, M>() * p_z<T, L, M + 1>(z) * f_phi<T, M, 'r'>(x, y);
     }
     else if (M < 0) {
-        const T mul_shared = -M * p_z<T, L, -M>(z);
-        const T mul_xn = f_phi<T, -M - 1, 'i'>(x, y) * mul_shared;
-        const T mul_yn = f_phi<T, -M - 1, 'r'>(x, y) * mul_shared;
-        const T mul_zn = DRSH_C<T, L, M>() * p_z<T, L, -M + 1>(z) * f_phi<T, -M, 'i'>(x, y);
-        output[entry_pos]               = mul_xn * dxn_d<T, 'x'>(x, y, z) + mul_yn * dyn_d<T, 'x'>(x, y, z) + mul_zn * dzn_d<T, 'x'>(x, y, z);
-        output[n_entries + entry_pos]   = mul_xn * dxn_d<T, 'y'>(x, y, z) + mul_yn * dyn_d<T, 'y'>(x, y, z) + mul_zn * dzn_d<T, 'y'>(x, y, z);
-        output[2*n_entries + entry_pos] = mul_xn * dxn_d<T, 'z'>(x, y, z) + mul_yn * dyn_d<T, 'z'>(x, y, z) + mul_zn * dzn_d<T, 'z'>(x, y, z);
+        output[entry_pos]               = -M * p_z<T, L, -M>(z) * f_phi<T, -M - 1, 'i'>(x, y);
+        output[n_entries + entry_pos]   = -M * p_z<T, L, -M>(z) * f_phi<T, -M - 1, 'r'>(x, y);
+        output[2*n_entries + entry_pos] = DRSH_C<T, L, M>() * p_z<T, L, -M + 1>(z) * f_phi<T, -M, 'i'>(x, y);
     }
     else { /* M == 0 */
-        const T mul_zn = DRSH_C<T, L, 0>() * p_z<T, L, 1>(z);
-        output[entry_pos]               = mul_zn * dzn_d<T, 'x'>(x, y, z);
-        output[n_entries + entry_pos]   = mul_zn * dzn_d<T, 'y'>(x, y, z);
-        output[2*n_entries + entry_pos] = mul_zn * dzn_d<T, 'z'>(x, y, z);
+        output[entry_pos]               = 0.;
+        output[n_entries + entry_pos]   = 0.;
+        output[2*n_entries + entry_pos] = DRSH_C<T, L, 0>() * p_z<T, L, 1>(z);
     }
 }
 
