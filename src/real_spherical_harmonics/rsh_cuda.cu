@@ -8,6 +8,8 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#include <algorithm>
+
 // 1./sqrt(pi) - at higher precision than actual execution using double type can provide
 template<typename T> __host__ __device__ constexpr T RSQRT_PI() { return 0.564189583547756286948079451560772585844050629328998856844; }
 
@@ -511,4 +513,62 @@ void drsh_cuda(
             (float*) output.data_ptr(), (const float*) xyz.data_ptr(), n_entries
         );
     } 
+}
+
+
+template<typename T>
+void rsh_cpp_kernel(
+        T* const __restrict__ output,
+        const T* const __restrict__ xyz,
+        const size_t lm_size,
+        const size_t n_entries) {
+    T x, y, z;
+    for (size_t lm = 0; lm < lm_size; lm++) {
+        for (size_t entry_pos = 0; entry_pos < n_entries; entry_pos++) {
+            x = xyz[3*entry_pos];
+            y = xyz[3*entry_pos + 1];
+            z = xyz[3*entry_pos + 2];
+            output[lm*n_entries + entry_pos] = rsh_fptr_cpp<T>[lm](x, y, z);
+        }
+    }
+}
+
+
+template<typename T>
+void drsh_cpp_kernel(
+        T* const __restrict__ output,
+        const T* const __restrict__ xyz,
+        const size_t lm_size,
+        const size_t n_entries) {
+    T x, y, z;
+    for (size_t lm = 0; lm < lm_size; lm++) {
+        for (size_t entry_pos = 0; entry_pos < n_entries; entry_pos++) {
+            x = xyz[3*entry_pos];
+            y = xyz[3*entry_pos + 1];
+            z = xyz[3*entry_pos + 2];
+            drsh_fptr_cpp<T>[lm](&(output[3*(lm*n_entries + entry_pos)]), x, y, z);
+        }
+    }
+}
+
+
+void rsh_cpp(
+        torch::Tensor output,
+        torch::Tensor xyz) {
+    const size_t lm_size   = output.size(0);
+    const size_t n_entries = xyz.size(0);
+
+    if (xyz.dtype() == torch::kFloat64) rsh_cpp_kernel<double>((double*) output.data_ptr(), (const double*) xyz.data_ptr(), lm_size, n_entries);
+    else /* torch::kFloat32 */          rsh_cpp_kernel<float>((float*) output.data_ptr(), (const float*) xyz.data_ptr(), lm_size, n_entries);
+}
+
+
+void drsh_cpp(
+        torch::Tensor output,
+        torch::Tensor xyz) {
+    const size_t lm_size   = output.size(0);
+    const size_t n_entries = xyz.size(0);
+
+    if (xyz.dtype() == torch::kFloat64) drsh_cpp_kernel<double>((double*) output.data_ptr(), (const double*) xyz.data_ptr(), lm_size, n_entries);
+    else /* torch::kFloat32 */          drsh_cpp_kernel<float>((float*) output.data_ptr(), (const float*) xyz.data_ptr(), lm_size, n_entries);
 }
