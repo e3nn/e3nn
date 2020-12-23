@@ -4,8 +4,8 @@ void rsh_cuda(torch::Tensor output, torch::Tensor xyz);
 void rsh_cpp(torch::Tensor output, torch::Tensor xyz);
 void drsh_cuda(torch::Tensor output, torch::Tensor xyz);
 void drsh_cpp(torch::Tensor output, torch::Tensor xyz);
-
 void e3nn_normalization_cuda(torch::Tensor rsh);
+void e3nn_normalization_cpp(torch::Tensor rsh);
 
 // C++ interface
 
@@ -45,12 +45,13 @@ torch::Tensor drsh(torch::Tensor xyz, uint32_t lmax) {
 void e3nn_normalization(torch::Tensor rsh) {
     CHECK_INPUT(rsh);
 
-    e3nn_normalization_cuda(rsh);
+    if (rsh.device().is_cuda()) e3nn_normalization_cuda(rsh);
+    else  /*  device is cpu  */ e3nn_normalization_cpp(rsh);
 }
 
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("rsh", &rsh, "Real Spherical Harmonics");
   m.def("drsh", &drsh, "Partial derivatives of Real Spherical Harmonics with respect to the Cartesian coordinates");
-  m.def("e3nn_normalization", &e3nn_normalization, "e3nn normalization (-1)^L of real spherical harmonics (CUDA)");
+  m.def("e3nn_normalization", &e3nn_normalization, "e3nn normalization (-1)^L of real spherical harmonics");
 }

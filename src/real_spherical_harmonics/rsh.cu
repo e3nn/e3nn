@@ -8,8 +8,6 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include <algorithm>
-
 // 1./sqrt(pi) - at higher precision than actual execution using double type can provide
 template<typename T> __host__ __device__ constexpr T RSQRT_PI() { return 0.564189583547756286948079451560772585844050629328998856844; }
 

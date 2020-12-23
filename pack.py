@@ -27,8 +27,8 @@ def find_version(*file_paths):
 ext_modules = [
     CUDAExtension('e3nn.real_spherical_harmonics',
                   sources=['src/real_spherical_harmonics/rsh_bind.cpp',
-                           'src/real_spherical_harmonics/rsh_cuda.cu',
-                           'src/real_spherical_harmonics/e3nn_normalization_cuda.cu'],
+                           'src/real_spherical_harmonics/rsh.cu',
+                           'src/real_spherical_harmonics/e3nn_normalization.cu'],
                   extra_compile_args={'cxx': ['-std=c++14'],
                                       'nvcc': ['-std=c++14']}),
     CUDAExtension('e3nn.tensor_message',

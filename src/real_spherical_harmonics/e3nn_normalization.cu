@@ -37,3 +37,28 @@ void e3nn_normalization_cuda(torch::Tensor rsh) {
         e3nn_normalization_cuda_kernel<float><<<numBlocks, threads_per_block>>>((float*) rsh.data_ptr(), n_entries);
     }
 }
+
+
+template<typename T>
+void e3nn_normalization_cpp_kernel(T* const __restrict__ rsh, const size_t lm_size, const size_t n_entries) {
+    size_t lm = 1, L = 1;
+    while (lm < lm_size) {
+        for (size_t m = 0; m < 2*L + 1; m++) {
+            for (size_t entry_pos = 0; entry_pos < n_entries; entry_pos++) {
+                rsh[lm*n_entries + entry_pos] = -rsh[lm*n_entries + entry_pos];
+            }
+            lm++;
+        }
+        lm += 2*L + 3; // 2*(L+2) - 1, -1 is to counter over-counting in prev loop
+        L += 2;
+    }
+}
+
+
+void e3nn_normalization_cpp(torch::Tensor rsh) {
+    const size_t lm_size    = rsh.size(0);
+    const size_t n_entries  = rsh.size(1);
+
+    if (rsh.dtype() == torch::kFloat64) e3nn_normalization_cpp_kernel<double>((double*) rsh.data_ptr(), lm_size, n_entries);
+    else /* torch::kFloat32 */          e3nn_normalization_cpp_kernel<float>((float*) rsh.data_ptr(), lm_size, n_entries);
+}
