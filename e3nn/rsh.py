@@ -225,7 +225,7 @@ def spherical_harmonics_xyz_cuda(Rs: TY_RS_STRICT, xyz):  # pragma: no cover
     cuda version of spherical_harmonics_xyz
     """
     lmax = rs.lmax(Rs)
-    out = real_spherical_harmonics.real_spherical_harmonics(xyz, lmax)  # real spherical harmonics are calculated for all L's up to lmax (inclusive) due to performance reasons (CUDA)
+    out = real_spherical_harmonics.rsh(xyz, lmax)  # real spherical harmonics are calculated for all L's up to lmax (inclusive) due to performance reasons (CUDA)
     real_spherical_harmonics.e3nn_normalization(out)  # (-1)^L, which is the same as (pi-theta) -> (-1)^(L+m) combined with 'quantum' norm (-1)^m
 
     if not rs.are_equal(Rs, list(range(lmax + 1))):
