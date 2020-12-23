@@ -9,7 +9,7 @@
 #include <cuda_runtime.h>
 
 // 1./sqrt(pi) - at higher precision than actual execution using double type can provide
-template<typename T> __device__ constexpr T RSQRT_PI() { return 0.564189583547756286948079451560772585844050629328998856844; }
+template<typename T> __host__ __device__ constexpr T RSQRT_PI() { return 0.564189583547756286948079451560772585844050629328998856844; }
 
 /*
    Idea of the following list of constexpr functions is to compute coefficients once at compile time,
@@ -20,7 +20,7 @@ template<typename T> __device__ constexpr T RSQRT_PI() { return 0.56418958354775
         nvcc -ptx rsh_cuda.cu
    and check if constexpr computed in rsh_cuda.ptx file.
 */
-template<typename T, int L, int abs_M, int power> __device__ constexpr T RSH_C() {
+template<typename T, int L, int abs_M, int power> __host__ __device__ constexpr T RSH_C() {
     T output;
     switch (L*10000 + abs_M*100 + power) {
         // L = 0
@@ -203,7 +203,7 @@ template<typename T, int L, int abs_M, int power> __device__ constexpr T RSH_C()
 /*
     Handle special case of xyz = (0., 0., 0.) with additional multiplier, either 0. or 1.
 */
-template<typename T> __device__ __forceinline__ T nonzero(const T x, const T y, const T z) { return (T) (x != 0. || y != 0. || z != 0.); }
+template<typename T> __host__ __device__ __forceinline__ T nonzero(const T x, const T y, const T z) { return (T) (x != 0. || y != 0. || z != 0.); }
 
 
 /*
@@ -213,7 +213,7 @@ template<typename T> __device__ __forceinline__ T nonzero(const T x, const T y, 
     __forceinline__ forces body of the function to be substituted in the place of the call.
     It proportionally enlarges executable size, but on the other hand saves time otherwise required to resolve function call.
 */
-template<typename T, int M, char part> __device__ __forceinline__ T f_phi(const T x, const T y) {
+template<typename T, int M, char part> __host__ __device__ __forceinline__ T f_phi(const T x, const T y) {
     T output;
     if (part == 'r') {
         switch (M) {
@@ -257,7 +257,7 @@ template<typename T, int M, char part> __device__ __forceinline__ T f_phi(const 
 /*
     Polynomials in z.
 */
-template<typename T, int L, int abs_M> __device__ __forceinline__ T p_z(const T z){
+template<typename T, int L, int abs_M> __host__ __device__ __forceinline__ T p_z(const T z){
     T output;
     switch (L - abs_M) {
         case -1: {                                            output = 0.;                                                                break; }                     
@@ -312,7 +312,7 @@ template<typename T, int L, int abs_M> __device__ __forceinline__ T p_z(const T 
 /*
     Extra coef TODO: doc
 */
-template<typename T, int L, int M> __device__ constexpr T DRSH_C() {
+template<typename T, int L, int M> __host__ __device__ constexpr T DRSH_C() {
     T output;
     if (M > 0)              output = sqrt(static_cast<T>((L-M)*(L+M+1)));
     else if (M < 0)         output = sqrt(static_cast<T>((L+M)*(L-M+1)));
@@ -329,7 +329,7 @@ template<typename T, int L, int M> __device__ constexpr T DRSH_C() {
     Special case of (0., 0., 0.) handled via additional multiplier where necessary.
     Multiplication has been chosen over if-else to avoid branch divergence.
 */
-template<typename T, int L, int M> __device__ T rsh(const T x, const T y, const T z) {
+template<typename T, int L, int M> __host__ __device__ T rsh(const T x, const T y, const T z) {
     T output;
     if (M > 0)      output = p_z<T, L,  M>(z) * f_phi<T,  M, 'r'>(x, y);
     else if (M < 0) output = p_z<T, L, -M>(z) * f_phi<T, -M, 'i'>(x, y);
@@ -343,25 +343,26 @@ template<typename T, int L, int M> __device__ T rsh(const T x, const T y, const 
 
 /*
     Partial derivatives of real spherical harmonics with respect to normalized Cartesian coordinates.
+    Write pattern: output[entry_pos], output[n_entries + entry_pos], output[2*n_entries + entry_pos]
+    makes drsh itself faster, but backward becomes slower overall, and scales worse. Exact reason is unclear.
 */
-template<typename T, int L, int M> __device__ void drsh(T* const __restrict__ output, const T x, const T y, const T z, const size_t entry_pos, const size_t n_entries) {
+template<typename T, int L, int M> __host__ __device__ void drsh(T* const __restrict__ output, const T x, const T y, const T z) {
     if (M > 0) {
-        output[entry_pos]               =  M * p_z<T, L, M>(z) * f_phi<T, M - 1, 'r'>(x, y);
-        output[n_entries + entry_pos]   = -M * p_z<T, L, M>(z) * f_phi<T, M - 1, 'i'>(x, y);
-        output[2*n_entries + entry_pos] = DRSH_C<T, L, M>() * p_z<T, L, M + 1>(z) * f_phi<T, M, 'r'>(x, y);
+        output[0] =  M * p_z<T, L, M>(z) * f_phi<T, M - 1, 'r'>(x, y);
+        output[1] = -M * p_z<T, L, M>(z) * f_phi<T, M - 1, 'i'>(x, y);
+        output[2] = DRSH_C<T, L, M>() * p_z<T, L, M + 1>(z) * f_phi<T, M, 'r'>(x, y);
     }
     else if (M < 0) {
-        output[entry_pos]               = -M * p_z<T, L, -M>(z) * f_phi<T, -M - 1, 'i'>(x, y);
-        output[n_entries + entry_pos]   = -M * p_z<T, L, -M>(z) * f_phi<T, -M - 1, 'r'>(x, y);
-        output[2*n_entries + entry_pos] = DRSH_C<T, L, M>() * p_z<T, L, -M + 1>(z) * f_phi<T, -M, 'i'>(x, y);
+        output[0] = -M * p_z<T, L, -M>(z) * f_phi<T, -M - 1, 'i'>(x, y);
+        output[1] = -M * p_z<T, L, -M>(z) * f_phi<T, -M - 1, 'r'>(x, y);
+        output[2] = DRSH_C<T, L, M>() * p_z<T, L, -M + 1>(z) * f_phi<T, -M, 'i'>(x, y);
     }
     else { /* M == 0 */
-        output[entry_pos]               = 0.;
-        output[n_entries + entry_pos]   = 0.;
-        output[2*n_entries + entry_pos] = DRSH_C<T, L, 0>() * p_z<T, L, 1>(z);
+        output[0] = 0.;
+        output[1] = 0.;
+        output[2] = DRSH_C<T, L, 0>() * p_z<T, L, 1>(z);
     }
 }
-
 
 /*
 Array of pointers to functions stored to "constant memory" (__constant__) on GPU - common for all blocks.
@@ -377,7 +378,7 @@ Array of pointers to functions stored to "constant memory" (__constant__) on GPU
       81,  82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95.  96,  97,  98,  99
 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120
 */
-template<typename T> __constant__ T (*const rsh_fptr[]) (const T, const T, const T) = {
+template<typename T> __constant__ T (*const rsh_fptr_cuda[]) (const T, const T, const T) = {
                                                                                                                                              rsh<T, 0,0>,
                                                                                                                                rsh<T, 1,-1>, rsh<T, 1,0>, rsh<T, 1,1>,
                                                                                                                  rsh<T, 2,-2>, rsh<T, 2,-1>, rsh<T, 2,0>, rsh<T, 2,1>, rsh<T, 2,2>,
@@ -392,7 +393,37 @@ rsh<T,10,-10>, rsh<T,10,-9>, rsh<T,10,-8>, rsh<T,10,-7>, rsh<T,10,-6>, rsh<T,10,
 };
 
 
-template<typename T> __constant__ void (*const drsh_fptr[]) (T* const __restrict__, const T, const T, const T, const size_t, const size_t) = {
+template<typename T> __constant__ void (*const drsh_fptr_cuda[]) (T* const __restrict__, const T, const T, const T) = {
+                                                                                                                                                       drsh<T, 0,0>,
+                                                                                                                                        drsh<T, 1,-1>, drsh<T, 1,0>, drsh<T, 1,1>,
+                                                                                                                         drsh<T, 2,-2>, drsh<T, 2,-1>, drsh<T, 2,0>, drsh<T, 2,1>, drsh<T, 2,2>,
+                                                                                                          drsh<T, 3,-3>, drsh<T, 3,-2>, drsh<T, 3,-1>, drsh<T, 3,0>, drsh<T, 3,1>, drsh<T, 3,2>, drsh<T, 3,3>,
+                                                                                           drsh<T, 4,-4>, drsh<T, 4,-3>, drsh<T, 4,-2>, drsh<T, 4,-1>, drsh<T, 4,0>, drsh<T, 4,1>, drsh<T, 4,2>, drsh<T, 4,3>, drsh<T, 4,4>,
+                                                                            drsh<T, 5,-5>, drsh<T, 5,-4>, drsh<T, 5,-3>, drsh<T, 5,-2>, drsh<T, 5,-1>, drsh<T, 5,0>, drsh<T, 5,1>, drsh<T, 5,2>, drsh<T, 5,3>, drsh<T, 5,4>, drsh<T, 5,5>,
+                                                             drsh<T, 6,-6>, drsh<T, 6,-5>, drsh<T, 6,-4>, drsh<T, 6,-3>, drsh<T, 6,-2>, drsh<T, 6,-1>, drsh<T, 6,0>, drsh<T, 6,1>, drsh<T, 6,2>, drsh<T, 6,3>, drsh<T, 6,4>, drsh<T, 6,5>, drsh<T, 6,6>,
+                                              drsh<T, 7,-7>, drsh<T, 7,-6>, drsh<T, 7,-5>, drsh<T, 7,-4>, drsh<T, 7,-3>, drsh<T, 7,-2>, drsh<T, 7,-1>, drsh<T, 7,0>, drsh<T, 7,1>, drsh<T, 7,2>, drsh<T, 7,3>, drsh<T, 7,4>, drsh<T, 7,5>, drsh<T, 7,6>, drsh<T, 7,7>,
+                               drsh<T, 8,-8>, drsh<T, 8,-7>, drsh<T, 8,-6>, drsh<T, 8,-5>, drsh<T, 8,-4>, drsh<T, 8,-3>, drsh<T, 8,-2>, drsh<T, 8,-1>, drsh<T, 8,0>, drsh<T, 8,1>, drsh<T, 8,2>, drsh<T, 8,3>, drsh<T, 8,4>, drsh<T, 8,5>, drsh<T, 8,6>, drsh<T, 8,7>, drsh<T, 8,8>,
+                drsh<T, 9,-9>, drsh<T, 9,-8>, drsh<T, 9,-7>, drsh<T, 9,-6>, drsh<T, 9,-5>, drsh<T, 9,-4>, drsh<T, 9,-3>, drsh<T, 9,-2>, drsh<T, 9,-1>, drsh<T, 9,0>, drsh<T, 9,1>, drsh<T, 9,2>, drsh<T, 9,3>, drsh<T, 9,4>, drsh<T, 9,5>, drsh<T, 9,6>, drsh<T, 9,7>, drsh<T, 9,8>, drsh<T, 9,9>,
+drsh<T,10,-10>, drsh<T,10,-9>, drsh<T,10,-8>, drsh<T,10,-7>, drsh<T,10,-6>, drsh<T,10,-5>, drsh<T,10,-4>, drsh<T,10,-3>, drsh<T,10,-2>, drsh<T,10,-1>, drsh<T,10,0>, drsh<T,10,1>, drsh<T,10,2>, drsh<T,10,3>, drsh<T,10,4>, drsh<T,10,5>, drsh<T,10,6>, drsh<T,10,7>, drsh<T,10,8>, drsh<T,10,9>, drsh<T,10,10>
+};
+
+
+template<typename T> T (*const rsh_fptr_cpp[]) (const T, const T, const T) = {
+                                                                                                                                             rsh<T, 0,0>,
+                                                                                                                               rsh<T, 1,-1>, rsh<T, 1,0>, rsh<T, 1,1>,
+                                                                                                                 rsh<T, 2,-2>, rsh<T, 2,-1>, rsh<T, 2,0>, rsh<T, 2,1>, rsh<T, 2,2>,
+                                                                                                   rsh<T, 3,-3>, rsh<T, 3,-2>, rsh<T, 3,-1>, rsh<T, 3,0>, rsh<T, 3,1>, rsh<T, 3,2>, rsh<T, 3,3>,
+                                                                                     rsh<T, 4,-4>, rsh<T, 4,-3>, rsh<T, 4,-2>, rsh<T, 4,-1>, rsh<T, 4,0>, rsh<T, 4,1>, rsh<T, 4,2>, rsh<T, 4,3>, rsh<T, 4,4>,
+                                                                       rsh<T, 5,-5>, rsh<T, 5,-4>, rsh<T, 5,-3>, rsh<T, 5,-2>, rsh<T, 5,-1>, rsh<T, 5,0>, rsh<T, 5,1>, rsh<T, 5,2>, rsh<T, 5,3>, rsh<T, 5,4>, rsh<T, 5,5>,
+                                                         rsh<T, 6,-6>, rsh<T, 6,-5>, rsh<T, 6,-4>, rsh<T, 6,-3>, rsh<T, 6,-2>, rsh<T, 6,-1>, rsh<T, 6,0>, rsh<T, 6,1>, rsh<T, 6,2>, rsh<T, 6,3>, rsh<T, 6,4>, rsh<T, 6,5>, rsh<T, 6,6>,
+                                           rsh<T, 7,-7>, rsh<T, 7,-6>, rsh<T, 7,-5>, rsh<T, 7,-4>, rsh<T, 7,-3>, rsh<T, 7,-2>, rsh<T, 7,-1>, rsh<T, 7,0>, rsh<T, 7,1>, rsh<T, 7,2>, rsh<T, 7,3>, rsh<T, 7,4>, rsh<T, 7,5>, rsh<T, 7,6>, rsh<T, 7,7>,
+                             rsh<T, 8,-8>, rsh<T, 8,-7>, rsh<T, 8,-6>, rsh<T, 8,-5>, rsh<T, 8,-4>, rsh<T, 8,-3>, rsh<T, 8,-2>, rsh<T, 8,-1>, rsh<T, 8,0>, rsh<T, 8,1>, rsh<T, 8,2>, rsh<T, 8,3>, rsh<T, 8,4>, rsh<T, 8,5>, rsh<T, 8,6>, rsh<T, 8,7>, rsh<T, 8,8>,
+               rsh<T, 9,-9>, rsh<T, 9,-8>, rsh<T, 9,-7>, rsh<T, 9,-6>, rsh<T, 9,-5>, rsh<T, 9,-4>, rsh<T, 9,-3>, rsh<T, 9,-2>, rsh<T, 9,-1>, rsh<T, 9,0>, rsh<T, 9,1>, rsh<T, 9,2>, rsh<T, 9,3>, rsh<T, 9,4>, rsh<T, 9,5>, rsh<T, 9,6>, rsh<T, 9,7>, rsh<T, 9,8>, rsh<T, 9,9>,
+rsh<T,10,-10>, rsh<T,10,-9>, rsh<T,10,-8>, rsh<T,10,-7>, rsh<T,10,-6>, rsh<T,10,-5>, rsh<T,10,-4>, rsh<T,10,-3>, rsh<T,10,-2>, rsh<T,10,-1>, rsh<T,10,0>, rsh<T,10,1>, rsh<T,10,2>, rsh<T,10,3>, rsh<T,10,4>, rsh<T,10,5>, rsh<T,10,6>, rsh<T,10,7>, rsh<T,10,8>, rsh<T,10,9>, rsh<T,10,10>
+};
+
+
+template<typename T> void (*const drsh_fptr_cpp[]) (T* const __restrict__, const T, const T, const T) = {
                                                                                                                                                        drsh<T, 0,0>,
                                                                                                                                         drsh<T, 1,-1>, drsh<T, 1,0>, drsh<T, 1,1>,
                                                                                                                          drsh<T, 2,-2>, drsh<T, 2,-1>, drsh<T, 2,0>, drsh<T, 2,1>, drsh<T, 2,2>,
@@ -415,14 +446,14 @@ drsh<T,10,-10>, drsh<T,10,-9>, drsh<T,10,-8>, drsh<T,10,-7>, drsh<T,10,-6>, drsh
 */
 template<typename T>
 __global__ void rsh_cuda_kernel(T* const __restrict__ output, const T* const __restrict__ xyz, const size_t n_entries) {
-	const size_t entry_pos = blockDim.x*blockIdx.x + threadIdx.x;                   // position of entry
-	if (entry_pos >= n_entries) return;                                             // terminate early if out-of-bound - last warp (of threads) can be partially filled
+	const size_t entry_pos = blockDim.x*blockIdx.x + threadIdx.x;                       // position of entry
+	if (entry_pos >= n_entries) return;                                                 // terminate early if out-of-bound - last warp (of threads) can be partially filled
 
-	const T x = xyz[3*entry_pos];                                                   // "strided memory access" is generally not nice and severely drops throughput
-	const T y = xyz[3*entry_pos+1];                                                 // padding to 4 and packing in double4 (single read transaction) showed no noticeable improvement (is scale to0 small measure?)
-	const T z = xyz[3*entry_pos+2];                                                 // 100+ GB/s of throughput would be great, but even 3 GB/s does not make a bottleneck
+	const T x = xyz[3*entry_pos];                                                       // "strided memory access" is generally not nice and severely drops throughput
+	const T y = xyz[3*entry_pos+1];                                                     // padding to 4 and packing in double4 (single read transaction) showed no noticeable improvement (is scale to0 small measure?)
+	const T z = xyz[3*entry_pos+2];                                                     // 100+ GB/s of throughput would be great, but even 3 GB/s does not make a bottleneck
 
-    output[blockIdx.y*n_entries + entry_pos] = rsh_fptr<T>[blockIdx.y](x, y, z);    // select and apply function, store result to the "global memory"
+    output[blockIdx.y*n_entries + entry_pos] = rsh_fptr_cuda<T>[blockIdx.y](x, y, z);   // select and apply function, store result to the "global memory"
 }
 
 
@@ -435,7 +466,7 @@ __global__ void drsh_cuda_kernel(T* const __restrict__ output, const T* const __
     const T y = xyz[3*entry_pos+1];
     const T z = xyz[3*entry_pos+2];
 
-    drsh_fptr<T>[blockIdx.y](&(output[3*blockIdx.y*n_entries]), x, y, z, entry_pos, n_entries);
+    drsh_fptr_cuda<T>[blockIdx.y](&(output[3*(blockIdx.y*n_entries + entry_pos)]), x, y, z);
 }
 
 
@@ -479,5 +510,5 @@ void drsh_cuda(
         drsh_cuda_kernel<float><<<numBlocks, threads_per_block>>>(
             (float*) output.data_ptr(), (const float*) xyz.data_ptr(), n_entries
         );
-    }
+    } 
 }

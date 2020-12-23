@@ -28,7 +28,7 @@ torch::Tensor drsh(torch::Tensor xyz, uint32_t lmax) {
     const uint32_t lm_size = (lmax + 1) * (lmax + 1);
     const uint32_t ab_size = xyz.size(0);
 
-    torch::Tensor output = torch::empty({lm_size, 3, ab_size}, xyz.options());
+    torch::Tensor output = torch::empty({lm_size, ab_size, 3}, xyz.options());
     drsh_cuda(output, xyz);
     return output;
 }
