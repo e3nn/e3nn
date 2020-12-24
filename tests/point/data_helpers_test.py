@@ -45,7 +45,8 @@ def test_from_ase():
 
 
 def test_positions_grad():
-    N = 4
+    N = 7
+    lattice = torch.randn(3, 3)
     pos = torch.randn(N, 3)
     pos.requires_grad_(True)
     Rs_in = [(3, 0), (1, 1)]
@@ -54,6 +55,11 @@ def test_positions_grad():
     data = dh.DataNeighbors(x, pos, r_max)
     assert pos.requires_grad
     assert data.edge_attr.requires_grad
+    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph = True)
+    data = dh.DataPeriodicNeighbors(x, pos, lattice, r_max)
+    assert pos.requires_grad
+    assert data.edge_attr.requires_grad
+    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph = True)
 
 
 def test_some_periodic():
