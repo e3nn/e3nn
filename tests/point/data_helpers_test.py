@@ -55,11 +55,11 @@ def test_positions_grad():
     data = dh.DataNeighbors(x, pos, r_max)
     assert pos.requires_grad
     assert data.edge_attr.requires_grad
-    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph = True)
+    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph=True)
     data = dh.DataPeriodicNeighbors(x, pos, lattice, r_max)
     assert pos.requires_grad
     assert data.edge_attr.requires_grad
-    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph = True)
+    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph=True)
 
 
 def test_some_periodic():
