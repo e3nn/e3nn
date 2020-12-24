@@ -165,6 +165,10 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None
     Thus, ``edge_index`` has the same convention as the relative vectors:
     :math:`\\vec{r}_{source, target}`
 
+    Note that while the input positions can be a tensor with
+    ``requires_grad == True`` (it will be detached for the neighbor computation),
+    this function is not backwardable.
+
     Args:
         pos (shape [N, 3]): Positional coordinate; Tensor or numpy array. If Tensor, must be detached & on CPU.
         r_max (float): Radial cutoff distance for neighbor finding.
@@ -184,11 +188,19 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None
         cell = np.zeros((3, 3))
     cell = ase.geometry.complete_cell(cell)
 
-    first_idex, second_idex, displacements = ase.neighborlist.primitive_neighbor_list(
-        'ijD',
+    # When predicting forces, for example, positions may have requires_grad = True.
+    if isinstance(pos, torch.Tensor):
+        temp_pos = pos.detach().numpy()
+    else:
+        temp_pos = np.asarray(pos)
+
+    cell = np.asarray(cell)
+
+    first_idex, second_idex, shifts = ase.neighborlist.primitive_neighbor_list(
+        'ijS',
         pbc,
-        np.asarray(cell),
-        np.asarray(pos),
+        cell,
+        temp_pos,
         cutoff=r_max,
         self_interaction=self_interaction,
         use_scaled_positions=False
@@ -197,6 +209,13 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None
         torch.LongTensor(first_idex),
         torch.LongTensor(second_idex)
     ))
+    # We have to compute displacements in pytorch so that they are backwardable
+    displacements = pos[second_idex] - pos[first_idex]
+    displacements = displacements + torch.einsum(
+        'ni,ij->nj',
+        torch.as_tensor(shifts, dtype=displacements.dtype),
+        torch.as_tensor(cell, dtype=displacements.dtype)
+    )
     edge_attr = torch.as_tensor(displacements)
     return edge_index, edge_attr
 
