@@ -1,10 +1,12 @@
 # pylint: disable=not-callable, no-member, invalid-name, line-too-long, missing-docstring, arguments-differ
 import math
+from math import pi
 
+import scipy.signal
 import torch
 
 from e3nn import o3, rs, rsh
-from e3nn.s2grid import ToS2Grid, FromS2Grid
+from e3nn.s2grid import FromS2Grid, ToS2Grid
 from e3nn.tensor.irrep_tensor import IrrepTensor
 
 
@@ -13,7 +15,7 @@ def spherical_harmonics_dirac(vectors, lmax):
     approximation of a signal that is 0 everywhere except on the angle (alpha, beta) where it is one.
     the higher is lmax the better is the approximation
     """
-    return 4 * math.pi / (lmax + 1)**2 * rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors)
+    return 4 * pi / (lmax + 1)**2 * rsh.spherical_harmonics_xyz(list(range(lmax + 1)), vectors)
 
 
 def projection(vectors, lmax):
@@ -24,6 +26,20 @@ def projection(vectors, lmax):
     coeff = spherical_harmonics_dirac(vectors, lmax)  # [..., l * m]
     radii = vectors.norm(2, dim=-1, keepdim=True)  # [...]
     return coeff * radii
+
+
+def _find_peaks_2d(x):
+    iii = []
+    for i in range(x.shape[0]):
+        jj, _ = scipy.signal.find_peaks(x[i, :])
+        iii += [(i, j) for j in jj]
+
+    jjj = []
+    for j in range(x.shape[1]):
+        ii, _ = scipy.signal.find_peaks(x[:, j])
+        jjj += [(i, j) for i in ii]
+
+    return list(set(iii).intersection(set(jjj)))
 
 
 def adjusted_projection(vectors, lmax):
@@ -163,31 +179,39 @@ class SphericalTensor:
             'ai,zi->za', sh.reshape(-1, dim), self.signal.reshape(-1, dim))
         return output.reshape((*self.signal.shape[:-1], *alpha.shape))
 
-    def signal_on_grid(self, res=100):
+    def signal_on_grid(self, res=100, normalization='none'):
         """
         :return: [..., beta, alpha]
         Evaluate the signal on the sphere
         """
-        s2 = ToS2Grid(self.lmax, res=res, normalization='none')
+        s2 = ToS2Grid(self.lmax, res=res, normalization=normalization)
         return s2.grid, s2(self.signal)
 
-    def plot(self, res=100, radius=True, center=None, relu=False):
+    def plotly_surface(self, res=100, radius=True, center=None, relu=False, normalization='none'):
         """
-        r, f = self.plot()
-
+        To use as follow
+        ```
         import plotly.graph_objects as go
-        surface = go.Surface(
+        surface = go.Surface(**self.plotly_surface())
+        fig = go.Figure(data=[surface])
+        fig.show()
+        ```
+        """
+        r, f = self.plot(res, radius, center, relu, normalization)
+        return dict(
             x=r[:, :, 0].numpy(),
             y=r[:, :, 1].numpy(),
             z=r[:, :, 2].numpy(),
             surfacecolor=f.numpy(),
         )
-        fig = go.Figure(data=[surface])
-        fig.show()
+
+    def plot(self, res=100, radius=True, center=None, relu=False, normalization='none'):
+        """
+        Returns `(r, f)` of shapes `[beta, alpha, 3]` and `[beta, alpha]`
         """
         assert self.signal.dim() == 1
 
-        r, f = self.signal_on_grid(res)
+        r, f = self.signal_on_grid(res, normalization)
         f = f.relu() if relu else f
 
         # beta: [0, pi]
@@ -247,3 +271,50 @@ class SphericalTensor:
         # Better handle mismatch of features indices
         tp = rs.TensorProduct(self.Rs, other.Rs, o3.selection_rule)
         return IrrepTensor(tp(self.signal, other.signal), tp.Rs_out)
+
+    @classmethod
+    def from_irrep_tensor(cls, irrep_tensor):
+        Rs_remove_p = [(mul, L) for mul, L, p in irrep_tensor.Rs]
+        Rs, perm = rs.sort(Rs_remove_p)
+        Rs = rs.simplify(Rs)
+        mul, Ls, _ = zip(*Rs)
+        if max(mul) > 1:
+            raise ValueError(
+                "Cannot have multiplicity greater than 1 for any L. This tensor has a simplified Rs of {}".format(Rs)
+            )
+        Lmax = max(Ls)
+        sorted_tensor = torch.einsum('ij,...j->...i', perm.to_dense(), irrep_tensor.tensor)
+        signal = torch.zeros((Lmax + 1)**2)
+        Rs_idx = 0
+        for L in range(Lmax + 1):
+            if Rs[Rs_idx][1] == L:
+                ten_slice = slice(rs.dim(Rs[:Rs_idx]), rs.dim(Rs[:Rs_idx + 1]))
+                signal[L ** 2: (L + 1) ** 2] = sorted_tensor[ten_slice]
+                Rs_idx += 1
+        return cls(signal)
+
+    def find_peaks(self, res=100):
+        x1, f1 = self.signal_on_grid(res)
+
+        abc = pi / 2, pi / 2, pi / 2
+        R = o3.rot(*abc)
+        D = rs.rep(self.Rs, *abc)
+
+        rtensor = SphericalTensor(D @ self.signal)
+        rx2, f2 = rtensor.signal_on_grid(res)
+        x2 = torch.einsum('ij,baj->bai', R.T, rx2)
+
+        ij = _find_peaks_2d(f1)
+        x1p = torch.stack([x1[i, j] for i, j in ij])
+        f1p = torch.stack([f1[i, j] for i, j in ij])
+
+        ij = _find_peaks_2d(f2)
+        x2p = torch.stack([x2[i, j] for i, j in ij])
+        f2p = torch.stack([f2[i, j] for i, j in ij])
+
+        # Union of the results
+        mask = torch.cdist(x1p, x2p) < 2 * pi / res
+        x = torch.cat([x1p[mask.sum(1) == 0], x2p])
+        f = torch.cat([f1p[mask.sum(1) == 0], f2p])
+
+        return x, f

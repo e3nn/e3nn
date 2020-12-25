@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, arguments-differ
 """
 Real Spherical Harmonics equivariant with respect to o3.rot and o3.irr_repr
 """
@@ -9,26 +9,19 @@ import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
 from e3nn import rs
-from e3nn.rs import TY_RS_STRICT, TY_RS_LOOSE
 from e3nn.util.eval_code import eval_code
 
-try:
-    from e3nn import real_spherical_harmonics
-    rsh_no_cuda = False
-except ImportError:
-    rsh_no_cuda = True
+from e3nn import real_spherical_harmonics
 
 
 def spherical_harmonics_expand_matrix(ls, like=None):
     """
     convertion matrix between a flatten vector (L, m) like that
     (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
-
     and a bidimensional matrix representation like that
                     (0, 0)
             (1, -1) (1, 0) (1, 1)
     (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
-
     :return: tensor [l, m, l * m]
     """
     lmax = max(ls)
@@ -99,7 +92,6 @@ def sympy_legendre(l, m):
     en.wikipedia.org/wiki/Associated_Legendre_polynomials
     - remove two times (-1)^m
     - use another normalization such that P(l, -m) = P(l, m)
-
     y = sqrt(1 - z^2)
     """
     l = Integer(l)
@@ -113,7 +105,6 @@ def sympy_legendre(l, m):
 def poly_legendre(l, m):
     """
     polynomial coefficients of legendre
-
     y = sqrt(1 - z^2)
     """
     z, y = symbols('z y', real=True)
@@ -123,13 +114,10 @@ def poly_legendre(l, m):
 _legendre_code = """
 import torch
 from e3nn import rsh
-
 @torch.jit.script
 def main(z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     out = z.new_zeros(z.shape + (lsize,))
-
 # fill out
-
     return out
 """
 
@@ -158,7 +146,6 @@ def _legendre_genjit(ls):
 def legendre(ls, z, y=None):
     """
     associated Legendre polynomials
-
     :param ls: list
     :param z: tensor of shape [...]
     :return: tensor of shape [..., l * m]
@@ -173,14 +160,12 @@ def spherical_harmonics_z(Rs, z, y=None):
     """
     the z component of the spherical harmonics
     (useful to perform fourier transform)
-
     :param z: tensor of shape [...]
     :return: tensor of shape [..., l * m]
     """
     Rs = rs.simplify(Rs)
-    for _, l, p in Rs:
-        assert p in [0, (-1)**l]
-    ls = [l for mul, l, _ in Rs]
+    assert all(p in [0, (-1)**l] for _, l, p in Rs)
+    ls = [l for mul, l, _ in Rs for _ in range(mul)]
     return legendre(ls, z, y)  # [..., l * m]
 
 
@@ -189,7 +174,6 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # p
     """
     the alpha (x, y) component of the spherical harmonics
     (useful to perform fourier transform)
-
     :param alpha: tensor of shape [...]
     :return: tensor of shape [..., m]
     """
@@ -210,78 +194,122 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:  # p
     return out  # [..., m]
 
 
-def spherical_harmonics_alpha_z_y(Rs: TY_RS_STRICT, alpha, z, y):
+def spherical_harmonics_alpha_beta(Rs, alpha, beta):
+    """
+    spherical harmonics
+    :param Rs: list of L's
+    :param alpha: float or tensor of shape [...]
+    :param beta: float or tensor of shape [...]
+    :return: tensor of shape [..., m]
+    """
+    sh = None
+    if rs.lmax(Rs) <= 10:
+        xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
+        lmax = rs.lmax(Rs)
+        sh = rsh_optimized(xyz, lmax, e3nn_normalization=True)
+        if not rs.are_equal(Rs, list(range(lmax + 1))):
+            sh = torch.cat([sh[l * l: (l + 1) * (l + 1)] for mul, l, _ in Rs for _ in range(mul)])
+    else:
+        sh = spherical_harmonics_alpha_z_y(Rs, alpha, beta.cos(), beta.sin().abs())
+    return sh
+
+
+def spherical_harmonics_alpha_z_y(Rs, alpha, z, y):
     """
     cpu version of spherical_harmonics_alpha_beta
     """
+    Rs = rs.simplify(Rs)
     sha = spherical_harmonics_alpha(rs.lmax(Rs), alpha.flatten())  # [z, m]
     shz = spherical_harmonics_z(Rs, z.flatten(), y.flatten())  # [z, l * m]
     out = mul_m_lm(Rs, sha, shz)
     return out.reshape(alpha.shape + (shz.shape[1],))
 
 
-def spherical_harmonics_xyz_cuda(Rs: TY_RS_STRICT, xyz):  # pragma: no cover
-    """
-    cuda version of spherical_harmonics_xyz
-    """
-    lmax = rs.lmax(Rs)
-    out = real_spherical_harmonics.rsh(xyz, lmax)  # real spherical harmonics are calculated for all L's up to lmax (inclusive) due to performance reasons (CUDA)
-    real_spherical_harmonics.e3nn_normalization(out)  # (-1)^L, which is the same as (pi-theta) -> (-1)^(L+m) combined with 'quantum' norm (-1)^m
-
-    if not rs.are_equal(Rs, list(range(lmax + 1))):
-        out = torch.cat([out[l*l:(l+1)*(l+1)] for l in rs.extract_l(Rs)])
-    return out.t()
+@lru_cache()
+def _rep_zx(Rs, dtype, device):
+    o = torch.zeros((), dtype=dtype, device=device)
+    return rs.rep(Rs, o, -math.pi / 2, o)
 
 
-def spherical_harmonics_alpha_beta(Rs, alpha, beta):
+def spherical_harmonics_xyz(Rs, xyz, normalization='none'):
     """
     spherical harmonics
-
-    :param Rs: list of L's
-    :param alpha: float or tensor of shape [...]
-    :param beta: float or tensor of shape [...]
-    :return: tensor of shape [..., m]
-    """
-    Rs = rs.simplify(Rs)
-    if alpha.device.type == 'cuda' and beta.device.type == 'cuda' and not alpha.requires_grad and not beta.requires_grad and rs.lmax(Rs) <= 10 and not rsh_no_cuda:  # pragma: no cover
-        xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
-        rsh = spherical_harmonics_xyz_cuda(Rs, xyz)
-    else:
-        rsh = spherical_harmonics_alpha_z_y(Rs, alpha, beta.cos(), beta.sin().abs())
-    return rsh
-
-
-def spherical_harmonics_xyz(Rs, xyz, expect_normalized=False):
-    """
-    spherical harmonics
-
     :param Rs: list of L's
     :param xyz: tensor of shape [..., 3]
-    :param eps: epsilon for denominator of atan2
     :return: tensor of shape [..., m]
-
-    The eps parameter is only to be used when backpropogating to coordinates xyz.
-    To determine a stable eps value, we recommend benchmarking against numerical
-    gradients before setting this parameter. Use the smallest epsilon that prevents NaNs.
-    For some cases, we have used 1e-10. Your case may require a different value.
-    Use this option with care.
     """
+    sh = None
     Rs = rs.simplify(Rs)
-
-    *size, _ = xyz.size()
+    *size, _ = xyz.shape
     xyz = xyz.reshape(-1, 3)
 
-    if not expect_normalized:
-        xyz = torch.nn.functional.normalize(xyz, p=2, dim=-1)
+    if rs.lmax(Rs) <= 10:
+        xyz = torch.nn.functional.normalize(xyz, p=2, dim=1)
+        lmax = rs.lmax(Rs)
+        sh = rsh_optimized(xyz, lmax, e3nn_normalization=True)
 
-    # use cuda implementation if possible, otherwise use cpu implementation
-    if xyz.device.type == 'cuda' and not xyz.requires_grad and rs.lmax(Rs) <= 10 and not rsh_no_cuda:
-        rsh = spherical_harmonics_xyz_cuda(Rs, xyz)
+        # rsh_optimized returns real spherical harmonics for all rotation orders from 0 to lmax inclusive
+        # gaps in requested list of rotation orders are unusual, but possible
+        if not rs.are_equal(Rs, list(range(lmax + 1))):
+            sh = torch.cat([sh[l*l: (l+1)*(l+1)] for mul, l, _ in Rs for _ in range(mul)])
     else:
+        # normalize coordinates and filter out 0-inputs
+        d = torch.norm(xyz, 2, dim=1)
+        xyz = xyz[d > 0]
+        xyz = xyz / d[d > 0, None]
+
+        # if z > x, rotate x-axis with z-axis
+        s = xyz[:, 2].abs() > xyz[:, 0].abs()
+        xyz[s] = xyz[s] @ xyz.new_tensor([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
+
+        # calculate real spherical harmonics
         alpha = torch.atan2(xyz[:, 1], xyz[:, 0])
         z = xyz[:, 2]
-        y = (xyz[:, 0].pow(2) + xyz[:, 1].pow(2)).sqrt()
-        rsh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
-    return rsh.reshape(*size, rs.irrep_dim(Rs))
+        y = xyz[:, :2].norm(dim=1)
+        sh = spherical_harmonics_alpha_z_y(Rs, alpha, z, y)
+
+        # rotate back
+        sh[s] = sh[s] @ _rep_zx(tuple(Rs), xyz.dtype, xyz.device)
+
+        # handle special case of 0-inputs
+        if len(d) > len(sh):
+            out = sh.new_zeros(len(d), sh.shape[1])
+            out[d == 0] = math.sqrt(1 / (4 * math.pi)) * torch.cat([sh.new_ones(1) if l == 0 else sh.new_zeros(2 * l + 1) for mul, l, p in Rs for _ in range(mul)])
+            out[d > 0] = sh
+            sh = out
+
+    if normalization == 'component':
+        sh.mul_(math.sqrt(4 * math.pi))
+    elif normalization == 'norm':
+        sh.mul_(torch.cat([math.sqrt(4 * math.pi / (2 * l + 1)) * sh.new_ones(2 * l + 1) for mul, l, p in Rs for _ in range(mul)]))
+    return sh.reshape(*size, sh.shape[1])
 
 
+class RSH(torch.autograd.Function):
+    """
+    xyz coordinates are expected to be already normalized.
+    e3nn_normalization is (-1)^L, it comes from combination if (pi-theta) -> (-1)^(L+m) and 'quantum' norm -> (-1)^m.
+    """
+    @staticmethod
+    def forward(ctx, xyz, lmax, e3nn_normalization=False):
+        Y = real_spherical_harmonics.rsh(xyz, lmax)
+        if e3nn_normalization:
+            real_spherical_harmonics.e3nn_normalization(Y)
+        if xyz.requires_grad:
+            ctx.save_for_backward(xyz)
+            ctx.lmax = lmax
+            ctx.e3nn_normalization = e3nn_normalization
+        return Y
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # grad_output = grad_output.clone() # uncomment for gradcheck test - particularity of e3nn_normalization being in-place operation
+        if ctx.e3nn_normalization:
+            e3nn_normalization(grad_output)
+        xyz, = ctx.saved_tensors
+        derivatives = drsh(xyz, ctx.lmax)
+        grad_xyz = (derivatives * grad_output.unsqueeze(2).expand(-1, -1, 3)).sum(dim=0)
+        return grad_xyz, None, None
+
+
+rsh_optimized = RSH.apply

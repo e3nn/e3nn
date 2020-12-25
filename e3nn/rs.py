@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin, arguments-differ
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, unexpected-keyword-arg, too-many-lines, redefined-builtin, arguments-differ, abstract-method
 """
 Some functions related to SO3 and his usual representations
 
@@ -17,7 +17,7 @@ from e3nn import o3, perm
 from e3nn.util.default_dtype import torch_default_dtype
 from e3nn.util.sparse import get_sparse_buffer, register_sparse_buffer
 
-TY_RS_LOOSE = List[Union[int, Tuple[int, int], Tuple[int, int, int]]]
+TY_RS_LOOSE = Union[List[Union[int, Tuple[int, int], Tuple[int, int, int]]], int]
 TY_RS_STRICT = List[Tuple[int, int, int]]
 
 
@@ -96,15 +96,30 @@ def transpose_mul(Rs, cmul=-1):
 def cut(features, *Rss, dim_=-1):
     """
     Cut `features` according to the list of Rs
+    ```
+    x = rs.randn(10, Rs1 + Rs2)
+    x1, x2 = cut(x, Rs1, Rs2)
+    ```
     """
     index = 0
     outputs = []
     for Rs in Rss:
         n = dim(Rs)
-        outputs.append(features.narrow(dim_, index, n))
+        yield features.narrow(dim_, index, n)
         index += n
     assert index == features.shape[dim_]
     return outputs
+
+
+def split_by_mul(Rs: TY_RS_LOOSE):
+    """
+    Example `split_by_mul([(1, 1), (2, 2)]) = [[(1, 1)], [(1, 2)], [(1, 2)]]`
+    """
+    Rs = simplify(Rs)
+
+    for mul, l, p in Rs:
+        for _ in range(mul):
+            yield [(1, l, p)]
 
 
 class TransposeToMulL(torch.nn.Module):
@@ -127,6 +142,9 @@ class TransposeToMulL(torch.nn.Module):
         )
 
     def forward(self, features):
+        """
+        ...
+        """
         *size, n = features.size()
         features = features.reshape(-1, n)
 
@@ -263,6 +281,9 @@ def convention(Rs: TY_RS_LOOSE) -> TY_RS_STRICT:
     :param Rs: list of triplet (multiplicity, representation order, [parity])
     :return: conventional version of the same list which always includes parity
     """
+    if isinstance(Rs, int):
+        return [(1, Rs, 0)]
+
     out = []
     for r in Rs:
         if isinstance(r, int):
@@ -425,13 +446,14 @@ def tensor_product(
     # Rs_in1 x Rs_in2 -> Rs_out
     torch.einsum('kij,i,j->k', Q, A, B)
     """
-    if isinstance(input1, list) and isinstance(input2, list):
+
+    if callable(output):
         return _tensor_product_in_in(input1, input2, output, normalization, sorted)
 
-    if isinstance(input1, list) and isinstance(output, list):
+    if callable(input2):
         return _tensor_product_in_out(input1, input2, output, normalization, sorted)
 
-    if isinstance(input2, list) and isinstance(output, list):
+    if callable(input1):
         Rs_in1, Q = _tensor_product_in_out(input2, input1, output, normalization, sorted)
         # [out, in2 * in1] -> [out, in1 * in2]
         row, col, val = Q.coo()
@@ -454,17 +476,17 @@ class TensorProduct(torch.nn.Module):
 
         Rs, mat = tensor_product(input1, input2, output, normalization, sorted)
 
-        if not isinstance(input1, list):
+        if callable(input1):
             self.Rs_in1 = Rs
             self.Rs_in2 = convention(input2)
             self.Rs_out = convention(output)
             self._complete = 'in1'
-        if not isinstance(input2, list):
+        if callable(input2):
             self.Rs_in1 = convention(input1)
             self.Rs_in2 = Rs
             self.Rs_out = convention(output)
             self._complete = 'in2'
-        if not isinstance(output, list):
+        if callable(output):
             self.Rs_in1 = convention(input1)
             self.Rs_in2 = convention(input2)
             self.Rs_out = Rs
@@ -521,6 +543,9 @@ class TensorProduct(torch.nn.Module):
         d_in1 = dim(self.Rs_in1)
         d_in2 = dim(self.Rs_in2)
         size_2 = features_2.shape[:-1]
+        if d_in2 == 0:
+            return features_2.new_zeros(*size_2, d_out, d_in1)
+
         features_2 = features_2.reshape(-1, d_in2)
 
         mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
@@ -537,6 +562,9 @@ class TensorProduct(torch.nn.Module):
         d_in1 = dim(self.Rs_in1)
         d_in2 = dim(self.Rs_in2)
         size_1 = features_1.shape[:-1]
+        if d_in1 == 0:
+            return features_1.new_zeros(*size_1, d_out, d_in2)
+
         features_1 = features_1.reshape(-1, d_in1)
 
         mixing_matrix = get_sparse_buffer(self, "mixing_matrix")  # [out, in1 * in2]
@@ -609,7 +637,7 @@ def _tensor_product_in_in(Rs_in1, Rs_in2, selection_rule, normalization, sorted)
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 I = torch.eye(mul_1 * mul_2).reshape(mul_1 * mul_2, mul_1, mul_2)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                i_out, i_1, i_2 = m.nonzero().T
+                i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
                 i_out += index_out
                 i_1 += index_1
                 i_2 += index_2
@@ -794,7 +822,7 @@ def tensor_square(
 
         for l_out in selection_rule(l_1, p_1, l_1, p_1):
             I = torch.eye(mul_1**2).reshape(mul_1**2, mul_1, mul_1)
-            uv = I.nonzero()[:, 1:]
+            uv = I.nonzero(as_tuple=False)[:, 1:]
             if l_out % 2 == 0:
                 I = I[uv[:, 0] <= uv[:, 1]]
             else:
@@ -810,7 +838,7 @@ def tensor_square(
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_1 + 1) ** 0.5
             dim_out = I.shape[0] * (2 * l_out + 1)
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_1)
-            i_out, i_1, i_2 = m.nonzero().T
+            i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
             i_out += index_out
             i_1 += index_1
             i_2 += index_1
@@ -833,7 +861,7 @@ def tensor_square(
                     C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
                 dim_out = I.shape[0] * (2 * l_out + 1)
                 m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-                i_out, i_1, i_2 = m.nonzero().T
+                i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
                 i_out += index_out
                 i_1 += index_1
                 i_2 += index_2
@@ -955,7 +983,7 @@ def elementwise_tensor_product(
                 C *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
             I = torch.einsum("uv,wu->wuv", torch.eye(mul), torch.eye(mul))
             m = torch.einsum("wuv,kij->wkuivj", I, C).reshape(dim_out, dim_1, dim_2)
-            i_out, i_1, i_2 = m.nonzero().T
+            i_out, i_1, i_2 = m.nonzero(as_tuple=False).T
             i_out += index_out
             i_1 += index_1
             i_2 += index_2
@@ -1014,15 +1042,16 @@ class ElementwiseTensorProduct(torch.nn.Module):
         return features.T.reshape(*size, d_out)
 
 
-def _is_representation(D, eps):
-    I = D(0, 0, 0)
+def _is_representation(D, eps, with_parity=False):
+    e = (0, 0, 0, 0) if with_parity else (0, 0, 0)
+    I = D(*e)
     if not torch.allclose(I, I @ I):
         return False
 
-    g1 = o3.rand_angles()
-    g2 = o3.rand_angles()
+    g1 = o3.rand_angles() + (0,) if with_parity else o3.rand_angles()
+    g2 = o3.rand_angles() + (0,) if with_parity else o3.rand_angles()
 
-    g12 = o3.compose(*g1, *g2)
+    g12 = o3.compose_with_parity(*g1, *g2) if with_parity else o3.compose(*g1, *g2)
     D12 = D(*g12)
 
     D1D2 = D(*g1) @ D(*g2)
@@ -1031,6 +1060,7 @@ def _is_representation(D, eps):
 
 
 def _round_sqrt(x, eps):
+    # round off x assuming it contains terms of the form +-1/sqrt(N)
     x[x.abs() < eps] = 0
     x = x.sign() / x.pow(2)
     x = x.div(eps).round().mul(eps)
@@ -1040,14 +1070,16 @@ def _round_sqrt(x, eps):
     return x
 
 
-def reduce_tensor(formula, eps=1e-10, **kw_Rs):
+def reduce_tensor(formula, eps=1e-9, has_parity=None, **kw_Rs):
     """
     Usage
     Rs, Q = rs.reduce_tensor('ijkl=jikl=ikjl=ijlk', i=[(1, 1)])
     Rs = 0,2,4
     Q = tensor of shape [15, 81]
     """
+    dtype = torch.get_default_dtype()
     with torch_default_dtype(torch.float64):
+        # reformat `formulas` and make checks
         formulas = [
             (-1 if f.startswith('-') else 1, f.replace('-', ''))
             for f in formula.split('=')
@@ -1061,9 +1093,13 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
             if len(f0) != len(f):
                 raise RuntimeError(f'{f0} and {f} don\'t have the same number of indices')
 
+        # `formulas` is a list of (sign, permutation of indices)
+        # each formula can be viewed as a permutation of the original formula
         formulas = {(s, tuple(f.index(i) for i in f0)) for s, f in formulas}  # set of generators (permutations)
 
-        # create the entire group
+        # they can be composed, for instance if you have ijk=jik=ikj
+        # you also have ijk=jki
+        # applying all possible compositions creates an entire group
         while True:
             n = len(formulas)
             formulas = formulas.union([(s, perm.inverse(p)) for s, p in formulas])
@@ -1073,14 +1109,24 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
                 for s2, p2 in formulas
             ])
             if len(formulas) == n:
-                break
+                break  # we break when the set is stable => it is now a group \o/
 
+        # lets clean the `kw_Rs` before checking that they are compatible with the formulas
         for i in kw_Rs:
-            Rs = convention(kw_Rs[i])
-            if not all(p == 0 for _, _, p in Rs):
-                raise RuntimeError(f'{format_Rs(Rs)} parity support is not implemented')
-            kw_Rs[i] = Rs
+            if not callable(kw_Rs[i]):
+                Rs = convention(kw_Rs[i])
+                if has_parity is None:
+                    has_parity = any(p != 0 for _, _, p in Rs)
+                if not has_parity and not all(p == 0 for _, _, p in Rs):
+                    raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
+                if has_parity and any(p == 0 for _, _, p in Rs):
+                    raise RuntimeError(f'{format_Rs(Rs)} parity has to be specified everywhere or nowhere')
+                kw_Rs[i] = Rs
 
+        if has_parity is None:
+            raise RuntimeError(f'please specify the argument `has_parity`')
+
+        # here we check that each index has one and only one representation
         for _s, p in formulas:
             f = "".join(f0[i] for i in p)
             for i, j in zip(f0, f):
@@ -1095,12 +1141,20 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
             if i not in kw_Rs:
                 raise RuntimeError(f'index {i} has not Rs associated to it')
 
-        full_base = list(itertools.product(*(range(dim(kw_Rs[i])) for i in f0)))
+        e = (0, 0, 0, 0) if has_parity else (0, 0, 0)
+        dims = {i: len(kw_Rs[i](*e)) if callable(kw_Rs[i]) else dim(kw_Rs[i]) for i in f0}  # dimension of each index
+        full_base = list(itertools.product(*(range(dims[i]) for i in f0)))  # (0, 0, 0), (0, 0, 1), (0, 0, 2), ... (3, 3, 3)
+        # len(full_base) degrees of freedom in an unconstrained tensor
 
+        # but there is constraints given by the group `formulas`
+        # For instance if `ij=-ji`, then 00=-00, 01=-01 and so on
         base = set()
         for x in full_base:
+            # T[x] is a coefficient of the tensor T and is related to other coefficient T[y]
+            # if x and y are related by a formula
             xs = {(s, tuple(x[i] for i in p)) for s, p in formulas}
-            # s * T[x] all equal for (s, x) in xs
+            # s * T[x] are all equal for all (s, x) in xs
+            # if T[x] = -T[x] it is then equal to 0 and we lose this degree of freedom
             if not (-1, x) in xs:
                 # the sign is arbitrary, put both possibilities
                 base.add(frozenset({
@@ -1108,6 +1162,12 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
                     frozenset({(-s, x) for s, x in xs})
                 }))
 
+        # len(base) is the number of degrees of freedom in the tensor.
+        # Now we want to decompose these degrees of freedom into irreps
+
+        base = sorted([sorted([sorted(xs) for xs in x]) for x in base])  # requested for python 3.7 but not for 3.8 (probably a bug in 3.7)
+
+        # First we compute the change of basis (projection) between full_base and base
         d_sym = len(base)
         d = len(full_base)
         Q = torch.zeros(d_sym, d)
@@ -1121,28 +1181,40 @@ def reduce_tensor(formula, eps=1e-10, **kw_Rs):
         assert torch.allclose(Q @ Q.T, torch.eye(d_sym))
 
         if d_sym == 0:
-            return [], torch.zeros(d_sym, d)
+            return [], torch.zeros(d_sym, d).to(dtype=dtype)
 
-        def representation(alpha, beta, gamma):
-            m = o3.kron(*(rep(kw_Rs[i], alpha, beta, gamma) for i in f0))
+        # We project the representation on the basis `base`
+        def representation(alpha, beta, gamma, parity=None):
+            def re(r):
+                if callable(r):
+                    if has_parity:
+                        return r(alpha, beta, gamma, parity)
+                    return r(alpha, beta, gamma)
+                return rep(r, alpha, beta, gamma, parity)
+
+            m = o3.kron(*(re(kw_Rs[i]) for i in f0))
             return Q @ m @ Q.T
 
-        assert _is_representation(representation, eps)
+        # And check that after this projection it is still a representation
+        assert _is_representation(representation, eps, has_parity)
 
+        # The rest of the code simply extract the irreps present in this representation
         Rs_out = []
         A = Q.clone()
         for l in range(int((d_sym - 1) // 2) + 1):
-            if 2 * l + 1 > d_sym - dim(Rs_out):
-                break
+            for p in [-1, 1] if has_parity else [0]:
+                if 2 * l + 1 > d_sym - dim(Rs_out):
+                    break
 
-            mul, B, representation = o3.reduce(representation, partial(o3.irr_repr, l), eps)
-            A = o3.direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
-            A = _round_sqrt(A, eps)
-            Rs_out += [(mul, l)]
+                mul, B, representation = o3.reduce(representation, partial(rep, [(1, l, p)]), eps, has_parity)
+                A = o3.direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
+                A = _round_sqrt(A, eps)
+                Rs_out += [(mul, l, p)]
 
-            if dim(Rs_out) == d_sym:
-                break
+                if dim(Rs_out) == d_sym:
+                    break
 
         if dim(Rs_out) != d_sym:
             raise RuntimeError(f'unable to decompose into irreducible representations')
-        return simplify(Rs_out), A
+
+        return simplify(Rs_out), A.to(dtype=dtype)

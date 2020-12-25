@@ -1,8 +1,7 @@
-
+"""
 
 def visualize_missing_point(fixed, removed, guessed, votes=None, probabilities=None, show_votes=False):
-    """
-
+    '''
     Args:
         fixed: List of fixed points.
         removed: Removed point. Shape [3].
@@ -13,7 +12,7 @@ def visualize_missing_point(fixed, removed, guessed, votes=None, probabilities=N
 
     Returns:
         Plotly Figure. Plot with plotly.offline.iplot(fig) in ipython notebook.
-    """
+    '''
     xs, ys, zs = zip(*fixed)
     fixed_trace = {
         'x': xs,
@@ -72,3 +71,5 @@ def visualize_missing_point(fixed, removed, guessed, votes=None, probabilities=N
         data += voted_traces
 
     return data
+
+"""

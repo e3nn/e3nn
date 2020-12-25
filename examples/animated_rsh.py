@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, missing-docstring
+# pylint: disable=not-callable, no-member, invalid-name, missing-docstring, line-too-long
 import math
 import os
 import subprocess
@@ -73,7 +73,7 @@ def main(lmax, resolution, steps):
                 projection=dict(type='perspective'),
             ),
         ),
-        paper_bgcolor='rgba(255,255,255,255)',
+        paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(l=0, r=0, t=0, b=0)
     )
@@ -96,7 +96,7 @@ def main(lmax, resolution, steps):
         fig = go.Figure(surfaces, layout=layout)
         fig.write_image('sh/{:03d}.png'.format(i))
 
-    subprocess.check_output(["convert", "-delay", "3", "-loop", "0", "sh/*.png", "output.gif"])
+    subprocess.check_output(["convert", "-delay", "3", "-loop", "0", "-dispose", "2", "sh/*.png", "output.gif"])
 
 
 if __name__ == '__main__':

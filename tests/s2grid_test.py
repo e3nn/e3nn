@@ -2,13 +2,14 @@
 import unittest
 
 import torch
+import torch.fft
 
 from e3nn import o3, rs, s2grid
 
 
 class Tests(unittest.TestCase):
 
-    def test_fft(self):
+    def test_fft1(self):
         with o3.torch_default_dtype(torch.float64):
             for lmax in [0, 1, 10, 20]:
                 res = 2 * lmax + 1
@@ -24,11 +25,11 @@ class Tests(unittest.TestCase):
 
                 y1 = x @ sha
 
-                y2 = torch.fft(torch.stack([x, torch.zeros_like(x)], dim=-1), 1)
-                y2 = torch.cat([2**0.5 * y2[lmax + 1:, 1], y2[:1, 0], 2**0.5 * y2[1:lmax + 1, 0]])
+                y2 = torch.fft.fft(torch.complex(x, torch.zeros_like(x)))
+                y2 = torch.cat([2**0.5 * y2[lmax + 1:].imag, y2[:1].real, 2**0.5 * y2[1:lmax + 1].real])
 
-                y3 = torch.rfft(x, 1)
-                y3 = torch.cat([-2**0.5 * y3[1:, 1].flip(0), y3[:1, 0], 2**0.5 * y3[1:, 0]])
+                y3 = torch.fft.rfft(x)
+                y3 = torch.cat([-2**0.5 * y3[1:].imag.flip(0), y3[:1].real, 2**0.5 * y3[1:].real])
 
                 self.assertLess((y3 - y2).abs().max(), 1e-10 * y3.abs().max())
                 self.assertLess((y1 - y2).abs().max(), 1e-10 * y1.abs().max())
@@ -37,11 +38,11 @@ class Tests(unittest.TestCase):
                 y = torch.randn(res)
                 x1 = sha @ y
 
-                x2 = torch.stack([
+                x2 = torch.complex(
                     torch.cat([y[lmax:lmax + 1], y[lmax + 1:] / 2**0.5]),
                     torch.cat([torch.zeros(1), -y[:lmax].flip(0) / 2**0.5]),
-                ], dim=-1)
-                x2 = torch.irfft(x2, 1) * res
+                )
+                x2 = torch.fft.irfft(x2, n=x1.shape[0]) * res
 
                 self.assertLess((x1 - x2).abs().max(), 1e-10 * x1.abs().max())
 

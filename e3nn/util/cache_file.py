@@ -3,13 +3,12 @@ Cache in files
 '''
 import fcntl
 import glob
+import gzip
 import os
+import pickle
 import sys
 from functools import lru_cache, wraps
-from itertools import count, chain
-import gzip
-
-import torch
+from itertools import chain, count
 
 
 class FileSystemMutex:
@@ -49,7 +48,7 @@ class FileSystemMutex:
 
 
 def cached_picklesjar(dirname, maxsize=128, open_jar=gzip.open,
-                      load=torch.load, save=torch.save, ext='torch'):
+                      load=pickle.load, save=pickle.dump, ext='pickle'):
     '''
     Cache a function with a directory
 

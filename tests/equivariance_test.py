@@ -214,7 +214,7 @@ class Tests(unittest.TestCase):
             Rs_in = [(mul, l) for l in range(3 + 1)]
             Rs_out = [(mul, l) for l in range(3 + 1)]
 
-            net = GatedConvNetwork(Rs_in, [(10, 0), (1, 1), (1, 2), (1, 3)], Rs_out, lmax=3, feature_product=True)
+            net = GatedConvNetwork(Rs_in, [(10, 0), (1, 1), (1, 2), (1, 3)], Rs_out)
 
             abc = torch.randn(3)
             rot_geo = o3.rot(*abc)

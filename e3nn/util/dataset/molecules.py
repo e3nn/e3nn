@@ -40,12 +40,12 @@ def center_positions(positions):
     return [pos - center for pos in positions]
 
 
-def random_rotate_translate(positions, rotation=True, translation=1):
+def random_rotate_translate(positions, translation=1):
     while True:
         trans = torch.rand(3) * 2 - 1
         if trans.norm() <= 1:
             break
-    rot = o3.rot(*torch.rand(3) * 6.2832).type(torch.float32)
+    rot = o3.rand_rot().type(torch.float32)
     return [rot @ pos + translation * trans for pos in positions]
 
 
@@ -91,6 +91,23 @@ class QM7(torch.utils.data.Dataset):
 
 class QM9(torch.utils.data.Dataset):
     url = 'https://ndownloader.figshare.com/files/3195389'
+    properties_names = [
+        'A GHz Rotational constant',
+        'B GHz Rotational constant',
+        'C GHz Rotational constant',
+        'μ D Dipole moment',
+        'α a^3_0 Isotropic polarizability',
+        'ϵ_HOMO Ha Energy of HOMO',
+        'ϵ_LUMO Ha Energy of LUMO',
+        'ϵ_gap Ha Gap (ϵLUMO−ϵHOMO)',
+        'R^2 a^2_0 Electronic spatial extent',
+        'zpve Ha Zero point vibrational energy',
+        'U_0 Ha Internal energy at 0K',
+        'U Ha Internal energy at 298.15K',
+        'H Ha Enthalpy at 298.15K',
+        'G Ha Free energy at 298.15K',
+        'C_v cal/(molK) Heat capacity at 298.15K',
+    ]
 
     def __init__(self, root, transform=None):
         self.root = os.path.expanduser(root)
@@ -103,7 +120,8 @@ class QM9(torch.utils.data.Dataset):
         with open(path, "rt") as f:
             lines = f.readlines()
         n = int(lines[0])
-        energy = float(lines[1].split()[12])
+        properties = [float(x) for x in lines[1].split()[2:]]
+        # https://www.nature.com/articles/sdata201422/tables/4
         qualias = []
         positions = []
         for i in range(2, 2 + n):
@@ -112,8 +130,8 @@ class QM9(torch.utils.data.Dataset):
             positions.append([float(a.replace('*^', 'e')) for a in [x, y, z]])
         positions = [torch.tensor(pos) for pos in positions]
         if self.transform is not None:
-            return self.transform(positions, qualias, energy)
-        return positions, qualias, energy
+            return self.transform(positions, qualias, properties)
+        return positions, qualias, properties
 
     def __len__(self):
         return len(self.files)

@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, unbalanced-tuple-unpacking
+# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member, unbalanced-tuple-unpacking, abstract-method
 import torch
 
 from e3nn import rs
@@ -32,13 +32,22 @@ class GatedBlockParity(torch.nn.Module):
             Rs_out=rs.format_Rs(self.Rs_out),
         )
 
-    def forward(self, features, dim=-1):
+    def forward(self, features, dim=-1, groups=None):
         scalars, gates, nonscalars = rs.cut(features, self.Rs_scalars, self.Rs_gates, self.Rs_nonscalars, dim_=dim)
         scalars = self.act_scalars(scalars)
-        if gates.shape[dim]:
+        if gates.shape[dim] and groups is None:
             gates = self.act_gates(gates)
             nonscalars = self.mul(nonscalars, gates)
             features = torch.cat([scalars, nonscalars], dim=dim)
+        # If group structure needs to be preserved
+        elif gates.shape[dim] and groups is not None:
+            gates = self.act_gates(gates)
+            nonscalars = self.mul(nonscalars, gates)
+            shape = scalars.shape
+            scalars = scalars.reshape(*shape[:dim], groups, -1, *shape[dim:][1:])
+            nonscalars = nonscalars.reshape(*shape[:dim], groups, -1, *shape[dim:][1:])
+            features = torch.cat([scalars, nonscalars], dim=len(shape[:dim]) + 1)
+            features = features.reshape(*shape[:dim], -1, *shape[dim:][1:])
         else:
             features = scalars
         return features

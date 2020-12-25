@@ -20,12 +20,16 @@ from e3nn.util.cache_file import cached_picklesjar
 from e3nn.util.default_dtype import torch_default_dtype
 
 
-def rot_z(gamma):
+def rot_z(gamma, dtype=None, device=None):
     """
     Rotation around Z axis
     """
+    if dtype is None:
+        dtype = torch.get_default_dtype()
     if not torch.is_tensor(gamma):
-        gamma = torch.tensor(gamma, dtype=torch.get_default_dtype())
+        gamma = torch.tensor(gamma, dtype=dtype, device=device)
+    else:
+        gamma = gamma.to(dtype=dtype, device=device)
 
     return torch.stack([
         torch.stack([gamma.cos(),
@@ -40,12 +44,16 @@ def rot_z(gamma):
     ], dim=-2)
 
 
-def rot_y(beta):
+def rot_y(beta, dtype=None, device=None):
     """
     Rotation around Y axis
     """
+    if dtype is None:
+        dtype = torch.get_default_dtype()
     if not torch.is_tensor(beta):
-        beta = torch.tensor(beta, dtype=torch.get_default_dtype())
+        beta = torch.tensor(beta, dtype=dtype, device=device)
+    else:
+        beta = beta.to(dtype=dtype, device=device)
 
     return torch.stack([
         torch.stack([beta.cos(),
@@ -65,11 +73,11 @@ def rot_y(beta):
 # is proportional to
 # [x, y, z]
 
-def rot(alpha, beta, gamma):
+def rot(alpha, beta, gamma, dtype=None, device=None):
     """
     ZYZ Euler angles rotation
     """
-    return rot_z(alpha) @ rot_y(beta) @ rot_z(gamma)
+    return rot_z(alpha, dtype, device) @ rot_y(beta, dtype, device) @ rot_z(gamma, dtype, device)
 
 
 def rand_rot():
@@ -135,6 +143,13 @@ def compose(a1, b1, c1, a2, b2, c2):
     rotz = rot(0, -b, -a) @ comp
     c = torch.atan2(rotz[1, 0], rotz[0, 0])
     return a, b, c
+
+
+def compose_with_parity(a1, b1, c1, p1, a2, b2, c2, p2):
+    """
+    (a, b, c, p) = (a1, b1, c1, p1) composed with (a2, b2, c2, p2)
+    """
+    return compose(a1, b1, c1, a2, b2, c2) + ((p1 + p2) % 2,)
 
 
 def irr_repr(order, alpha, beta, gamma, dtype=None, device=None):
@@ -211,6 +226,11 @@ def kron(*matrices):
     """
     for m in matrices:
         assert m.dim() == 2
+
+    if len(matrices) == 0:
+        return torch.ones(1, 1)
+    if len(matrices) == 1:
+        return matrices[0]
 
     x, y, *matrices = matrices
     z = torch.einsum("ij,kl->ikjl", x, y).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
@@ -463,17 +483,18 @@ def xyz3x3_to_irreducible_basis():
     return to1.type(torch.get_default_dtype()), to3.type(torch.get_default_dtype()), to5.type(torch.get_default_dtype())
 
 
-def intertwiners(D1, D2, eps=1e-10):
+def intertwiners(D1, D2, eps=1e-9, with_parity=False):
     """
     Compute a basis of the vector space of matrices A such that
-    D1(g) A = A D2(g) for all g in SO(3)
+    D1(g) A = A D2(g) for all g in O(3)
     """
-    I1 = D1(0, 0, 0)
-    I2 = D2(0, 0, 0)
+    e = (0, 0, 0, 0) if with_parity else (0, 0, 0)
+    I1 = D1(*e)
+    I2 = D2(*e)
 
     # picking 20 random rotations seems good enough
-    rr = [rand_angles() for _ in range(20)]
-    xs = [kron(D1(*r), I2) - kron(I1, D2(*r).T) for r in rr]
+    rr = [(rand_angles() + (i % 2,)) if with_parity else rand_angles() for i in range(20)]
+    xs = [kron(D1(*g), I2) - kron(I1, D2(*g).T) for g in rr]
     xtx = sum(x.T @ x for x in xs)
 
     res = xtx.symeig(eigenvectors=True)
@@ -485,17 +506,22 @@ def intertwiners(D1, D2, eps=1e-10):
     for A in null_space:
         d = 0
         for _ in range(4):
-            r = rand_angles()
-            d += A @ D2(*r) - D1(*r) @ A
+            if with_parity:
+                r = rand_angles()
+                p = torch.randint(0, 2, size=()).item()
+                g = r + (p,)
+            else:
+                g = rand_angles()
+            d += A @ D2(*g) - D1(*g) @ A
         d /= 4
         if d.abs().max() < eps:
             solutions.append((d.norm(), A))
-    solutions = [A for _, A in sorted(solutions)]
+    solutions = [A for _, A in sorted(solutions, key=lambda x: x[0])]
 
     return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
 
-def reduce(D, D_small, eps=1e-10):
+def reduce(D, D_small, eps=1e-9, with_parity=False):
     """
     Given a "big" representation and a "small" representation
     computes how many times the small appears in the big one and return:
@@ -508,15 +534,16 @@ def reduce(D, D_small, eps=1e-10):
             return (A @ oldD(*g) @ A.T)[d:][:, d:]
         return newD
 
-    dim = D(0, 0, 0).shape[0]
-    dim_small = D_small(0, 0, 0).shape[0]
+    e = (0, 0, 0, 0) if with_parity else (0, 0, 0)
+    dim = D(*e).shape[0]
+    dim_small = D_small(*e).shape[0]
 
     D_rest = D
     bigA = torch.eye(dim)
     n = 0
 
     while True:
-        A = intertwiners(D_small, D_rest, eps) * dim_small**0.5
+        A = intertwiners(D_small, D_rest, eps, with_parity) * dim_small**0.5
 
         # stops if "small" does not appear in "big" anymore
         if A.shape[0] == 0:
@@ -529,13 +556,18 @@ def reduce(D, D_small, eps=1e-10):
         n += 1
         D_rest = change_and_remove(bigA, D, n * dim_small)
 
+    if with_parity:
+        g = (5.5407, 1.3256, 2.8139, 1)
+    else:
+        g = (5.5407, 1.3256, 2.8139)
+    assert (bigA @ D(*g) @ bigA.T - direct_sum(*[D_small(*g)] * n + [D_rest(*g)])).abs().max() < eps
     return n, bigA, D_rest
 
 
 @torch.jit.script
 def orthonormalize(
         vecs: torch.Tensor,
-        eps: float = 1e-10
+        eps: float = 1e-9
 ) -> Tuple[torch.Tensor, torch.Tensor]:  # pragma: no cover
     """
     :param vecs: tensor of shape [n, m] with n <= m
@@ -554,23 +586,22 @@ def orthonormalize(
     for x in vecs:
         for y in base:
             x -= torch.dot(x, y) * y
-        if x.norm() > eps:
+        if x.norm() > 2 * eps:
             x = x / x.norm()
-            x[x.abs() < eps] = torch.zeros(())
-            x *= x[x.nonzero()[0, 0]].sign()
+            x[x.abs() < eps] = x.new_zeros(())
             base += [x]
 
     expand = []
-    for x in torch.eye(dim):
+    for x in torch.eye(dim, device=vecs.device, dtype=vecs.dtype):
         for y in base + expand:
             x -= torch.dot(x, y) * y
-        if x.norm() > eps:
+        if x.norm() > 2 * eps:
             x /= x.norm()
-            x[x.abs() < eps] = torch.zeros(())
+            x[x.abs() < eps] = x.new_zeros(())
             x *= x[x.nonzero()[0, 0]].sign()
             expand += [x]
 
-    base = torch.stack(base) if len(base) > 0 else torch.zeros(0, dim)
-    expand = torch.stack(expand) if len(expand) > 0 else torch.zeros(0, dim)
+    base = torch.stack(base) if len(base) > 0 else vecs.new_zeros(0, dim)
+    expand = torch.stack(expand) if len(expand) > 0 else vecs.new_zeros(0, dim)
 
     return base, expand

@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, arguments-differ
+# pylint: disable=not-callable, no-member, invalid-name, line-too-long, arguments-differ, abstract-method
 """
 Fourier Transform : sphere (grid) <--> spherical tensor (Rs=[(1, l) for l in range(lmax + 1)])
 
@@ -8,6 +8,7 @@ import math
 
 import lie_learn.spaces.S3 as S3
 import torch
+import torch.fft
 from e3nn import rsh, o3
 from e3nn.util.default_dtype import torch_default_dtype
 
@@ -63,6 +64,11 @@ def complete_lmax_res(lmax, res_beta, res_alpha):
 
 def irfft(x, res):
     """
+    ```
+    _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
+    x = torch.randn(2 * lmax + 1)
+    s2grid.irfft(x, res) == sha @ x
+    ```
     :param x: tensor of shape [..., m]
     :return: tensor of shape [..., alpha]
     """
@@ -76,7 +82,7 @@ def irfft(x, res):
     ], dim=-1)
     assert x.shape[1] == res
     l = res // 2
-    x = torch.stack([
+    x = torch.complex(
         torch.cat([
             x[:, l:l + 1],
             x[:, l + 1:].div(math.sqrt(2))
@@ -85,23 +91,28 @@ def irfft(x, res):
             torch.zeros_like(x[:, :1]),
             x[:, :l].flip(-1).div(-math.sqrt(2)),
         ], dim=1),
-    ], dim=-1)
-    x = torch.irfft(x, 1) * res
+    )
+    x = torch.fft.irfft(x, n=res, dim=1) * res
     return x.reshape(*size, res)
 
 
 def rfft(x, l):
     """
+    ```
+    _betas, _alphas, _shb, sha = s2grid.spherical_harmonics_s2_grid(lmax, res, res)
+    x = torch.randn(res)
+    s2grid.rfft(x, lmax) == x @ sha
+    ```
     :param x: tensor of shape [..., alpha]
     :return: tensor of shape [..., m]
     """
     *size, res = x.shape
     x = x.reshape(-1, res)
-    x = torch.rfft(x, 1)
+    x = torch.fft.rfft(x, dim=1)
     x = torch.cat([
-        x[:, 1:l + 1, 1].flip(1).mul(-math.sqrt(2)),
-        x[:, :1, 0],
-        x[:, 1:l + 1, 0].mul(math.sqrt(2)),
+        x[:, 1:l + 1].imag.flip(1).mul(-math.sqrt(2)),
+        x[:, :1].real,
+        x[:, 1:l + 1].real.mul(math.sqrt(2)),
     ], dim=1)
     return x.reshape(*size, 2 * l + 1)
 
@@ -117,11 +128,11 @@ class ToS2Grid(torch.nn.Module):
         """
         :param lmax: lmax of the input signal
         :param res: resolution of the output as a tuple (beta resolution, alpha resolution)
-        :param normalization: either 'norm' or 'component'
+        :param normalization: either 'norm', 'component', 'none' or custom
         """
         super().__init__()
 
-        assert normalization in ['norm', 'component', 'none'], "normalization needs to be 'norm', 'component' or 'none'"
+        assert normalization in ['norm', 'component', 'none'] or torch.is_tensor(normalization), "normalization needs to be 'norm', 'component' or 'none'"
 
         if isinstance(res, int) or res is None:
             lmax, res_beta, res_alpha = complete_lmax_res(lmax, res, None)
@@ -131,16 +142,21 @@ class ToS2Grid(torch.nn.Module):
         betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
 
         with torch_default_dtype(torch.float64):
-            # normalize such that all l has the same variance on the sphere
             if normalization == 'component':
+                # normalize such that all l has the same variance on the sphere
+                # given that all componant has mean 0 and variance 1
                 n = math.sqrt(4 * math.pi) * torch.tensor([
                     1 / math.sqrt(2 * l + 1)
                     for l in range(lmax + 1)
                 ]) / math.sqrt(lmax + 1)
             if normalization == 'norm':
+                # normalize such that all l has the same variance on the sphere
+                # given that all componant has mean 0 and variance 1/(2L+1)
                 n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
             if normalization == 'none':
                 n = torch.ones(lmax + 1)
+            if torch.is_tensor(normalization):
+                n = normalization.to(dtype=torch.float64)
             m = rsh.spherical_harmonics_expand_matrix(range(lmax + 1))  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
@@ -188,12 +204,12 @@ class FromS2Grid(torch.nn.Module):
         """
         :param res: resolution of the input as a tuple (beta resolution, alpha resolution)
         :param lmax: maximum l of the output
-        :param normalization: either 'norm' or 'component'
+        :param normalization: either 'norm', 'component', 'none' or custom
         :param lmax_in: maximum l of the input of ToS2Grid in order to be the inverse
         """
         super().__init__()
 
-        assert normalization in ['norm', 'component', 'none'], "normalization needs to be 'norm', 'component' or 'none'"
+        assert normalization in ['norm', 'component', 'none'] or torch.is_tensor(normalization), "normalization needs to be 'norm', 'component' or 'none'"
 
         if isinstance(res, int) or res is None:
             lmax, res_beta, res_alpha = complete_lmax_res(lmax, res, None)
@@ -216,6 +232,8 @@ class FromS2Grid(torch.nn.Module):
                 n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
             if normalization == 'none':
                 n = 4 * math.pi * torch.ones(lmax + 1)
+            if torch.is_tensor(normalization):
+                n = normalization.to(dtype=torch.float64)
             m = rsh.spherical_harmonics_expand_matrix(range(lmax + 1))  # [l, m, i]
             assert res_beta % 2 == 0
             qw = torch.tensor(S3.quadrature_weights(res_beta // 2)) * res_beta**2 / res_alpha  # [b]

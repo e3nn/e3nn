@@ -16,17 +16,6 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: 3.8
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install wheel
-        pip install torch==1.5.0+cpu torchvision==0.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-        CUDA=cpu
-        pip install torch-scatter==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-        pip install torch-sparse==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-        pip install torch-cluster==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-        pip install torch-spline-conv==latest+${CUDA} -f https://pytorch-geometric.com/whl/torch-1.5.0.html
-        pip install .
     - name: Lint with flake8
       run: |
         pip install flake8
@@ -34,6 +23,19 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82,E251,F811,E302,E261,E231,F401,F841,W293,W291,W605,W292,W391,E128,E305,W503,W504 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=180 --statistics
+    - name: Install dependencies
+      env:
+        TORCH: "1.7.0"
+        CUDA: "cpu"
+      run: |
+        python -m pip install --upgrade pip
+        pip install wheel
+        pip install torch==${TORCH} torchvision torchaudio -f https://download.pytorch.org/whl/cpu/torch_stable.html
+        pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+        pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+        pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+        pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
+        pip install .
     - name: Test with pytest
       run: |
         pip install pytest

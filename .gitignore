@@ -7,9 +7,18 @@ notebook
 
 *.egg-info
 
+# Documentation
+doc/_build
 
 # files
 mutex
 
 *.png
 *.gif
+*.jpeg
+
+*.npz
+
+# Ignore shared libraries built in the source directory
+e3nn/*.so
+e3nn/*.dylib
