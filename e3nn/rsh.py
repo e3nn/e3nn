@@ -291,7 +291,7 @@ class RSH(torch.autograd.Function):
     e3nn_normalization is (-1)^L, it comes from combination if (pi-theta) -> (-1)^(L+m) and 'quantum' norm -> (-1)^m.
     """
     @staticmethod
-    def forward(ctx, xyz, lmax, e3nn_normalization=False):
+    def forward(ctx, xyz, lmax, e3nn_normalization):
         Y = real_spherical_harmonics.rsh(xyz, lmax)
         if e3nn_normalization:
             real_spherical_harmonics.e3nn_normalization(Y)
@@ -299,7 +299,7 @@ class RSH(torch.autograd.Function):
             ctx.save_for_backward(xyz)
             ctx.lmax = lmax
             ctx.e3nn_normalization = e3nn_normalization
-        return Y
+        return Y.t().contiguous()
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -312,4 +312,10 @@ class RSH(torch.autograd.Function):
         return grad_xyz, None, None
 
 
-rsh_optimized = RSH.apply
+def rsh_optimized(xyz, lmax, e3nn_normalization=False):
+    # apply does not support keyword arguments
+    if e3nn_normalization:
+        return RSH.apply(xyz, lmax, True)
+    else:
+        return RSH.apply(xyz, lmax, False)
+
