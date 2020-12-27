@@ -19,42 +19,36 @@ def test_scipy_spherical_harmonics():
 def test_sh_is_in_irrep():
     with o3.torch_default_dtype(torch.float64):
         for l in range(4 + 1):
-            a, b = 3.14 * torch.rand(2)  # works only for beta in [0, pi]
+            a, b = 3.14 * torch.rand(2, 1)  # works only for beta in [0, pi]
             Y = rsh.spherical_harmonics_alpha_beta([l], a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1) * (-1) ** l
             D = o3.irr_repr(l, a, b, 0)
             assert (Y - D[:, l]).norm() < 1e-10
 
 
-def test_sh_cuda_single():
-    if torch.cuda.is_available():
-        with o3.torch_default_dtype(torch.float64):
-            for l in range(10 + 1):
-                x = torch.randn(10, 3)
-                x_cuda = x.cuda()
-                Y1 = rsh.spherical_harmonics_xyz([l], x)
-                Y2 = rsh.spherical_harmonics_xyz([l], x_cuda).cpu()
-                assert (Y1 - Y2).abs().max() < 1e-7
-    else:
-        print("Cuda is not available! test_sh_cuda_single skipped!")
-
-
-def test_sh_cuda_ordered_full():
-    if torch.cuda.is_available():
-        with o3.torch_default_dtype(torch.float64):
-            l = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+def test_sh_cuda_vs_cpu_single():
+    with o3.torch_default_dtype(torch.float64):
+        for l in range(10 + 1):
             x = torch.randn(10, 3)
             x_cuda = x.cuda()
-            Y1 = rsh.spherical_harmonics_xyz(l, x)
-            Y2 = rsh.spherical_harmonics_xyz(l, x_cuda).cpu()
+            Y1 = rsh.spherical_harmonics_xyz([l], x)
+            Y2 = rsh.spherical_harmonics_xyz([l], x_cuda).cpu()
             assert (Y1 - Y2).abs().max() < 1e-7
-    else:
-        print("Cuda is not available! test_sh_cuda_ordered_full skipped!")
 
 
-def test_sh_cuda_ordered_partial():
+def test_sh_cuda_vs_cpu_ordered_full():
+    with o3.torch_default_dtype(torch.float64):
+        l = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        x = torch.randn(10, 3)
+        x_cuda = x.cuda()
+        Y1 = rsh.spherical_harmonics_xyz(l, x)
+        Y2 = rsh.spherical_harmonics_xyz(l, x_cuda).cpu()
+        assert (Y1 - Y2).abs().max() < 1e-7
+
+
+def test_sh_cuda_vs_cpu_reordered_partial():
     if torch.cuda.is_available():
         with o3.torch_default_dtype(torch.float64):
-            l = [0, 2, 5, 7, 10]
+            l = [2, 7, 5, 1, 10]
             x = torch.randn(10, 3)
             x_cuda = x.cuda()
             Y1 = rsh.spherical_harmonics_xyz(l, x)
