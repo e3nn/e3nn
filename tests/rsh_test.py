@@ -9,7 +9,7 @@ from e3nn import o3, rsh
 def test_scipy_spherical_harmonics():
     with o3.torch_default_dtype(torch.float64):
         ls = [0, 1, 2, 3, 4, 5]
-        beta = torch.linspace(1e-3, math.pi - 1e-3, 100, requires_grad=True).reshape(1, -1)
+        beta = torch.linspace(1e-3, math.pi - 1e-3, 100, requires_grad=True).reshape(-1, 1)
         alpha = torch.linspace(0, 2 * math.pi, 100, requires_grad=True).reshape(-1, 1)
         Y1 = rsh.spherical_harmonics_alpha_beta(ls, alpha, beta)
         Y2 = rsh.spherical_harmonics_alpha_beta(ls, alpha.detach(), beta.detach())
