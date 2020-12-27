@@ -7,6 +7,7 @@ from e3nn.non_linearities.rescaled_act import swish
 from functools import partial
 
 from torch_geometric.data import Data
+from torch_geometric.utils import degree
 
 
 def test_tpnn():
@@ -27,7 +28,12 @@ def test_tpnn():
     abs_distances = torch.norm(rel_vectors, 2, -1, keepdim=True)
     rel_vectors = rel_vectors / abs_distances
 
-    graph = Data(x=features, edge_index=edge_index, pos=pos, abs_distances=abs_distances.squeeze(), rel_vec=rel_vectors)
+    origin_nodes, _ = edge_index  # origin, neighbor
+    num_nodes = pos.size(0)
+    node_degrees = degree(origin_nodes, num_nodes=num_nodes, dtype=torch.get_default_dtype())
+    norm = node_degrees[origin_nodes].rsqrt()  # 1 / sqrt(degree(i))
+
+    graph = Data(x=features, edge_index=edge_index, pos=pos, abs_distances=abs_distances.squeeze(), rel_vec=rel_vectors, norm=norm)
     output = model(graph)
     print(output)
 
@@ -56,6 +62,11 @@ def test_tensor_passing_layer_gradients():
     abs_distances = torch.norm(rel_vectors, 2, -1, keepdim=True)
     rel_vectors = rel_vectors / abs_distances
 
-    inputs = (edge_index, features, abs_distances.squeeze(), rel_vectors)
+    origin_nodes, _ = edge_index  # origin, neighbor
+    num_nodes = pos.size(0)
+    node_degrees = degree(origin_nodes, num_nodes=num_nodes, dtype=torch.get_default_dtype())
+    norm = node_degrees[origin_nodes].rsqrt()  # 1 / sqrt(degree(i))
+
+    inputs = (edge_index, features, abs_distances.squeeze(), rel_vectors, norm)
     test = gradcheck(layer, inputs)
     assert test
