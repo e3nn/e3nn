@@ -204,11 +204,12 @@ def spherical_harmonics_alpha_beta(Rs, alpha, beta):
     """
     sh = None
     if rs.lmax(Rs) <= 10:
+        Rs = rs.simplify(Rs)
         xyz = torch.stack([beta.sin() * alpha.cos(), beta.sin() * alpha.sin(), beta.cos()], dim=-1)
         lmax = rs.lmax(Rs)
         sh = rsh_optimized(xyz, lmax, e3nn_normalization=True)
         if not rs.are_equal(Rs, list(range(lmax + 1))):
-            sh = torch.cat([sh[l * l: (l + 1) * (l + 1)] for mul, l, _ in Rs for _ in range(mul)])
+            sh = torch.cat([sh[:, l*l:(l+1)*(l+1)] for _, l, _ in Rs], dim=1)
     else:
         sh = spherical_harmonics_alpha_z_y(Rs, alpha, beta.cos(), beta.sin().abs())
     return sh
@@ -251,7 +252,7 @@ def spherical_harmonics_xyz(Rs, xyz, normalization='none'):
         # rsh_optimized returns real spherical harmonics for all rotation orders from 0 to lmax inclusive
         # gaps in requested list of rotation orders are unusual, but possible
         if not rs.are_equal(Rs, list(range(lmax + 1))):
-            sh = torch.cat([sh[l*l: (l+1)*(l+1)] for mul, l, _ in Rs for _ in range(mul)])
+            sh = torch.cat([sh[:, l*l:(l+1)*(l+1)] for _, l, _ in Rs], dim=1)
     else:
         # normalize coordinates and filter out 0-inputs
         d = torch.norm(xyz, 2, dim=1)
