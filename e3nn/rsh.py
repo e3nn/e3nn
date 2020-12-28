@@ -304,11 +304,11 @@ class RSH(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        # grad_output = grad_output.clone() # uncomment for gradcheck test - particularity of e3nn_normalization being in-place operation
+        # grad_output = grad_output.clone()  # uncomment for gradcheck test - particularity of e3nn_normalization being in-place operation
         if ctx.e3nn_normalization:
-            e3nn_normalization(grad_output)
+            real_spherical_harmonics.e3nn_normalization(grad_output)
         xyz, = ctx.saved_tensors
-        derivatives = drsh(xyz, ctx.lmax)
+        derivatives = real_spherical_harmonics.drsh(xyz, ctx.lmax)
         grad_xyz = (derivatives * grad_output.unsqueeze(2).expand(-1, -1, 3)).sum(dim=0)
         return grad_xyz, None, None
 
