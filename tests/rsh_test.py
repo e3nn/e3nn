@@ -131,10 +131,10 @@ def test_sh_equivariance():
             alpha, beta, gamma = torch.rand(3)
 
             ra, rb, _ = o3.compose(alpha, beta, gamma, a, b, 0)
-            Yrx = rsh.spherical_harmonics_alpha_beta([l], ra, rb)
+            Yrx = rsh.spherical_harmonics_alpha_beta([l], ra.unsqueeze(0), rb.unsqueeze(0))
 
-            Y = rsh.spherical_harmonics_alpha_beta([l], a, b)
-            DrY = o3.irr_repr(l, alpha, beta, gamma) @ Y
+            Y = rsh.spherical_harmonics_alpha_beta([l], a.unsqueeze(0), b.unsqueeze(0))
+            DrY = torch.einsum("ij,aj->ai", o3.irr_repr(l, alpha, beta, gamma), Y)
 
             assert (Yrx - DrY).abs().max() < 1e-10 * Y.abs().max()
 
