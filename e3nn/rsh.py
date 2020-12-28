@@ -319,4 +319,3 @@ def rsh_optimized(xyz, lmax, e3nn_normalization=False):
         return RSH.apply(xyz, lmax, True)
     else:
         return RSH.apply(xyz, lmax, False)
-
