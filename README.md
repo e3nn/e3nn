@@ -1,4 +1,15 @@
 # e3nn
+
+## e3nn_core
+:christmas_tree: The core features of the library has been moved to :sparkles:[e3nn_core](https://github.com/e3nn/e3nn_core):sparkles:.
+- `CustomWeightedTensorProduct` is now [`TensorProduct`](https://docs.e3nn.org/en/latest/api/nn/nn_tp.html#e3nn_core.nn.tensor_product.TensorProduct) and its method `.right()` replaces `Kernel`.
+- `Rs` lists are replaced by the more powerful [Irreps](https://docs.e3nn.org/en/latest/api/o3/o3_irreps.html#e3nn_core.o3.irreps.Irreps) object.
+- Rotations functions from `o3` have been completed by [quaternion and axis-angle support](https://docs.e3nn.org/en/latest/api/o3/o3_rotation.html).
+- Spherical harmonics are implemented as tensor products [`Y^{l+1} = Y^l \otimes (x,y,z)`](https://docs.e3nn.org/en/latest/api/o3/o3_sh.html#e3nn_core.o3.cartesian_spherical_harmonics.spherical_harmonics) and are faster.
+- Code examples are documented [here](https://docs.e3nn.org/en/latest/examples/examples.html)
+
+## Intro
+
 [![Coverage Status](https://coveralls.io/repos/github/e3nn/e3nn/badge.svg?branch=master)](https://coveralls.io/github/e3nn/e3nn?branch=master)
 
 E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in dimension 3. That is the group of rotations, translations and mirror.
