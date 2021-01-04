@@ -57,7 +57,7 @@ class DataNeighbors(tg.data.Data):
             features = torch.nn.functional.one_hot(torch.as_tensor(species_ids)).to(dtype=torch.get_default_dtype())
         return cls(
             x=features,
-            pos=torch.as_tensor(atoms.positions),
+            pos=atoms.positions,
             r_max=r_max,
             cell=atoms.get_cell(),
             pbc=atoms.pbc,
@@ -170,7 +170,7 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None
     this function is not backwardable.
 
     Args:
-        pos (shape [N, 3]): Positional coordinate; Tensor or numpy array. If Tensor, must be detached & on CPU.
+        pos (shape [N, 3]): Positional coordinate; Tensor or numpy array. If Tensor, must be on CPU.
         r_max (float): Radial cutoff distance for neighbor finding.
         cell (numpy shape [3, 3]): Cell for periodic boundary conditions. Ignored if ``pbc == False``.
         pbc (bool or 3-tuple of bool): Whether the system is periodic in each of the three cell dimensions.
@@ -211,13 +211,14 @@ def _neighbor_list_and_relative_vec(pos, r_max, self_interaction=True, cell=None
     ))
     # We have to compute displacements in pytorch so that they are backwardable
     displacements = pos[second_idex] - pos[first_idex]
+    # If pos was numpy, displacements will be too, so convert:
+    displacements = torch.as_tensor(displacements)
     displacements = displacements + torch.einsum(
         'ni,ij->nj',
         torch.as_tensor(shifts, dtype=displacements.dtype),
         torch.as_tensor(cell, dtype=displacements.dtype)
     )
-    edge_attr = torch.as_tensor(displacements)
-    return edge_index, edge_attr
+    return edge_index, displacements
 
 
 def _neighbor_list_and_relative_vec_lattice(pos, lattice, r_max, self_interaction=True):
