@@ -1,6 +1,7 @@
 r"""Function to decompose a multi-index tensor
 """
-from e3nn import group, o3
+from e3nn import o3
+from e3nn.math import group
 
 
 def reduce_tensor(formula, eps=1e-9, has_parity=True, **kw_irreps):

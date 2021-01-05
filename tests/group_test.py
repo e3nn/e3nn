@@ -1,7 +1,7 @@
 import itertools
 
 import torch
-from e3nn.group import O3, SO3, is_representation, is_group
+from e3nn.math.group import O3, SO3, is_representation, is_group
 
 
 def test_representation():

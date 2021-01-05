@@ -1,5 +1,5 @@
 import torch
-from e3nn.group import LieGroup
+from e3nn.math.group import LieGroup
 from e3nn.math import complete_basis, direct_sum, kron
 
 
