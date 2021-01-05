@@ -1,6 +1,7 @@
 import torch
 from e3nn import o3
-from e3nn.nn import FullyConnectedTensorProduct, Identity, Linear
+from e3nn.nn import Identity
+from e3nn.o3 import FullyConnectedTensorProduct, Linear
 
 
 def test_fully_connected():

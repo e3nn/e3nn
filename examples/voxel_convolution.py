@@ -7,7 +7,7 @@ import math
 import torch
 
 from e3nn import o3
-from e3nn.nn import FullyConnectedTensorProduct, Linear
+from e3nn.o3 import FullyConnectedTensorProduct, Linear
 from e3nn.math import gaussian_basis_projection
 
 

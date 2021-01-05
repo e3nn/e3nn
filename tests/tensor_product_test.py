@@ -3,7 +3,7 @@ import random
 import pytest
 import torch
 from e3nn import o3
-from e3nn.nn import TensorProduct
+from e3nn.o3 import TensorProduct
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight):

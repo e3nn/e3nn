@@ -1,6 +1,6 @@
 import torch
 
-from e3nn import nn, o3
+from e3nn import o3
 from e3nn.math import normalize2mom
 
 
@@ -161,7 +161,7 @@ class Gate(torch.nn.Module):
         self.act_gates = Activation(irreps_gates, act_gates)
         irreps_gates = self.act_gates.irreps_out
 
-        self.mul = nn.ElementwiseTensorProduct(irreps_nonscalars, irreps_gates)
+        self.mul = o3.ElementwiseTensorProduct(irreps_nonscalars, irreps_gates)
         irreps_nonscalars = self.mul.irreps_out
 
         self.irreps_out = irreps_scalars + irreps_nonscalars

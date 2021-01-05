@@ -16,7 +16,7 @@ from torch_geometric.data import Data, DataLoader
 from torch_scatter import scatter
 
 from e3nn import o3
-from e3nn.nn import FullyConnectedTensorProduct
+from e3nn.o3 import FullyConnectedTensorProduct
 
 
 def tetris():
