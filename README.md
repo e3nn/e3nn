@@ -1,7 +1,7 @@
 # e3nn
 
-## e3nn_core
-:christmas_tree: The core features of the library has been moved to :sparkles:[e3nn_core](https://github.com/e3nn/e3nn_core):sparkles:.
+## e3nn main
+:christmas_tree: The core features of the library has been rewritten in the branch :sparkles:[e3nn:main](https://github.com/e3nn/e3nn/tree/main):sparkles:.
 - `CustomWeightedTensorProduct` is now [`TensorProduct`](https://docs.e3nn.org/en/latest/api/nn/nn_tp.html#e3nn_core.nn.tensor_product.TensorProduct) and its method `.right()` replaces `Kernel`.
 - `Rs` lists are replaced by the more powerful [Irreps](https://docs.e3nn.org/en/latest/api/o3/o3_irreps.html#e3nn_core.o3.irreps.Irreps) object.
 - Rotations functions from `o3` have been completed by [quaternion and axis-angle support](https://docs.e3nn.org/en/latest/api/o3/o3_rotation.html).
