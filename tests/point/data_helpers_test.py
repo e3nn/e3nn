@@ -34,10 +34,32 @@ def test_from_ase():
     atoms = ase.build.molecule('CH3CHO')
     data = dh.DataNeighbors.from_ase(atoms, r_max=2.)
     assert data.x.shape == (len(atoms), 3)  # 3 species in this atoms
+    # check edges
+    for edge in range(data.num_edges):
+        real_displacement = atoms.positions[data.edge_index[1, edge]] - atoms.positions[data.edge_index[0, edge]]
+        assert torch.allclose(data.edge_attr[edge], torch.as_tensor(real_displacement))
     # periodic
     atoms = ase.build.bulk('Cu', 'fcc', a=3.6, cubic=True)
     data = dh.DataNeighbors.from_ase(atoms, r_max=2.5)
     assert data.x.shape == (len(atoms), 1)  # one species
+
+
+def test_positions_grad():
+    N = 7
+    lattice = torch.randn(3, 3)
+    pos = torch.randn(N, 3)
+    pos.requires_grad_(True)
+    Rs_in = [(3, 0), (1, 1)]
+    x = torch.randn(N, rs.dim(Rs_in))
+    r_max = 1
+    data = dh.DataNeighbors(x, pos, r_max)
+    assert pos.requires_grad
+    assert data.edge_attr.requires_grad
+    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph=True)
+    data = dh.DataPeriodicNeighbors(x, pos, lattice, r_max)
+    assert pos.requires_grad
+    assert data.edge_attr.requires_grad
+    torch.autograd.grad(data.edge_attr.sum(), pos, create_graph=True)
 
 
 def test_some_periodic():
