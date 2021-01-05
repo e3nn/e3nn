@@ -1,4 +1,0 @@
-autodocsumm
-myst-parser
-sphinx
-sphinx-rtd-theme

@@ -1,0 +1,7 @@
+autodocsumm
+myst-parser
+sphinx
+sphinx-rtd-theme
+sympy
+torch_geometric
+torch>=1.4.0

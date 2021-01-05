@@ -1,4 +1,0 @@
-ignore:
-  - "e3nn/util"
-  - "tests"
-  - "*.py"

@@ -1,104 +1,87 @@
-# pylint: disable=not-callable, no-member, invalid-name, line-too-long, wildcard-import, unused-wildcard-import, missing-docstring
+import random
+
+import pytest
 import torch
-from e3nn import o3, rs
-from e3nn.tensor_product import (CustomWeightedTensorProduct,
-                                 LearnableTensorProduct, LearnableTensorSquare,
-                                 GroupedWeightedTensorProduct)
+from e3nn import o3
+from e3nn.nn import TensorProduct
 
 
-def test_learnable_tensor_square_normalization():
-    Rs_in = [1, 2, 3, 4]
-    Rs_out = [0, 2, 4, 5]
+def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
+    def mul_out(mul):
+        if mode == "uvuv":
+            return mul**2
+        return mul
 
-    m = LearnableTensorSquare(Rs_in, Rs_out)
-    y = m(rs.randn(1000, Rs_in))
-
-    assert y.var().log10().abs() < 1.5, y.var().item()
-
-
-def test_learnable_tensor_product_normalization():
-    Rs_in1 = [2, 0, 4]
-    Rs_in2 = [2, 3]
-    Rs_out = [0, 2, 4, 5]
-
-    m = LearnableTensorProduct(Rs_in1, Rs_in2, Rs_out)
-
-    x1 = rs.randn(1000, Rs_in1)
-    x2 = rs.randn(1000, Rs_in2)
-    y = m(x1, x2)
-
-    assert y.var().log10().abs() < 1.5, y.var().item()
+    try:
+        return TensorProduct(
+            [(20, (l1, p1)), (15, (l1, p1))],
+            [(20, (l2, p2)), (15, (l2, p2))],
+            [(mul_out(20), (lo, po)), (mul_out(15), (lo, po))],
+            [
+                (0, 0, 0, mode, weight),
+                (1, 1, 1, mode, weight),
+                (0, 0, 1, 'uvw', True, 0.5),
+                (0, 1, 1, 'uvw', True, 0.2),
+            ]
+        )
+    except AssertionError:
+        return None
 
 
-def test_weighted_tensor_product():
+def random_params():
+    params = set()
+    while len(params) < 25:
+        l1 = random.randint(0, 2)
+        p1 = random.choice([-1, 1])
+        l2 = random.randint(0, 2)
+        p2 = random.choice([-1, 1])
+        lo = random.randint(0, 2)
+        po = random.choice([-1, 1])
+        mode = random.choice(['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv'])
+        weight = random.choice([True, False])
+        if make_tp(l1, p1, l2, p2, lo, po, mode, weight) is not None:
+            params.add((l1, p1, l2, p2, lo, po, mode, weight))
+    return params
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params())
+def test(l1, p1, l2, p2, lo, po, mode, weight):
+    eps = 1e-10
+    n = 1_500
+    tol = 1.8
     torch.set_default_dtype(torch.float64)
 
-    Rs_in1 = rs.simplify([1] * 20 + [2] * 4)
-    Rs_in2 = rs.simplify([0] * 10 + [1] * 10 + [2] * 5)
-    Rs_out = rs.simplify([0] * 3 + [1] * 4)
+    m = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
 
-    tp = GroupedWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out)
+    # bilinear
+    x1 = torch.randn(2, m.irreps_in1.dim)
+    x2 = torch.randn(2, m.irreps_in1.dim)
+    y1 = torch.randn(2, m.irreps_in2.dim)
+    y2 = torch.randn(2, m.irreps_in2.dim)
 
-    x1 = rs.randn(20, Rs_in1)
-    x2 = rs.randn(20, Rs_in2)
+    z1 = m(x1 + x2, y1 + y2)
+    z2 = m(x1, y1 + y2) + m(x2, y1 + y2)
+    z3 = m(x1 + x2, y1) + m(x1 + x2, y2)
+    assert (z1 - z2).abs().max() < eps
+    assert (z1 - z3).abs().max() < eps
 
-    angles = o3.rand_angles()
+    # right
+    z1 = m(x1, y1)
+    z2 = torch.einsum('zi,zij->zj', x1, m.right(y1))
+    assert (z1 - z2).abs().max() < eps
 
-    z1 = tp(x1, x2) @ rs.rep(Rs_out, *angles).T
-    z2 = tp(x1 @ rs.rep(Rs_in1, *angles).T, x2 @ rs.rep(Rs_in2, *angles).T)
+    # variance
+    x1 = torch.randn(n, m.irreps_in1.dim)
+    y1 = torch.randn(n, m.irreps_in2.dim)
+    z1 = m(x1, y1).var(0)
+    assert z1.mean().log10().abs() < torch.tensor(tol).log10()
 
-    z1.sum().backward()
-
-    assert torch.allclose(z1, z2)
-
-
-def test_custom_weighted_tensor_product():
-    torch.set_default_dtype(torch.float64)
-
-    Rs_in1 = [(20, 1), (4, 2)]
-    Rs_in2 = [(10, 0), (10, 1), (4, 2)]
-    Rs_out = [(3, 0), (4, 1)]
-
-    instr = [
-        (0, 1, 0, 'uvw'),
-        (1, 2, 1, 'uuu'),
-        (0, 1, 1, 'uvw'),
-    ]
-
-    tp = CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr)
-
-    x1 = rs.randn(20, Rs_in1)
-    x2 = rs.randn(20, Rs_in2)
-
-    angles = o3.rand_angles()
-
-    z1 = tp(x1, x2) @ rs.rep(Rs_out, *angles).T
-    z2 = tp(x1 @ rs.rep(Rs_in1, *angles).T, x2 @ rs.rep(Rs_in2, *angles).T)
-
-    z1.sum().backward()
-
-    assert torch.allclose(z1, z2)
-
-
-def test_custom_weighted_tensor_product2():
-    torch.set_default_dtype(torch.float64)
-
-    Rs_in1 = [(2, l) for l in [0, 1, 2]]
-    Rs_in2 = [(3, l) for l in [0, 1, 2]]
-    Rs_out = [(2, l) for l in [0, 1, 2]]
-
-    instr = [
-        (i1, i2, i3, 'uvw')
-        for i1, (_, l1) in enumerate(Rs_in1)
-        for i2, (_, l2) in enumerate(Rs_in2)
-        for i3, (_, l3) in enumerate(Rs_out)
-        if abs(l1 - l2) <= l3 <= l1 + l2
-    ]
-
-    tp1 = CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr)
-    tp2 = CustomWeightedTensorProduct(Rs_in1, Rs_in2, Rs_out, instr, own_weight=False, _specialized_code=False)
-
-    x1 = rs.randn(2, Rs_in1)
-    x2 = rs.randn(2, Rs_in2)
-
-    assert torch.allclose(tp1(x1, x2), tp2(x1, x2, tp1.weight))
+    # equivariance
+    R = o3.rand_matrix()
+    x1 = torch.randn(2, m.irreps_in1.dim)
+    x2 = x1 @ m.irreps_in1.D_from_matrix(R, k=torch.tensor(1)).T
+    y1 = torch.randn(2, m.irreps_in2.dim)
+    y2 = y1 @ m.irreps_in2.D_from_matrix(R, k=torch.tensor(1)).T
+    z1 = m(x1, y1) @ m.irreps_out.D_from_matrix(R, k=torch.tensor(1)).T
+    z2 = m(x2, y2)
+    assert (z1 - z2).abs().max() < eps

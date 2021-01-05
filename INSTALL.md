@@ -1,63 +1,34 @@
-# Installation
+# Install
 
-If you don't need CUDA kernel acceleration, execute:
+## pytorch-geometric
+
+First you have to install pytorch-geometric, here are the commands for torch 1.7.0 and no cuda support:
+
+```
+TORCH=1.7.0
+CUDA=cpu
+pip install torch==$TORCH torchvision torchaudio -f https://download.pytorch.org/whl/cpu/torch_stable.html
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install torch-geometric
+```
+
+See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions, they are all compatible with e3nn-core.
+
+## e3nn-core
+
+For now the library is pure python, therefore the installation precedure is very simple:
+
 ```
 python setup.py install
 ```
 
-## How to compile the CUDA kernels
+or
 
-First you need to install `nvcc` and `conda`.
-
-### Create a new Python environment
 ```
-conda create -n e3nn python=3.8
+python setup.py develop
 ```
 
-To activate the environement execute
-```
-conda activate e3nn
-```
-
-### Install pytorch
-
-pytorch need to be compatible with you version of `nvcc`.
-Check your version of nvcc
-```
-nvcc --version
-```
-
-If like me you have `CUDA compilation tools, release 9.2, V9.2.148`, install pytorch with
-```
-pip install torch==1.5.0+cu92 torchvision==0.6.0+cu92 -f https://download.pytorch.org/whl/torch_stable.html
-```
-**The version of cuda needs to match between pytorch and nvcc!**
-
-Now we can check if CUDA works
-```
-python -c "import torch; print(torch.randn((), device='cuda'))"
-```
-
-### Compile the code
-
-Clone this repository
-```
-git clone git@github.com:e3nn/e3nn.git
-cd e3nn
-```
-
-Remove previous attempts and cache
-```
-rm -rf build dist e3nn.egg-info __pycache__
-rm -rf .cache/pip
-```
-
-Execute installation script
-```
-python setup_cuda.py install
-```
-
-Check compilation success
-```
-python -c "import torch; import e3nn.cuda_rsh"
-```
+We plan to incude (optional to build) home-made cuda kernels to accelerate the bottleneck operations.

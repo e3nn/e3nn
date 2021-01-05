@@ -3,12 +3,12 @@ Evaluate a python string as code
 """
 import importlib.machinery
 import importlib.util
-import tempfile
 import os
+import tempfile
 
 
 def eval_code(code):
-    """
+    r"""
     save code in a temporary file and import it as a module
     """
     new_file, filename = tempfile.mkstemp(text=True)
