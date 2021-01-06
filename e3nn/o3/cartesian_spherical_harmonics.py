@@ -24,6 +24,15 @@ def spherical_harmonics(l, xyz, normalization='integral', normalize=False):
 
     The value of the constant depends on the choice of normalization.
 
+    It obeys the following property:
+
+    .. math::
+        Y^{l+1}_i(x) &= \text{cste}(l) \; & C_{ijk} Y^l_j(x) x_k
+
+        \partial_k Y^{l+1}_i(x) &= \text{cste}(l) \; (l+1) & C_{ijk} Y^l_j(x)
+
+    Where :math:`C` are the `wigner_3j`.
+
     Parameters
     ----------
     l : int or list of int

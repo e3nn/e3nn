@@ -82,3 +82,35 @@ def test_parity():
         Y1 = (-1)**l * o3.spherical_harmonics(l, x)
         Y2 = o3.spherical_harmonics(l, -x)
         assert (Y1 - Y2).abs().max() < 1e-10
+
+
+def test_recurrence_relation():
+    for l in range(10):
+        x = torch.randn(3, requires_grad=True)
+
+        a = o3.spherical_harmonics(l + 1, x)
+
+        b = torch.einsum(
+            'ijk,j,k->i',
+            o3.wigner_3j(l + 1, l, 1),
+            o3.spherical_harmonics(l, x),
+            x[[1, 2, 0]]
+        )
+
+        alpha = b.norm() / a.norm()
+
+        assert (a / a.norm() - b / b.norm()).abs().max() < 1e-10
+
+
+        def f(x):
+            return o3.spherical_harmonics(l + 1, x)
+        a = torch.autograd.functional.jacobian(f, x)
+        a = a[:, [1, 2, 0]]
+
+        b = (l + 1) / alpha * torch.einsum(
+            'ijk,j->ik',
+            o3.wigner_3j(l + 1, l, 1),
+            o3.spherical_harmonics(l, x)
+        )
+
+        assert (a - b).abs().max() < 1e-10
