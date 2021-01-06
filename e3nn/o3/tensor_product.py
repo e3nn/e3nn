@@ -54,7 +54,7 @@ class TensorProduct(torch.nn.Module):
 
     Examples
     --------
-    Create a module that computes :math:`z_u = x_u \wedge y_u`
+    Create a module that computes elementwise the cross-product of 16 vectors with 16 vectors :math:`z_u = x_u \wedge y_u`
 
     >>> module = TensorProduct(
     ...     "16x1o", "16x1o", "16x1e",
@@ -63,7 +63,7 @@ class TensorProduct(torch.nn.Module):
     ...     ]
     ... )
 
-    Create a module that computes :math:`z_w = \sum_{u,v} w_{uvw} x_u \wedge y_v`
+    Now mix all 16 vectors with all 16 vectors to makes 16 pseudo-vectors :math:`z_w = \sum_{u,v} w_{uvw} x_u \wedge y_v`
 
     >>> module = TensorProduct(
     ...     [(16, (1, -1))],
@@ -488,8 +488,12 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         features_2 : `torch.Tensor`
             tensor of shape ``(..., irreps_in2.dim)``
 
-        weight : `torch.Tensor`, optional
+        weight : `torch.Tensor` or list of `torch.Tensor`, optional
             required if ``internal_weights`` is ``False``
+            tensor of shape ``(self.weight_numel,)`` if ``shared_weights`` is ``True``
+            tensor of shape ``(..., self.weight_numel)`` if ``shared_weights`` is ``False``
+            or list of tensors of shapes ``self.weight_shapes`` / ``(...) + self.weight_shapes``.
+            Use ``self.weight_infos`` to know what are the weights used for.
 
         Returns
         -------
@@ -522,8 +526,12 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         features_2 : `torch.Tensor`
             tensor of shape ``(..., irreps_in2.dim)``
 
-        weight : `torch.Tensor`, optional
+        weight : `torch.Tensor` or list of `torch.Tensor`, optional
             required if ``internal_weights`` is ``False``
+            tensor of shape ``(self.weight_numel,)`` if ``shared_weights`` is ``True``
+            tensor of shape ``(..., self.weight_numel)`` if ``shared_weights`` is ``False``
+            or list of tensors of shapes ``self.weight_shapes`` / ``(...) + self.weight_shapes``.
+            Use ``self.weight_infos`` to know what are the weights used for.
 
         Returns
         -------
