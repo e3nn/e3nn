@@ -21,10 +21,11 @@ It contains fundamental mathematical operations such as tensor products and sphe
 - [x] tests!
 - [x] s2grid
 - [x] partial tensor product
+- [x] batchnorm
 - [ ] s2/so3 activation
-- [ ] batchnorm
 - [ ] dropout
 - [ ] groupnorm
 - [ ] E(3) kernels
 - [ ] image convolution
 - [ ] cuda kernels!
+- [ ] io tensors

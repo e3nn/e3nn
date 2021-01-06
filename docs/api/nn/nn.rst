@@ -1,5 +1,5 @@
-nn Module
-=========
+nn
+==
 
 All functions in this module are accessible via ``nn`` submodule:
 
@@ -13,3 +13,4 @@ All functions in this module are accessible via ``nn`` submodule:
 .. toctree::
     nn_gate
     nn_fc
+    nn_bn

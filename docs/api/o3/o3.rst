@@ -1,5 +1,5 @@
-o3 Module
-=========
+o3
+==
 
 All functions in this module are accessible via ``o3`` submodule:
 
