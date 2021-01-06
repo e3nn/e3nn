@@ -1,9 +1,15 @@
-import math
 from math import sqrt
 
 import torch
 from e3nn import o3
 from e3nn.util import eval_code, broadcast_tensors
+
+
+def _prod(x):
+    out = 1
+    for a in x:
+        out *= a
+    return out
 
 
 class TensorProduct(torch.nn.Module):
@@ -417,7 +423,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
         # weights
         self.weight_shapes = wshapes
-        self.weight_numel = sum(math.prod(shape) for shape in self.weight_shapes)
+        self.weight_numel = sum(_prod(shape) for shape in self.weight_shapes)
         self.weight_infos = [
             (i_1, i_2, i_out, mode, path_weight, shape)
             for (i_1, i_2, i_out, mode, path_weight), shape in zip(
@@ -456,7 +462,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                 ws = []
                 i = 0
                 for shape in self.weight_shapes:
-                    d = math.prod(shape)
+                    d = _prod(shape)
                     if not self.shared_weights:
                         ws += [weight[..., i:i+d].reshape((-1,) + shape)]
                     else:
@@ -493,7 +499,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         with torch.autograd.profiler.record_function(repr(self)):
             size = features_2.shape[:-1]
             assert features_2.shape[-1] == self.irreps_in2.dim, f"{features_2.shape} is not (..., {self.irreps_in2.dim})"
-            features_2 = features_2.reshape(math.prod(size), self.irreps_in2.dim)
+            features_2 = features_2.reshape(_prod(size), self.irreps_in2.dim)
 
             if features_2.shape[0] == 0:
                 return torch.zeros(*size, self.irreps_in1.dim, self.irreps_out.dim)
@@ -529,8 +535,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             size = features_1.shape[:-1]
             assert features_1.shape[-1] == self.irreps_in1.dim, f"{features_1.shape} is not (..., {self.irreps_in1.dim})"
             assert features_2.shape[-1] == self.irreps_in2.dim, f"{features_2.shape} is not (..., {self.irreps_in2.dim})"
-            features_1 = features_1.reshape(math.prod(size), self.irreps_in1.dim)
-            features_2 = features_2.reshape(math.prod(size), self.irreps_in2.dim)
+            features_1 = features_1.reshape(_prod(size), self.irreps_in1.dim)
+            features_2 = features_2.reshape(_prod(size), self.irreps_in2.dim)
 
             if features_1.shape[0] == 0:
                 return torch.zeros(*size, self.irreps_out.dim)
