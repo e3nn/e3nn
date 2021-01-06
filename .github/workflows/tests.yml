@@ -1,21 +1,28 @@
-name: Python package
+name: Check Syntax and Run Tests
 
 on:
   push:
     branches:
-    - master
+    - main
+
+  pull_request:
+    branches:
+    - main
 
 jobs:
   build:
 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v1
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
       with:
-        python-version: 3.8
+        python-version: ${{ matrix.python-version }}
     - name: Lint with flake8
       run: |
         pip install flake8
@@ -40,5 +47,5 @@ jobs:
       run: |
         pip install pytest pytest-cov
         pip install coveralls
-        coverage run --source=e3nn -m pytest tests/
+        coverage run --source=e3nn_core -m pytest --doctest-modules .
         COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls

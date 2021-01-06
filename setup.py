@@ -51,7 +51,7 @@ setup(
         "Operating System :: POSIX",
         "Operating System :: MacOS",
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.6',
     license="MIT",
     license_files="LICENSE",
 )
