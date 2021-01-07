@@ -1,6 +1,7 @@
 import math
 from functools import partial
 
+import pytest
 import torch
 from e3nn import o3
 
@@ -40,17 +41,18 @@ def test_backwardable():
     assert torch.autograd.gradcheck(partial(o3.spherical_harmonics, ls), (xyz,), check_undefined_grad=False)
 
 
-def test_normalization():
+@pytest.mark.parametrize('l', range(10 + 1))
+def test_normalization(l):
     torch.set_default_dtype(torch.float64)
-    for l in range(10 + 1):
-        n = o3.spherical_harmonics([l], torch.randn(3), 'integral', normalize=True).pow(2).mean()
-        assert abs(n - 1 / (4 * math.pi)) < 1e-10
 
-        n = o3.spherical_harmonics([l], torch.randn(3), 'norm', normalize=True).norm()
-        assert abs(n - 1) < 1e-10
+    n = o3.spherical_harmonics(l, torch.randn(3), 'integral', normalize=True).pow(2).mean()
+    assert abs(n - 1 / (4 * math.pi)) < 1e-10
 
-        n = o3.spherical_harmonics([l], torch.randn(3), 'component', normalize=True).pow(2).mean()
-        assert abs(n - 1) < 1e-10
+    n = o3.spherical_harmonics(l, torch.randn(3), 'norm', normalize=True).norm()
+    assert abs(n - 1) < 1e-10
+
+    n = o3.spherical_harmonics(l, torch.randn(3), 'component', normalize=True).pow(2).mean()
+    assert abs(n - 1) < 1e-10
 
 
 def test_closure():
@@ -72,45 +74,47 @@ def test_closure():
                 assert m.abs().max() < 0.01
 
 
-def test_parity():
+@pytest.mark.parametrize('l', range(11 + 1))
+def test_parity(l):
     r"""
     (-1)^l Y(x) = Y(-x)
     """
     torch.set_default_dtype(torch.float64)
-    for l in range(11 + 1):
-        x = torch.randn(3)
-        Y1 = (-1)**l * o3.spherical_harmonics(l, x)
-        Y2 = o3.spherical_harmonics(l, -x)
-        assert (Y1 - Y2).abs().max() < 1e-10
+    x = torch.randn(3)
+    Y1 = (-1)**l * o3.spherical_harmonics(l, x)
+    Y2 = o3.spherical_harmonics(l, -x)
+    assert (Y1 - Y2).abs().max() < 1e-10
 
 
-def test_recurrence_relation():
-    for l in range(10):
-        x = torch.randn(3, requires_grad=True)
+@pytest.mark.parametrize('l', range(9 + 1))
+def test_recurrence_relation(l):
+    torch.set_default_dtype(torch.float64)
 
-        a = o3.spherical_harmonics(l + 1, x)
+    x = torch.randn(3, requires_grad=True)
 
-        b = torch.einsum(
-            'ijk,j,k->i',
-            o3.wigner_3j(l + 1, l, 1),
-            o3.spherical_harmonics(l, x),
-            x[[1, 2, 0]]
-        )
+    a = o3.spherical_harmonics(l + 1, x)
 
-        alpha = b.norm() / a.norm()
+    b = torch.einsum(
+        'ijk,j,k->i',
+        o3.wigner_3j(l + 1, l, 1),
+        o3.spherical_harmonics(l, x),
+        x[[1, 2, 0]]
+    )
 
-        assert (a / a.norm() - b / b.norm()).abs().max() < 1e-10
+    alpha = b.norm() / a.norm()
+
+    assert (a / a.norm() - b / b.norm()).abs().max() < 1e-9
 
 
-        def f(x):
-            return o3.spherical_harmonics(l + 1, x)
-        a = torch.autograd.functional.jacobian(f, x)
-        a = a[:, [1, 2, 0]]
+    def f(x):
+        return o3.spherical_harmonics(l + 1, x)
+    a = torch.autograd.functional.jacobian(f, x)
+    a = a[:, [1, 2, 0]]
 
-        b = (l + 1) / alpha * torch.einsum(
-            'ijk,j->ik',
-            o3.wigner_3j(l + 1, l, 1),
-            o3.spherical_harmonics(l, x)
-        )
+    b = (l + 1) / alpha * torch.einsum(
+        'ijk,j->ik',
+        o3.wigner_3j(l + 1, l, 1),
+        o3.spherical_harmonics(l, x)
+    )
 
-        assert (a - b).abs().max() < 1e-10
+    assert (a - b).abs().max() < 1e-9

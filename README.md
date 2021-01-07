@@ -22,7 +22,8 @@ It contains fundamental mathematical operations such as tensor products and sphe
 - [x] s2grid
 - [x] partial tensor product
 - [x] batchnorm
-- [ ] s2/so3 activation
+- [x] s2 activation
+- [ ] so3 activation
 - [ ] dropout
 - [ ] groupnorm
 - [ ] E(3) kernels

@@ -265,6 +265,88 @@ class Irreps(tuple):
         """
         return Irreps([(1, l, (-1)**l) for l in range(lmax + 1)])
 
+    @staticmethod
+    def s2signal(lmax, p_val, p_arg):
+        r"""representation of a signal on the sphere
+
+        .. math::
+            f(x) = \sum_{l=0}^{l_\mathrm{max}} A^l \cdot Y^l(x)
+
+            (P f)(x) = p_v f(p_a x)
+
+            (P f)(x) = \sum_{l=0}^{l_\mathrm{max}} p_v p_a^l A^l \cdot Y^l(x)
+
+        Parameters
+        ----------
+        lmax : int
+            :math:`l_\mathrm{max}`
+
+        p_val : {+1, -1}
+            :math:`p_v`
+
+        p_arg : {+1, -1}
+            :math:`p_a`
+
+        Returns
+        -------
+        `Irreps`
+            representation of :math:`\{A^l\}_l`
+
+        Examples
+        --------
+
+        >>> Irreps.s2signal(3, 1, 1)
+        0e+1e+2e+3e
+
+        >>> Irreps.s2signal(3, 1, -1)
+        0e+1o+2e+3o
+        """
+        return Irreps([(1, l, p_val * p_arg**l) for l in range(lmax + 1)])
+
+    def randn(self, *size, normalization='component', dtype=None, device=None, requires_grad=False):
+        """random tensor
+
+        Parameters
+        ----------
+        *size : list of int
+            size of the output tensor, needs to contains a ``-1``
+
+        normalization : {'component', 'norm'}
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``size`` where ``-1`` is replaced by ``self.dim``
+
+        Examples
+        --------
+
+        >>> Irreps("5x0e + 10x1o").randn(5, -1, 5, normalization='norm').shape
+        torch.Size([5, 35, 5])
+
+        >>> Irreps("2o").randn(2, -1, 3, normalization='norm').norm(dim=1).sub(1).abs().max().item() < 1e-5
+        True
+        """
+        di = size.index(-1)
+        lsize = size[:di]
+        rsize = size[di + 1:]
+
+        if normalization == 'component':
+            return torch.randn(*lsize, self.dim, *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
+
+        if normalization == 'norm':
+            x = torch.zeros(*lsize, self.dim, *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
+            with torch.no_grad():
+                start = 0
+                for mul, ir in self:
+                    r = torch.randn(*lsize, mul, ir.dim, *rsize)
+                    r.div_(r.norm(2, dim=di + 1, keepdim=True))
+                    x.narrow(di, start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
+                    start += mul * ir.dim
+            return x
+
+        assert False, "normalization needs to be 'norm' or 'component'"
+
     def __getitem__(self, i):
         x = super().__getitem__(i)
         if isinstance(i, slice):
@@ -317,11 +399,11 @@ class Irreps(tuple):
         return Irreps(out)
 
     @property
-    def dim(self):
+    def dim(self) -> int:
         return sum(mul * ir.dim for mul, ir in self)
 
     @property
-    def num_irreps(self):
+    def num_irreps(self) -> int:
         return sum(mul for mul, _ in self)
 
     @property
@@ -329,7 +411,7 @@ class Irreps(tuple):
         return [l for mul, (l, p) in self for _ in range(mul)]
 
     @property
-    def lmax(self):
+    def lmax(self) -> int:
         return max(self.ls)
 
     def __repr__(self):
