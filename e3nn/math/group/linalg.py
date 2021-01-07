@@ -1,9 +1,11 @@
+import warnings
+
 import torch
-from e3nn.math.group import LieGroup
 from e3nn.math import complete_basis, direct_sum, kron
+from e3nn.math.group import Group
 
 
-def intertwiners(group: LieGroup, D1, D2, eps=1e-9):
+def intertwiners(group: Group, D1, D2, eps=1e-9):
     r"""
     Compute a basis of the vector space of matrices A such that
     D1(g) A = A D2(g) for all g in O(3)
@@ -12,7 +14,10 @@ def intertwiners(group: LieGroup, D1, D2, eps=1e-9):
     I1 = D1(e)
     I2 = D2(e)
 
-    # picking 20 random rotations seems good enough
+    if I1.dtype in [torch.float16, torch.float32]:
+        warnings.warn("Warning: intertwiners: you should use torch.float64")
+
+    # picking 20 random rotations seems good enough, no idea for the finite groups
     rr = [group.random() for i in range(20)]
     xs = [kron(D1(g), I2) - kron(I1, D2(g).T) for g in rr]
     xtx = sum(x.T @ x for x in xs)
@@ -36,7 +41,7 @@ def intertwiners(group: LieGroup, D1, D2, eps=1e-9):
     return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
 
 
-def has_rep_in_rep(group: LieGroup, D, D_small, eps=1e-9):
+def has_rep_in_rep(group: Group, D, D_small, eps=1e-9):
     r"""computes if a representation appears in another one
     Given a "big" representation and a "small" representation
     computes how many times the small appears in the big one and return:

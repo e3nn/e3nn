@@ -1,6 +1,9 @@
 from typing import Tuple, Set
 import random
 import math
+import torch
+from e3nn.math import complete_basis
+
 
 TY_PERM = Tuple[int]
 
@@ -100,3 +103,49 @@ def is_group(g: Set[TY_PERM]) -> bool:
                 return False
 
     return True
+
+
+def to_cycles(p: TY_PERM) -> Set[Tuple[int]]:
+    n = len(p)
+
+    cycles = set()
+
+    for i in range(n):
+        c = [i]
+        while p[i] != c[0]:
+            i = p[i]
+            c += [i]
+        if len(c) >= 2:
+            i = c.index(min(c))
+            c = c[i:] + c[:i]
+            cycles.add(tuple(c))
+
+    return cycles
+
+
+def sign(p: TY_PERM) -> int:
+    s = 1
+    for c in to_cycles(p):
+        if len(c) % 2 == 0:
+            s = -s
+    return s
+
+
+def standard_representation(p: TY_PERM) -> torch.Tensor:
+    r"""irrep of Sn of dimension n - 1
+    """
+    A = complete_basis(torch.ones(1, len(p)))
+    return A @ natural_representation(p) @ A.T
+
+
+def natural_representation(p: TY_PERM) -> torch.Tensor:
+    r"""natural representation of Sn
+    """
+    n = len(p)
+    ip = inverse(p)
+    d = torch.zeros(n, n)
+
+    for a in range(n):
+        d[a, ip[a]] = 1
+
+    return d

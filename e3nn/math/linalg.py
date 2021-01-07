@@ -99,7 +99,7 @@ def complete_basis(
     assert vecs.dim() == 2
     dim = vecs.shape[1]
 
-    base = [x for x in vecs]
+    base = [x / x.norm() for x in vecs]
 
     expand = []
     for x in torch.eye(dim, device=vecs.device, dtype=vecs.dtype):

@@ -4,9 +4,10 @@ from abc import ABC, abstractmethod
 
 import torch
 from e3nn import o3
+from e3nn.math import perm
 
 
-class LieGroup(ABC):  # pragma: no cover
+class Group(ABC):  # pragma: no cover
     @abstractmethod
     def irrep_indices(self):
         while False:
@@ -35,9 +36,68 @@ class LieGroup(ABC):  # pragma: no cover
     def inverse(self, g):
         return NotImplemented
 
+
+class FiniteGroup(Group):  # pragma: no cover
+    @abstractmethod
+    def elements(self):
+        while False:
+            yield None
+
+    @abstractmethod
+    def order(self) -> int:
+        return NotImplemented
+
+
+class LieGroup(Group):  # pragma: no cover
     @abstractmethod
     def haar(self, g):
         return NotImplemented
+
+
+class Sn(FiniteGroup):
+    def __init__(self, n):
+        super().__init__()
+        self.n = n
+
+    def irrep_indices(self):
+        # many are missing https://en.wikipedia.org/wiki/Representation_theory_of_the_symmetric_group
+        for ir in ['trivial', 'sign', 'standard', 'sign standard']:
+            yield ir
+
+    def irrep(self, ir):
+        if ir == 'trivial':
+            def rep(p):
+                return torch.ones(1, 1)
+            return rep
+        if ir == 'sign':
+            def rep(p):
+                return perm.sign(p) * torch.ones(1, 1)
+            return rep
+        if ir == 'standard':
+            return perm.standard_representation
+        if ir == 'sign standard':
+            def rep(p):
+                return perm.sign(p) * perm.standard_representation(p)
+            return rep
+
+    def compose(self, p1, p2):
+        return perm.compose(p1, p2)
+
+    def random(self):
+        return perm.rand(self.n)
+
+    def identity(self):
+        return perm.identity(self.n)
+
+    def inverse(self, p):
+        return perm.inverse(p)
+
+    def elements(self):
+        for i in range(self.order()):
+            yield perm.from_int(i, self.n)
+
+    def order(self):
+        return math.factorial(self.n)
 
 
 class SO3(LieGroup):
