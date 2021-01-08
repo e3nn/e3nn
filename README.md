@@ -11,6 +11,7 @@
 ## Intro
 
 [![Coverage Status](https://coveralls.io/repos/github/e3nn/e3nn/badge.svg?branch=master)](https://coveralls.io/github/e3nn/e3nn?branch=master)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](code_of_conduct.md)
 
 E(3) is the [Euclidean group](https://en.wikipedia.org/wiki/Euclidean_group) in dimension 3. That is the group of rotations, translations and mirror.
 `e3nn` is a [pytorch](https://pytorch.org) library that aims to create **E**(**3**) equivariant **n**eural **n**etworks.
