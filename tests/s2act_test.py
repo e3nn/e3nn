@@ -21,4 +21,4 @@ def test_equivariance(act, normalization, p_val, p_arg):
     y1 = m(x) @ m.irreps_out.D_from_angles(a, b, c, torch.tensor(1)).T
     y2 = m(x @ m.irreps_in.D_from_angles(a, b, c, torch.tensor(1)).T)
 
-    assert (y1 - y2).abs().max() < 1e-6
+    assert (y1 - y2).abs().max() < 1e-5
