@@ -14,11 +14,11 @@ class Group(ABC):  # pragma: no cover
             yield None
 
     @abstractmethod
-    def irrep(self, r):
+    def rep(self, r):
         return NotImplemented
 
-    def irrep_dim(self, r):
-        return self.irrep(r)(self.identity()).shape[0]
+    def rep_dim(self, r):
+        return self.rep(r)(self.identity()).shape[0]
 
     @abstractmethod
     def compose(self, g1, g2):
@@ -64,20 +64,26 @@ class Sn(FiniteGroup):
         for ir in ['trivial', 'sign', 'standard', 'sign standard']:
             yield ir
 
-    def irrep(self, ir):
-        if ir == 'trivial':
+    def rep(self, r):
+        if r == 'trivial':
             def rep(p):
                 return torch.ones(1, 1)
             return rep
-        if ir == 'sign':
+        if r == 'sign':
             def rep(p):
                 return perm.sign(p) * torch.ones(1, 1)
             return rep
-        if ir == 'standard':
+        if r == 'standard':
             return perm.standard_representation
-        if ir == 'sign standard':
+        if r == 'sign standard':
             def rep(p):
                 return perm.sign(p) * perm.standard_representation(p)
+            return rep
+        if r == 'natural':
+            return perm.natural_representation
+        if r == 'sign natural':
+            def rep(p):
+                return perm.sign(p) * perm.natural_representation(p)
             return rep
 
     def compose(self, p1, p2):
@@ -105,10 +111,10 @@ class SO3(LieGroup):
         for l in itertools.count():
             yield l
 
-    def irrep(self, l):
+    def rep(self, l):
         return o3.Irrep(l, 1).D_from_quaternion
 
-    def irrep_dim(self, l):
+    def rep_dim(self, l):
         return 2 * l + 1
 
     def compose(self, q1, q2):
@@ -134,13 +140,13 @@ class O3(LieGroup):
             yield o3.Irrep(l, (-1)**l)
             yield o3.Irrep(l, -(-1)**l)
 
-    def irrep(self, r):
+    def rep(self, r):
         def rep(g):
             q, p = g
             return r.D_from_quaternion(q, p)
         return rep
 
-    def irrep_dim(self, r):
+    def rep_dim(self, r):
         return r.dim
 
     def compose(self, g1, g2):

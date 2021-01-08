@@ -38,7 +38,9 @@ def intertwiners(group: Group, D1, D2, eps=1e-9):
             solutions.append((d.norm(), A))
     solutions = [A for _, A in sorted(solutions, key=lambda x: x[0])]
 
-    return torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
+    solutions = torch.stack(solutions) if len(solutions) > 0 else torch.zeros(0, I1.shape[0], I2.shape[0])
+    solutions = torch.qr(solutions.flatten(1)).R
+    return solutions.reshape(len(solutions), I1.shape[0], I2.shape[0])
 
 
 def has_rep_in_rep(group: Group, D, D_small, eps=1e-9):

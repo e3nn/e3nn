@@ -116,20 +116,20 @@ def reduce_tensor(group: Group, formula, eps=1e-9, **kw_representations):
         irreps = []
         A = Q.clone()
         for ir in group.irrep_indices():
-            if group.irrep(ir)(ide).shape[0] > d_sym - sum(mul * group.irrep_dim(ir) for mul, ir in irreps):
+            if group.rep(ir)(ide).shape[0] > d_sym - sum(mul * group.rep_dim(ir) for mul, ir in irreps):
                 break
 
-            mul, B, representation = has_rep_in_rep(group, representation, group.irrep(ir), eps)
+            mul, B, representation = has_rep_in_rep(group, representation, group.rep(ir), eps)
             A = direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
             A = _round_sqrt(A, eps)
 
             if mul > 0:
                 irreps += [(mul, ir)]
 
-            if sum(mul * group.irrep_dim(ir) for mul, ir in irreps) == d_sym:
+            if sum(mul * group.rep_dim(ir) for mul, ir in irreps) == d_sym:
                 break
 
-        if sum(mul * group.irrep_dim(ir) for mul, ir in irreps) != d_sym:
+        if sum(mul * group.rep_dim(ir) for mul, ir in irreps) != d_sym:
             raise RuntimeError(f'unable to decompose into irreducible representations')
 
         A = A.reshape(len(A), *[dims[i] for i in f0])
