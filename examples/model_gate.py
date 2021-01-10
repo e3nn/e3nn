@@ -33,7 +33,7 @@ class Convolution(torch.nn.Module):
         for i, (mul, ir_in) in enumerate(self.irreps_in):
             for j, (_, ir_edge) in enumerate(self.irreps_edge):
                 for ir_out in ir_in * ir_edge:
-                    if ir_out in irreps_out:
+                    if ir_out in self.irreps_out:
                         k = len(irreps_mid)
                         irreps_mid.append((mul, ir_out))
                         instructions.append((i, j, k, 'uvu', True))
@@ -49,7 +49,7 @@ class Convolution(torch.nn.Module):
         self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.relu, 1 / number_of_basis)
         self.tp = tp
 
-        self.lin2 = Linear(irreps_mid, irreps_out)
+        self.lin2 = Linear(irreps_mid, self.irreps_out)
 
     def forward(self, x, edge_src, edge_dst, edge_attr, edge_length_embedded) -> torch.Tensor:
         weight = self.fc(edge_length_embedded)
