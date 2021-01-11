@@ -12,26 +12,37 @@ from torch_scatter import scatter
 
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
-from e3nn.o3 import Linear, TensorProduct
+from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
 from e3nn.math import gaussian_basis_projection
 
 
 class Convolution(torch.nn.Module):
-    def __init__(self, irreps_in, irreps_edge, irreps_out, number_of_basis, radial_layers, radial_neurons, num_neighbors) -> None:
+    def __init__(
+            self,
+            irreps_in,
+            irreps_node_attr,
+            irreps_edge_attr,
+            irreps_out,
+            number_of_basis,
+            radial_layers,
+            radial_neurons,
+            num_neighbors
+        ) -> None:
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
-        self.irreps_edge = o3.Irreps(irreps_edge)
+        self.irreps_node_attr = o3.Irreps(irreps_node_attr)
+        self.irreps_edge_attr = o3.Irreps(irreps_edge_attr)
         self.irreps_out = o3.Irreps(irreps_out)
         self.num_neighbors = num_neighbors
 
-        self.si = Linear(self.irreps_in, self.irreps_out)
+        self.si = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_out)
 
-        self.lin1 = Linear(self.irreps_in, self.irreps_in)
+        self.lin1 = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_in)
 
         irreps_mid = []
         instructions = []
         for i, (mul, ir_in) in enumerate(self.irreps_in):
-            for j, (_, ir_edge) in enumerate(self.irreps_edge):
+            for j, (_, ir_edge) in enumerate(self.irreps_edge_attr):
                 for ir_out in ir_in * ir_edge:
                     if ir_out in self.irreps_out:
                         k = len(irreps_mid)
@@ -41,7 +52,7 @@ class Convolution(torch.nn.Module):
 
         tp = TensorProduct(
             self.irreps_in,
-            self.irreps_edge,
+            self.irreps_edge_attr,
             irreps_mid,
             instructions,
             shared_weights=False,
@@ -49,18 +60,20 @@ class Convolution(torch.nn.Module):
         self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.relu, 1 / number_of_basis)
         self.tp = tp
 
-        self.lin2 = Linear(irreps_mid, self.irreps_out)
+        self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_out)
 
-    def forward(self, x, edge_src, edge_dst, edge_attr, edge_length_embedded) -> torch.Tensor:
+    def forward(self, node_input, node_attr, edge_src, edge_dst, edge_attr, edge_length_embedded) -> torch.Tensor:
         weight = self.fc(edge_length_embedded)
 
-        si = self.si(x)
-        x = self.lin1(x)
+        x = node_input
+
+        si = self.si(x, node_attr)
+        x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
         x = scatter(edge_features, edge_dst, dim=0, dim_size=len(x)).div(self.num_neighbors**0.5)
 
-        x = self.lin2(x)
+        x = self.lin2(x, node_attr)
         return si + 0.5 * x
 
 
@@ -99,6 +112,7 @@ class Network(torch.nn.Module):
     def __init__(
             self,
             irreps_in,
+            irreps_node_attr,
             irreps_out,
             irreps_hidden,
             irreps_sh,
@@ -117,6 +131,7 @@ class Network(torch.nn.Module):
         self.num_nodes = num_nodes
 
         self.irreps_in = o3.Irreps(irreps_in)
+        self.irreps_node_attr = o3.Irreps(irreps_node_attr)
         self.irreps_out = o3.Irreps(irreps_out)
         self.irreps_hidden = o3.Irreps(irreps_hidden)
         self.irreps_sh = o3.Irreps(irreps_sh)
@@ -145,25 +160,71 @@ class Network(torch.nn.Module):
                 irreps_gates, [act_gates[ir.p] for _, ir in irreps_gates],  # gates (scalars)
                 irreps_nonscalars  # non-scalars
             )
-            conv = Convolution(irreps, self.irreps_sh, gate.irreps_in, number_of_basis, radial_layers, radial_neurons, num_neighbors)
+            conv = Convolution(
+                irreps,
+                self.irreps_node_attr,
+                self.irreps_sh,
+                gate.irreps_in,
+                number_of_basis,
+                radial_layers,
+                radial_neurons,
+                num_neighbors
+            )
             irreps = gate.irreps_out
             self.layers.append(Compose(conv, gate))
 
-        self.layers.append(Convolution(irreps, self.irreps_sh, self.irreps_out, number_of_basis, radial_layers, radial_neurons, num_neighbors))
+        self.layers.append(
+            Convolution(
+                irreps,
+                self.irreps_node_attr,
+                self.irreps_sh,
+                self.irreps_out,
+                number_of_basis,
+                radial_layers,
+                radial_neurons,
+                num_neighbors
+            )
+        )
 
     def forward(self, data) -> torch.Tensor:
-        edge_src, edge_dst = radius_graph(data.pos, self.max_radius, data.batch)
+        """evaluate the network
+
+        Parameters
+        ----------
+        data : `torch_geometric.data.Data`
+            data object containing
+            - ``pos`` the position of the nodes (atoms)
+            - ``x`` the input features of the nodes, optional
+            - ``z`` the attributes of the nodes, for instance the atom type, optional
+            - ``batch`` the graph to which the node belong, optional
+        """
+        if hasattr(data, 'batch'):
+            batch = data.batch
+        else:
+            batch = None
+
+        edge_src, edge_dst = radius_graph(data.pos, self.max_radius, batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component', normalize=True)
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = gaussian_basis_projection(edge_length, 0.0, self.max_radius, self.number_of_basis)
         edge_attr = smooth_transition(edge_length / self.max_radius)[:, None] * edge_sh
 
-        x = data.x
-        for lay in self.layers:
-            x = lay(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
+        if hasattr(data, 'x'):
+            x = data.x
+        else:
+            x = scatter(edge_attr, edge_dst, dim=0, dim_size=len(data.pos)).div(self.num_neighbors**0.5)
 
-        return scatter(x, data.batch, dim=0).div(self.num_nodes**0.5)
+        if hasattr(data, 'z'):
+            z = data.z
+        else:
+            assert self.irreps_node_attr.lmax == 0
+            z = x.new_ones(len(x), self.irreps_node_attr.dim)
+
+        for lay in self.layers:
+            x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
+
+        return scatter(x, batch, dim=0).div(self.num_nodes**0.5)
 
 
 def test():
@@ -171,14 +232,23 @@ def test():
 
     num_nodes = 5
     irreps_in = o3.Irreps("3x0e + 2x1o")
+    irreps_attr = o3.Irreps("1x0e")
 
-    dataset = [Data(pos=torch.randn(num_nodes, 3), x=torch.randn(num_nodes, irreps_in.dim)) for _ in range(10)]
+    dataset = [
+        Data(
+            pos=torch.randn(num_nodes, 3),
+            x=irreps_in.randn(num_nodes, -1),
+            z=irreps_attr.randn(num_nodes, -1)
+        )
+        for _ in range(10)
+    ]
     data = next(iter(DataLoader(dataset, batch_size=len(dataset))))
 
     irreps_out = o3.Irreps("2x0o + 2x1o + 2x2e")
 
     f = Network(
         irreps_in,
+        irreps_attr,
         irreps_out,
         o3.Irreps("5x0e + 5x0o + 5x1e + 5x1o"),
         o3.Irreps.spherical_harmonics(3),
@@ -193,8 +263,9 @@ def test():
 
     R = o3.rand_matrix()
     D_in = irreps_in.D_from_matrix(R)
+    D_attr = irreps_attr.D_from_matrix(R)
     D_out = irreps_out.D_from_matrix(R)
-    rotated_data = Data(pos=data.pos @ R.T, x=data.x @ D_in.T, batch=data.batch)
+    rotated_data = Data(pos=data.pos @ R.T, x=data.x @ D_in.T, z=data.z @ D_attr.T, batch=data.batch)
 
     pred = f(data)
     rotated_pred = f(rotated_data)
