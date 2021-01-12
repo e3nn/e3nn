@@ -94,7 +94,7 @@ If you want to get involved in and contribute to the development, improvement, a
 Our community abides by the [Contributor Covenant Code of Conduct](code_of_conduct.md).
 
 ## Citing
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
+[![DOI](https://zenodo.org/badge/237431920.svg)](https://zenodo.org/badge/latestdoi/237431920)
 
 ```
 @software{e3nn_2020_4071988,
