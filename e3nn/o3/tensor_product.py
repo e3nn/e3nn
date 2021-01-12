@@ -633,8 +633,8 @@ class ElementwiseTensorProduct(TensorProduct):
     irreps_in2 : `Irreps`
         representation of the second input
 
-    irreps_out : `Irreps`
-        representation of the output
+    irreps_out : iterator of `Irrep`, optional
+        representations of the output
 
     normalization : {'component', 'norm'}
         see `TensorProduct`
@@ -643,11 +643,14 @@ class ElementwiseTensorProduct(TensorProduct):
             self,
             irreps_in1,
             irreps_in2,
+            irreps_out=None,
             normalization='component',
         ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
+        if irreps_out is not None:
+            irreps_out = [o3.Irrep(ir) for ir in irreps_out]
 
         assert irreps_in1.num_irreps == irreps_in2.num_irreps
 
@@ -668,18 +671,22 @@ class ElementwiseTensorProduct(TensorProduct):
                 irreps_in1.insert(i + 1, (mul_1 - mul_2, ir_1))
             i += 1
 
-        irreps_out = []
+        out = []
         instr = []
         for i, ((mul, ir_1), (mul_2, ir_2)) in enumerate(zip(irreps_in1, irreps_in2)):
             assert mul == mul_2
             for ir in ir_1 * ir_2:
-                i_out = len(irreps_out)
-                irreps_out.append((mul, ir))
+
+                if irreps_out is not None and ir not in irreps_out:
+                    continue
+
+                i_out = len(out)
+                out.append((mul, ir))
                 instr += [
                     (i, i, i_out, 'uuu', False)
                 ]
 
-        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, normalization, internal_weights=False)
+        super().__init__(irreps_in1, irreps_in2, out, instr, normalization, internal_weights=False)
 
 
 class Linear(TensorProduct):
