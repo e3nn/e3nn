@@ -43,6 +43,8 @@ jobs:
         pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
         pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
         pip install .
+
+        pip install plotly
     - name: Test with pytest
       run: |
         pip install pytest pytest-cov

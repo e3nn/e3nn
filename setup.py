@@ -35,6 +35,7 @@ setup(
     packages=find_packages(exclude=["tests.*", "tests"]),
     install_requires=[
         'sympy',
+        'scipy',   # only for SphericalTensor.find_peaks
         'torch>=1.4.0',
         'torch_geometric',
     ],

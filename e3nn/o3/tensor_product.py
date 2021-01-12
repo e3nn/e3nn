@@ -656,34 +656,30 @@ class ElementwiseTensorProduct(TensorProduct):
 
         i = 0
         while i < len(irreps_in1):
-            mul_1, (l_1, p_1) = irreps_in1[i]
-            mul_2, (l_2, p_2) = irreps_in2[i]
+            mul_1, ir_1 = irreps_in1[i]
+            mul_2, ir_2 = irreps_in2[i]
 
             if mul_1 < mul_2:
-                irreps_in2[i] = (mul_1, (l_2, p_2))
-                irreps_in2.insert(i + 1, (mul_2 - mul_1, (l_2, p_2)))
+                irreps_in2[i] = (mul_1, ir_2)
+                irreps_in2.insert(i + 1, (mul_2 - mul_1, ir_2))
 
             if mul_2 < mul_1:
-                irreps_in1[i] = (mul_2, (l_1, p_1))
-                irreps_in1.insert(i + 1, (mul_1 - mul_2, (l_1, p_1)))
+                irreps_in1[i] = (mul_2, ir_1)
+                irreps_in1.insert(i + 1, (mul_1 - mul_2, ir_1))
             i += 1
 
         irreps_out = []
         instr = []
-        for i, ((mul, (l_1, p_1)), (mul_2, (l_2, p_2))) in enumerate(zip(irreps_in1, irreps_in2)):
+        for i, ((mul, ir_1), (mul_2, ir_2)) in enumerate(zip(irreps_in1, irreps_in2)):
             assert mul == mul_2
-            for l in list(range(abs(l_1 - l_2), l_1 + l_2 + 1)):
+            for ir in ir_1 * ir_2:
                 i_out = len(irreps_out)
-                irreps_out.append((mul, (l, p_1 * p_2)))
+                irreps_out.append((mul, ir))
                 instr += [
-                    (i, i, i_out, 'uuu', False, 1.0)
+                    (i, i, i_out, 'uuu', False)
                 ]
 
-        in1 = [(mul, ir, 1.0) for mul, ir in irreps_in1]
-        in2 = [(mul, ir, 1.0) for mul, ir in irreps_in2]
-        out = [(mul, ir, 1.0) for mul, ir in irreps_out]
-
-        super().__init__(in1, in2, out, instr, normalization, internal_weights=False)
+        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, normalization, internal_weights=False)
 
 
 class Linear(TensorProduct):
@@ -723,14 +719,12 @@ class Linear(TensorProduct):
 
         instr = [
             (i_in, 0, i_out, 'uvw', True, 1.0)
-            for i_in, (_, (l_in, p_in)) in enumerate(irreps_in)
-            for i_out, (_, (l_out, p_out)) in enumerate(irreps_out)
-            if l_in == l_out and p_in == p_out
+            for i_in, (_, ir_in) in enumerate(irreps_in)
+            for i_out, (_, ir_out) in enumerate(irreps_out)
+            if ir_in == ir_out
         ]
-        in1 = [(mul, ir, 1.0) for mul, ir in irreps_in]
-        out = [(mul, ir, 1.0) for mul, ir in irreps_out]
 
-        super().__init__(in1, [(1, (0, 1), 1.0)], out, instr, internal_weights=internal_weights, shared_weights=shared_weights)
+        super().__init__(irreps_in, "0e", irreps_out, instr, internal_weights=internal_weights, shared_weights=shared_weights)
 
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out

@@ -265,44 +265,6 @@ class Irreps(tuple):
         """
         return Irreps([(1, l, (-1)**l) for l in range(lmax + 1)])
 
-    @staticmethod
-    def s2signal(lmax, p_val, p_arg):
-        r"""representation of a signal on the sphere
-
-        .. math::
-            f(x) = \sum_{l=0}^{l_\mathrm{max}} A^l \cdot Y^l(x)
-
-            (P f)(x) = p_v f(p_a x)
-
-            (P f)(x) = \sum_{l=0}^{l_\mathrm{max}} p_v p_a^l A^l \cdot Y^l(x)
-
-        Parameters
-        ----------
-        lmax : int
-            :math:`l_\mathrm{max}`
-
-        p_val : {+1, -1}
-            :math:`p_v`
-
-        p_arg : {+1, -1}
-            :math:`p_a`
-
-        Returns
-        -------
-        `Irreps`
-            representation of :math:`\{A^l\}_l`
-
-        Examples
-        --------
-
-        >>> Irreps.s2signal(3, 1, 1)
-        0e+1e+2e+3e
-
-        >>> Irreps.s2signal(3, 1, -1)
-        0e+1o+2e+3o
-        """
-        return Irreps([(1, l, p_val * p_arg**l) for l in range(lmax + 1)])
-
     def randn(self, *size, normalization='component', dtype=None, device=None, requires_grad=False):
         """random tensor
 

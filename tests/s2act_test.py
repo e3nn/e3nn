@@ -3,7 +3,7 @@ import itertools
 
 import pytest
 import torch
-from e3nn import o3
+from e3nn import o3, io
 from e3nn.nn import S2Activation
 
 
@@ -11,7 +11,7 @@ from e3nn.nn import S2Activation
 def test_equivariance(act, normalization, p_val, p_arg):
     torch.set_default_dtype(torch.float64)
 
-    irreps = o3.Irreps.s2signal(3, p_val, p_arg)
+    irreps = io.SphericalTensor(3, p_val, p_arg)
 
     x = irreps.randn(50, -1)
     m = S2Activation(irreps, act, 120, normalization=normalization, lmax_out=6, random_rot=True)

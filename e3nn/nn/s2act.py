@@ -34,8 +34,8 @@ class S2Activation(torch.nn.Module):
 
     Examples
     --------
-
-    >>> m = S2Activation(o3.Irreps.s2signal(5, p_val=+1, p_arg=-1), torch.tanh, 100)
+    >>> from e3nn import io
+    >>> m = S2Activation(io.SphericalTensor(5, p_val=+1, p_arg=-1), torch.tanh, 100)
     '''
     def __init__(self, irreps, act, res, normalization='component', lmax_out=None, random_rot=False):
         super().__init__()

@@ -14,9 +14,9 @@ def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
 
     try:
         return TensorProduct(
-            [(20, (l1, p1)), (15, (l1, p1))],
-            [(20, (l2, p2)), (15, (l2, p2))],
-            [(mul_out(20), (lo, po)), (mul_out(15), (lo, po))],
+            [(25, (l1, p1)), (19, (l1, p1))],
+            [(25, (l2, p2)), (19, (l2, p2))],
+            [(mul_out(25), (lo, po)), (mul_out(19), (lo, po))],
             [
                 (0, 0, 0, mode, weight),
                 (1, 1, 1, mode, weight),
@@ -48,7 +48,7 @@ def random_params():
 def test(l1, p1, l2, p2, lo, po, mode, weight):
     eps = 1e-10
     n = 1_500
-    tol = 1.8
+    tol = 1.9
     torch.set_default_dtype(torch.float64)
 
     m = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
