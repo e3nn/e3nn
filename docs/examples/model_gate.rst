@@ -28,3 +28,4 @@ or consider that ``p=1`` in order to **not** be equivariant to Parity.
 .. literalinclude:: ../../examples/model_gate.py
     :lines: 111-227
 
+Full code `here <https://github.com/e3nn/e3nn/blob/main/examples/model_gate.py>`
