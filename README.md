@@ -97,7 +97,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](code_of_condu
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3723557.svg)](https://doi.org/10.5281/zenodo.3723557)
 
 ```
-@software{e3nn_2020_3723557,
+@software{e3nn_2020_4071988,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Benjamin K. Miller and
@@ -105,14 +105,17 @@ Our community abides by the [Contributor Covenant Code of Conduct](code_of_condu
                   Kostiantyn Lapchevskyi and
                   Maurice Weiler and
                   Michał Tyszkiewicz and
-                  Jes Frellsen},
-  title        = {github.com/e3nn/e3nn},
-  month        = may,
+                  Bradley Dice and
+                  Jes Frellsen and
+                  Sophia Sanborn and
+                  M. Alby},
+  title        = {\texttt{e3nn}: a modular framework for Euclidean Neural Networks, github.com/e3nn/e3nn}},
+  month        = oct,
   year         = 2020,
   publisher    = {Zenodo},
-  version      = {0.0.0},
-  doi          = {10.5281/zenodo.3723557},
-  url          = {https://doi.org/10.5281/zenodo.3723557}
+  version      = {0.1.0},
+  doi          = {10.5281/zenodo.4071988},
+  url          = {https://doi.org/10.5281/zenodo.4071988}
 }
 ```
 
