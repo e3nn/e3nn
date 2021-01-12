@@ -215,7 +215,7 @@ class Irreps(tuple):
     """
     def __new__(self, irreps):
         if isinstance(irreps, Irreps):
-            return irreps
+            return tuple.__new__(self, irreps)
 
         out = []
         if isinstance(irreps, Irrep):
