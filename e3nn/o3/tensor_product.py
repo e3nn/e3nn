@@ -85,6 +85,14 @@ class TensorProduct(torch.nn.Module):
     ...         (1, 0, 0, "uvw", True, 1),
     ...     ]
     ... )
+
+    Example of a dot product:
+
+    >>> irreps = o3.Irreps("3x0e + 4x0o + 1e + 2o + 3o")
+    >>> module = TensorProduct(irreps, irreps, "0e", [
+    ...     (i, i, 0, 'uuw', False)
+    ...     for i, (mul, ir) in enumerate(irreps)
+    ... ])
     """
     def __init__(
             self,
@@ -378,9 +386,13 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('u,ijk,zvj->zuivk', s2.new_zeros({mul_1}).fill_(1.0), w3j[{index_w3j}], s2)")
             if mode == 'uuw':
                 assert mul_1 == mul_2
-                assert weight
-                code_out += line_out.format(f"ein('{z}uw,ijk,zuij->zwk', ws[{index_w}], w3j[{index_w3j}], ss)")
-                code_right += line_right.format(f"ein('{z}uw,ijk,zuj->zuiwk', ws[{index_w}], w3j[{index_w3j}], s2)")
+                if weight:
+                    code_out += line_out.format(f"ein('{z}uw,ijk,zuij->zwk', ws[{index_w}], w3j[{index_w3j}], ss)")
+                    code_right += line_right.format(f"ein('{z}uw,ijk,zuj->zuiwk', ws[{index_w}], w3j[{index_w3j}], s2)")
+                else:
+                    assert mul_out == 1
+                    code_out += line_out.format(f"ein('ijk,zuij->zk', w3j[{index_w3j}], ss)")
+                    code_right += line_right.format(f"ein('ijk,zuj->zuik', w3j[{index_w3j}], s2)")
             if mode == 'uuu':
                 assert mul_1 == mul_2 == mul_out
                 if weight:

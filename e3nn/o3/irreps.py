@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 
 from e3nn import o3
@@ -62,6 +64,14 @@ class Irrep(tuple):
     def __repr__(self):
         p = {+1: 'e', -1: 'o'}[self.p]
         return f"{self.l}{p}"
+
+    @classmethod
+    def iterator(cls):
+        r"""Iterator through all the irreps of :math:`O(3)`
+        """
+        for l in itertools.count():
+            yield Irrep(l, (-1)**l)
+            yield Irrep(l, -(-1)**l)
 
     def D_from_angles(self, alpha, beta, gamma, k=None):
         r"""Matrix :math:`p^k D^l(\alpha, \beta, \gamma)`
