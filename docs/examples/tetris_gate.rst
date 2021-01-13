@@ -3,7 +3,7 @@ Tetris Gate Example
 
 Build on top of `tetris_polynomial`, the following is added:
 
-* `gaussian_basis_projection`
+* `soft_one_hot_linspace`
 * `Gate`
 
 .. rubric:: code

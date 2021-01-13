@@ -1,7 +1,7 @@
 import torch
 
 
-def gaussian_basis_projection(x, start, end, number):
+def soft_one_hot_linspace(x, start, end, number):
     r"""Projection on a basis of gaussians
 
     .. math::

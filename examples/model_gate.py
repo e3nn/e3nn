@@ -13,7 +13,7 @@ from torch_scatter import scatter
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
-from e3nn.math import gaussian_basis_projection
+from e3nn.math import soft_one_hot_linspace
 
 
 class Convolution(torch.nn.Module):
@@ -57,7 +57,7 @@ class Convolution(torch.nn.Module):
             instructions,
             shared_weights=False,
         )
-        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.relu, 1 / number_of_basis)
+        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.relu)
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_out)
@@ -207,7 +207,7 @@ class Network(torch.nn.Module):
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component', normalize=True)
         edge_length = edge_vec.norm(dim=1)
-        edge_length_embedded = gaussian_basis_projection(edge_length, 0.0, self.max_radius, self.number_of_basis)
+        edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
         edge_attr = smooth_transition(edge_length / self.max_radius)[:, None] * edge_sh
 
         if hasattr(data, 'x'):

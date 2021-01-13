@@ -8,7 +8,7 @@ import torch
 
 from e3nn import o3
 from e3nn.o3 import FullyConnectedTensorProduct, Linear
-from e3nn.math import gaussian_basis_projection
+from e3nn.math import soft_one_hot_linspace
 
 
 class Convolution(torch.nn.Module):
@@ -52,7 +52,7 @@ class Convolution(torch.nn.Module):
         si = self.si(x.transpose(1, 4))
         si = si.transpose(1, 4)
 
-        weight = gaussian_basis_projection(self.d, 0.0, 1.0, self.num_gaussian) @ self.weight
+        weight = soft_one_hot_linspace(self.d, 0.0, 1.0, self.num_gaussian) @ self.weight
         weight = weight * (math.pi * self.d).cos()[:, :, :, None] / (self.size ** (3/2))
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
         kernel = torch.einsum('xyzio->oixyz', kernel)

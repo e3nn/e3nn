@@ -13,7 +13,7 @@ from torch_scatter import scatter
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import FullyConnectedTensorProduct
-from e3nn.math import gaussian_basis_projection
+from e3nn.math import soft_one_hot_linspace
 
 
 def tetris():
@@ -66,7 +66,7 @@ class Convolution(torch.nn.Module):
             internal_weights=False,
             shared_weights=False,
         )
-        self.fc = FullyConnectedNet([3, 256, tp.weight_numel], torch.relu, 1/3)
+        self.fc = FullyConnectedNet([3, 256, tp.weight_numel], torch.relu)
         self.tp = tp
 
     def forward(self, edge_src, edge_dst, node_features, edge_sh, edge_length_embedded, num_neighbors) -> torch.Tensor:
@@ -103,7 +103,7 @@ class Network(torch.nn.Module):
         edge_src, edge_dst = radius_graph(data.pos, 2.1, data.batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component', normalize=True)
-        edge_length_embedded = gaussian_basis_projection(edge_vec.norm(dim=1), 1.0, 2.0, 3)
+        edge_length_embedded = soft_one_hot_linspace(edge_vec.norm(dim=1), 1.0, 2.0, 3) * 3**0.5
 
         x = scatter(edge_sh, edge_dst, dim=0).div(num_neighbors**0.5)
 
