@@ -93,6 +93,26 @@ class TensorProduct(torch.nn.Module):
     ...     (i, i, 0, 'uuw', False)
     ...     for i, (mul, ir) in enumerate(irreps)
     ... ])
+
+    Implement :math:`z_u = x_u \otimes (\sum_v w_{uv} y_v)`
+
+    >>> module = TensorProduct(
+    ...     "8x0o + 7x1o + 3x2e",
+    ...     "10x0e + 10x1e + 10x2e",
+    ...     "8x0o + 7x1o + 3x2e",
+    ...     [
+    ...         # paths for the l=0:
+    ...         (0, 0, 0, "uvu", True),  # 0x0->0
+    ...         # paths for the l=1:
+    ...         (1, 0, 1, "uvu", True),  # 1x0->1
+    ...         (1, 1, 1, "uvu", True),  # 1x1->1
+    ...         (1, 2, 1, "uvu", True),  # 1x2->1
+    ...         # paths for the l=2:
+    ...         (2, 0, 2, "uvu", True),  # 2x0->2
+    ...         (2, 1, 2, "uvu", True),  # 2x1->2
+    ...         (2, 2, 2, "uvu", True),  # 2x2->2
+    ...     ]
+    ... )
     """
     def __init__(
             self,
