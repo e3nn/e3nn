@@ -130,13 +130,13 @@ class Network(torch.nn.Module):
         self.num_neighbors = num_neighbors
         self.num_nodes = num_nodes
 
-        self.irreps_in = o3.Irreps(irreps_in)
-        self.irreps_node_attr = o3.Irreps(irreps_node_attr)
+        self.irreps_in = o3.Irreps(irreps_in) if irreps_in is not None else None
+        self.irreps_node_attr = o3.Irreps(irreps_node_attr) if irreps_node_attr is not None else irreps_node_attr
         self.irreps_out = o3.Irreps(irreps_out)
         self.irreps_hidden = o3.Irreps(irreps_hidden)
         self.irreps_sh = o3.Irreps(irreps_sh)
 
-        irreps = self.irreps_in
+        irreps = self.irreps_in if self.irreps_in is not None else self.irreps_sh
 
         act = {
             1: torch.relu,
@@ -162,7 +162,7 @@ class Network(torch.nn.Module):
             )
             conv = Convolution(
                 irreps,
-                self.irreps_node_attr,
+                self.irreps_node_attr if self.irreps_node_attr is not None else "1e",
                 self.irreps_sh,
                 gate.irreps_in,
                 number_of_basis,
@@ -176,7 +176,7 @@ class Network(torch.nn.Module):
         self.layers.append(
             Convolution(
                 irreps,
-                self.irreps_node_attr,
+                self.irreps_node_attr if self.irreps_node_attr is not None else "1e",
                 self.irreps_sh,
                 self.irreps_out,
                 number_of_basis,
@@ -210,16 +210,15 @@ class Network(torch.nn.Module):
         edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
         edge_attr = smooth_transition(edge_length / self.max_radius)[:, None] * edge_sh
 
-        if hasattr(data, 'x'):
+        if self.irreps_in is not None:
             x = data.x
         else:
             x = scatter(edge_attr, edge_dst, dim=0, dim_size=len(data.pos)).div(self.num_neighbors**0.5)
 
-        if hasattr(data, 'z'):
+        if self.irreps_node_attr is not None:
             z = data.z
         else:
-            assert self.irreps_node_attr.lmax == 0
-            z = x.new_ones(len(x), self.irreps_node_attr.dim)
+            z = x.new_ones(x.shape[0], 1)
 
         for lay in self.layers:
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
