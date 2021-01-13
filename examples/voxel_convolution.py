@@ -29,7 +29,7 @@ class Convolution(torch.nn.Module):
         lattice = torch.stack(torch.meshgrid(r, r, r), dim=-1)
         self.register_buffer('d', lattice.norm(dim=-1))
 
-        sh = o3.spherical_harmonics(self.irreps_sh, lattice, 'component', True)  # [x, y, z, irreps_sh.dim]
+        sh = o3.spherical_harmonics(self.irreps_sh, lattice, True, 'component')  # [x, y, z, irreps_sh.dim]
         self.register_buffer('sh', sh)
 
         self.tp = FullyConnectedTensorProduct(self.irreps_in, self.irreps_sh, self.irreps_out, shared_weights=False)

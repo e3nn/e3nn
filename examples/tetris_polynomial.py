@@ -78,7 +78,7 @@ class InvariantPolynomial(torch.nn.Module):
 
         edge_src, edge_dst = radius_graph(data.pos, 1.1, data.batch)  # tensors of indices representing the graph
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component')
+        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, False, normalization='component')
 
         # For each node, the initial features are the sum of the spherical harmonics of the neighbors
         node_features = scatter(edge_sh, edge_dst, dim=0).div(num_neighbors**0.5)

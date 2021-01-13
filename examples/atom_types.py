@@ -22,15 +22,14 @@ class InvariantPolynomial(torch.nn.Module):
     def __init__(self, irreps_out, num_z, lmax) -> None:
         super().__init__()
         self.num_z = num_z
-        self.lmax = lmax
 
-        irreps_sh = o3.Irreps.spherical_harmonics(lmax)
+        self.irreps_sh = o3.Irreps.spherical_harmonics(lmax)
 
         # to multiply the edge type one-hot with the spherical harmonics to get the edge attributes
         self.mul = TensorProduct(
             [(num_z**2, "0e")],
-            irreps_sh,
-            [(num_z**2, ir) for _, ir in irreps_sh],
+            self.irreps_sh,
+            [(num_z**2, ir) for _, ir in self.irreps_sh],
             [
                 (0, l, l, "uvu", False)
                 for l in range(lmax + 1)
@@ -42,7 +41,7 @@ class InvariantPolynomial(torch.nn.Module):
         irreps_out = o3.Irreps(irreps_out)
 
         self.tp1 = FullyConnectedTensorProduct(
-            irreps_in1=irreps_sh,
+            irreps_in1=self.irreps_sh,
             irreps_in2=irreps_attr,
             irreps_out=irreps_mid,
         )
@@ -62,7 +61,7 @@ class InvariantPolynomial(torch.nn.Module):
 
         # spherical harmonics
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_sh = o3.spherical_harmonics(list(range(self.lmax + 1)), edge_vec, normalization='component')
+        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalize=False, normalization='component')
 
         # edge types
         edge_zz = num_z * data.z[edge_src] + data.z[edge_dst]  # from 0 to num_z^2 - 1

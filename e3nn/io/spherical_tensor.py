@@ -59,6 +59,17 @@ class SphericalTensor(o3.Irreps):
         r"""Convert a set of relative positions into a spherical tensor
 
         TODO rename this function?
+
+        Examples
+        --------
+        >>> x = SphericalTensor(4, 1, -1)
+        >>> p = torch.tensor([
+        ...     [1.0, 0, 0],
+        ...     [3.0, 4.0, 0],
+        ... ])
+        >>> d = x.from_geometry_adjusted(p)
+        >>> x.signal_xyz(d, p)
+        tensor([1.0000, 5.0000])
         """
         vectors = vectors.reshape(-1, 3)
         radii = vectors.norm(dim=1)  # [batch]
@@ -76,7 +87,7 @@ class SphericalTensor(o3.Irreps):
 
         return solution @ coeff
 
-    def from_geometry(self, vectors):
+    def from_geometry_global_rescale(self, vectors):
         r"""Convert a set of relative positions into a spherical tensor
 
         TODO rename this function?
@@ -122,10 +133,9 @@ class SphericalTensor(o3.Irreps):
     def signal_xyz(self, signal, r):
         r"""Evaluate the signal on given points on the sphere
         """
-        sh = o3.spherical_harmonics(self, r)
+        sh = o3.spherical_harmonics(self, r, normalize=True)
         dim = (self.lmax + 1)**2
-        output = torch.einsum(
-            'ai,zi->za', sh.reshape(-1, dim), signal.reshape(-1, dim))
+        output = torch.einsum('ai,zi->za', sh.reshape(-1, dim), signal.reshape(-1, dim))
         return output.reshape(signal.shape[:-1] + r.shape[:-1])
 
     def signal_on_grid(self, signal, res=100, normalization='integral'):

@@ -9,7 +9,7 @@ import torch
 from e3nn import o3
 
 
-def spherical_harmonics(l, xyz, normalization='integral', normalize=False):
+def spherical_harmonics(l, xyz, normalize, normalization='integral'):
     r"""Spherical harmonics
 
     .. image:: https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif
@@ -41,13 +41,13 @@ def spherical_harmonics(l, xyz, normalization='integral', normalize=False):
     xyz : `torch.Tensor`
         tensor :math:`x` of shape ``(..., 3)``.
 
+    normalize : bool
+        normalize ``xyz`` on the sphere
+
     normalization : {'integral', 'component', 'norm'}
         * *component*: :math:`\|Y^l(x)\|^2 = 2l+1, x \in S^2`
         * *norm*: :math:`\|Y^l(x)\| = 1, x \in S^2`, ``component / sqrt(2l+1)``
         * *integral*: :math:`\int_{S^2} Y^l_m(x)^2 dx = 1`, ``component / sqrt(4pi)``
-
-    normalize : bool
-        normalize ``xyz`` on the sphere
 
     Returns
     -------
@@ -59,7 +59,7 @@ def spherical_harmonics(l, xyz, normalization='integral', normalize=False):
     Examples
     --------
 
-    >>> spherical_harmonics(0, torch.randn(2, 3), normalization='component')
+    >>> spherical_harmonics(0, torch.randn(2, 3), False, normalization='component')
     tensor([[1.],
             [1.]])
 
