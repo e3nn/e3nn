@@ -721,6 +721,60 @@ class ElementwiseTensorProduct(TensorProduct):
         super().__init__(irreps_in1, irreps_in2, out, instr, normalization, internal_weights=False)
 
 
+class FullTensorProduct(TensorProduct):
+    r"""Full tensor product between two irreps
+
+    .. math::
+
+        z_{uv} = x_u \otimes y_v
+
+    where :math:`u` and :math:`v` runs over the irrep, note that ther is no weights.
+
+    Parameters
+    ----------
+    irreps_in1 : `Irreps`
+        representation of the first input
+
+    irreps_in2 : `Irreps`
+        representation of the second input
+
+    irreps_out : iterator of `Irrep`, optional
+        representations of the output
+
+    normalization : {'component', 'norm'}
+        see `TensorProduct`
+    """
+    def __init__(
+            self,
+            irreps_in1,
+            irreps_in2,
+            irreps_out=None,
+            normalization='component',
+        ):
+
+        irreps_in1 = o3.Irreps(irreps_in1).simplify()
+        irreps_in2 = o3.Irreps(irreps_in2).simplify()
+        if irreps_out is not None:
+            irreps_out = [o3.Irrep(ir) for ir in irreps_out]
+
+        out = []
+        instr = []
+        for i_1, (mul_1, ir_1) in enumerate(irreps_in1):
+            for i_2, (mul_2, ir_2) in enumerate(irreps_in2):
+                for ir_out in ir_1 * ir_2:
+
+                    if irreps_out is not None and ir_out not in irreps_out:
+                        continue
+
+                    i_out = len(out)
+                    out.append((mul_1 * mul_2, ir_out))
+                    instr += [
+                        (i_1, i_2, i_out, 'uvuv', False)
+                    ]
+
+        super().__init__(irreps_in1, irreps_in2, out, instr, normalization, internal_weights=False)
+
+
 class Linear(TensorProduct):
     r"""Linear operation equivariant to :math:`O(3)`
 
