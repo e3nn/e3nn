@@ -104,6 +104,8 @@ def reduce_tensor(group: Group, formula, eps=1e-9, **kw_representations):
         if d_sym == 0:
             return [], torch.zeros(d_sym, d).to(dtype=dtype)
 
+        # up to now, the only used information about the representations was their dimensions
+
         # We project the representation on the basis `base`
         def representation(g):
             m = kron(*(kw_representations[i](g) for i in f0))

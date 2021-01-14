@@ -1,9 +1,10 @@
 import itertools
+import collections
 
 import torch
 
 from e3nn import o3
-from e3nn.math import direct_sum
+from e3nn.math import direct_sum, perm
 
 
 class Irrep(tuple):
@@ -372,6 +373,35 @@ class Irreps(tuple):
             elif mul > 0:
                 out.append((mul, ir))
         return Irreps(out)
+
+    def sort(self):
+        r"""sort the representation
+
+        Returns
+        -------
+        irreps : `Irreps`
+        p : tuple of int
+        inv : tuple of int
+
+        Examples
+        --------
+
+        >>> Irreps("1e + 0e + 1e").sort().irreps
+        0e+1e+1e
+
+        >>> Irreps("2o + 1e + 0e + 1e").sort().p
+        (3, 1, 0, 2)
+
+        >>> Irreps("2o + 1e + 0e + 1e").sort().inv
+        (2, 1, 3, 0)
+        """
+        Ret = collections.namedtuple("sort", ["irreps", "p", "inv"])
+        out = [(ir, i, mul) for i, (mul, ir) in enumerate(self)]
+        out = sorted(out)
+        inv = tuple(i for _, i, _ in out)
+        p = perm.inverse(inv)
+        irreps = Irreps([(mul, ir) for ir, _, mul in out])
+        return Ret(irreps, p, inv)
 
     @property
     def dim(self) -> int:

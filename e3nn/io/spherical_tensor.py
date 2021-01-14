@@ -71,6 +71,7 @@ class SphericalTensor(o3.Irreps):
         >>> x.signal_xyz(d, p)
         tensor([1.0000, 5.0000])
         """
+        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
         vectors = vectors.reshape(-1, 3)
         radii = vectors.norm(dim=1)  # [batch]
         vectors = vectors[radii > 0]  # [batch, 3]
@@ -92,15 +93,16 @@ class SphericalTensor(o3.Irreps):
 
         TODO rename this function?
         """
+        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
         vectors = vectors.reshape(-1, 3)
-        r = vectors.norm(dim=1)
+        radii = vectors.norm(dim=1)
         sh = o3.spherical_harmonics(self, vectors, normalize=True)
         # 0.5 * sum_a ( Y(v_a) . sum_b r_b Y(v_b) s - r_a )^2
-        A = torch.einsum('ai,b,bi->a', sh, r, sh)
+        A = torch.einsum('ai,b,bi->a', sh, radii, sh)
         # 0.5 * sum_a ( A_a s - r_a )^2
         # sum_a A_a^2 s = sum_a A_a r_a
-        s = torch.dot(A, r) / A.norm().pow(2)
-        return s * torch.einsum('a,ai->i', r, sh)
+        s = torch.dot(A, radii) / A.norm().pow(2)
+        return s * torch.einsum('a,ai->i', radii, sh)
 
     def from_samples_on_s2(self, positions, values, res=100):
         r"""Convert a set of position on the sphere and values into a spherical tensor
