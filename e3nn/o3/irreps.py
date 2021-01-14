@@ -66,12 +66,15 @@ class Irrep(tuple):
         return f"{self.l}{p}"
 
     @classmethod
-    def iterator(cls):
+    def iterator(cls, lmax=None):
         r"""Iterator through all the irreps of :math:`O(3)`
         """
         for l in itertools.count():
             yield Irrep(l, (-1)**l)
             yield Irrep(l, -(-1)**l)
+
+            if l == lmax:
+                break
 
     def D_from_angles(self, alpha, beta, gamma, k=None):
         r"""Matrix :math:`p^k D^l(\alpha, \beta, \gamma)`
