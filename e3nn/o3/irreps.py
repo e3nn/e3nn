@@ -178,6 +178,24 @@ class Irrep(tuple):
         for l in range(lmin, lmax + 1):
             yield Irrep(l, p)
 
+    def count(self, _value):
+        raise NotImplementedError
+
+    def index(self, _value):
+        raise NotImplementedError
+
+    def __rmul__(self, _object):
+        raise NotImplementedError
+
+    def __add__(self, _other):
+        raise NotImplementedError
+
+    def __contains__(self, _object):
+        raise NotImplementedError
+
+    def __len__(self):
+        raise NotImplementedError
+
 
 class Irreps(tuple):
     r"""Direct sum of irreducible representations of :math:`O(3)`
@@ -332,16 +350,18 @@ class Irreps(tuple):
             return Irreps(x)
         return x
 
-    def __contains__(self, x: object) -> bool:
-        if isinstance(x, Irrep):
-            return x in (ir for _, ir in self)
-        return super().__contains__(x)
+    def __contains__(self, x) -> bool:
+        return Irrep(x) in (ir for _, ir in self)
+
+    def count(self, x) -> int:
+        x = Irrep(x)
+        return sum(mul for mul, ir in self if ir == x)
+
+    def index(self, _object):
+        raise NotImplementedError
 
     def __add__(self, other):
         return Irreps(super().__add__(other))
-
-    def __radd__(self, other):
-        return Irreps(super().__radd__(other))
 
     def __mul__(self, other):
         return Irreps(super().__mul__(other))
