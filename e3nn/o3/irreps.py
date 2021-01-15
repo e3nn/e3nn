@@ -241,6 +241,9 @@ class Irreps(tuple):
                 if isinstance(mul_ir, str):
                     mul = 1
                     ir = Irrep(mul_ir)
+                elif isinstance(mul_ir, Irrep):
+                    mul = 1
+                    ir = mul_ir
                 elif len(mul_ir) == 2:
                     mul, ir = mul_ir
                     ir = Irrep(ir)
