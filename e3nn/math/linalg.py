@@ -4,8 +4,7 @@ import torch
 
 
 def kron(*matrices):
-    r"""
-    Kroneker product between matrices
+    r"""Kroneker product between matrices
     """
     for m in matrices:
         assert m.dim() == 2
@@ -24,8 +23,7 @@ def kron(*matrices):
 
 
 def direct_sum(*matrices):
-    r"""
-    Direct sum of matrices, put them in the diagonal
+    r"""Direct sum of matrices, put them in the diagonal
     """
     front_indices = matrices[0].shape[:-2]
     m = sum(x.size(-2) for x in matrices)
@@ -43,44 +41,56 @@ def direct_sum(*matrices):
 
 @torch.jit.script
 def orthonormalize(
-        vecs: torch.Tensor,
+        original: torch.Tensor,
         eps: float = 1e-9
 ) -> Tuple[torch.Tensor, torch.Tensor]:
+    r"""orthonomalize vectors
+
+    Parameters
+    ----------
+    original : `torch.Tensor`
+        list of the original vectors :math:`x`
+
+    eps : float
+        a small number
+
+    Returns
+    -------
+    final : `torch.Tensor`
+        list of orthonomalized vectors :math:`y`
+
+    matrix : `torch.Tensor`
+        the matrix :math:`A` such that :math:`y = A x`
     """
-    :param vecs: tensor of shape [n, m] with n <= m
-    :return: (base, expand)
-    base.shape[1] == m
-    expand.shape[1] == m
-    base.shape[0] + expand.shape[0] == m
-    cat[base, expand] is orthonormal
-    """
-    assert vecs.dim() == 2
-    dim = vecs.shape[1]
+    assert original.dim() == 2
+    dim = original.shape[1]
 
-    base = []
-    for x in vecs:
-        for y in base:
-            x -= torch.dot(x, y) * y
+    final = []
+    matrix = []
+
+    for i, x in enumerate(original):
+        cx = x.new_zeros(len(original))
+        cx[i] = 1
+        for j, y in enumerate(final):
+            c = torch.dot(x, y)
+            x = x - c * y
+            cx = cx - c * matrix[j]
         if x.norm() > 2 * eps:
-            x = x / x.norm()
-            x[x.abs() < eps] = x.new_zeros(())
-            x *= x[x.nonzero()[0, 0]].sign()
-            base += [x]
+            c = 1 / x.norm()
+            x = c * x
+            cx = c * cx
+            x[x.abs() < eps] = 0
+            cx[cx.abs() < eps] = 0
+            c = x[x.nonzero()[0, 0]].sign()
+            x = c * x
+            cx = c * cx
+            final += [x]
+            matrix += [cx]
 
-    expand = []
-    for x in torch.eye(dim, device=vecs.device, dtype=vecs.dtype):
-        for y in base + expand:
-            x -= torch.dot(x, y) * y
-        if x.norm() > 2 * eps:
-            x /= x.norm()
-            x[x.abs() < eps] = x.new_zeros(())
-            x *= x[x.nonzero()[0, 0]].sign()
-            expand += [x]
+    final = torch.stack(final) if len(final) > 0 else original.new_zeros(0, dim)
+    matrix = torch.stack(matrix) if len(matrix) > 0 else original.new_zeros(0, len(original))
 
-    base = torch.stack(base) if len(base) > 0 else vecs.new_zeros(0, dim)
-    expand = torch.stack(expand) if len(expand) > 0 else vecs.new_zeros(0, dim)
-
-    return base, expand
+    return final, matrix
 
 
 @torch.jit.script
@@ -88,14 +98,6 @@ def complete_basis(
         vecs: torch.Tensor,
         eps: float = 1e-9
 ) -> torch.Tensor:
-    """
-    :param vecs: tensor of shape [n, m] with n <= m
-    :return: (base, expand)
-    base.shape[1] == m
-    expand.shape[1] == m
-    base.shape[0] + expand.shape[0] == m
-    expand are orthonormal
-    """
     assert vecs.dim() == 2
     dim = vecs.shape[1]
 
