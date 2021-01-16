@@ -859,3 +859,59 @@ class Linear(TensorProduct):
         """
         ones = features.new_ones(features.shape[:-1] + (1,))
         return super().forward(features, ones, weight)
+
+
+class Norm(TensorProduct):
+    r"""Norm operation
+
+    Parameters
+    ----------
+    irreps_in : `Irreps`
+        representation of the input
+
+    normalization : {'component', 'norm'}
+        see `TensorProduct`
+
+    Examples
+    --------
+    Compute the norms of 17 vectors.
+
+    >>> norm = Norm("17x1o")
+    >>> norm(torch.randn(17 * 3)).shape
+    torch.Size([17])
+    """
+    def __init__(
+            self,
+            irreps_in,
+            normalization='component'
+        ):
+        irreps_in = o3.Irreps(irreps_in).simplify()
+        irreps_out = o3.Irreps([(mul, "0e") for mul, _ in irreps_in])
+
+        instr = [
+            (i, i, i, 'uuu', False)
+            for i in range(len(irreps_in))
+        ]
+
+        super().__init__(irreps_in, irreps_in, irreps_out, instr, normalization)
+
+        self.irreps_in = irreps_in
+        self.irreps_out = irreps_out.simplify()
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.irreps_in})"
+
+    def forward(self, features):
+        """evaluate
+
+        Parameters
+        ----------
+        features : `torch.Tensor`
+            tensor of shape ``(..., irreps_in.dim)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(..., irreps_out.dim)``
+        """
+        return super().forward(features, features)
