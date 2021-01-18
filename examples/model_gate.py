@@ -112,10 +112,10 @@ class Network(torch.nn.Module):
     def __init__(
             self,
             irreps_in,
-            irreps_node_attr,
-            irreps_out,
             irreps_hidden,
-            irreps_sh,
+            irreps_out,
+            irreps_node_attr,
+            irreps_edge_attr,
             layers,
             max_radius,
             number_of_basis,
@@ -131,12 +131,12 @@ class Network(torch.nn.Module):
         self.num_nodes = num_nodes
 
         self.irreps_in = o3.Irreps(irreps_in) if irreps_in is not None else None
-        self.irreps_node_attr = o3.Irreps(irreps_node_attr) if irreps_node_attr is not None else irreps_node_attr
-        self.irreps_out = o3.Irreps(irreps_out)
         self.irreps_hidden = o3.Irreps(irreps_hidden)
-        self.irreps_sh = o3.Irreps(irreps_sh)
+        self.irreps_out = o3.Irreps(irreps_out)
+        self.irreps_node_attr = o3.Irreps(irreps_node_attr) if irreps_node_attr is not None else irreps_node_attr
+        self.irreps_edge_attr = o3.Irreps(irreps_edge_attr)
 
-        irreps = self.irreps_in if self.irreps_in is not None else self.irreps_sh
+        irreps = self.irreps_in if self.irreps_in is not None else self.irreps_edge_attr
 
         act = {
             1: torch.relu,
@@ -150,9 +150,9 @@ class Network(torch.nn.Module):
         self.layers = torch.nn.ModuleList()
 
         for _ in range(layers):
-            irreps_scalars = o3.Irreps([(mul, ir) for mul, ir in self.irreps_hidden if ir.l == 0 and tp_path_exists(irreps, self.irreps_sh, ir)])
-            irreps_nonscalars = o3.Irreps([(mul, ir) for mul, ir in self.irreps_hidden if ir.l > 0])
-            ir = "0e" if tp_path_exists(irreps, self.irreps_sh, "0e") else "0o"
+            irreps_scalars = o3.Irreps([(mul, ir) for mul, ir in self.irreps_hidden if ir.l == 0 and tp_path_exists(irreps, self.irreps_edge_attr, ir)])
+            irreps_nonscalars = o3.Irreps([(mul, ir) for mul, ir in self.irreps_hidden if ir.l > 0 and tp_path_exists(irreps, self.irreps_edge_attr, ir)])
+            ir = "0e" if tp_path_exists(irreps, self.irreps_edge_attr, "0e") else "0o"
             irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_nonscalars])
 
             gate = Gate(
@@ -163,7 +163,7 @@ class Network(torch.nn.Module):
             conv = Convolution(
                 irreps,
                 self.irreps_node_attr if self.irreps_node_attr is not None else "1e",
-                self.irreps_sh,
+                self.irreps_edge_attr,
                 gate.irreps_in,
                 number_of_basis,
                 radial_layers,
@@ -177,7 +177,7 @@ class Network(torch.nn.Module):
             Convolution(
                 irreps,
                 self.irreps_node_attr if self.irreps_node_attr is not None else "1e",
-                self.irreps_sh,
+                self.irreps_edge_attr,
                 self.irreps_out,
                 number_of_basis,
                 radial_layers,
@@ -205,7 +205,7 @@ class Network(torch.nn.Module):
 
         edge_src, edge_dst = radius_graph(data.pos, self.max_radius, batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component', normalize=True)
+        edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, normalization='component', normalize=True)
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
         edge_attr = smooth_transition(edge_length / self.max_radius)[:, None] * edge_sh
@@ -231,7 +231,7 @@ def test():
 
     num_nodes = 5
     irreps_in = o3.Irreps("3x0e + 2x1o")
-    irreps_attr = o3.Irreps("1x0e")
+    irreps_attr = o3.Irreps("10x0e")
 
     dataset = [
         Data(
@@ -247,9 +247,9 @@ def test():
 
     f = Network(
         irreps_in,
-        irreps_attr,
-        irreps_out,
         o3.Irreps("5x0e + 5x0o + 5x1e + 5x1o"),
+        irreps_out,
+        irreps_attr,
         o3.Irreps.spherical_harmonics(3),
         layers=3,
         max_radius=2.0,
