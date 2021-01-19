@@ -2,7 +2,7 @@
 
 Exact equivariance to :math:`E(3)`
 
-version of january 2020
+version of january 2021
 """
 import math
 import torch
@@ -76,7 +76,7 @@ class Convolution(torch.nn.Module):
         return si + 0.5 * x
 
 
-def smooth_transition(x):
+def smooth_cutoff(x):
     u = 2 * (x - 1)
     y = (math.pi * u).cos().neg().add(1).div(2)
     y[u > 0] = 0
@@ -112,21 +112,21 @@ class Network(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `o3.Irreps` or None
+    irreps_in : `Irreps` or None
         representation of the input features
         can be set to ``None`` if nodes don't have input features
 
-    irreps_hidden : `o3.Irreps`
+    irreps_hidden : `Irreps`
         representation of the hidden features
 
-    irreps_out : `o3.Irreps`
+    irreps_out : `Irreps`
         representation of the output features
 
-    irreps_node_attr : `o3.Irreps` or None
+    irreps_node_attr : `Irreps` or None
         representation of the nodes attributes
         can be set to ``None`` if nodes don't have attributes
 
-    irreps_edge_attr : `o3.Irreps`
+    irreps_edge_attr : `Irreps`
         representation of the edge attributes
         the edge attributes are :math:`h(r) Y(\vec r / r)`
         where :math:`h` is a smooth function that goes to zero at ``max_radius``
@@ -252,7 +252,7 @@ class Network(torch.nn.Module):
         edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, normalization='component', normalize=True)
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
-        edge_attr = smooth_transition(edge_length / self.max_radius)[:, None] * edge_sh
+        edge_attr = smooth_cutoff(edge_length / self.max_radius)[:, None] * edge_sh
 
         if self.irreps_in is not None:
             x = data.x

@@ -11,8 +11,8 @@ The main operation of the Convolution module is ``tp``.
 It makes the atoms interact with their neighbors but does not mix the channels.
 To mix the channels it is sandwich with ``lin1`` and ``lin2``.
 
-.. literalinclude:: ../../../../e3nn/nn/models/gate_points_2001.py
-    :lines: 21-79
+.. literalinclude:: ../../../../e3nn/nn/models/gate_points_2101.py
+    :lines: 18-76
 
 .. rubric:: Network
 
@@ -25,11 +25,9 @@ This is why ``irreps_sh`` is a parameter of the class ``Network``,
 one can use specific ``l`` of the spherical harmonics with the correct parity ``p=(-1)^l`` (one can use `Irreps.spherical_harmonics` for that)
 or consider that ``p=1`` in order to **not** be equivariant to Parity.
 
-.. literalinclude:: ../../../../e3nn/nn/models/gate_points_2001.py
-    :lines: 113-273
+.. literalinclude:: ../../../../e3nn/nn/models/gate_points_2101.py
+    :lines: 110-270
 
-Full code `here <https://github.com/e3nn/e3nn/blob/main/e3nn/nn/models/gate_points_2001.py>`
-
-.. automodule:: e3nn.nn.models.gate_points_2001
+.. automodule:: e3nn.nn.models.gate_points_2101
     :members:
     :show-inheritance:

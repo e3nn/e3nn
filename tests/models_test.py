@@ -1,6 +1,6 @@
 import torch
 from e3nn import o3
-from e3nn.nn.models.gate_points_2001 import Network
+from e3nn.nn.models.gate_points_2101 import Network
 from torch_geometric.data import Data, DataLoader
 
 

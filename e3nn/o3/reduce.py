@@ -35,3 +35,25 @@ def reduce_tensor(formula, eps=1e-9, has_parity=True, **kw_irreps):
         irreps = o3.Irreps([(mul, l, 1) for mul, l in irreps])
 
     return irreps, Q
+
+
+def reduce_irreps_tensor(formula, **irreps):
+    f0, formulas = group.germinate_formulas(formula)
+
+    irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
+
+    for _s, p in formulas:
+        f = "".join(f0[i] for i in p)
+        for i, j in zip(f0, f):
+            if i in irreps and j in irreps and irreps[i] != irreps[j]:
+                raise RuntimeError(f'irreps of {i} and {j} should be the same')
+            if i in irreps:
+                irreps[j] = irreps[i]
+            if j in irreps:
+                irreps[i] = irreps[j]
+
+    for i in f0:
+        if i not in irreps:
+            raise RuntimeError(f'index {i} has no irreps associated to it')
+
+    Q, base = group.reduce_permutation(f0, formulas, **{i: irs.dim for i, irs in irreps.items()})
