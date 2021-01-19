@@ -113,6 +113,35 @@ class TensorProduct(torch.nn.Module):
     ...         (2, 2, 2, "uvu", True),  # 2x2->2
     ...     ]
     ... )
+
+    Tensor Product using the xavier uniform initialization:
+
+    >>> irreps_1 = o3.Irreps("5x0e + 10x1o + 1x2e")
+    >>> irreps_2 = o3.Irreps("5x0e + 10x1o + 1x2e")
+    >>> irreps_out = o3.Irreps("5x0e + 10x1o + 1x2e")
+    >>> # create a Fully Connected Tensor Product
+    >>> module = o3.TensorProduct(
+    ...     irreps_1,
+    ...     irreps_2,
+    ...     irreps_out,
+    ...     [
+    ...         (i_1, i_2, i_out, "uvw", True, mul_1 * mul_2)
+    ...         for i_1, (mul_1, ir_1) in enumerate(irreps_1)
+    ...         for i_2, (mul_2, ir_2) in enumerate(irreps_2)
+    ...         for i_out, (mul_out, ir_out) in enumerate(irreps_out)
+    ...         if ir_out in ir_1 * ir_2
+    ...     ]
+    ... )
+    >>> with torch.no_grad():
+    ...     for weight in module.parameters():
+    ...         # formula from torch.nn.init.xavier_uniform_
+    ...         mul_1, mul_2, mul_out = weight.shape
+    ...         a = (6 / (mul_1 * mul_2 + mul_out))**0.5
+    ...         _ = weight.uniform_(-a, a)  # `_ = ` is only here because of pytest
+    >>> n = 1_000
+    >>> vars = module(irreps_1.randn(n, -1), irreps_2.randn(n, -1)).var(0)
+    >>> assert vars.min() > 1 / 3
+    >>> assert vars.max() < 3
     """
     def __init__(
             self,
@@ -232,7 +261,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             if dim_1 == 0 or dim_2 == 0 or dim_out == 0:
                 continue
 
-            alpha = out_var[i_out] / sum(path_weight_ * in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, path_weight_ in instructions if i_out_ == i_out)
+            alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in instructions if i_out_ == i_out)
 
             s = 4 * f" "
 
@@ -255,7 +284,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
             assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
-            c = sqrt(alpha * path_weight / {
+            alpha = sqrt(alpha / {
                 'uvw': (mul_1 * mul_2),
                 'uvu': mul_2,
                 'uvv': mul_1,
@@ -275,8 +304,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     'uvuv': (mul_1, mul_2),
                 }[mode])
 
-            line_out = f"{s}out[:, {index_out}:{index_out+dim_out}] += {c} * {{}}.reshape(batch, {dim_out})\n\n"
-            line_right = f"{s}out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += {c} * {{}}.reshape(batch, {dim_1}, {dim_out})\n\n"
+            line_out = f"{s}out[:, {index_out}:{index_out+dim_out}] += {alpha} * {{}}.reshape(batch, {dim_out})\n\n"
+            line_right = f"{s}out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += {alpha} * {{}}.reshape(batch, {dim_1}, {dim_out})\n\n"
 
             if _specialized_code:
                 # optimized code for special cases:
@@ -471,11 +500,9 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         if internal_weights:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.ParameterDict()
-            for i, (i_1, i_2, i_out, mode, path_weight, shape) in enumerate(self.weight_infos):
-                mul_1, (l_1, p_1) = self.irreps_in1[i_1]
-                mul_2, (l_2, p_2) = self.irreps_in2[i_2]
-                mul_out, (l_out, p_out) = self.irreps_out[i_out]
-                self.weight[f'{i} l1={l_1} l2={l_2} lout={l_out}'] = torch.nn.Parameter(torch.randn(shape))
+            for i_1, i_2, i_out, mode, path_weight, shape in self.weight_infos:
+                name = f'[{i_1}:{self.irreps_in1[i_1:i_1+1]}] x [{i_2}:{self.irreps_in2[i_2:i_2+1]}] -> [{i_out}:{self.irreps_out[i_out:i_out+1]}]'
+                self.weight[name] = torch.nn.Parameter(torch.randn(shape))
 
         self.to(dtype=torch.get_default_dtype())
 
