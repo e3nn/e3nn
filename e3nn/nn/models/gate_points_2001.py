@@ -1,13 +1,12 @@
-"""(Ready to use) model with self-interactions and gates
+"""model with self-interactions and gates
 
 Exact equivariance to :math:`E(3)`
 
->>> test()
+version of january 2020
 """
 import math
 import torch
 from torch_cluster import radius_graph
-from torch_geometric.data import Data, DataLoader
 from torch_scatter import scatter
 
 from e3nn import o3
@@ -109,6 +108,51 @@ class Compose(torch.nn.Module):
 
 
 class Network(torch.nn.Module):
+    r"""equivariant neural network
+
+    Parameters
+    ----------
+    irreps_in : `o3.Irreps` or None
+        representation of the input features
+        can be set to ``None`` if nodes don't have input features
+
+    irreps_hidden : `o3.Irreps`
+        representation of the hidden features
+
+    irreps_out : `o3.Irreps`
+        representation of the output features
+
+    irreps_node_attr : `o3.Irreps` or None
+        representation of the nodes attributes
+        can be set to ``None`` if nodes don't have attributes
+
+    irreps_edge_attr : `o3.Irreps`
+        representation of the edge attributes
+        the edge attributes are :math:`h(r) Y(\vec r / r)`
+        where :math:`h` is a smooth function that goes to zero at ``max_radius``
+        and :math:`Y` are the spherical harmonics polynomials
+
+    layers : int
+        number of gates (non linearities)
+
+    max_radius : float
+        maximum radius for the convolution
+
+    number_of_basis : int
+        number of basis on which the edge length are projected
+
+    radial_layers : int
+        number of hidden layers in the radial fully connected network
+
+    radial_neurons : int
+        number of neurons in the hidden layers of the radial fully connected network
+
+    num_neighbors : float
+        typical number of nodes at a distance ``max_radius``
+
+    num_nodes : float
+        typical number of nodes in a graph
+    """
     def __init__(
             self,
             irreps_in,
@@ -224,49 +268,3 @@ class Network(torch.nn.Module):
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
         return scatter(x, batch, dim=0).div(self.num_nodes**0.5)
-
-
-def test():
-    torch.set_default_dtype(torch.float64)
-
-    num_nodes = 5
-    irreps_in = o3.Irreps("3x0e + 2x1o")
-    irreps_attr = o3.Irreps("10x0e")
-
-    dataset = [
-        Data(
-            pos=torch.randn(num_nodes, 3),
-            x=irreps_in.randn(num_nodes, -1),
-            z=irreps_attr.randn(num_nodes, -1)
-        )
-        for _ in range(10)
-    ]
-    data = next(iter(DataLoader(dataset, batch_size=len(dataset))))
-
-    irreps_out = o3.Irreps("2x0o + 2x1o + 2x2e")
-
-    f = Network(
-        irreps_in,
-        o3.Irreps("5x0e + 5x0o + 5x1e + 5x1o"),
-        irreps_out,
-        irreps_attr,
-        o3.Irreps.spherical_harmonics(3),
-        layers=3,
-        max_radius=2.0,
-        number_of_basis=5,
-        radial_layers=2,
-        radial_neurons=100,
-        num_neighbors=4.0,
-        num_nodes=num_nodes,
-    )
-
-    R = o3.rand_matrix()
-    D_in = irreps_in.D_from_matrix(R)
-    D_attr = irreps_attr.D_from_matrix(R)
-    D_out = irreps_out.D_from_matrix(R)
-    rotated_data = Data(pos=data.pos @ R.T, x=data.x @ D_in.T, z=data.z @ D_attr.T, batch=data.batch)
-
-    pred = f(data)
-    rotated_pred = f(rotated_data)
-
-    assert (pred @ D_out.T - rotated_pred).abs().max() < 1e-10
