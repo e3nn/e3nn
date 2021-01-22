@@ -94,7 +94,7 @@ def _wigner_nj(*irrepss, normalization='component'):
 
 
 class ReducedTensorProducts:
-    def __init__(self, formula, eps=1e-9, **irreps):
+    def __init__(self, formula, ir_out=None, eps=1e-9, **irreps):
         f0, formulas = group.germinate_formulas(formula)
 
         irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
@@ -136,6 +136,9 @@ class ReducedTensorProducts:
         change_of_basis = []
 
         for ir in Ps:
+            if ir_out is not None and ir not in ir_out:
+                continue
+
             P = torch.stack([P for P, _, _ in Ps[ir]])
             paths = [path for _, path, _ in Ps[ir]]
             Cs = [C for _, _, C in Ps[ir]]
