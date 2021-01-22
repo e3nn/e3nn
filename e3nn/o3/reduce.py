@@ -43,7 +43,7 @@ _TP = collections.namedtuple('tp', 'op, args')
 _INPUT = collections.namedtuple('input', 'tensor, start, stop')
 
 
-def _wigner_nj(*irrepss, normalization='component'):
+def _wigner_nj(*irrepss, normalization='component', lmax=None):
     irrepss = [o3.Irreps(irreps) for irreps in irrepss]
 
     if len(irrepss) == 1:
@@ -66,6 +66,9 @@ def _wigner_nj(*irrepss, normalization='component'):
         i = 0
         for mul, ir in irreps_right:
             for ir_out in ir_left * ir:
+                if lmax is not None and ir_out.l > lmax:
+                    continue
+
                 C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l)
                 if normalization == 'component':
                     C *= ir_out.dim**0.5
@@ -94,7 +97,7 @@ def _wigner_nj(*irrepss, normalization='component'):
 
 
 class ReducedTensorProducts:
-    def __init__(self, formula, ir_out=None, eps=1e-9, **irreps):
+    def __init__(self, formula, ir_out=None, lmax=None, eps=1e-9, **irreps):
         f0, formulas = group.germinate_formulas(formula)
 
         irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
@@ -118,7 +121,7 @@ class ReducedTensorProducts:
 
         Ps = collections.defaultdict(list)
 
-        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0]):
+        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], lmax=lmax):
             P = C.flatten(1) @ Q.flatten(1).T
             Ps[ir].append((P.flatten(), path, C))
 
