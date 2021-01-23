@@ -97,7 +97,10 @@ def _wigner_nj(*irrepss, normalization='component', lmax=None):
 
 
 class ReducedTensorProducts:
-    def __init__(self, formula, ir_out=None, lmax=None, eps=1e-9, **irreps):
+    def __init__(self, formula, irreps_out=None, lmax=None, eps=1e-9, **irreps):
+        if irreps_out is not None:
+            irreps_out = [o3.Irrep(ir) for ir in irreps_out]
+
         f0, formulas = group.germinate_formulas(formula)
 
         irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
@@ -117,13 +120,14 @@ class ReducedTensorProducts:
                 raise RuntimeError(f'index {i} has no irreps associated to it')
 
 
-        Q, base = group.reduce_permutation(f0, formulas, **{i: irs.dim for i, irs in irreps.items()})
+        Q, _ = group.reduce_permutation(f0, formulas, **{i: irs.dim for i, irs in irreps.items()})
 
         Ps = collections.defaultdict(list)
 
         for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], lmax=lmax):
-            P = C.flatten(1) @ Q.flatten(1).T
-            Ps[ir].append((P.flatten(), path, C))
+            if irreps_out is None or ir in irreps_out:
+                P = C.flatten(1) @ Q.flatten(1).T
+                Ps[ir].append((P.flatten(), path, C))
 
         tps = set()
 
@@ -139,9 +143,6 @@ class ReducedTensorProducts:
         change_of_basis = []
 
         for ir in Ps:
-            if ir_out is not None and ir not in ir_out:
-                continue
-
             P = torch.stack([P for P, _, _ in Ps[ir]])
             paths = [path for _, path, _ in Ps[ir]]
             Cs = [C for _, _, C in Ps[ir]]
@@ -193,4 +194,4 @@ class ReducedTensorProducts:
                 values[path] = out
                 return out
 
-        return torch.cat([evaluate(path) for ir, path in self.outputs], dim=-1)
+        return torch.cat([evaluate(path) for _ir, path in self.outputs], dim=-1)
