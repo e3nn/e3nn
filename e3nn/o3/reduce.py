@@ -14,7 +14,7 @@ def reduce_tensor(formula, eps=1e-9, has_parity=True, **kw_irreps):
 
     >>> irreps, Q = reduce_tensor('ijkl=jikl=ikjl=ijlk', i="1e")
     >>> irreps
-    0e+2e+4e
+    1x0e+1x2e+1x4e
     """
     gr = group.O3() if has_parity else group.SO3()
 

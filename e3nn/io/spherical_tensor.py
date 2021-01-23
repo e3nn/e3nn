@@ -47,10 +47,10 @@ class SphericalTensor(o3.Irreps):
     --------
 
     >>> SphericalTensor(3, 1, 1)
-    0e+1e+2e+3e
+    1x0e+1x1e+1x2e+1x3e
 
     >>> SphericalTensor(3, 1, -1)
-    0e+1o+2e+3o
+    1x0e+1x1o+1x2e+1x3o
     """
     def __new__(self, lmax, p_val, p_arg):
         return o3.Irreps.__new__(self, [(1, l, p_val * p_arg**l) for l in range(lmax + 1)])

@@ -40,6 +40,9 @@ class Irrep(tuple):
 
     >>> Irrep("2e") in Irrep("1o") * Irrep("1o")
     True
+
+    >>> Irrep("1o") + Irrep("2o")
+    1x1o+1x2o
     """
     def __new__(self, l, p=None):
         if isinstance(l, Irrep):
@@ -164,19 +167,18 @@ class Irrep(tuple):
     def dim(self) -> int:
         return 2 * self.l + 1
 
-    def __mul__(self, other):
+    def __mul__(self, ir):
         r"""generate the irreps from the product of two irreps
 
         Returns
         -------
         generator of `Irrep`
         """
-        assert isinstance(other, Irrep)
-        p = self.p * other.p
-        lmin = abs(self.l - other.l)
-        lmax = self.l + other.l
-        for l in range(lmin, lmax + 1):
-            yield Irrep(l, p)
+        ir = Irrep(ir)
+        p = self.p * ir.p
+        lmin = abs(self.l - ir.l)
+        lmax = self.l + ir.l
+        return [Irrep(l, p) for l in range(lmin, lmax + 1)]
 
     def count(self, _value):
         raise NotImplementedError
@@ -184,11 +186,12 @@ class Irrep(tuple):
     def index(self, _value):
         raise NotImplementedError
 
-    def __rmul__(self, _object):
-        raise NotImplementedError
+    def __rmul__(self, mul):
+        assert isinstance(mul, int)
+        return Irreps([(mul, self)])
 
-    def __add__(self, _other):
-        raise NotImplementedError
+    def __add__(self, irreps):
+        return Irreps(self) + Irreps(irreps)
 
     def __contains__(self, _object):
         raise NotImplementedError
@@ -296,7 +299,7 @@ class Irreps(tuple):
         --------
 
         >>> Irreps.spherical_harmonics(3)
-        0e+1o+2e+3o
+        1x0e+1x1o+1x2e+1x3o
         """
         return Irreps([(1, l, (-1)**l) for l in range(lmax + 1)])
 
@@ -350,20 +353,24 @@ class Irreps(tuple):
             return Irreps(x)
         return x
 
-    def __contains__(self, x) -> bool:
-        return Irrep(x) in (ir for _, ir in self)
+    def __contains__(self, ir) -> bool:
+        ir = Irrep(ir)
+        return ir in (ir for _, ir in self)
 
-    def count(self, x) -> int:
-        x = Irrep(x)
-        return sum(mul for mul, ir in self if ir == x)
+    def count(self, ir) -> int:
+        ir = Irrep(ir)
+        return sum(mul for mul, ir in self if ir == ir)
 
     def index(self, _object):
         raise NotImplementedError
 
-    def __add__(self, other):
-        return Irreps(super().__add__(other))
+    def __add__(self, irreps):
+        irreps = Irreps(irreps)
+        return Irreps(super().__add__(irreps))
 
     def __mul__(self, other):
+        if isinstance(other, Irreps):
+            raise NotImplementedError("Use o3.TensorProduct for this, see the documentation")
         return Irreps(super().__mul__(other))
 
     def __rmul__(self, other):
@@ -382,12 +389,12 @@ class Irreps(tuple):
         Note that simplify does not sort the representations.
 
         >>> Irreps("1e + 1e + 0e").simplify()
-        2x1e+0e
+        2x1e+1x0e
 
         Same representations which are seperated from each other are not combined
 
         >>> Irreps("1e + 1e + 0e + 1e").simplify()
-        2x1e+0e+1e
+        2x1e+1x0e+1x1e
         """
         out = []
         for mul, ir in self:
@@ -410,7 +417,7 @@ class Irreps(tuple):
         --------
 
         >>> Irreps("1e + 0e + 1e").sort().irreps
-        0e+1e+1e
+        1x0e+1x1e+1x1e
 
         >>> Irreps("2o + 1e + 0e + 1e").sort().p
         (3, 1, 0, 2)
@@ -443,7 +450,7 @@ class Irreps(tuple):
         return max(self.ls)
 
     def __repr__(self):
-        return "+".join("{}{}".format(f"{mul}x" if mul != 1 else "", ir) for mul, ir in self)
+        return "+".join(f"{mul}x{ir}" for mul, ir in self)
 
     def D_from_angles(self, alpha, beta, gamma, k=None):
         r"""Matrix of the representation
