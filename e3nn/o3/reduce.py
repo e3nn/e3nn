@@ -43,8 +43,10 @@ _TP = collections.namedtuple('tp', 'op, args')
 _INPUT = collections.namedtuple('input', 'tensor, start, stop')
 
 
-def _wigner_nj(*irrepss, normalization='component', lmax=None):
+def _wigner_nj(*irrepss, normalization='component', irreps_mid=None):
     irrepss = [o3.Irreps(irreps) for irreps in irrepss]
+    if irreps_mid is not None:
+        irreps_mid = [o3.Irrep(ir) for ir in irreps_mid]
 
     if len(irrepss) == 1:
         irreps, = irrepss
@@ -66,7 +68,7 @@ def _wigner_nj(*irrepss, normalization='component', lmax=None):
         i = 0
         for mul, ir in irreps_right:
             for ir_out in ir_left * ir:
-                if lmax is not None and ir_out.l > lmax:
+                if irreps_mid is not None and ir_out not in irreps_mid:
                     continue
 
                 C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l)
@@ -96,8 +98,17 @@ def _wigner_nj(*irrepss, normalization='component', lmax=None):
     return sorted(ret, key=lambda x: x[0])
 
 
+def _get_ops(path):
+    if isinstance(path, _INPUT):
+        return
+    assert isinstance(path, _TP)
+    yield path.op
+    for op in _get_ops(path.args[0]):
+        yield op
+
+
 class ReducedTensorProducts:
-    def __init__(self, formula, irreps_out=None, lmax=None, eps=1e-9, **irreps):
+    def __init__(self, formula, irreps_out=None, irreps_mid=None, eps=1e-9, **irreps):
         if irreps_out is not None:
             irreps_out = [o3.Irrep(ir) for ir in irreps_out]
 
@@ -119,26 +130,20 @@ class ReducedTensorProducts:
             if i not in irreps:
                 raise RuntimeError(f'index {i} has no irreps associated to it')
 
+        for i in irreps:
+            if i not in f0:
+                raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
 
         Q, _ = group.reduce_permutation(f0, formulas, **{i: irs.dim for i, irs in irreps.items()})
 
         Ps = collections.defaultdict(list)
 
-        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], lmax=lmax):
+        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], irreps_mid=irreps_mid):
             if irreps_out is None or ir in irreps_out:
                 P = C.flatten(1) @ Q.flatten(1).T
                 Ps[ir].append((P.flatten(), path, C))
 
         tps = set()
-
-        def get_ops(path):
-            if isinstance(path, _INPUT):
-                return
-            assert isinstance(path, _TP)
-            yield path.op
-            for op in get_ops(path.args[0]):
-                yield op
-
         outputs = []
         change_of_basis = []
 
@@ -147,8 +152,7 @@ class ReducedTensorProducts:
             paths = [path for _, path, _ in Ps[ir]]
             Cs = [C for _, _, C in Ps[ir]]
 
-            P, A = orthonormalize(P, eps)
-            P = P.reshape(len(P), ir.dim, len(Q))
+            _, A = orthonormalize(P, eps)
 
             # remove paths
             paths = [path for path, c in zip(paths, A.norm(dim=0)) if c > eps]
@@ -158,7 +162,7 @@ class ReducedTensorProducts:
             assert A.shape[0] == A.shape[1]
 
             for path in paths:
-                for op in get_ops(path):
+                for op in _get_ops(path):
                     tps.add(op)
 
             for path in paths:
@@ -176,7 +180,14 @@ class ReducedTensorProducts:
             op: o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
             for op in tps
         }
+        self.irreps_in = [irreps[i] for i in f0]
         self.irreps_out = o3.Irreps([ir for ir, _ in outputs]).simplify()
+
+    def __repr__(self):
+        return f"""{self.__class__.__name__}(
+    in: {' times '.join(map(repr, self.irreps_in))}
+    out: {self.irreps_out}
+)"""
 
     def __call__(self, *xs):
         values = dict()
