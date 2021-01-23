@@ -14,7 +14,7 @@ class CartesianTensor(o3.Irreps):
     --------
 
     >>> CartesianTensor("ij=-ji")
-    1e
+    1x1e
 
     >>> import torch
     >>> x = CartesianTensor("ijk=-jik=-ikj")
