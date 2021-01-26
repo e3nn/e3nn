@@ -465,10 +465,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         code_right += f"{s}return out"
 
         self.code_out = code_out
-        self.main_out = eval_code(self.code_out).main
-
         self.code_right = code_right
-        self.main_right = eval_code(self.code_right).main
 
         # w3j
         self.wigners = wigners
@@ -570,7 +567,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             weight = self.prepare_weight_list(weight)
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
-            operator = self.main_right(features_2, weight, wigners)
+            operator = eval_code(self.code_right).main(features_2, weight, wigners)
 
             return operator.reshape(*size, self.irreps_in1.dim, self.irreps_out.dim)
 
@@ -611,7 +608,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             weight = self.prepare_weight_list(weight)
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
-            features = self.main_out(features_1, features_2, weight, wigners)
+            features = eval_code(self.code_out).main(features_1, features_2, weight, wigners)
+
 
             return features.reshape(*size, self.irreps_out.dim)
 

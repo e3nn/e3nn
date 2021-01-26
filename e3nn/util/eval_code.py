@@ -5,8 +5,10 @@ import importlib.machinery
 import importlib.util
 import os
 import tempfile
+import functools
 
 
+@functools.lru_cache(None)
 def eval_code(code):
     r"""
     save code in a temporary file and import it as a module
