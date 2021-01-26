@@ -56,7 +56,7 @@ class Convolution(torch.nn.Module):
             instructions,
             shared_weights=False,
         )
-        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.relu)
+        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], swish)
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_out)
