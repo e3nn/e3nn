@@ -1,5 +1,6 @@
 import itertools
 import collections
+import warnings
 
 import torch
 
@@ -269,6 +270,7 @@ class Irreps(tuple):
                     mul, ir = mul_ir
                     ir = Irrep(ir)
                 elif len(mul_ir) == 3:
+                    warnings.warn("prefer using [(mul, (l, p))] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
                     mul, l, p = mul_ir
                     ir = Irrep(l, p)
                 else:
@@ -301,7 +303,7 @@ class Irreps(tuple):
         >>> Irreps.spherical_harmonics(3)
         1x0e+1x1o+1x2e+1x3o
         """
-        return Irreps([(1, l, (-1)**l) for l in range(lmax + 1)])
+        return Irreps([(1, (l, (-1)**l)) for l in range(lmax + 1)])
 
     def randn(self, *size, normalization='component', dtype=None, device=None, requires_grad=False):
         """random tensor
