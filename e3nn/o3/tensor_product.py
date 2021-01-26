@@ -368,6 +368,18 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('{z}uv,uw,zvi->zuiw', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, e1, s2)")
                     continue
 
+                if l_1 == l_2 and l_out == 0 and mode == 'uuu' and normalization == 'component' and weight:
+                    # Cl_l_0 = eye / sqrt(2L+1)
+                    code_out += line_out.format(f"ein('{z}u,zui,zui->zu', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, s1, s2)")
+                    code_right += line_right.format(f"ein('{z}u,uw,zui->zuiw', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, e1, s2)")
+                    continue
+
+                if l_1 == l_2 and l_out == 0 and mode == 'uuu' and normalization == 'component' and not weight:
+                    # Cl_l_0 = eye / sqrt(2L+1)
+                    code_out += line_out.format(f"ein('zui,zui->zu', s1, s2).div({sqrt(2 * l_1 + 1)})")
+                    code_right += line_right.format(f"ein('uw,zui->zuiw', e1, s2).div({sqrt(2 * l_1 + 1)})")
+                    continue
+
                 if (l_1, l_2, l_out) == (1, 1, 1) and mode == 'uvw' and normalization == 'component' and weight:
                     # C1_1_1 = levi-civita / sqrt(2)
                     code_out += f"{s}s1 = s1.reshape(batch, {mul_1}, 1, {2 * l_1 + 1})\n"
@@ -908,17 +920,16 @@ class Norm(TensorProduct):
     def __init__(
             self,
             irreps_in,
-            normalization='component'
         ):
         irreps_in = o3.Irreps(irreps_in).simplify()
         irreps_out = o3.Irreps([(mul, "0e") for mul, _ in irreps_in])
 
         instr = [
-            (i, i, i, 'uuu', False)
-            for i in range(len(irreps_in))
+            (i, i, i, 'uuu', False, ir.dim)
+            for i, (mul, ir) in enumerate(irreps_in)
         ]
 
-        super().__init__(irreps_in, irreps_in, irreps_out, instr, normalization)
+        super().__init__(irreps_in, irreps_in, irreps_out, instr, 'component')
 
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out.simplify()
@@ -939,4 +950,4 @@ class Norm(TensorProduct):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        return super().forward(features, features)
+        return super().forward(features, features).sqrt()
