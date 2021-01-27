@@ -2,7 +2,6 @@ import torch
 
 from e3nn.o3 import ElementwiseTensorProduct, Norm
 
-# TODO: test this!
 class NormActivation(torch.nn.Module):
     r"""Gate activation function
 
@@ -77,9 +76,12 @@ class NormActivation(torch.nn.Module):
             epsilon_norms[epsilon_norms < self.epsilon] = self.epsilon
             nonlin_arg = epsilon_norms
             if self.bias:
-                nonlin_arg = nonlin_arg + self.biases
+                nonlin_arg = nonlin_arg + self.biases[None, :]
             scalings = self.scalar_nonlinearity(nonlin_arg) / epsilon_norms
         else:
-            scalings = self.scalar_nonlinearity(norms)
+            nonlin_arg = norms
+            if self.bias:
+                nonlin_arg = nonlin_arg + self.biases[None, :]
+            scalings = self.scalar_nonlinearity(nonlin_arg)
 
         return self.scalar_multiplier(scalings, features)
