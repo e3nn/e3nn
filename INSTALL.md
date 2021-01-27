@@ -2,16 +2,19 @@
 
 ## pytorch-geometric
 
-First you have to install pytorch-geometric, here are the commands for torch 1.7.0 and no cuda support:
+First you have to install pytorch-geometric, here are the commands for torch 1.7.1 and no cuda support:
 
 ```
-TORCH=1.7.0
+TORCH=1.7.1
 CUDA=cpu
+
 pip install torch==$TORCH torchvision torchaudio -f https://download.pytorch.org/whl/cpu/torch_stable.html
-pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
-pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
-pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
-pip install torch-spline-conv -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+
+TORCH=1.7.0
+pip install --no-index torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --no-index torch-sparse -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --no-index torch-cluster -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --no-index torch-spline-conv -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
 pip install torch-geometric
 ```
 
