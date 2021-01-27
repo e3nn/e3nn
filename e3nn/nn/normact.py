@@ -1,59 +1,64 @@
 import torch
 
-from e3nn.o3 import ElementwiseTensorProduct, Norm
+from e3nn import o3
+
 
 class NormActivation(torch.nn.Module):
-    r"""Gate activation function
+    r"""Norm-based activation function
+
+    Applies a scalar nonlinearity to the norm of each irrep and ouputs a (normalized) version of that irrep multiplied by the scalar output of the scalar nonlinearity.
+
 
     Parameters
     ----------
-    irreps_scalars : `Irreps`
-        representation of the scalars (the one not use for the gates)
+    irreps_in : `Irreps`
+        representation of the input
 
-    act_scalars : list of function or None
-        activations acting on the scalars
+    scalar_nonlinearity : callable
+        scalar nonlinearity such as ``torch.sigmoid``
 
-    irreps_gates : `Irreps`
-        representation of the scalars used to gate.
-        ``irreps_gates.num_irreps == irreps_nonscalars.num_irreps``
+    normalize : bool
+        whether to normalize the input features before multiplying them by the scalars from the nonlinearity
 
-    act_gates : list of function or None
-        activations acting on the gates
+    epsilon : float
+        when ``normalize`ing, norms smaller than ``epsilon`` will be clamped to ``epsilon`` to avoid division by zero
 
-    irreps_nonscalars : `Irreps`
-        representation of the non-scalars.
-        ``irreps_gates.num_irreps == irreps_nonscalars.num_irreps``
+    bias : bool
+        whether to apply a learnable additive bias to the inputs of the ``scalar_nonlinearity``
 
     Examples
     --------
 
-    >>> g = Gate("16x0o", [torch.tanh], "32x0o", [torch.tanh], "16x1e+16x1o")
-    >>> g.irreps_out
-    16x0o+16x1o+16x1e
+    >>> n = NormActivation("2x1e", torch.sigmoid)
+    >>> feats = torch.ones(1, 2*3)
+    >>> print(feats.reshape(1, 2, 3).norm(dim=-1))
+    tensor([[1.7321, 1.7321]])
+    >>> print(torch.sigmoid(feats.reshape(1, 2, 3).norm(dim=-1)))
+    tensor([[0.8497, 0.8497]])
+    >>> print(n(feats).reshape(1, 2, 3).norm(dim=-1))
+    tensor([[0.8497, 0.8497]])
     """
     def __init__(self,
                  irreps_in,
                  scalar_nonlinearity,
                  normalize=True,
-                 bias=False,
                  epsilon=1e-8,
-                 **kwargs):
+                 bias=False):
         super().__init__()
-        self.irreps_in = irreps_in
-        self.irreps_out = irreps_in
-        self.norm = Norm(irreps_in, **kwargs)
+        self.irreps_in = o3.Irreps(irreps_in)
+        self.irreps_out = o3.Irreps(irreps_in)
+        self.norm = o3.Norm(irreps_in)
         self.scalar_nonlinearity = scalar_nonlinearity
         self.epsilon = torch.as_tensor(epsilon)
-        self.normalize = True
+        self.normalize = normalize
         self.bias = bias
         if self.bias:
             self.biases = torch.nn.Parameter(torch.zeros(irreps_in.num_irreps))
 
-        self.scalar_multiplier = ElementwiseTensorProduct(
+        self.scalar_multiplier = o3.ElementwiseTensorProduct(
             irreps_in1=self.norm.irreps_out,
             irreps_in2=irreps_in,
         )
-
 
     def forward(self, features):
         '''evaluate
@@ -66,7 +71,7 @@ class NormActivation(torch.nn.Module):
         Returns
         -------
         `torch.Tensor`
-            tensor of shape ``(..., irreps_out.dim)``
+            tensor of shape ``(..., irreps_in.dim)``
         '''
         norms = self.norm(features)
 
@@ -76,12 +81,12 @@ class NormActivation(torch.nn.Module):
             epsilon_norms[epsilon_norms < self.epsilon] = self.epsilon
             nonlin_arg = epsilon_norms
             if self.bias:
-                nonlin_arg = nonlin_arg + self.biases[None, :]
+                nonlin_arg = nonlin_arg + self.biases
             scalings = self.scalar_nonlinearity(nonlin_arg) / epsilon_norms
         else:
             nonlin_arg = norms
             if self.bias:
-                nonlin_arg = nonlin_arg + self.biases[None, :]
+                nonlin_arg = nonlin_arg + self.biases
             scalings = self.scalar_nonlinearity(nonlin_arg)
 
         return self.scalar_multiplier(scalings, features)

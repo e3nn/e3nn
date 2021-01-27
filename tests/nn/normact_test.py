@@ -12,8 +12,8 @@ def test_norm_activation(do_bias):
     N_batch = 3
     in_features = torch.randn(N_batch, irreps_in.dim)
     # Set some features to zero to test avoiding divide by zero
-    in_features[0, 0] = 0 # batch 0, scalar 0
-    in_features[1, 4:4+3] = 0 # batch 0, vector 1
+    in_features[0, 0] = 0  # batch 0, scalar 0
+    in_features[1, 4:4+3] = 0  # batch 0, vector 1
 
     norm_act = NormActivation(
         irreps_in=irreps_in,
@@ -41,7 +41,7 @@ def test_norm_activation(do_bias):
         else:
             true_nonlin_arg = scalar_in.abs()
         assert torch.allclose(
-            torch.sign(scalar_in)*nonlin(true_nonlin_arg), # of in norm
+            torch.sign(scalar_in)*nonlin(true_nonlin_arg),
             out[batch, :4]
         )
         # vectors
