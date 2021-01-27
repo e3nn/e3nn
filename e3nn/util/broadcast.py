@@ -29,9 +29,10 @@ def broadcast_tensors(x, y, dim_x=-1, dim_y=-1):
     assert dim_x == dim_y
     dim = dim_x
 
-    shape = [max(dx, dy) for dx, dy in zip(x.shape[:dim], y.shape[:dim])]
+    if x.shape[:dim] != y.shape[:dim]:
+        shape = [max(dx, dy) for dx, dy in zip(x.shape[:dim], y.shape[:dim])]
 
-    x = x.expand(*shape, *(-1,)*(x.ndim - dim))
-    y = y.expand(*shape, *(-1,)*(y.ndim - dim))
+        x = x.expand(*shape, *(-1,)*(x.ndim - dim))
+        y = y.expand(*shape, *(-1,)*(y.ndim - dim))
 
     return x, y
