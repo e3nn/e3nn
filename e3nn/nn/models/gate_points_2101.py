@@ -12,7 +12,7 @@ from torch_scatter import scatter
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
-from e3nn.math import soft_one_hot_linspace
+from e3nn.math import soft_one_hot_linspace, swish
 
 
 class Convolution(torch.nn.Module):
@@ -56,7 +56,7 @@ class Convolution(torch.nn.Module):
             instructions,
             shared_weights=False,
         )
-        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.relu)
+        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], swish)
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_out)
@@ -166,13 +166,15 @@ class Network(torch.nn.Module):
             radial_layers,
             radial_neurons,
             num_neighbors,
-            num_nodes
+            num_nodes,
+            reduce_output=True,
         ) -> None:
         super().__init__()
         self.max_radius = max_radius
         self.number_of_basis = number_of_basis
         self.num_neighbors = num_neighbors
         self.num_nodes = num_nodes
+        self.reduce_output = reduce_output
 
         self.irreps_in = o3.Irreps(irreps_in) if irreps_in is not None else None
         self.irreps_hidden = o3.Irreps(irreps_hidden)
@@ -183,12 +185,12 @@ class Network(torch.nn.Module):
         irreps = self.irreps_in if self.irreps_in is not None else self.irreps_edge_attr
 
         act = {
-            1: torch.relu,
+            1: swish,
             -1: torch.tanh,
         }
         act_gates = {
-            1: torch.relu,
-            -1: torch.abs,
+            1: torch.sigmoid,
+            -1: torch.tanh,
         }
 
         self.layers = torch.nn.ModuleList()
@@ -267,4 +269,7 @@ class Network(torch.nn.Module):
         for lay in self.layers:
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
-        return scatter(x, batch, dim=0).div(self.num_nodes**0.5)
+        if self.reduce_output:
+            return scatter(x, batch, dim=0).div(self.num_nodes**0.5)
+        else:
+            return x

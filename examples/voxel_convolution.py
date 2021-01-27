@@ -12,7 +12,7 @@ from e3nn.math import soft_one_hot_linspace
 
 
 class Convolution(torch.nn.Module):
-    def __init__(self, irreps_in, irreps_out, size):
+    def __init__(self, irreps_in, irreps_out, size, steps=(1, 1, 1)):
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
@@ -26,7 +26,13 @@ class Convolution(torch.nn.Module):
 
         # interaction with neighbors
         r = torch.linspace(-1, 1, self.size)
-        lattice = torch.stack(torch.meshgrid(r, r, r), dim=-1)
+        x = r * steps[0] / min(steps)
+        x = x[x.abs() <= 1]
+        y = r * steps[1] / min(steps)
+        y = y[y.abs() <= 1]
+        z = r * steps[2] / min(steps)
+        z = z[z.abs() <= 1]
+        lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
         self.register_buffer('d', lattice.norm(dim=-1))
 
         sh = o3.spherical_harmonics(self.irreps_sh, lattice, True, 'component')  # [x, y, z, irreps_sh.dim]
