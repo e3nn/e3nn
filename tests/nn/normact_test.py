@@ -5,6 +5,7 @@ import torch
 import e3nn
 from e3nn.nn import NormActivation
 
+
 @pytest.mark.parametrize('do_bias', [True, False])
 def test_norm_activation(do_bias):
     nonlin = torch.sigmoid
