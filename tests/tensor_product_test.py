@@ -48,7 +48,7 @@ def random_params():
 def test(l1, p1, l2, p2, lo, po, mode, weight):
     eps = 1e-10
     n = 1_500
-    tol = 1.9
+    tol = 3.0
     torch.set_default_dtype(torch.float64)
 
     m = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
