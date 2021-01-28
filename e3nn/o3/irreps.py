@@ -46,7 +46,7 @@ class Irrep(tuple):
     1x1o+1x2o
     """
     def __new__(cls, l, p=None):
-        if isinstance(l, Irrep):
+        if isinstance(l, Irrep) and p is None:
             return l
 
         if isinstance(l, str) and p is None:
@@ -270,9 +270,9 @@ class Irreps(tuple):
                     mul, ir = mul_ir
                     ir = Irrep(ir)
                 elif len(mul_ir) == 3:
-                    warnings.warn("prefer using [(mul, (l, p))] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
                     mul, l, p = mul_ir
                     ir = Irrep(l, p)
+                    warnings.warn("prefer using [(mul, (l, p))] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
                 else:
                     mul = None
                     ir = None

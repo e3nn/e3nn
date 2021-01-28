@@ -18,7 +18,7 @@ class CartesianTensor(o3.Irreps):
     1x1e
 
     >>> x = CartesianTensor("ijk=-jik=-ikj")
-    >>> x.from_tensor(torch.ones(3, 3, 3))
+    >>> x.from_cartesian(torch.ones(3, 3, 3))
     tensor([0.])
 
     >>> x.from_vectors(torch.ones(3), torch.ones(3), torch.ones(3))
@@ -34,7 +34,7 @@ class CartesianTensor(o3.Irreps):
         return ret
 
     def from_cartesian(self, data):
-        Q = self.Q.flatten(-self.num_index)
+        Q = self.change_of_basis().flatten(-self.num_index)
         return data.flatten(-self.num_index) @ Q.T
 
     def from_vectors(self, *xs):
