@@ -3,8 +3,8 @@ from e3nn import o3
 from e3nn.nn import BatchNorm
 
 
-def test_normalization():
-    torch.set_default_dtype(torch.float64)
+def test_normalization(float_tolerance, assert_equivariant):
+    sqrt_float_tolerance = torch.sqrt(float_tolerance)
 
     batch, n = 20, 20
     irreps = o3.Irreps("3x0e + 4x1e")
@@ -15,13 +15,11 @@ def test_normalization():
     x = m(x)
 
     a = x[..., :3]  # [batch, space, mul]
-    assert a.mean([0, 1]).abs().max() < 1e-10
-    assert a.pow(2).mean([0, 1]).sub(1).abs().max() < 1e-5
+    assert a.mean([0, 1]).abs().max() < float_tolerance
+    assert a.pow(2).mean([0, 1]).sub(1).abs().max() < sqrt_float_tolerance
 
     a = x[..., 3:].reshape(batch, n, 4, 3)  # [batch, space, mul, repr]
-    assert a.pow(2).sum(3).mean([0, 1]).sub(1).abs().max() < 1e-5
-
-    #
+    assert a.pow(2).sum(3).mean([0, 1]).sub(1).abs().max() < sqrt_float_tolerance
 
     m = BatchNorm(irreps, normalization='component')
 
@@ -29,8 +27,10 @@ def test_normalization():
     x = m(x)
 
     a = x[..., :3]  # [batch, space, mul]
-    assert a.mean([0, 1]).abs().max() < 1e-10
-    assert a.pow(2).mean([0, 1]).sub(1).abs().max() < 1e-5
+    assert a.mean([0, 1]).abs().max() < float_tolerance
+    assert a.pow(2).mean([0, 1]).sub(1).abs().max() < sqrt_float_tolerance
 
     a = x[..., 3:].reshape(batch, n, 4, 3)  # [batch, space, mul, repr]
-    assert a.pow(2).mean(3).mean([0, 1]).sub(1).abs().max() < 1e-5
+    assert a.pow(2).mean(3).mean([0, 1]).sub(1).abs().max() < sqrt_float_tolerance
+
+    assert_equivariant(m, irreps_in=irreps, irreps_out=irreps)

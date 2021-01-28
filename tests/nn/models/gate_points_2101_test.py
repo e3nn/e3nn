@@ -4,9 +4,7 @@ from e3nn.nn.models.gate_points_2101 import Network
 from torch_geometric.data import Data, DataLoader
 
 
-def test_gate_points_2001():
-    torch.set_default_dtype(torch.float64)
-
+def test_gate_points_2101(float_tolerance):
     num_nodes = 5
     irreps_in = o3.Irreps("3x0e + 2x1o")
     irreps_attr = o3.Irreps("10x0e")
@@ -38,6 +36,7 @@ def test_gate_points_2001():
         num_nodes=num_nodes,
     )
 
+    # Test equivariance with a full data pipeline:
     R = o3.rand_matrix()
     D_in = irreps_in.D_from_matrix(R)
     D_attr = irreps_attr.D_from_matrix(R)
@@ -47,4 +46,4 @@ def test_gate_points_2001():
     pred = f(data)
     rotated_pred = f(rotated_data)
 
-    assert (pred @ D_out.T - rotated_pred).abs().max() < 1e-10
+    assert (pred @ D_out.T - rotated_pred).abs().max() < float_tolerance

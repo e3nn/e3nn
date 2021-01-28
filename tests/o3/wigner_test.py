@@ -11,8 +11,7 @@ def test_wigner_3j_symmetry():
     assert torch.allclose(o3.wigner_3j(1, 2, 3), o3.wigner_3j(2, 3, 1).transpose(0, 2).transpose(1, 2))
 
 
-def test_wigner_3j():
-    torch.set_default_dtype(torch.float64)
+def test_wigner_3j(float_tolerance):
     abc = o3.rand_angles(10)
 
     l1, l2, l3 = 1, 2, 3
@@ -22,4 +21,4 @@ def test_wigner_3j():
     D3 = o3.Irrep(l3, 1).D_from_angles(*abc)
 
     C2 = torch.einsum("ijk,zil,zjm,zkn->zlmn", C, D1, D2, D3)
-    assert (C - C2).abs().max() < 1e-10
+    assert (C - C2).abs().max() < float_tolerance
