@@ -34,6 +34,7 @@ jobs:
       env:
         TORCH: "1.7.0"
         CUDA: "cpu"
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         python -m pip install --upgrade pip
         pip install wheel
@@ -45,9 +46,14 @@ jobs:
         pip install .
 
         pip install plotly
-    - name: Test with pytest
+    - name: Install pytest
       run: |
         pip install pytest pytest-cov
         pip install coveralls
-        coverage run --source=e3nn_core -m pytest --doctest-modules .
+    - name: Test with pytest
+      run: |
+        coverage run --source=e3nn -m pytest --doctest-modules .
+    - name: Upload to coveralls
+      if: github.event_name == 'push'
+      run: |
         COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls

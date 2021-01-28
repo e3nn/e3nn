@@ -14,10 +14,10 @@ def test_creation():
     o3.Irreps(irreps)
     o3.Irreps([(32, (4, -1))])
     o3.Irreps("11e")
-    assert o3.Irreps("16x1e + 32 x 2o") == o3.Irreps([(16, 1, 1), (32, 2, -1)])
+    assert o3.Irreps("16x1e + 32 x 2o") == o3.Irreps([(16, (1, 1)), (32, (2, -1))])
     o3.Irreps(["1e", '2o'])
     o3.Irreps([(16, "3e"), '1e'])
-    o3.Irreps([(16, "3e"), '1e', (256, 1, -1)])
+    o3.Irreps([(16, "3e"), '1e', (256, (1, -1))])
 
 
 def test_slice():

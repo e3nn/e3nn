@@ -4,7 +4,10 @@ from e3nn import o3
 
 
 def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
-    irreps, Q = o3.reduce_tensor('ijk=-ikj=-jik', i='1e')
+    tp = o3.ReducedTensorProducts('ijk=-ikj=-jik', i='1e')
+    irreps = tp.irreps_out
+    Q = tp.change_of_basis
+
     assert irreps == ((1, (0, 1)),)
     r = o3.rand_angles()
     D = o3.wigner_D(1, *r)
@@ -14,7 +17,9 @@ def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
 
 
 def test_reduce_tensor_antisymmetric_L2(float_tolerance):
-    irreps, Q = o3.reduce_tensor('ijk=-ikj=-jik', i='2e')
+    tp = o3.ReducedTensorProducts('ijk=-ikj=-jik', i='2e')
+    irreps = tp.irreps_out
+    Q = tp.change_of_basis
     assert irreps[0] == (1, (1, 1))
     q = Q[:3].reshape(3, 5, 5, 5)
 
@@ -25,30 +30,32 @@ def test_reduce_tensor_antisymmetric_L2(float_tolerance):
     Q2 = torch.einsum('yz,zijk->yijk', D1, q)
 
     assert (Q1 - Q2).abs().max() < 10*float_tolerance
-    assert (q + q.transpose(1, 2)).abs().max() < 10*float_tolerance
-    assert (q + q.transpose(1, 3)).abs().max() < 10*float_tolerance
-    assert (q + q.transpose(3, 2)).abs().max() < 10*float_tolerance
 
 
 def test_reduce_tensor_elasticity_tensor():
-    irreps, _Q = o3.reduce_tensor('ijkl=jikl=klij', i='1e')
+    tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i='1e')
+    irreps = tp.irreps_out
     assert irreps.dim == 21
 
 
 def test_reduce_tensor_elasticity_tensor_parity():
-    irreps, _Q = o3.reduce_tensor('ijkl=jikl=klij', i='1o')
+    tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i='1o')
+    irreps = tp.irreps_out
     assert all(p == 1 for _, (_, p) in irreps)
     assert irreps.dim == 21
 
 
-def test_reduce_tensor_rot():
-    irreps, _Q = o3.reduce_tensor('ijkl=jikl=klij', i=o3.quaternion_to_matrix, has_parity=False)
-    assert irreps.dim == 21
+# def test_reduce_tensor_rot():
+#     tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i=o3.quaternion_to_matrix, has_parity=False)
+#     irreps = tp.irreps_out
+#     assert irreps.dim == 21
 
 
 def test_reduce_tensor_equivariance(float_tolerance):
     ir = o3.Irreps('1e')
-    irreps, Q = o3.reduce_tensor('ijkl=jikl=klij', i=ir)
+    tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i=ir)
+    irreps = tp.irreps_out
+    Q = tp.change_of_basis
 
     abc = o3.rand_angles()
     R = ir.D_from_angles(*abc)

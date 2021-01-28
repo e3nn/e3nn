@@ -49,7 +49,7 @@ def random_params():
 def test(float_tolerance, assert_equivariant, l1, p1, l2, p2, lo, po, mode, weight):
     eps = float_tolerance
     n = 1_500
-    tol = 1.9
+    tol = 3.0
 
     m = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
 

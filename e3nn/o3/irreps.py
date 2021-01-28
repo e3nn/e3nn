@@ -45,8 +45,8 @@ class Irrep(tuple):
     >>> Irrep("1o") + Irrep("2o")
     1x1o+1x2o
     """
-    def __new__(self, l, p=None):
-        if isinstance(l, Irrep):
+    def __new__(cls, l, p=None):
+        if isinstance(l, Irrep) and p is None:
             return l
 
         if isinstance(l, str) and p is None:
@@ -64,7 +64,7 @@ class Irrep(tuple):
 
         assert isinstance(l, int) and l >= 0, l
         assert p in [-1, 1], p
-        return tuple.__new__(self, (l, p))
+        return super().__new__(cls, (l, p))
 
     def __repr__(self):
         p = {+1: 'e', -1: 'o'}[self.p]
@@ -239,9 +239,9 @@ class Irreps(tuple):
     >>> Irrep("2e") in Irreps("0e + 2e")
     True
     """
-    def __new__(self, irreps):
+    def __new__(cls, irreps):
         if isinstance(irreps, Irreps):
-            return tuple.__new__(self, irreps)
+            return super().__new__(cls, irreps)
 
         out = []
         if isinstance(irreps, Irrep):
@@ -270,9 +270,9 @@ class Irreps(tuple):
                     mul, ir = mul_ir
                     ir = Irrep(ir)
                 elif len(mul_ir) == 3:
-                    warnings.warn("prefer using [(mul, (l, p))] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
                     mul, l, p = mul_ir
                     ir = Irrep(l, p)
+                    warnings.warn("prefer using [(mul, (l, p))] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
                 else:
                     mul = None
                     ir = None
@@ -281,7 +281,7 @@ class Irreps(tuple):
                 assert ir is not None
 
                 out.append((mul, ir))
-        return tuple.__new__(self, out)
+        return super().__new__(cls, out)
 
     @staticmethod
     def spherical_harmonics(lmax):
