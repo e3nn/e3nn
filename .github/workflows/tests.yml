@@ -46,10 +46,12 @@ jobs:
         pip install .
 
         pip install plotly
-    - name: Test with pytest
+    - name: Install pytest
       run: |
         pip install pytest pytest-cov
         pip install coveralls
+    - name: Test with pytest
+      run: |
         coverage run --source=e3nn -m pytest --doctest-modules .
     - name: Upload to coveralls
       if: ${{ github.event.push }}
