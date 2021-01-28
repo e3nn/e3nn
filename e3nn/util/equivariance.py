@@ -74,7 +74,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
         for parity_k in parity_ks:
             args = [
-                torch.randn(point_shape) if irreps == 'points' else irreps.randn(*arg_shape) 
+                torch.randn(point_shape) if irreps == 'points' else irreps.randn(*arg_shape)
                 for irreps in irreps_in
             ]
             # Build a rotation matrix for point data
@@ -85,7 +85,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
             # Evaluate the function on rotated arguments:
             rot_args = [
-                (a @ rot_mat.T) if irreps == 'points' else (a @ irreps.D_from_matrix(*D_params).T) 
+                (a @ rot_mat.T) if irreps == 'points' else (a @ irreps.D_from_matrix(*D_params).T)
                 for irreps, a in zip(irreps_in, args)
             ]
             x1 = func(*rot_args)
@@ -107,7 +107,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
             # apply the group action to x2
             x2 = [
-                (a @ rot_mat.T) if irreps == 'points' else (a @ irreps.D_from_matrix(*D_params).T) 
+                (a @ rot_mat.T) if irreps == 'points' else (a @ irreps.D_from_matrix(*D_params).T)
                 for irreps, a in zip(irreps_out, x2)
             ]
 

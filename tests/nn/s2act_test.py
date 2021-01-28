@@ -3,7 +3,7 @@ import itertools
 
 import pytest
 import torch
-from e3nn import o3, io
+from e3nn import io
 from e3nn.nn import S2Activation
 
 

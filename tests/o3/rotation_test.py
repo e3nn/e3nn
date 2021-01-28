@@ -25,7 +25,9 @@ def test_conversions(float_tolerance):
             else:
                 return f(x)
         return g
-    identity = lambda x: x
+
+    def identity(x):
+        return x
     conv = [
         [identity, wrap(o3.angles_to_matrix), wrap(o3.angles_to_axis_angle), wrap(o3.angles_to_quaternion)],
         [wrap(o3.matrix_to_angles), identity, wrap(o3.matrix_to_axis_angle), wrap(o3.matrix_to_quaternion)],

@@ -102,7 +102,6 @@ def test_recurrence_relation(float_tolerance, l):
 
     assert (a / a.norm() - b / b.norm()).abs().max() < 10*float_tolerance
 
-
     def f(x):
         return o3.spherical_harmonics(l + 1, x, False)
     a = torch.autograd.functional.jacobian(f, x)
