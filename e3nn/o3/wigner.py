@@ -109,19 +109,20 @@ def wigner_3j(l1, l2, l3):
 
     try:
         if l1 <= l2 <= l3:
-            return _W3j[(l1, l2, l3)].clone()
+            out = _W3j[(l1, l2, l3)].clone()
         if l1 <= l3 <= l2:
-            return _W3j[(l1, l3, l2)].transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = _W3j[(l1, l3, l2)].transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
         if l2 <= l1 <= l3:
-            return _W3j[(l2, l1, l3)].transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = _W3j[(l2, l1, l3)].transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
         if l3 <= l2 <= l1:
-            return _W3j[(l3, l2, l1)].transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = _W3j[(l3, l2, l1)].transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
         if l2 <= l3 <= l1:
-            return _W3j[(l2, l3, l1)].transpose(0, 2).transpose(1, 2).clone()
+            out = _W3j[(l2, l3, l1)].transpose(0, 2).transpose(1, 2).clone()
         if l3 <= l1 <= l2:
-            return _W3j[(l3, l1, l2)].transpose(0, 2).transpose(0, 1).clone()
+            out = _W3j[(l3, l1, l2)].transpose(0, 2).transpose(0, 1).clone()
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
+    return out.to(dtype=torch.get_default_dtype())
 
 
 def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
