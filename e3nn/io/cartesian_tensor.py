@@ -46,8 +46,7 @@ class CartesianTensor(o3.Irreps):
         xs = [x @ A.T for x in xs]
         return self._rtp(*xs)
 
-    @property
-    def Q(self):
+    def change_of_basis(self):
         A = torch.tensor([
             [0, 1, 0],
             [0, 0, 1],
