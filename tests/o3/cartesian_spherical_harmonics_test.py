@@ -13,9 +13,7 @@ def test_zeros():
     assert torch.allclose(o3.spherical_harmonics([0, 1], torch.zeros(1, 3), False, normalization='norm'), torch.tensor([[1, 0, 0, 0.0]]))
 
 
-def test_equivariance():
-    torch.set_default_dtype(torch.float64)
-
+def test_equivariance(float_tolerance):
     lmax = 5
     irreps = o3.Irreps.spherical_harmonics(lmax)
     x = torch.randn(2, 3)
@@ -23,11 +21,10 @@ def test_equivariance():
     y1 = o3.spherical_harmonics(irreps, x @ o3.angles_to_matrix(*abc).T, False)
     y2 = o3.spherical_harmonics(irreps, x, False) @ irreps.D_from_angles(*abc).T
 
-    assert (y1 - y2).abs().max() < 1e-10
+    assert (y1 - y2).abs().max() < float_tolerance
 
 
 def test_backwardable():
-    torch.set_default_dtype(torch.float64)
     lmax = 3
     ls = list(range(lmax + 1))
 
@@ -44,17 +41,16 @@ def test_backwardable():
 
 
 @pytest.mark.parametrize('l', range(10 + 1))
-def test_normalization(l):
-    torch.set_default_dtype(torch.float64)
+def test_normalization(float_tolerance, l):
 
     n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization='integral').pow(2).mean()
-    assert abs(n - 1 / (4 * math.pi)) < 1e-10
+    assert abs(n - 1 / (4 * math.pi)) < float_tolerance
 
     n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization='norm').norm()
-    assert abs(n - 1) < 1e-10
+    assert abs(n - 1) < float_tolerance
 
     n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization='component').pow(2).mean()
-    assert abs(n - 1) < 1e-10
+    assert abs(n - 1) < float_tolerance
 
 
 def test_closure():
@@ -62,7 +58,7 @@ def test_closure():
     integral of Ylm * Yjn = delta_lj delta_mn
     integral of 1 over the unit sphere = 4 pi
     """
-    torch.set_default_dtype(torch.float64)
+    #torch.set_default_dtype(torch.float64)
     x = torch.randn(300_000, 3)
     Ys = [o3.spherical_harmonics(l, x, normalize=True) for l in range(0, 3 + 1)]
     for l1, Y1 in enumerate(Ys):
@@ -77,21 +73,18 @@ def test_closure():
 
 
 @pytest.mark.parametrize('l', range(11 + 1))
-def test_parity(l):
+def test_parity(float_tolerance, l):
     r"""
     (-1)^l Y(x) = Y(-x)
     """
-    torch.set_default_dtype(torch.float64)
     x = torch.randn(3)
     Y1 = (-1)**l * o3.spherical_harmonics(l, x, False)
     Y2 = o3.spherical_harmonics(l, -x, False)
-    assert (Y1 - Y2).abs().max() < 1e-10
+    assert (Y1 - Y2).abs().max() < float_tolerance
 
 
 @pytest.mark.parametrize('l', range(9 + 1))
-def test_recurrence_relation(l):
-    torch.set_default_dtype(torch.float64)
-
+def test_recurrence_relation(float_tolerance, l):
     x = torch.randn(3, requires_grad=True)
 
     a = o3.spherical_harmonics(l + 1, x, False)
@@ -105,7 +98,7 @@ def test_recurrence_relation(l):
 
     alpha = b.norm() / a.norm()
 
-    assert (a / a.norm() - b / b.norm()).abs().max() < 1e-9
+    assert (a / a.norm() - b / b.norm()).abs().max() < 10*float_tolerance
 
 
     def f(x):
@@ -119,4 +112,4 @@ def test_recurrence_relation(l):
         o3.spherical_harmonics(l, x, False)
     )
 
-    assert (a - b).abs().max() < 1e-9
+    assert (a - b).abs().max() < 10*float_tolerance

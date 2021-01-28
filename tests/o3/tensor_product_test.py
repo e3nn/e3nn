@@ -1,4 +1,5 @@
 import random
+from tests.conftest import assert_equivariant
 
 import pytest
 import torch
@@ -45,11 +46,10 @@ def random_params():
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params())
-def test(l1, p1, l2, p2, lo, po, mode, weight):
-    eps = 1e-10
+def test(float_tolerance, assert_equivariant, l1, p1, l2, p2, lo, po, mode, weight):
+    eps = float_tolerance
     n = 1_500
     tol = 1.9
-    torch.set_default_dtype(torch.float64)
 
     m = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
 
@@ -77,11 +77,4 @@ def test(l1, p1, l2, p2, lo, po, mode, weight):
     assert z1.mean().log10().abs() < torch.tensor(tol).log10()
 
     # equivariance
-    R = o3.rand_matrix()
-    x1 = torch.randn(2, m.irreps_in1.dim)
-    x2 = x1 @ m.irreps_in1.D_from_matrix(R, k=torch.tensor(1)).T
-    y1 = torch.randn(2, m.irreps_in2.dim)
-    y2 = y1 @ m.irreps_in2.D_from_matrix(R, k=torch.tensor(1)).T
-    z1 = m(x1, y1) @ m.irreps_out.D_from_matrix(R, k=torch.tensor(1)).T
-    z2 = m(x2, y2)
-    assert (z1 - z2).abs().max() < eps
+    assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
