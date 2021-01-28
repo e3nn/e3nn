@@ -48,7 +48,7 @@ def assert_equivariant(float_tolerance):
     def func(*args, sqrt_tolerance=False, tolerance_multiplier=1., **kwargs):
         # Apply a default:
         if 'ntrials' not in kwargs:
-            kwargs['ntrials'] = 2
+            kwargs['ntrials'] = 1
         error = equivariance_error(*args, **kwargs)
         tol = tolerance_multiplier*float_tolerance
         if sqrt_tolerance:
