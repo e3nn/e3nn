@@ -58,7 +58,9 @@ def reduce_permutation(f0, formulas, **dims):
         if i not in dims:
             raise RuntimeError(f'index {i} has no dimension associated to it')
 
-    full_base = list(itertools.product(*(range(dims[i]) for i in f0)))  # (0, 0, 0), (0, 0, 1), (0, 0, 2), ... (3, 3, 3)
+    dims = [dims[i] for i in f0]
+
+    full_base = list(itertools.product(*(range(d) for d in dims)))  # (0, 0, 0), (0, 0, 1), (0, 0, 2), ... (3, 3, 3)
     # len(full_base) degrees of freedom in an unconstrained tensor
 
     # but there is constraints given by the group `formulas`
@@ -84,20 +86,23 @@ def reduce_permutation(f0, formulas, **dims):
 
     # First we compute the change of basis (projection) between full_base and base
     d_sym = len(base)
-    d = len(full_base)
-    Q = torch.zeros(d_sym, d)
+    Q = torch.zeros(d_sym, len(full_base))
     ret = []
 
     for i, x in enumerate(base):
         x = max(x, key=lambda xs: sum(s for s, x in xs))
         ret.append(x)
         for s, e in x:
-            j = full_base.index(e)
+            # j = full_base.index(e)
+            j = 0
+            for k, d in zip(e, dims):
+                j *= d
+                j += k
             Q[i, j] = s / len(x)**0.5
 
-    assert torch.allclose(Q @ Q.T, torch.eye(d_sym))
+    # assert torch.allclose(Q @ Q.T, torch.eye(d_sym))
 
-    Q = Q.reshape(d_sym, *(dims[i] for i in f0))
+    Q = Q.reshape(d_sym, *dims)
     return Q, ret
 
 
