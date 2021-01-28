@@ -171,7 +171,7 @@ def reduce_tensor(group: Group, formula, eps=1e-9, **kw_representations):
                 break
 
         if sum(mul * group.rep_dim(ir) for mul, ir in irreps) != d_sym:
-            raise RuntimeError(f'unable to decompose into irreducible representations')
+            raise RuntimeError('unable to decompose into irreducible representations')
 
         A = A.reshape(len(A), *[dims[i] for i in f0])
         return irreps, A.to(dtype=dtype)

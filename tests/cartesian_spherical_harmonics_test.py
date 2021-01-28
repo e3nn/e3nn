@@ -107,9 +107,9 @@ def test_recurrence_relation(l):
 
     assert (a / a.norm() - b / b.norm()).abs().max() < 1e-9
 
-
     def f(x):
         return o3.spherical_harmonics(l + 1, x, False)
+
     a = torch.autograd.functional.jacobian(f, x)
     a = a[:, [1, 2, 0]]
 

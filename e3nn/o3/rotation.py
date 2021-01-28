@@ -573,7 +573,6 @@ def quaternion_to_angles(q):
     return matrix_to_angles(quaternion_to_matrix(q))
 
 
-
 def axis_angle_to_angles(axis, angle):
     r"""convertion from axis-angle to angles
 

@@ -26,7 +26,7 @@ class Convolution(torch.nn.Module):
             radial_layers,
             radial_neurons,
             num_neighbors
-        ) -> None:
+                ) -> None:
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_node_attr = o3.Irreps(irreps_node_attr)
@@ -168,7 +168,7 @@ class Network(torch.nn.Module):
             num_neighbors,
             num_nodes,
             reduce_output=True,
-        ) -> None:
+                ) -> None:
         super().__init__()
         self.max_radius = max_radius
         self.number_of_basis = number_of_basis
