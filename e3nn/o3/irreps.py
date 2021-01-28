@@ -496,7 +496,7 @@ class Irreps(tuple):
         """
         return self.D_from_angles(*o3.quaternion_to_angles(q), k)
 
-    def D_from_matrix(self, R, k=None):
+    def D_from_matrix(self, R):
         r"""Matrix of the representation
 
         Parameters
@@ -512,4 +512,7 @@ class Irreps(tuple):
         `torch.Tensor`
             tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
         """
+        d = torch.det(R).sign()
+        R = d[..., None, None] * R
+        k = (1 - d) / 2
         return self.D_from_angles(*o3.matrix_to_angles(R), k)
