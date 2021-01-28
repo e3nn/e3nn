@@ -27,7 +27,7 @@ class CartesianTensor(o3.Irreps):
     def __new__(cls, formula):
         f = formula.split('=')[0].replace('-', '')
         rtp = o3.ReducedTensorProducts(formula, **{i : "1o" for i in f})
-        ret = o3.Irreps.__new__(cls, rtp.irreps_out)
+        ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
         ret.num_index = len(f)
         ret._rtp = rtp

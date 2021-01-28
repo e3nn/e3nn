@@ -52,8 +52,8 @@ class SphericalTensor(o3.Irreps):
     >>> SphericalTensor(3, 1, -1)
     1x0e+1x1o+1x2e+1x3o
     """
-    def __new__(self, lmax, p_val, p_arg):
-        return o3.Irreps.__new__(self, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
+    def __new__(cls, lmax, p_val, p_arg):
+        return super().__new__(cls, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
 
     def from_geometry_adjusted(self, vectors):
         r"""Convert a set of relative positions into a spherical tensor
