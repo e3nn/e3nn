@@ -35,7 +35,7 @@ def test_linear(assert_equivariant):
     m = Linear(irreps_in, irreps_out)
     print(m)
     m(torch.randn(irreps_in.dim))
-    
+
     assert_equivariant(m)
 
 
@@ -66,5 +66,5 @@ def test_norm(assert_equivariant):
     true_vec_norms = torch.linalg.norm(vecs, dim=-1)
     assert torch.allclose(out_norms[0, :3], true_scalar_norms)
     assert torch.allclose(out_norms[0, 3:], true_vec_norms)
-  
+
     assert_equivariant(norm)

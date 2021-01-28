@@ -2,7 +2,6 @@ import random
 
 import pytest
 import torch
-from e3nn import o3
 from e3nn.o3 import TensorProduct
 
 
