@@ -1,5 +1,4 @@
 import random
-from tests.conftest import assert_equivariant
 
 import pytest
 import torch

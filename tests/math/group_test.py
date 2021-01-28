@@ -15,5 +15,7 @@ def test_representation():
 
 
 def test_is_group():
+    if torch.get_default_dtype() != torch.float64:
+        pytest.xfail('groups only check out with double accuracy')
     assert is_group(O3(), 1e-3)
     assert is_group(SO3(), 1e-3)

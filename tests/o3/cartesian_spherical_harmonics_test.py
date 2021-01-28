@@ -21,7 +21,7 @@ def test_equivariance(float_tolerance):
     y1 = o3.spherical_harmonics(irreps, x @ o3.angles_to_matrix(*abc).T, False)
     y2 = o3.spherical_harmonics(irreps, x, False) @ irreps.D_from_angles(*abc).T
 
-    assert (y1 - y2).abs().max() < float_tolerance
+    assert (y1 - y2).abs().max() < 10*float_tolerance
 
 
 def test_backwardable():
@@ -58,7 +58,6 @@ def test_closure():
     integral of Ylm * Yjn = delta_lj delta_mn
     integral of 1 over the unit sphere = 4 pi
     """
-    #torch.set_default_dtype(torch.float64)
     x = torch.randn(300_000, 3)
     Ys = [o3.spherical_harmonics(l, x, normalize=True) for l in range(0, 3 + 1)]
     for l1, Y1 in enumerate(Ys):
@@ -85,6 +84,9 @@ def test_parity(float_tolerance, l):
 
 @pytest.mark.parametrize('l', range(9 + 1))
 def test_recurrence_relation(float_tolerance, l):
+    if torch.get_default_dtype() != torch.float64 and l > 6:
+        pytest.xfail('we expect this to fail for high l and single precision')
+
     x = torch.randn(3, requires_grad=True)
 
     a = o3.spherical_harmonics(l + 1, x, False)
