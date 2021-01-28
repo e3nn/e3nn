@@ -1,4 +1,5 @@
 from math import sqrt
+from collections import namedtuple
 
 import torch
 from e3nn import o3
@@ -242,9 +243,14 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
         last_ss = None
 
+        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight")
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
+        self.instructions = [
+            Instruction(i_1, i_2, i_out, mode, weight, path_weight)
+            for i_1, i_2, i_out, mode, weight, path_weight in instructions
+        ]
 
-        for i_1, i_2, i_out, mode, weight, path_weight in instructions:
+        for i_1, i_2, i_out, mode, weight, path_weight in self.instructions:
             mul_1, (l_1, p_1) = self.irreps_in1[i_1]
             mul_2, (l_2, p_2) = self.irreps_in2[i_2]
             mul_out, (l_out, p_out) = self.irreps_out[i_out]
@@ -261,7 +267,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             if dim_1 == 0 or dim_2 == 0 or dim_out == 0:
                 continue
 
-            alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in instructions if i_out_ == i_out)
+            alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in self.instructions if i_out_ == i_out)
 
             s = 4 * f" "
 
@@ -499,7 +505,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             for (i_1, i_2, i_out, mode, path_weight), shape in zip(
                 [
                     (i_1, i_2, i_out, mode, path_weight)
-                    for i_1, i_2, i_out, mode, weight, path_weight in instructions
+                    for i_1, i_2, i_out, mode, weight, path_weight in self.instructions
                     if weight
                 ],
                 wshapes

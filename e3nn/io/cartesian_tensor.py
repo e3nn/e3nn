@@ -1,3 +1,4 @@
+import torch
 from e3nn import o3
 
 
@@ -16,23 +17,42 @@ class CartesianTensor(o3.Irreps):
     >>> CartesianTensor("ij=-ji")
     1x1e
 
-    >>> import torch
     >>> x = CartesianTensor("ijk=-jik=-ikj")
     >>> x.from_cartesian(torch.ones(3, 3, 3))
     tensor([0.])
+
+    >>> x.from_vectors(torch.ones(3), torch.ones(3), torch.ones(3))
+    tensor([0.])
     """
-    def __new__(self, formula, p=-1):
+    def __new__(cls, formula):
         f = formula.split('=')[0].replace('-', '')
-        def vector(g):
-            q, k = g
-            return (-1)**k * o3.quaternion_to_matrix(q)
-        irreps, Q = o3.reduce_tensor(formula, **{i : vector for i in f})
-        ret = o3.Irreps.__new__(self, irreps)
+        rtp = o3.ReducedTensorProducts(formula, **{i : "1o" for i in f})
+        ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
         ret.num_index = len(f)
-        ret.Q = Q
+        ret._rtp = rtp
         return ret
 
     def from_cartesian(self, data):
-        Q = self.Q.flatten(-self.num_index)
+        Q = self.change_of_basis().flatten(-self.num_index)
         return data.flatten(-self.num_index) @ Q.T
+
+    def from_vectors(self, *xs):
+        A = torch.tensor([
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0.0],
+        ])
+        xs = [x @ A.T for x in xs]
+        return self._rtp(*xs)
+
+    def change_of_basis(self):
+        A = torch.tensor([
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0.0],
+        ])
+        i = 'abcdefghijkl'[:self.num_index]
+        j = ',am,bn,co,dp,eq,fr,gs,ht,iu,jv,kw,lx'[:3 * self.num_index]
+        k = 'mnopqrstuvwx'[:self.num_index]
+        return torch.einsum(f"z{i}{j}->z{k}", self._rtp.change_of_basis, *[A] * self.num_index)
