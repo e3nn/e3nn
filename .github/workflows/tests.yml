@@ -50,5 +50,5 @@ jobs:
       run: |
         pip install pytest pytest-cov
         pip install coveralls
-        coverage run --source=e3nn_core -m pytest --doctest-modules .
+        coverage run --source=e3nn -m pytest --doctest-modules .
         COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
