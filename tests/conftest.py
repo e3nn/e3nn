@@ -28,6 +28,23 @@ def float_tolerance(request):
 
 @pytest.fixture(scope='session')
 def assert_equivariant(float_tolerance):
+    r"""Assert that the ``equivariance_error`` is below the ``float_tolerance``.
+
+    Parameters
+    ----------
+    func : callable
+        the function to test
+    sqrt_tolerance : bool
+        whether to replace ``float_tolerance`` with ``sqrt(float_tolerance)``.
+    tolerance_multiplier : float
+        ``float_tolerance`` is replaced by ``tolerance_multiplier*float_tolerance``. Defaults to 1.
+    **kwargs : kwargs
+        passed through to ``equivariance_error``.
+
+    Returns
+    -------
+    None
+    """
     # TODO: record statistics on equivariance error
     def func(*args, sqrt_tolerance=False, tolerance_multiplier=1., **kwargs):
         # Apply a default:
