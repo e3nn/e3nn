@@ -21,13 +21,13 @@ class CartesianTensor(o3.Irreps):
     >>> x.from_cartesian(torch.ones(3, 3, 3))
     tensor([0.])
     """
-    def __new__(self, formula, p=-1):
+    def __new__(cls, formula, p=-1):
         f = formula.split('=')[0].replace('-', '')
         def vector(g):
             q, k = g
             return (-1)**k * o3.quaternion_to_matrix(q)
         irreps, Q = o3.reduce_tensor(formula, **{i : vector for i in f})
-        ret = o3.Irreps.__new__(self, irreps)
+        ret = super().__new__(cls, irreps)
         ret.formula = formula
         ret.num_index = len(f)
         ret.Q = Q
