@@ -2,7 +2,6 @@ import pytest
 
 import torch
 
-from e3nn import o3
 from e3nn.util.equivariance import equivariance_error
 
 

@@ -1,8 +1,6 @@
 import random
 
-import numpy as np
 import torch
-from torch._C import Value
 
 from e3nn import o3
 
