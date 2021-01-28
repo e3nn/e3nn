@@ -33,7 +33,7 @@ class CartesianTensor(o3.Irreps):
         ret._rtp = rtp
         return ret
 
-    def from_tensor(self, data):
+    def from_cartesian(self, data):
         Q = self.Q.flatten(-self.num_index)
         return data.flatten(-self.num_index) @ Q.T
 
