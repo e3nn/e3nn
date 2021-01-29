@@ -79,13 +79,12 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
             ]
             # Build a rotation matrix for point data
             rot_mat = o3.rand_matrix()
-            D_params = (rot_mat, parity_k)
             # add parity
             rot_mat *= (-1)**parity_k
 
             # Evaluate the function on rotated arguments:
             rot_args = [
-                (a @ rot_mat.T) if irreps == 'cartesian' else (a @ irreps.D_from_matrix(*D_params).T)
+                (a @ rot_mat.T) if irreps == 'cartesian' else (a @ irreps.D_from_matrix(rot_mat).T)
                 for irreps, a in zip(irreps_in, args)
             ]
             x1 = func(*rot_args)
@@ -107,7 +106,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
             # apply the group action to x2
             x2 = [
-                (a @ rot_mat.T) if irreps == 'cartesian' else (a @ irreps.D_from_matrix(*D_params).T)
+                (a @ rot_mat.T) if irreps == 'cartesian' else (a @ irreps.D_from_matrix(rot_mat).T)
                 for irreps, a in zip(irreps_out, x2)
             ]
 
