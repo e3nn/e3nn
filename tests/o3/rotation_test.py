@@ -3,11 +3,9 @@ import torch
 from e3nn import o3
 
 
-def test_xyz():
-    torch.set_default_dtype(torch.float64)
-
+def test_xyz(float_tolerance):
     R = o3.rand_matrix(10)
-    assert (R @ R.transpose(-1, -2) - torch.eye(3)).abs().max() < 1e-10
+    assert (R @ R.transpose(-1, -2) - torch.eye(3)).abs().max() < float_tolerance
 
     a, b, c = o3.matrix_to_angles(R)
     pos1 = o3.angles_to_xyz(a, b)
@@ -15,13 +13,11 @@ def test_xyz():
     assert torch.allclose(pos1, pos2)
 
     a2, b2 = o3.xyz_to_angles(pos2)
-    assert (a - a2).abs().max() < 1e-10
-    assert (b - b2).abs().max() < 1e-10
+    assert (a - a2).abs().max() < float_tolerance
+    assert (b - b2).abs().max() < float_tolerance
 
 
-def test_conversions():
-    torch.set_default_dtype(torch.float64)
-
+def test_conversions(float_tolerance):
     def wrap(f):
         def g(x):
             if isinstance(x, tuple):
@@ -29,7 +25,9 @@ def test_conversions():
             else:
                 return f(x)
         return g
-    identity = lambda x: x
+
+    def identity(x):
+        return x
     conv = [
         [identity, wrap(o3.angles_to_matrix), wrap(o3.angles_to_axis_angle), wrap(o3.angles_to_quaternion)],
         [wrap(o3.matrix_to_angles), identity, wrap(o3.matrix_to_axis_angle), wrap(o3.matrix_to_quaternion)],
@@ -45,12 +43,10 @@ def test_conversions():
         g = conv[i][j](g)
     R2 = g
 
-    assert (R1 - R2).abs().max() < 1e-10
+    assert (R1 - R2).abs().max() < 10*float_tolerance
 
 
-def test_compose():
-    torch.set_default_dtype(torch.float64)
-
+def test_compose(float_tolerance):
     q1 = o3.rand_quaternion(10)
     q2 = o3.rand_quaternion(10)
 
@@ -76,6 +72,6 @@ def test_compose():
     R3 = o3.angles_to_matrix(*abc)
     R4 = o3.axis_angle_to_matrix(ax, a)
 
-    assert (R1 - R2).norm(dim=1).max() < 1e-10
-    assert (R1 - R3).norm(dim=1).max() < 1e-10
-    assert (R1 - R4).norm(dim=1).max() < 1e-10
+    assert (R1 - R2).norm(dim=1).max() < float_tolerance
+    assert (R1 - R3).norm(dim=1).max() < float_tolerance
+    assert (R1 - R4).norm(dim=1).max() < float_tolerance
