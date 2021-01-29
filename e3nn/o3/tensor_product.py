@@ -154,7 +154,7 @@ class TensorProduct(torch.nn.Module):
             internal_weights=None,
             shared_weights=None,
             _specialized_code=True,
-        ):
+                ):
         super().__init__()
 
         assert normalization in ['component', 'norm'], normalization
@@ -221,7 +221,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
     out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
     ein = torch.einsum
 """
-        s = 4 * f" "
+        s = 4 * " "
 
         wshapes = []
         wigners = []
@@ -230,7 +230,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             index_1 = self.irreps_in1[:i_1].dim
             dim_1 = mul_1 * (2 * l_1 + 1)
             code_out += f"{s}x1_{i_1} = x1[:, {index_1}:{index_1+dim_1}].reshape(batch, {mul_1}, {2 * l_1 + 1})\n"
-        code_out += f"\n"
+        code_out += "\n"
 
         for i_2, (mul_2, (l_2, p_2)) in enumerate(self.irreps_in2):
             index_2 = self.irreps_in2[:i_2].dim
@@ -238,8 +238,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             line = f"{s}x2_{i_2} = x2[:, {index_2}:{index_2+dim_2}].reshape(batch, {mul_2}, {2 * l_2 + 1})\n"
             code_out += line
             code_right += line
-        code_out += f"\n"
-        code_right += f"\n"
+        code_out += "\n"
+        code_right += "\n"
 
         last_ss = None
 
@@ -269,7 +269,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
             alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in self.instructions if i_out_ == i_out)
 
-            s = 4 * f" "
+            s = 4 * " "
 
             line = (
                 f"{s}with torch.autograd.profiler.record_function("
@@ -279,7 +279,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             code_out += line
             code_right += line
 
-            s = 8 * f" "
+            s = 8 * " "
 
             code_out += f"{s}s1 = x1_{i_1}\n"
             code_right += f"{s}e1 = torch.eye({mul_1}, dtype=x2.dtype, device=x2.device)\n"
@@ -478,7 +478,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwvk', w3j[{index_w3j}], e1, s2)")
             code_out += "\n"
 
-        s = 4 * f" "
+        s = 4 * " "
         code_out += f"{s}return out"
         code_right += f"{s}return out"
 
@@ -628,7 +628,6 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
             features = eval_code(self.code_out).main(features_1, features_2, weight, wigners)
 
-
             return features.reshape(*size, self.irreps_out.dim)
 
 
@@ -672,7 +671,7 @@ class FullyConnectedTensorProduct(TensorProduct):
             normalization='component',
             internal_weights=None,
             shared_weights=None
-        ):
+                ):
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         irreps_out = o3.Irreps(irreps_out).simplify()
@@ -720,7 +719,7 @@ class ElementwiseTensorProduct(TensorProduct):
             irreps_in2,
             irreps_out=None,
             normalization='component',
-        ):
+                ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -793,7 +792,7 @@ class FullTensorProduct(TensorProduct):
             irreps_in2,
             irreps_out=None,
             normalization='component',
-        ):
+                ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -857,7 +856,7 @@ class Linear(TensorProduct):
             irreps_out,
             internal_weights=None,
             shared_weights=None,
-        ):
+                ):
         irreps_in = o3.Irreps(irreps_in).simplify()
         irreps_out = o3.Irreps(irreps_out).simplify()
 
@@ -926,7 +925,7 @@ class Norm(TensorProduct):
     def __init__(
             self,
             irreps_in,
-        ):
+                ):
         irreps_in = o3.Irreps(irreps_in).simplify()
         irreps_out = o3.Irreps([(mul, "0e") for mul, _ in irreps_in])
 

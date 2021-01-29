@@ -368,6 +368,7 @@ def matrix_to_angles(R):
     gamma : `torch.Tensor`
         tensor of shape :math:`(...)`
     """
+    assert torch.allclose(torch.det(R), torch.tensor(1.0))
     x = R @ R.new_tensor([0, 0, 1])
     a, b = xyz_to_angles(x)
     R = angles_to_matrix(a, b, a.new_zeros(a.shape)).transpose(-1, -2) @ R
@@ -476,6 +477,7 @@ def matrix_to_axis_angle(R):
     angle : `torch.Tensor`
         tonsor of shape :math:`(...)`
     """
+    assert torch.allclose(torch.det(R), torch.tensor(1.0))
     tr = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
     angle = torch.acos(tr.sub(1).div(2).clamp(-1, 1))
     axis = torch.stack([
@@ -571,7 +573,6 @@ def quaternion_to_angles(q):
         tensor of shape :math:`(...)`
     """
     return matrix_to_angles(quaternion_to_matrix(q))
-
 
 
 def axis_angle_to_angles(axis, angle):

@@ -104,6 +104,7 @@ def test_recurrence_relation(float_tolerance, l):
 
     def f(x):
         return o3.spherical_harmonics(l + 1, x, False)
+
     a = torch.autograd.functional.jacobian(f, x)
     a = a[:, [1, 2, 0]]
 
