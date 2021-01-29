@@ -48,6 +48,12 @@ class Convolution(torch.nn.Module):
                         irreps_mid.append((mul, ir_out))
                         instructions.append((i, j, k, 'uvu', True))
         irreps_mid = o3.Irreps(irreps_mid)
+        irreps_mid, p, _ = irreps_mid.sort()
+
+        instructions = [
+            (i_1, i_2, p[i_out], mode, train)
+            for i_1, i_2, i_out, mode, train in instructions
+        ]
 
         tp = TensorProduct(
             self.irreps_in,
