@@ -15,9 +15,9 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
     func : callable
         the function to test
     irreps_in : list of `Irreps` or `Irreps`
-        the input irreps for each of the arguments of ``func``. If left as the default of ``None``, ``[func.irreps_in]`` will be used. If a sequence is provided, a valid element is also the string ``'points'``, which denotes that the corresponding input should be dealt with as points in 3D.
+        the input irreps for each of the arguments of ``func``. If left as the default of ``None``, ``[func.irreps_in]`` will be used. If a sequence is provided, a valid element is also the string ``'cartesian'``, which denotes that the corresponding input should be dealt with as cartesian in 3D.
     irreps_out : list of `Irreps` or `Irreps`
-        the out irreps for each of the arguments of ``func``. If left as the default of ``None``, ``[func.irreps_out]`` will be used. If a sequence is provided, a valid element is also the string ``'points'``, which denotes that the corresponding output should be dealt with as points in 3D.
+        the out irreps for each of the arguments of ``func``. If left as the default of ``None``, ``[func.irreps_out]`` will be used. If a sequence is provided, a valid element is also the string ``'cartesian'``, which denotes that the corresponding output should be dealt with as cartesian in 3D.
     ntrials : int
         run this many trials with random inputs
     batch_dim : bool or tuple
@@ -38,14 +38,14 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
     if isinstance(irreps_in, o3.Irreps):
         irreps_in = [irreps_in]
     elif isinstance(irreps_in, list) or isinstance(irreps_in, tuple):
-        irreps_in = [i if i == 'points' else o3.Irreps(i) for i in irreps_in]
+        irreps_in = [i if i == 'cartesian' else o3.Irreps(i) for i in irreps_in]
     else:
         irreps_in = [o3.Irreps(irreps_in)]
 
     if isinstance(irreps_out, o3.Irreps):
         irreps_out = [irreps_out]
     elif isinstance(irreps_out, list) or isinstance(irreps_out, tuple):
-        irreps_out = [i if i == 'points' else o3.Irreps(i) for i in irreps_out]
+        irreps_out = [i if i == 'cartesian' else o3.Irreps(i) for i in irreps_out]
     else:
         irreps_out = [o3.Irreps(irreps_out)]
 
@@ -74,7 +74,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
         for parity_k in parity_ks:
             args = [
-                torch.randn(point_shape) if irreps == 'points' else irreps.randn(*arg_shape)
+                torch.randn(point_shape) if irreps == 'cartesian' else irreps.randn(*arg_shape)
                 for irreps in irreps_in
             ]
             # Build a rotation matrix for point data
@@ -85,7 +85,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
             # Evaluate the function on rotated arguments:
             rot_args = [
-                (a @ rot_mat.T) if irreps == 'points' else (a @ irreps.D_from_matrix(*D_params).T)
+                (a @ rot_mat.T) if irreps == 'cartesian' else (a @ irreps.D_from_matrix(*D_params).T)
                 for irreps, a in zip(irreps_in, args)
             ]
             x1 = func(*rot_args)
@@ -107,7 +107,7 @@ def equivariance_error(func, irreps_in=None, irreps_out=None, ntrials=1, batch_d
 
             # apply the group action to x2
             x2 = [
-                (a @ rot_mat.T) if irreps == 'points' else (a @ irreps.D_from_matrix(*D_params).T)
+                (a @ rot_mat.T) if irreps == 'cartesian' else (a @ irreps.D_from_matrix(*D_params).T)
                 for irreps, a in zip(irreps_out, x2)
             ]
 
