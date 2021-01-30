@@ -1,4 +1,5 @@
 import random
+import itertools
 
 import torch
 
@@ -40,6 +41,9 @@ def assert_equivariant(
         **kwargs : kwargs
             passed through to ``equivariance_error``.
     """
+    # Prevent pytest from showing this function in the traceback
+    __tracebackhide__ = True
+
     irreps_in, irreps_out = get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
     if args_in is None:
         if not all(isinstance(i, o3.Irreps) or i == 'cartesian' for i in irreps_in):
@@ -52,7 +56,7 @@ def assert_equivariant(
         ]
 
     # Get error
-    error = equivariance_error(
+    errors = equivariance_error(
         func,
         args_in=args_in,
         irreps_in=irreps_in,
@@ -63,7 +67,15 @@ def assert_equivariant(
     tol = tolerance_multiplier*EQUIVARIANCE_TOLERANCE[torch.get_default_dtype()]
     if sqrt_tolerance:
         tol = torch.sqrt(tol)
-    assert error <= tol, "Largest componentwise equivariance error %f too large" % (error,)
+    problems = {case: err for case, err in errors.items() if err > tol}
+
+    if len(problems) != 0:
+        print(problems)
+        errstr = (
+            "Largest componentwise equivariance error was too large for: " + \
+            '; '.join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
+        )
+        assert len(problems) == 0, errstr
 
 
 def equivariance_error(
@@ -72,7 +84,8 @@ def equivariance_error(
     irreps_in=None,
     irreps_out=None,
     ntrials=1,
-    do_parity=True
+    do_parity=True,
+    do_translation=True
 ):
     r"""Get the maximum equivariance error for ``func`` over ``ntrials``
 
@@ -90,13 +103,14 @@ def equivariance_error(
         the out irreps for each of the return values of ``func``. Accepts similar values to ``irreps_in``.
     ntrials : int
         run this many trials with random transforms
-    do_parity : True
+    do_parity : bool
         whether to test parity
+    do_translation : bool
+        whether to test translation for ``'cartesian'`` inputs
 
     Returns
     -------
-    `torch.Tensor`
-        scalar tensor giving largest componentwise error
+    dictionary mapping tuples ``(parity_k, did_translate)`` to errors
     """
     irreps_in, irreps_out = get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
 
@@ -106,20 +120,34 @@ def equivariance_error(
         parity_ks = torch.Tensor([0, 1])
     else:
         parity_ks = torch.Tensor([0])
+    if do_translation:
+        do_translation = [False, True]
+    else:
+        do_translation = [False]
 
-    biggest_err = -float("Inf")
+    tests = itertools.product(parity_ks, do_translation)
+
+    neg_inf = -float("Inf")
+    biggest_errs = {}
 
     for trial in range(ntrials):
-        for parity_k in parity_ks:
+        for this_test in tests:
+            parity_k, this_do_translate = this_test
             # Build a rotation matrix for point data
             rot_mat = o3.rand_matrix()
             # add parity
             rot_mat *= (-1)**parity_k
+            # build translation
+            translation = torch.randn(1, 3) if this_do_translate else 0.
 
             # Evaluate the function on rotated arguments:
             rot_args = [
                 a if irreps is None else (
-                    (a @ rot_mat.T) if irreps == 'cartesian' else (
+                    (
+                        # For cartesian inputs
+                        (a @ rot_mat.T) + translation
+                    ) if irreps == 'cartesian' else (
+                        # For irreps inputs
                         a @ irreps.D_from_matrix(rot_mat).T
                     )
                 )
@@ -145,7 +173,11 @@ def equivariance_error(
             # apply the group action to x2
             x2 = [
                 a if irreps is None else (
-                    (a @ rot_mat.T) if irreps == 'cartesian' else (
+                    (
+                        # For cartesian
+                        (a @ rot_mat.T) + translation
+                    ) if irreps == 'cartesian' else (
+                        # For irreps
                         a @ irreps.D_from_matrix(rot_mat).T
                     )
                 )
@@ -157,10 +189,10 @@ def equivariance_error(
                 for a, b in zip(x1, x2)
             )
 
-            if error > biggest_err:
-                biggest_err = error
+            if error > biggest_errs.get(this_test, neg_inf):
+                biggest_errs[this_test] = error
 
-    return biggest_err
+    return biggest_errs
 
 
 def get_io_irreps(func, irreps_in=None, irreps_out=None):
