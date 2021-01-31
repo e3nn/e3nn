@@ -19,8 +19,3 @@ def float_tolerance(request):
     }[request.param]
     torch.set_default_dtype(dtype)
     return e3nn.util.test.EQUIVARIANCE_TOLERANCE[dtype]
-
-
-@pytest.fixture(scope='session')
-def assert_equivariant():
-    return e3nn.util.test.assert_equivariant

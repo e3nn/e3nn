@@ -20,8 +20,7 @@ def assert_equivariant(
     args_in=None,
     irreps_in=None,
     irreps_out=None,
-    sqrt_tolerance=False,
-    tolerance_multiplier=1.,
+    tolerance=None,
     **kwargs
 ):
     r"""Assert that ``func`` is equivariant.
@@ -34,10 +33,8 @@ def assert_equivariant(
             see ``equivariance_error``
         irreps_out : object
             see ``equivariance_error``
-        sqrt_tolerance : bool
-            whether to replace the tolerance with ``sqrt(tolerance)``. Defaults to False.
-        tolerance_multiplier : float
-            ``tolerance`` is replaced by ``tolerance_multiplier*tolerance``. Defaults to 1.
+        tolerance : float or None
+            the threshold below which the equivariance error must fall. If ``None``, (the default), ``EQUIVARIANCE_TOLERANCE[torch.get_default_dtype()]`` is used.
         **kwargs : kwargs
             passed through to ``equivariance_error``.
     """
@@ -64,10 +61,10 @@ def assert_equivariant(
         **kwargs
     )
     # Check it
-    tol = tolerance_multiplier*EQUIVARIANCE_TOLERANCE[torch.get_default_dtype()]
-    if sqrt_tolerance:
-        tol = torch.sqrt(tol)
-    problems = {case: err for case, err in errors.items() if err > tol}
+    if tolerance is None:
+        tolerance = EQUIVARIANCE_TOLERANCE[torch.get_default_dtype()]
+
+    problems = {case: err for case, err in errors.items() if err > tolerance}
 
     if len(problems) != 0:
         print(problems)
@@ -138,7 +135,7 @@ def equivariance_error(
             # add parity
             rot_mat *= (-1)**parity_k
             # build translation
-            translation = torch.randn(1, 3) if this_do_translate else 0.
+            translation = 10*torch.randn(1, 3) if this_do_translate else 0.
 
             # Evaluate the function on rotated arguments:
             rot_args = [

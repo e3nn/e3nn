@@ -3,6 +3,7 @@ import random
 import pytest
 import torch
 from e3nn.o3 import TensorProduct
+from e3nn.util.test import assert_equivariant
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
@@ -44,7 +45,7 @@ def random_params():
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params())
-def test(float_tolerance, assert_equivariant, l1, p1, l2, p2, lo, po, mode, weight):
+def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     eps = float_tolerance
     n = 1_500
     tol = 3.0
