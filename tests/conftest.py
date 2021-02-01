@@ -1,21 +1,2 @@
-import pytest
-
-import torch
-
-import e3nn.util.test
-
-
-@pytest.fixture(scope='session', autouse=True, params=['float32', 'float64'])
-def float_tolerance(request):
-    """Run all tests with various default floating dtypes.
-
-    Returns
-    --------
-        A precision threshold to use for closeness tests.
-    """
-    dtype = {
-        'float32': torch.float32,
-        'float64': torch.float64
-    }[request.param]
-    torch.set_default_dtype(dtype)
-    return e3nn.util.test.EQUIVARIANCE_TOLERANCE[dtype]
+# See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
+pytest_plugins = ['e3nn.util.test']

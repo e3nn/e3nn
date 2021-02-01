@@ -15,6 +15,30 @@ EQUIVARIANCE_TOLERANCE = {
 }
 
 
+try:
+    # If pytest is available, define an e3nn pytest plugin
+    # See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
+    import pytest
+    @pytest.fixture(scope='session', autouse=True, params=['float32', 'float64'])
+    def float_tolerance(request):
+        """Run all tests with various default floating dtypes.
+
+        Returns
+        --------
+            A precision threshold to use for closeness tests.
+        """
+        old_dtype = torch.get_default_dtype()
+        dtype = {
+            'float32': torch.float32,
+            'float64': torch.float64
+        }[request.param]
+        torch.set_default_dtype(dtype)
+        yield EQUIVARIANCE_TOLERANCE[dtype]
+        torch.set_default_dtype(old_dtype)
+except ImportError:
+    pass
+
+
 def assert_equivariant(
     func,
     args_in=None,
@@ -117,6 +141,9 @@ def equivariance_error(
         parity_ks = torch.Tensor([0, 1])
     else:
         parity_ks = torch.Tensor([0])
+
+    if ('cartesian' not in irreps_in):
+        do_translation = False
     if do_translation:
         do_translation = [False, True]
     else:
@@ -135,7 +162,7 @@ def equivariance_error(
             # add parity
             rot_mat *= (-1)**parity_k
             # build translation
-            translation = 10*torch.randn(1, 3) if this_do_translate else 0.
+            translation = 10*torch.randn(1, 3, dtype=rot_mat.dtype) if this_do_translate else 0.
 
             # Evaluate the function on rotated arguments:
             rot_args = [
