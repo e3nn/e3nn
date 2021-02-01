@@ -6,3 +6,4 @@ e3nn
     nn/nn
     io
     math
+    util/util

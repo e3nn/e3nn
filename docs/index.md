@@ -9,7 +9,7 @@
 :caption: "Contents:"
 
 api/e3nn
-installation
+guide/guide
 examples/examples
 ```
 
