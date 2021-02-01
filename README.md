@@ -5,16 +5,17 @@
 The aim of this library it to help the developement of E3 equivariant neural networks.
 It contains fundamental mathematical operations such as tensor products and spherical harmonics.
 
+![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
+
 ## Installation
+- install [pytorch](https://pytorch.org/)
+- install [pytorch_geometric](https://github.com/rusty1s/pytorch_geometric)
+- `pip install e3nn`
+
 See [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
 
 ### Previous version
-e3nn has been recently refactored. The last version before refactoring can be installed with the command
-```
-pip install e3nn==0.1.1
-```
-
-![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
+e3nn has been recently refactored. The last version before refactoring can be installed with the command `pip install e3nn==0.1.1`
 
 ## Help
 We are happy to help! The best way to get help on `e3nn` is to submit a [Question](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=question&template=question.md&title=%E2%9D%93+%5BQUESTION%5D) or [Bug Report](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=bug&template=bug-report.md&title=%F0%9F%90%9B+%5BBUG%5D).
