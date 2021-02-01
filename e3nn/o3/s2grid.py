@@ -321,11 +321,15 @@ class ToS2Grid(torch.nn.Module):
         m = _expand_matrix(range(lmax + 1))  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
+        self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
         self.register_buffer('alphas', alphas)
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
         self.to(torch.get_default_dtype())
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
 
     @property
     def grid(self):
@@ -430,11 +434,15 @@ class FromS2Grid(torch.nn.Module):
         qw = _quadrature_weights(res_beta // 2) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
 
+        self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
         self.register_buffer('alphas', alphas)
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
         self.to(torch.get_default_dtype())
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
 
     @property
     def grid(self):
