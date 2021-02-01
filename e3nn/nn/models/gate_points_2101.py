@@ -275,8 +275,6 @@ class Network(torch.nn.Module):
             assert self.irreps_node_attr == "0e"
             z = x.new_ones(x.shape[0], 1)
 
-        print(x.shape, z.shape)
-
         for lay in self.layers:
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
