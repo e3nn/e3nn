@@ -6,6 +6,7 @@ import e3nn
 from e3nn.nn import NormActivation
 from e3nn.util.test import assert_equivariant
 
+
 @pytest.mark.parametrize('do_bias', [True, False])
 @pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
 def test_norm_activation(do_bias, nonlin):
