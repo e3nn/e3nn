@@ -272,7 +272,7 @@ class Network(torch.nn.Module):
         if 'z' in data:
             z = data.z
         else:
-            assert self.irreps_node_attr == "0e"
+            assert self.irreps_node_attr == o3.Irreps("0e")
             z = x.new_ones(x.shape[0], 1)
 
         for lay in self.layers:
