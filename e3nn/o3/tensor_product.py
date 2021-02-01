@@ -522,10 +522,21 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         self.to(dtype=torch.get_default_dtype())
 
     def __repr__(self):
+        npath = sum(
+            {
+                'uvw': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul * self.irreps_out[i.i_out].mul,
+                'uvu': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul,
+                'uvv': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul,
+                'uuw': self.irreps_in1[i.i_in1].mul * self.irreps_out[i.i_out].mul,
+                'uuu': self.irreps_in1[i.i_in1].mul,
+                'uvuv': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul,
+            }[i.connection_mode]
+            for i in self.instructions
+        )
         return (
             f"{self.__class__.__name__}"
             f"({self.irreps_in1.simplify()} x {self.irreps_in2.simplify()} "
-            f"-> {self.irreps_out.simplify()} | {self.weight_numel} weights)"
+            f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
 
     def prepare_weight_list(self, weight):

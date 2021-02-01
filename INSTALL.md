@@ -8,7 +8,7 @@ First you have to install pytorch-geometric, here are the commands for torch 1.7
 TORCH=1.7.1
 CUDA=cpu
 
-pip install torch==$TORCH torchvision torchaudio -f https://download.pytorch.org/whl/cpu/torch_stable.html
+pip install torch==$TORCH+$CUDA -f https://download.pytorch.org/whl/torch_stable.html
 
 TORCH=1.7.0
 pip install --no-index torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
@@ -18,20 +18,18 @@ pip install --no-index torch-spline-conv -f https://pytorch-geometric.com/whl/to
 pip install torch-geometric
 ```
 
-See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions, they are all compatible with e3nn-core.
+See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions.
 
-## e3nn-core
+## e3nn
 
 For now the library is pure python, therefore the installation precedure is very simple:
 
 ```
-python setup.py install
+pip install e3nn
 ```
 
-or
+or clone the main branch and execute
 
 ```
 python setup.py develop
 ```
-
-We plan to incude (optional to build) home-made cuda kernels to accelerate the bottleneck operations.
