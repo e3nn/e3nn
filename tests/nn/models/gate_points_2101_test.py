@@ -34,6 +34,6 @@ def test_gate_points_2101(float_tolerance):
 
     assert_equivariant(
         wrapper,
-        irreps_in=['cartesian', irreps_in, irreps_attr],
+        irreps_in=['cartesian_points', irreps_in, irreps_attr],
         irreps_out=[irreps_out],
     )

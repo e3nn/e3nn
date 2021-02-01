@@ -67,14 +67,14 @@ def assert_equivariant(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    irreps_in, irreps_out = get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
+    irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
     if args_in is None:
-        if not all(isinstance(i, o3.Irreps) or i == 'cartesian' for i in irreps_in):
-            raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian'` are specified; provide explicit ``args_in``")
+        if not all((isinstance(i, o3.Irreps) or i == 'cartesian_points') for i in irreps_in):
+            raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
         # Generate random args with random size batch dim between 1 and 4:
         batch_size = random.randint(1, 4)
         args_in = [
-            torch.randn(batch_size, 3) if irreps == 'cartesian' else irreps.randn(batch_size, -1)
+            torch.randn(batch_size, 3) if (irreps == 'cartesian_points') else irreps.randn(batch_size, -1)
             for irreps in irreps_in
         ]
 
@@ -135,7 +135,7 @@ def equivariance_error(
     -------
     dictionary mapping tuples ``(parity_k, did_translate)`` to errors
     """
-    irreps_in, irreps_out = get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
+    irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
 
     assert len(args_in) == len(irreps_in), "irreps_in and args_in don't match in length"
 
@@ -144,7 +144,8 @@ def equivariance_error(
     else:
         parity_ks = torch.Tensor([0])
 
-    if ('cartesian' not in irreps_in):
+    if ('cartesian_points' not in irreps_in):
+        # There's nothing to translate
         do_translation = False
     if do_translation:
         do_translation = [False, True]
@@ -167,18 +168,7 @@ def equivariance_error(
             translation = 10*torch.randn(1, 3, dtype=rot_mat.dtype) if this_do_translate else 0.
 
             # Evaluate the function on rotated arguments:
-            rot_args = [
-                a if irreps is None else (
-                    (
-                        # For cartesian inputs
-                        (a @ rot_mat.T) + translation
-                    ) if irreps == 'cartesian' else (
-                        # For irreps inputs
-                        a @ irreps.D_from_matrix(rot_mat).T
-                    )
-                )
-                for irreps, a in zip(irreps_in, args_in)
-            ]
+            rot_args = _transform(args_in, irreps_in, rot_mat, translation)
             x1 = func(*rot_args)
 
             # Evaluate the function on the arguments, then apply group action:
@@ -197,18 +187,7 @@ def equivariance_error(
             assert len(x1) == len(irreps_out)
 
             # apply the group action to x2
-            x2 = [
-                a if irreps is None else (
-                    (
-                        # For cartesian
-                        (a @ rot_mat.T) + translation
-                    ) if irreps == 'cartesian' else (
-                        # For irreps
-                        a @ irreps.D_from_matrix(rot_mat).T
-                    )
-                )
-                for irreps, a in zip(irreps_out, x2)
-            ]
+            x2 = _transform(x2, irreps_out, rot_mat, translation)
 
             error = max(
                 (a - b).abs().max()
@@ -221,9 +200,25 @@ def equivariance_error(
     return biggest_errs
 
 
-def get_io_irreps(func, irreps_in=None, irreps_out=None):
+def _transform(dat, irreps_dat, rot_mat, translation=0.):
+    """Transform ``dat`` by ``rot_mat`` and ``translation`` according to ``irreps_dat``."""
+    out = []
+    for irreps, a in zip(irreps_dat, dat):
+        if irreps is None:
+            out.append(a)
+        elif irreps == 'cartesian_points':
+            out.append((a @ rot_mat.T) + translation)
+        elif irreps == 'cartesian_vectors':
+            out.append((a @ rot_mat.T))
+        else:
+            # For o3.Irreps
+            out.append(a @ irreps.D_from_matrix(rot_mat).T)
+    return out
+
+
+def _get_io_irreps(func, irreps_in=None, irreps_out=None):
     """Preprocess or, if not given, try to infer the I/O irreps for ``func``."""
-    SPECIAL_VALS = ['cartesian', None]
+    SPECIAL_VALS = ['cartesian_points', 'cartesian_vectors', None]
 
     if irreps_in is None:
         if hasattr(func, 'irreps_in'):
