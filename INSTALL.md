@@ -8,7 +8,7 @@ First you have to install pytorch-geometric, here are the commands for torch 1.7
 TORCH=1.7.1
 CUDA=cpu
 
-pip install torch==$TORCH torchvision torchaudio -f https://download.pytorch.org/whl/cpu/torch_stable.html
+pip install torch==$TORCH+$CUDA -f https://download.pytorch.org/whl/torch_stable.html
 
 TORCH=1.7.0
 pip install --no-index torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
