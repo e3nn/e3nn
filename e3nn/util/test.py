@@ -21,7 +21,9 @@ try:
     import pytest
     @pytest.fixture(scope='session', autouse=True, params=['float32', 'float64'])
     def float_tolerance(request):
-        """Run all tests with various default floating dtypes.
+        """Run all tests with various PyTorch default dtypes.
+
+        This is a session-wide, autouse fixture — you only need to request it explicitly if a test needs to know the tolerance for the current default dtype.
 
         Returns
         --------

@@ -39,13 +39,3 @@ In addition to `Irreps`-like objects, ``irreps_in`` can also contain two special
 These can be used to test models that operate on full graphs that include position information:
 
 .. literalinclude:: ../../tests/nn/models/gate_points_2101_test.py
-
-
-Pytest Plugin
--------------
-
-The module `e3nn.util.test` can also be imported as a pytest plugin by adding::
-
-    pytest_plugins = ['e3nn.util.test']
-
-in your ``conftest.py``. It currently provides a single autouse fixture `float_tolerance` that runs every test in the session twice, once with a PyTorch default dtype of ``float32`` and once with ``float64``. Tests that request it as a fixture are passed a reasonable error threshold for equivariance testing (the same threshold used, by default, in `assert_equivariant`).
