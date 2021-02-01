@@ -3,9 +3,10 @@ import torch
 from e3nn import o3
 from e3nn.nn import Identity
 from e3nn.o3 import FullyConnectedTensorProduct, Linear, FullTensorProduct, Norm
+from e3nn.util.test import assert_equivariant
 
 
-def test_fully_connected(assert_equivariant):
+def test_fully_connected():
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
@@ -19,7 +20,7 @@ def test_fully_connected(assert_equivariant):
     )
 
 
-def test_id(assert_equivariant):
+def test_id():
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
     m = Identity(irreps_in, irreps_out)
@@ -29,7 +30,7 @@ def test_id(assert_equivariant):
     assert_equivariant(m)
 
 
-def test_linear(assert_equivariant):
+def test_linear():
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
     m = Linear(irreps_in, irreps_out)
@@ -39,7 +40,7 @@ def test_linear(assert_equivariant):
     assert_equivariant(m)
 
 
-def test_full(assert_equivariant):
+def test_full():
 
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2x2e + 2x3o")
@@ -52,7 +53,7 @@ def test_full(assert_equivariant):
     )
 
 
-def test_norm(assert_equivariant):
+def test_norm():
     irreps_in = o3.Irreps("3x0e + 5x1o")
     scalars = torch.randn(3)
     vecs = torch.randn(5, 3)

@@ -4,6 +4,7 @@ import torch
 
 import e3nn
 from e3nn.nn import NormActivation
+from e3nn.util.test import assert_equivariant
 
 
 @pytest.mark.parametrize('do_bias', [True, False])
@@ -74,7 +75,7 @@ def test_norm_activation(do_bias, nonlin):
 
 @pytest.mark.parametrize('do_bias', [True, False])
 @pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
-def test_norm_activation_equivariant(assert_equivariant, do_bias, nonlin):
+def test_norm_activation_equivariant(do_bias, nonlin):
     irreps_in = e3nn.o3.Irreps(
         # test lots of different irreps
         "2x0e + 3x0o + 5x1o + 1x1e + 2x2e + 1x2o + 1x3e + 1x3o + 1x5e + 1x6o"

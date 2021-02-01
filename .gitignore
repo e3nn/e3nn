@@ -1,5 +1,6 @@
 notebook
 .vscode
+.coverage
 *.egg-info
 __pycache__
 QM9

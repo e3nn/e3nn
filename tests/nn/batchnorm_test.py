@@ -1,9 +1,10 @@
 import torch
 from e3nn import o3
 from e3nn.nn import BatchNorm
+from e3nn.util.test import assert_equivariant
 
 
-def test_normalization(float_tolerance, assert_equivariant):
+def test_normalization(float_tolerance):
     sqrt_float_tolerance = torch.sqrt(float_tolerance)
 
     batch, n = 20, 20
