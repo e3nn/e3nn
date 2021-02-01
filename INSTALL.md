@@ -18,20 +18,18 @@ pip install --no-index torch-spline-conv -f https://pytorch-geometric.com/whl/to
 pip install torch-geometric
 ```
 
-See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions, they are all compatible with e3nn-core.
+See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions.
 
-## e3nn-core
+## e3nn
 
 For now the library is pure python, therefore the installation precedure is very simple:
 
 ```
-python setup.py install
+pip install e3nn
 ```
 
-or
+or clone the main branch and execute
 
 ```
 python setup.py develop
 ```
-
-We plan to incude (optional to build) home-made cuda kernels to accelerate the bottleneck operations.

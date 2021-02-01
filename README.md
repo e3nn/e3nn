@@ -6,9 +6,7 @@ The aim of this library it to help the developement of E3 equivariant neural net
 It contains fundamental mathematical operations such as tensor products and spherical harmonics.
 
 ## Installation
-```
-pip install e3nn
-```
+See [INSTALL](INSTALL.md)
 
 ### Previous version
 e3nn has been recently refactored. The last version before refactoring can be installed with the command
