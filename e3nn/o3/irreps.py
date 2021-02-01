@@ -171,6 +171,10 @@ class Irrep(tuple):
     def dim(self) -> int:
         return 2 * self.l + 1
 
+    def __eq__(self, ir) -> bool:
+        ir = Irrep(ir)
+        return super().__eq__(ir)
+
     def __mul__(self, ir):
         r"""generate the irreps from the product of two irreps
 
@@ -361,6 +365,10 @@ class Irreps(tuple):
     def __contains__(self, ir) -> bool:
         ir = Irrep(ir)
         return ir in (ir for _, ir in self)
+
+    def __eq__(self, irreps) -> bool:
+        irreps = Irreps(irreps)
+        return super().__eq__(irreps)
 
     def count(self, ir) -> int:
         ir = Irrep(ir)
