@@ -6,7 +6,7 @@ The aim of this library it to help the developement of E3 equivariant neural net
 It contains fundamental mathematical operations such as tensor products and spherical harmonics.
 
 ## Installation
-See [INSTALL](INSTALL.md)
+See [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
 
 ### Previous version
 e3nn has been recently refactored. The last version before refactoring can be installed with the command
@@ -23,7 +23,7 @@ We are happy to help! The best way to get help on `e3nn` is to submit a [Questio
 If you want to get involved in and contribute to the development, improvement, and application of `e3nn`, introduce yourself with [Project Wanted](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=projectwanted&template=project-wanted.md&title=%F0%9F%91%8B++Hi%21+I%27m+%5BYOUR_NAME%5D+and+I%27m+interested+in+%5BYOUR_INTERESTS%5D.).
 
 ## Code of conduct
-Our community abides by the [Contributor Covenant Code of Conduct](code_of_conduct.md).
+Our community abides by the [Contributor Covenant Code of Conduct](https://github.com/e3nn/e3nn/blob/main/code_of_conduct.md).
 
 ## Citing
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3724963.svg)](https://doi.org/10.5281/zenodo.3724963)

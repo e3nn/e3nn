@@ -26,4 +26,4 @@ And the following features of `pytorch_geometric <https://pytorch-geometric.read
     :lines: 98-118
     :dedent: 4
 
-Full code `here <https://github.com/e3nn/e3nn/blob/main/examples/tetris_polynomial.py>`
+Full code `here <https://github.com/e3nn/e3nn/blob/main/examples/tetris_polynomial.py>`_
