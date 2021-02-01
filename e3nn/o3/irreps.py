@@ -246,9 +246,11 @@ class Irreps(tuple):
         if isinstance(irreps, Irreps):
             return super().__new__(cls, irreps)
 
+        MulIr = collections.namedtuple("MulIr", "mul, ir")
+
         out = []
         if isinstance(irreps, Irrep):
-            out.append((1, Irrep(irreps)))
+            out.append(MulIr(1, Irrep(irreps)))
         elif isinstance(irreps, str):
             for mul_ir in irreps.split('+'):
                 if 'x' in mul_ir:
@@ -260,7 +262,7 @@ class Irreps(tuple):
                     ir = Irrep(mul_ir)
 
                 assert isinstance(mul, int) and mul >= 0
-                out.append((mul, ir))
+                out.append(MulIr(mul, ir))
         else:
             for mul_ir in irreps:
                 if isinstance(mul_ir, str):
@@ -283,7 +285,7 @@ class Irreps(tuple):
                 assert isinstance(mul, int) and mul >= 0
                 assert ir is not None
 
-                out.append((mul, ir))
+                out.append(MulIr(mul, ir))
         return super().__new__(cls, out)
 
     @staticmethod
