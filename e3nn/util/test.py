@@ -6,10 +6,10 @@ import torch
 from e3nn import o3
 
 
-EQUIVARIANCE_TOLERANCE = {
+FLOAT_TOLERANCE = {
     t: torch.as_tensor(v, dtype=t)
     for t, v in {
-        torch.float32: 1e-4,
+        torch.float32: 1e-3,
         torch.float64: 1e-10
     }.items()
 }
@@ -35,7 +35,7 @@ try:
             'float64': torch.float64
         }[request.param]
         torch.set_default_dtype(dtype)
-        yield EQUIVARIANCE_TOLERANCE[dtype]
+        yield FLOAT_TOLERANCE[dtype]
         torch.set_default_dtype(old_dtype)
 except ImportError:
     pass
@@ -60,7 +60,7 @@ def assert_equivariant(
         irreps_out : object
             see ``equivariance_error``
         tolerance : float or None
-            the threshold below which the equivariance error must fall. If ``None``, (the default), ``EQUIVARIANCE_TOLERANCE[torch.get_default_dtype()]`` is used.
+            the threshold below which the equivariance error must fall. If ``None``, (the default), ``FLOAT_TOLERANCE[torch.get_default_dtype()]`` is used.
         **kwargs : kwargs
             passed through to ``equivariance_error``.
     """
@@ -88,7 +88,7 @@ def assert_equivariant(
     )
     # Check it
     if tolerance is None:
-        tolerance = EQUIVARIANCE_TOLERANCE[torch.get_default_dtype()]
+        tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
 
     problems = {case: err for case, err in errors.items() if err > tolerance}
 
