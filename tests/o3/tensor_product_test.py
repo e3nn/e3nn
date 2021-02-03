@@ -1,4 +1,5 @@
 import random
+import warnings
 
 import pytest
 import torch
@@ -28,9 +29,9 @@ def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
         return None
 
 
-def random_params():
+def random_params(n=25):
     params = set()
-    while len(params) < 25:
+    while len(params) < n:
         l1 = random.randint(0, 2)
         p1 = random.choice([-1, 1])
         l2 = random.randint(0, 2)
@@ -77,3 +78,32 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
     # equivariance
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
+def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
+    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+
+    def rand_inputs():
+        batch_dim = random.randint(1, 10)
+        return (
+            torch.randn(batch_dim, tp.irreps_in1.dim),
+            torch.randn(batch_dim, tp.irreps_in2.dim)
+        )
+
+    # Test tracing
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error', category=torch.jit.TracerWarning)
+        tp_trace = torch.jit.trace(
+            tp,
+            example_inputs=rand_inputs(),
+            check_inputs=[rand_inputs() for _ in range(5)]
+        )
+
+    assert_equivariant(
+        tp_trace,
+        irreps_in=[tp.irreps_in1, tp.irreps_in2],
+        irreps_out=tp.irreps_out
+    )
+
+# TODO: test tp.right()
