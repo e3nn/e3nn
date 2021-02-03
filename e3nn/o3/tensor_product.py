@@ -198,6 +198,8 @@ class TensorProduct(torch.nn.Module):
         self.shared_weights = shared_weights
         z = '' if self.shared_weights else 'z'
 
+        # == TorchScript main operation templates ==
+        # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return. 
         code_out = f"""
 from typing import List
 
@@ -216,11 +218,14 @@ def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[t
     x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
     if x1.shape[0] == 0:
-        return torch.zeros(outsize)
-    
-    batch = x1.shape[0]
-    out = x1.new_zeros((batch, {self.irreps_out.dim}))
-    ein = torch.einsum
+        return torch.zeros(
+            outsize,
+            device=x1.device
+        )
+    else:
+        batch = x1.shape[0]
+        out = x1.new_zeros((batch, {self.irreps_out.dim}))
+        ein = torch.einsum
 """
 
         code_right = f"""
@@ -238,13 +243,21 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
     x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
     if x2.shape[0] == 0:
-        return torch.zeros(outsize)
-
-    batch = x2.shape[0]
-    out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
-    ein = torch.einsum
+        return torch.zeros(
+            outsize,
+            device=x2.device
+        )
+    else:
+        batch = x2.shape[0]
+        out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
+        ein = torch.einsum
 """
-        s = 4 * " "
+        # == end TorchScript templates ==
+        # Put everything in the else block
+        base_indent = 2
+        def indent_for_level(indent_level):
+            return ((base_indent + indent_level) * 4) * " "
+        s = indent_for_level(0)
 
         wshapes = []
         wigners = []
@@ -292,7 +305,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
             alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in self.instructions if i_out_ == i_out)
 
-            s = 4 * " "
+            s = indent_for_level(0)
 
             line = (
                 f"{s}with torch.autograd.profiler.record_function("
@@ -302,7 +315,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             code_out += line
             code_right += line
 
-            s = 8 * " "
+            s = indent_for_level(1)
 
             code_out += f"{s}s1 = x1_{i_1}\n"
             code_right += f"{s}e1 = torch.eye({mul_1}, dtype=x2.dtype, device=x2.device)\n"
@@ -501,11 +514,9 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwvk', w3j[{index_w3j}], e1, s2)")
             code_out += "\n"
 
-        code_out += """
-    return out.reshape(outsize)
-"""
+        code_out += f"{s}return out.reshape(outsize)"
         code_right += """
-    return out.reshape(outsize)
+        return out.reshape(outsize)
 """
 
         self.code_out = code_out
@@ -618,7 +629,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
             return self.main_right(features_2, weight, wigners)
-        
+
     def forward(self, features_1, features_2, weight=None):
         r"""evaluate :math:`w x \otimes y`
 
