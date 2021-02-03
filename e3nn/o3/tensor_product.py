@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import torch
 from e3nn import o3
-from e3nn.util import eval_code, broadcast_tensors
+from e3nn.util import eval_code
 
 
 def _prod(x):
@@ -198,16 +198,31 @@ class TensorProduct(torch.nn.Module):
         self.shared_weights = shared_weights
         z = '' if self.shared_weights else 'z'
 
+        # == TorchScript main operation templates ==
+        # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
         code_out = f"""
 from typing import List
 
 import torch
 
+from e3nn.util import broadcast_tensors
+
 @torch.jit.script
 def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
-    batch = x1.shape[0]
-    out = x1.new_zeros((batch, {self.irreps_out.dim}))
-    ein = torch.einsum
+    x1, x2 = broadcast_tensors(x1, x2)
+    size = x1.shape[:-1]
+    outsize = size + ({self.irreps_out.dim},)
+    assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+    x1 = x1.reshape(-1, {self.irreps_in1.dim})
+    x2 = x2.reshape(-1, {self.irreps_in2.dim})
+
+    if x1.shape[0] == 0:
+        return x1.new_zeros(outsize)
+    else:
+        batch = x1.shape[0]
+        out = x1.new_zeros((batch, {self.irreps_out.dim}))
+        ein = torch.einsum
 """
 
         code_right = f"""
@@ -215,13 +230,28 @@ from typing import List
 
 import torch
 
+from e3nn.util import broadcast_tensors
+
 @torch.jit.script
 def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
-    batch = x2.shape[0]
-    out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
-    ein = torch.einsum
+    size = x2.shape[:-1]
+    outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+    x2 = x2.reshape(-1, {self.irreps_in2.dim})
+
+    if x2.shape[0] == 0:
+        return x2.new_zeros(outsize)
+    else:
+        batch = x2.shape[0]
+        out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
+        ein = torch.einsum
 """
-        s = 4 * " "
+        # == end TorchScript templates ==
+        # Put everything in the else block
+        base_indent = 2
+        def indent_for_level(indent_level):
+            return ((base_indent + indent_level) * 4) * " "
+        s = indent_for_level(0)
 
         wshapes = []
         wigners = []
@@ -269,7 +299,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
             alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in self.instructions if i_out_ == i_out)
 
-            s = 4 * " "
+            s = indent_for_level(0)
 
             line = (
                 f"{s}with torch.autograd.profiler.record_function("
@@ -279,7 +309,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             code_out += line
             code_right += line
 
-            s = 8 * " "
+            s = indent_for_level(1)
 
             code_out += f"{s}s1 = x1_{i_1}\n"
             code_right += f"{s}e1 = torch.eye({mul_1}, dtype=x2.dtype, device=x2.device)\n"
@@ -478,12 +508,13 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwvk', w3j[{index_w3j}], e1, s2)")
             code_out += "\n"
 
-        s = 4 * " "
-        code_out += f"{s}return out"
-        code_right += f"{s}return out"
+        code_out += f"{s}return out.reshape(outsize)"
+        code_right += f"{s}return out.reshape(outsize)"
 
         self.code_out = code_out
+        self._compiled_main_out = eval_code(self.code_out).main
         self.code_right = code_right
+        self._compiled_main_right = eval_code(self.code_right).main
 
         # w3j
         self.wigners = wigners
@@ -586,19 +617,10 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
         with torch.autograd.profiler.record_function(repr(self)):
-            size = features_2.shape[:-1]
-            assert features_2.shape[-1] == self.irreps_in2.dim, f"{features_2.shape} is not (..., {self.irreps_in2.dim})"
-            features_2 = features_2.reshape(_prod(size), self.irreps_in2.dim)
-
-            if features_2.shape[0] == 0:
-                return torch.zeros(*size, self.irreps_in1.dim, self.irreps_out.dim)
-
             weight = self.prepare_weight_list(weight)
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
-            operator = eval_code(self.code_right).main(features_2, weight, wigners)
-
-            return operator.reshape(*size, self.irreps_in1.dim, self.irreps_out.dim)
+            return self._compiled_main_right(features_2, weight, wigners)
 
     def forward(self, features_1, features_2, weight=None):
         r"""evaluate :math:`w x \otimes y`
@@ -624,22 +646,31 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             tensor of shape ``(..., irreps_out.dim)``
         """
         with torch.autograd.profiler.record_function(repr(self)):
-            features_1, features_2 = broadcast_tensors(features_1, features_2)
-            size = features_1.shape[:-1]
-            assert features_1.shape[-1] == self.irreps_in1.dim, f"{features_1.shape} is not (..., {self.irreps_in1.dim})"
-            assert features_2.shape[-1] == self.irreps_in2.dim, f"{features_2.shape} is not (..., {self.irreps_in2.dim})"
-            features_1 = features_1.reshape(_prod(size), self.irreps_in1.dim)
-            features_2 = features_2.reshape(_prod(size), self.irreps_in2.dim)
-
-            if features_1.shape[0] == 0:
-                return torch.zeros(*size, self.irreps_out.dim)
-
             weight = self.prepare_weight_list(weight)
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
-            features = eval_code(self.code_out).main(features_1, features_2, weight, wigners)
+            return self._compiled_main_out(features_1, features_2, weight, wigners)
 
-            return features.reshape(*size, self.irreps_out.dim)
+    # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
+    # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances
+    # torch.nn.Module does not currently impliment __get/setstate__ but may in the future, which is why we have these hasattr checks.
+    def __getstate__(self):
+        if hasattr(super(), "__getstate__"):
+            out = super().__getstate__().copy()
+        else:
+            out = self.__dict__.copy()
+        del out['_compiled_main_out']
+        del out['_compiled_main_right']
+        return out
+
+    def __setstate__(self, d):
+        d = d.copy()
+        d["_compiled_main_out"] = eval_code(d['code_out']).main
+        d["_compiled_main_right"] = eval_code(d['code_right']).main
+        if hasattr(super(), "__setstate__"):
+            super().__setstate__(d)
+        else:
+            self.__dict__.update(d)
 
 
 class FullyConnectedTensorProduct(TensorProduct):

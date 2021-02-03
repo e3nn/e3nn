@@ -1,5 +1,6 @@
 import random
 import itertools
+import warnings
 
 import torch
 
@@ -67,16 +68,12 @@ def assert_equivariant(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
-    if args_in is None:
-        if not all((isinstance(i, o3.Irreps) or i == 'cartesian_points') for i in irreps_in):
-            raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
-        # Generate random args with random size batch dim between 1 and 4:
-        batch_size = random.randint(1, 4)
-        args_in = [
-            torch.randn(batch_size, 3) if (irreps == 'cartesian_points') else irreps.randn(batch_size, -1)
-            for irreps in irreps_in
-        ]
+    args_in, irreps_in, irreps_out = _get_args_in(
+        func,
+        args_in=args_in,
+        irreps_in=irreps_in,
+        irreps_out=irreps_out
+    )
 
     # Get error
     errors = equivariance_error(
@@ -136,8 +133,6 @@ def equivariance_error(
     dictionary mapping tuples ``(parity_k, did_translate)`` to errors
     """
     irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
-
-    assert len(args_in) == len(irreps_in), "irreps_in and args_in don't match in length"
 
     if do_parity:
         parity_ks = torch.Tensor([0, 1])
@@ -200,6 +195,91 @@ def equivariance_error(
     return biggest_errs
 
 
+def assert_jit_trace(
+    func,
+    method_name=None,
+    args_in=None,
+    irreps_in=None,
+    irreps_out=None,
+    n_random_tests=2,
+    strict_shapes=True,
+    **kwargs
+):
+    r"""Assert that ``func`` can be traced to TorchScript.
+
+    Parameters
+    ----------
+        func : Callable
+            The function to trace.
+        method_name : str or None (default)
+            If ``func`` is a module, methods other than ``forward()`` can be traced by giving their name as a string. (This uses ``torch.jit.trace_module`` instead of ``torch.jit.trace``.)
+        args_in : list or None
+            the original input arguments for the function. If ``None`` and the function has ``irreps_in`` consisting only of ``o3.Irreps`` and ``'cartesian'``, random test inputs will be generated.
+        irreps_in : object
+            see ``equivariance_error``
+        irreps_out : object
+            see ``equivariance_error``
+        n_random_tests : int
+            If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be generated as test inputs for ``torch.jit.trace``.
+        strict_shapes : bool
+            Test that the traced function errors on inputs with feature dimensions that don't match the input irreps.
+        **kwargs : kwargs
+            passed through to ``torch.jit.trace``.
+    Returns
+    -------
+        The traced TorchScript function.
+    """
+    # Prevent pytest from showing this function in the traceback
+    __tracebackhide__ = True
+
+    random_tests = args_in is None
+
+    args_in, irreps_in, irreps_out = _get_args_in(
+        func,
+        args_in=args_in,
+        irreps_in=irreps_in,
+        irreps_out=irreps_out
+    )
+
+    if random_tests:
+        test_inputs = [args_in] + [_rand_args(irreps_in) for _ in range(n_random_tests)]
+    else:
+        test_inputs = [args_in]
+
+    # Test tracing
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error', category=torch.jit.TracerWarning)
+        if method_name is not None:
+            func_trace = torch.jit.trace_module(
+                func,
+                inputs={method_name: tuple(args_in)},
+                check_inputs=[{method_name: t} for t in test_inputs]
+            )
+            func_trace = getattr(func_trace, method_name)
+        else:
+            func_trace = torch.jit.trace(
+                func,
+                example_inputs=tuple(args_in),
+                check_inputs=test_inputs
+            )
+
+    # Confirm that it rejects incorrect shapes
+    if random_tests and strict_shapes:
+        bad_args = _rand_args(irreps_in)
+        # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
+        bad_which = random.randint(0, len(bad_args)-1)
+        bad_args[bad_which] = bad_args[bad_which][..., :-random.randint(1, 3)]  # make bad shape
+        try:
+            func_trace(*bad_args)
+        except torch.jit.Error as e:
+            # As far as I can tell, there's no good way to introspect TorchScript exceptions. Checking for RuntimeError at least eliminates particlar possibilities
+            assert "RuntimeError" in str(e), "TorchScript through an unexpectedly strange error"
+        else:
+            raise AssertionError("Traced function didn't error on bad input shape")
+
+    return func_trace
+
+
 def _transform(dat, irreps_dat, rot_mat, translation=0.):
     """Transform ``dat`` by ``rot_mat`` and ``translation`` according to ``irreps_dat``."""
     out = []
@@ -248,3 +328,23 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
         irreps_out = [o3.Irreps(irreps_out)]
 
     return irreps_in, irreps_out
+
+
+def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
+    irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
+    if args_in is None:
+        args_in = _rand_args(irreps_in)
+    assert len(args_in) == len(irreps_in), "irreps_in and args_in don't match in length"
+    return args_in, irreps_in, irreps_out
+
+
+def _rand_args(irreps_in):
+    if not all((isinstance(i, o3.Irreps) or i == 'cartesian_points') for i in irreps_in):
+        raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
+    # Generate random args with random size batch dim between 1 and 4:
+    batch_size = random.randint(1, 4)
+    args_in = [
+        torch.randn(batch_size, 3) if (irreps == 'cartesian_points') else irreps.randn(batch_size, -1)
+        for irreps in irreps_in
+    ]
+    return args_in

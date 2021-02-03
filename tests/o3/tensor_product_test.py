@@ -1,9 +1,10 @@
 import random
+import copy
 
 import pytest
 import torch
 from e3nn.o3 import TensorProduct
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import assert_equivariant, assert_jit_trace
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
@@ -28,9 +29,9 @@ def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
         return None
 
 
-def random_params():
+def random_params(n=25):
     params = set()
-    while len(params) < 25:
+    while len(params) < n:
         l1 = random.randint(0, 2)
         p1 = random.choice([-1, 1])
         l2 = random.randint(0, 2)
@@ -77,3 +78,37 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
     # equivariance
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
+def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
+    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+
+    # Check the tensor product
+    tp_trace = assert_jit_trace(tp)
+
+    # Confirm equivariance of traced model
+    assert_equivariant(
+        tp_trace,
+        irreps_in=[tp.irreps_in1, tp.irreps_in2],
+        irreps_out=tp.irreps_out
+    )
+
+    # Check right()
+    assert_jit_trace(
+        tp,
+        method_name='right',
+        irreps_in=tp.irreps_in2,
+        irreps_out=tp.irreps_out
+    )
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
+def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
+    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+    x1 = torch.randn(2, tp.irreps_in1.dim)
+    x2 = torch.randn(2, tp.irreps_in2.dim)
+    res1 = tp(x1, x2)
+    tp_copy = copy.deepcopy(tp)
+    res2 = tp_copy(x1, x2)
+    assert torch.allclose(res1, res2)
