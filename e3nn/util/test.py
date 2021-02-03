@@ -202,6 +202,7 @@ def assert_jit_trace(
     irreps_in=None,
     irreps_out=None,
     n_random_tests=2,
+    strict_shapes=True,
     **kwargs
 ):
     r"""Assert that ``func`` can be traced to TorchScript.
@@ -220,6 +221,8 @@ def assert_jit_trace(
             see ``equivariance_error``
         n_random_tests : int
             If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be generated as test inputs for ``torch.jit.trace``.
+        strict_shapes : bool
+            Test that the traced function errors on inputs with feature dimensions that don't match the input irreps.
         **kwargs : kwargs
             passed through to ``torch.jit.trace``.
     Returns
@@ -261,7 +264,7 @@ def assert_jit_trace(
             )
 
     # Confirm that it rejects incorrect shapes
-    if random_tests:
+    if random_tests and strict_shapes:
         bad_args = _rand_args(irreps_in)
         # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
         bad_which = random.randint(0, len(bad_args)-1)

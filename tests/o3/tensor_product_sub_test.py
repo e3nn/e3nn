@@ -26,7 +26,7 @@ def test_id():
     m(torch.randn(irreps_in.dim))
 
     assert_equivariant(m)
-    assert_jit_trace
+    assert_jit_trace(m, strict_shapes=False)
 
 
 def test_linear():
