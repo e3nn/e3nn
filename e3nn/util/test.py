@@ -5,6 +5,7 @@ import warnings
 import torch
 
 from e3nn import o3
+from e3nn.util.jit import trace, trace_module
 
 
 FLOAT_TOLERANCE = {
@@ -199,8 +200,10 @@ def assert_jit_trace(
     func,
     method_name=None,
     args_in=None,
+    test_args=None,
     irreps_in=None,
     irreps_out=None,
+    error_on_warnings=True,
     n_random_tests=2,
     strict_shapes=True,
     **kwargs
@@ -215,10 +218,14 @@ def assert_jit_trace(
             If ``func`` is a module, methods other than ``forward()`` can be traced by giving their name as a string. (This uses ``torch.jit.trace_module`` instead of ``torch.jit.trace``.)
         args_in : list or None
             the original input arguments for the function. If ``None`` and the function has ``irreps_in`` consisting only of ``o3.Irreps`` and ``'cartesian'``, random test inputs will be generated.
+        test_args : list of tuple or None
+            Additional arguments with which to test the trace.
         irreps_in : object
             see ``equivariance_error``
         irreps_out : object
             see ``equivariance_error``
+        error_on_warnings : bool
+            If True (default), TracerWarnings emitted by ``torch.jit.trace`` will be treated as errors.
         n_random_tests : int
             If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be generated as test inputs for ``torch.jit.trace``.
         strict_shapes : bool
@@ -232,7 +239,7 @@ def assert_jit_trace(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    random_tests = args_in is None
+    random_tests = (args_in is None)
 
     args_in, irreps_in, irreps_out = _get_args_in(
         func,
@@ -245,19 +252,22 @@ def assert_jit_trace(
         test_inputs = [args_in] + [_rand_args(irreps_in) for _ in range(n_random_tests)]
     else:
         test_inputs = [args_in]
+    if test_args is not None:
+        test_inputs.extend(test_args)
 
     # Test tracing
     with warnings.catch_warnings():
-        warnings.filterwarnings('error', category=torch.jit.TracerWarning)
+        if error_on_warnings:
+            warnings.filterwarnings('error', category=torch.jit.TracerWarning)
         if method_name is not None:
-            func_trace = torch.jit.trace_module(
+            func_trace = trace_module(
                 func,
                 inputs={method_name: tuple(args_in)},
                 check_inputs=[{method_name: t} for t in test_inputs]
             )
             func_trace = getattr(func_trace, method_name)
         else:
-            func_trace = torch.jit.trace(
+            func_trace = trace(
                 func,
                 example_inputs=tuple(args_in),
                 check_inputs=test_inputs
