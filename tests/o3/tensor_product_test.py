@@ -1,10 +1,9 @@
 import random
-import warnings
 
 import pytest
 import torch
 from e3nn.o3 import TensorProduct
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import assert_equivariant, assert_jit_trace
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
@@ -84,21 +83,8 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
 
-    def rand_inputs():
-        batch_dim = random.randint(1, 10)
-        return (
-            torch.randn(batch_dim, tp.irreps_in1.dim),
-            torch.randn(batch_dim, tp.irreps_in2.dim)
-        )
-
-    # Test tracing
-    with warnings.catch_warnings():
-        warnings.filterwarnings('error', category=torch.jit.TracerWarning)
-        tp_trace = torch.jit.trace(
-            tp,
-            example_inputs=rand_inputs(),
-            check_inputs=[rand_inputs() for _ in range(5)]
-        )
+    # Check the tensor product
+    tp_trace = assert_jit_trace(tp)
 
     # Confirm equivariance of traced model
     assert_equivariant(
@@ -107,19 +93,10 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
         irreps_out=tp.irreps_out
     )
 
-    # Confirm that it rejects incorrect shapes
-    x1, x2 = rand_inputs()
-    x1 = x1[..., :-3]  # make bad shape
-    try:
-        tp_trace(x1, x2)
-    except torch.jit.Error as e:
-        lines = str(e).split('\n')
-        err_on_line = next(i for i in range(len(lines)) if "Incorrect feature dimension for x1" in lines[i])
-        # Make sure it occurred on the right line
-        assert err_on_line and (("~~~~" in lines[err_on_line+1]) and ("HERE" in lines[err_on_line+1]))
-    else:
-        raise AssertionError("It didn't error on bad input shape")
-    
-    
-
-# TODO: test tp.right()
+    # Check right()
+    assert_jit_trace(
+        tp,
+        method_name='right',
+        irreps_in=tp.irreps_in2,
+        irreps_out=tp.irreps_out
+    )

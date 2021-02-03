@@ -37,7 +37,7 @@ def broadcast_tensors(x: torch.Tensor,
     assert dim_x == dim_y
     dim: int = dim_x
 
-    # TorchScript requires us to build these shapes explicitly, 
+    # TorchScript requires us to build these shapes explicitly,
     # rather than using splats or list comprehensions
     xshape: List[int] = [-1] * x.ndim
     yshape: List[int] = [-1] * y.ndim
