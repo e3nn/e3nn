@@ -210,8 +210,8 @@ def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[t
     x1, x2 = broadcast_tensors(x1, x2)
     size = x1.shape[:-1]
     outsize = size + ({self.irreps_out.dim},)
-    assert x1.shape[-1] == {self.irreps_in1.dim}
-    assert x2.shape[-1] == {self.irreps_in2.dim}
+    assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
     x1 = x1.reshape(-1, {self.irreps_in1.dim})
     x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
@@ -234,7 +234,7 @@ from e3nn.util import broadcast_tensors
 def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
     size = x2.shape[:-1]
     outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
-    assert x2.shape[-1] == {self.irreps_in2.dim}
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
     x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
     if x2.shape[0] == 0:

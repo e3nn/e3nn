@@ -100,10 +100,26 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
             check_inputs=[rand_inputs() for _ in range(5)]
         )
 
+    # Confirm equivariance of traced model
     assert_equivariant(
         tp_trace,
         irreps_in=[tp.irreps_in1, tp.irreps_in2],
         irreps_out=tp.irreps_out
     )
+
+    # Confirm that it rejects incorrect shapes
+    x1, x2 = rand_inputs()
+    x1 = x1[..., :-3]  # make bad shape
+    try:
+        tp_trace(x1, x2)
+    except torch.jit.Error as e:
+        lines = str(e).split('\n')
+        err_on_line = next(i for i in range(len(lines)) if "Incorrect feature dimension for x1" in lines[i])
+        # Make sure it occurred on the right line
+        assert err_on_line and (("~~~~" in lines[err_on_line+1]) and ("HERE" in lines[err_on_line+1]))
+    else:
+        raise AssertionError("It didn't error on bad input shape")
+    
+    
 
 # TODO: test tp.right()
