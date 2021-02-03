@@ -1,4 +1,5 @@
 import random
+import copy
 
 import pytest
 import torch
@@ -100,3 +101,14 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
         irreps_in=tp.irreps_in2,
         irreps_out=tp.irreps_out
     )
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
+def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
+    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+    x1 = torch.randn(2, tp.irreps_in1.dim)
+    x2 = torch.randn(2, tp.irreps_in2.dim)
+    res1 = tp(x1, x2)
+    tp_copy = copy.deepcopy(tp)
+    res2 = tp_copy(x1, x2)
+    assert torch.allclose(res1, res2)

@@ -199,7 +199,7 @@ class TensorProduct(torch.nn.Module):
         z = '' if self.shared_weights else 'z'
 
         # == TorchScript main operation templates ==
-        # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return. 
+        # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
         code_out = f"""
 from typing import List
 
@@ -218,10 +218,7 @@ def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[t
     x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
     if x1.shape[0] == 0:
-        return torch.zeros(
-            outsize,
-            device=x1.device
-        )
+        return x1.new_zeros(outsize)
     else:
         batch = x1.shape[0]
         out = x1.new_zeros((batch, {self.irreps_out.dim}))
@@ -243,10 +240,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
     x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
     if x2.shape[0] == 0:
-        return torch.zeros(
-            outsize,
-            device=x2.device
-        )
+        return x2.new_zeros(outsize)
     else:
         batch = x2.shape[0]
         out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
@@ -515,14 +509,12 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             code_out += "\n"
 
         code_out += f"{s}return out.reshape(outsize)"
-        code_right += """
-        return out.reshape(outsize)
-"""
+        code_right += f"{s}return out.reshape(outsize)"
 
         self.code_out = code_out
-        self.main_out = eval_code(self.code_out).main
+        self._compiled_main_out = eval_code(self.code_out).main
         self.code_right = code_right
-        self.main_right = eval_code(self.code_right).main
+        self._compiled_main_right = eval_code(self.code_right).main
 
         # w3j
         self.wigners = wigners
@@ -628,7 +620,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             weight = self.prepare_weight_list(weight)
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
-            return self.main_right(features_2, weight, wigners)
+            return self._compiled_main_right(features_2, weight, wigners)
 
     def forward(self, features_1, features_2, weight=None):
         r"""evaluate :math:`w x \otimes y`
@@ -657,7 +649,28 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             weight = self.prepare_weight_list(weight)
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
-            return self.main_out(features_1, features_2, weight, wigners)
+            return self._compiled_main_out(features_1, features_2, weight, wigners)
+
+    # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
+    # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances
+    # torch.nn.Module does not currently impliment __get/setstate__ but may in the future, which is why we have these hasattr checks.
+    def __getstate__(self):
+        if hasattr(super(), "__getstate__"):
+            out = super().__getstate__().copy()
+        else:
+            out = self.__dict__.copy()
+        del out['_compiled_main_out']
+        del out['_compiled_main_right']
+        return out
+
+    def __setstate__(self, d):
+        d = d.copy()
+        d["_compiled_main_out"] = eval_code(d['code_out']).main
+        d["_compiled_main_right"] = eval_code(d['code_right']).main
+        if hasattr(super(), "__setstate__"):
+            super().__setstate__(d)
+        else:
+            self.__dict__.update(d)
 
 
 class FullyConnectedTensorProduct(TensorProduct):
