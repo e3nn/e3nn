@@ -4,6 +4,7 @@ from collections import namedtuple
 import torch
 from e3nn import o3
 from e3nn.util import eval_code
+from e3nn.util.jit import compile_mode
 
 
 def _prod(x):
@@ -13,6 +14,8 @@ def _prod(x):
     return out
 
 
+# This decorator applies to all the subclasses as well.
+@compile_mode('trace')
 class TensorProduct(torch.nn.Module):
     r"""Tensor Product with parametrizable paths
 
