@@ -107,6 +107,8 @@ class Compose(torch.nn.Module):
         super().__init__()
         self.first = first
         self.second = second
+        self.irreps_in = self.first.irreps_in
+        self.irreps_out = self.second.irreps_out
 
     def forward(self, *input):
         x = self.first(*input)
