@@ -6,6 +6,7 @@ import torch
 from ._argtools import _get_io_irreps, _rand_args
 
 _E3NN_COMPILE_MODE = "__e3nn_compile_mode__"
+_MAKE_TRACING_INPUT = 'make_tracing_input'
 
 
 def compile_mode(mode: str):
@@ -56,7 +57,7 @@ def _compile_submodules(
     elif compile_mode == 'trace':
         # These are always modules, so we're always using trace_module
         # We need tracing inputs:
-        if hasattr(mod, 'make_tracing_input'):
+        if hasattr(mod, _MAKE_TRACING_INPUT):
             # This returns a trace_module style dict of method names to test inputs
             check_inputs = [mod.make_tracing_input() for _ in range(n_extra_trace_checks+1)]
             assert all(isinstance(e, dict) for e in check_inputs), "make_tracing_input must return a dict"
@@ -79,18 +80,39 @@ def _compile_submodules(
 
 def trace_module(
     mod: torch.nn.Module,
-    inputs: dict,
+    inputs: dict = None,
     n_extra_trace_checks: int = 0,
     script_options: dict = {},
     trace_options: dict = {}
 ):
-    mod = _compile_submodules(
+    # Set the compile mode for mod, temporarily
+    old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
+    setattr(mod, _E3NN_COMPILE_MODE, 'trace')
+
+    # If inputs are provided, set make_tracing_input temporarily
+    old_make_tracing_input = None
+    if inputs is not None:
+        old_make_tracing_input = getattr(mod, _MAKE_TRACING_INPUT, None)
+        setattr(
+            mod,
+            _MAKE_TRACING_INPUT,
+            lambda: inputs
+        )
+
+    # Compile
+    out = _compile_submodules(
         mod,
         n_extra_trace_checks=n_extra_trace_checks,
         script_options=script_options,
         trace_options=trace_options
     )
-    return torch.jit.trace_module(mod, inputs, **trace_options)
+
+    # Restore old values, if we had them
+    if old_mode is not None:
+        setattr(mod, _E3NN_COMPILE_MODE, old_mode)
+    if old_make_tracing_input is not None:
+        setattr(mod, _MAKE_TRACING_INPUT, old_make_tracing_input)
+    return out
 
 
 def script(
@@ -99,10 +121,20 @@ def script(
     script_options: dict = {},
     trace_options: dict = {}
 ):
-    mod = _compile_submodules(
+    # Set the compile mode for mod, temporarily
+    old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
+    setattr(mod, _E3NN_COMPILE_MODE, 'script')
+
+    # Compile
+    out = _compile_submodules(
         mod,
         n_extra_trace_checks=n_extra_trace_checks,
         script_options=script_options,
         trace_options=trace_options
     )
-    return torch.jit.script(mod, **script_options)
+
+    # Restore old values, if we had them
+    if old_mode is not None:
+        setattr(mod, _E3NN_COMPILE_MODE, old_mode)
+
+    return out
