@@ -204,6 +204,37 @@ class Irrep(tuple):
         raise NotImplementedError
 
 
+class _MulIr(tuple):
+    def __new__(cls, mul, ir=None):
+        if ir is None:
+            mul, ir = mul
+
+        assert isinstance(mul, int)
+        assert isinstance(ir, Irrep)
+        return super().__new__(cls, (mul, ir))
+
+    @property
+    def mul(self) -> int:
+        return self[0]
+
+    @property
+    def ir(self) -> int:
+        return self[1]
+
+    @property
+    def dim(self) -> int:
+        return self.mul * self.ir.dim
+
+    def __repr__(self):
+        return f"{self.mul}x{self.ir}"
+
+    def count(self, _value):
+        raise NotImplementedError
+
+    def index(self, _value):
+        raise NotImplementedError
+
+
 class Irreps(tuple):
     r"""Direct sum of irreducible representations of :math:`O(3)`
 
@@ -246,11 +277,9 @@ class Irreps(tuple):
         if isinstance(irreps, Irreps):
             return super().__new__(cls, irreps)
 
-        MulIr = collections.namedtuple("MulIr", "mul, ir")
-
         out = []
         if isinstance(irreps, Irrep):
-            out.append(MulIr(1, Irrep(irreps)))
+            out.append(_MulIr(1, Irrep(irreps)))
         elif isinstance(irreps, str):
             for mul_ir in irreps.split('+'):
                 if 'x' in mul_ir:
@@ -262,7 +291,7 @@ class Irreps(tuple):
                     ir = Irrep(mul_ir)
 
                 assert isinstance(mul, int) and mul >= 0
-                out.append(MulIr(mul, ir))
+                out.append(_MulIr(mul, ir))
         else:
             for mul_ir in irreps:
                 if isinstance(mul_ir, str):
@@ -271,6 +300,8 @@ class Irreps(tuple):
                 elif isinstance(mul_ir, Irrep):
                     mul = 1
                     ir = mul_ir
+                elif isinstance(mul_ir, _MulIr):
+                    mul, ir = mul_ir
                 elif len(mul_ir) == 2:
                     mul, ir = mul_ir
                     ir = Irrep(ir)
@@ -285,7 +316,7 @@ class Irreps(tuple):
                 assert isinstance(mul, int) and mul >= 0
                 assert ir is not None
 
-                out.append(MulIr(mul, ir))
+                out.append(_MulIr(mul, ir))
         return super().__new__(cls, out)
 
     @staticmethod
@@ -457,7 +488,7 @@ class Irreps(tuple):
         return max(self.ls)
 
     def __repr__(self):
-        return "+".join(f"{mul}x{ir}" for mul, ir in self)
+        return "+".join(f"{mulir}" for mulir in self)
 
     def D_from_angles(self, alpha, beta, gamma, k=None):
         r"""Matrix of the representation
