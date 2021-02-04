@@ -21,10 +21,10 @@ class Convolution(torch.nn.Module):
         self.size = size
         self.num_gaussian = self.size
 
-        # self-interaction
-        self.si = Linear(self.irreps_in, self.irreps_out)
+        # self-connection
+        self.sc = Linear(self.irreps_in, self.irreps_out)
 
-        # interaction with neighbors
+        # connection with neighbors
         r = torch.linspace(-1, 1, self.size)
         x = r * steps[0] / min(steps)
         x = x[x.abs() <= 1]
@@ -55,14 +55,13 @@ class Convolution(torch.nn.Module):
             tensor of shape ``(batch, irreps_out.dim, x, y, z)``
 
         """
-        si = self.si(x.transpose(1, 4))
-        si = si.transpose(1, 4)
+        sc = self.sc(x.transpose(1, 4)).transpose(1, 4)
 
         weight = soft_one_hot_linspace(self.d, 0.0, 1.0, self.num_gaussian) @ self.weight
         weight = weight * (math.pi * self.d).cos()[:, :, :, None] / (self.size ** (3/2))
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
         kernel = torch.einsum('xyzio->oixyz', kernel)
-        return si + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2)
+        return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2)
 
 
 def test():
