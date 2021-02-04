@@ -16,6 +16,34 @@ from e3nn.math import soft_one_hot_linspace, swish
 
 
 class Convolution(torch.nn.Module):
+    r"""equivariant convolution
+
+    Parameters
+    ----------
+    irreps_in : `Irreps`
+        representation of the input node features
+
+    irreps_node_attr : `Irreps`
+        representation of the node attributes
+
+    irreps_edge_attr : `Irreps`
+        representation of the edge attributes
+
+    irreps_out : `Irreps` or None
+        representation of the output node features
+
+    number_of_basis : int
+        number of basis on which the edge length are projected
+
+    radial_layers : int
+        number of hidden layers in the radial fully connected network
+
+    radial_neurons : int
+        number of neurons in the hidden layers of the radial fully connected network
+
+    num_neighbors : float
+        typical number of nodes convolved over
+    """
     def __init__(
             self,
             irreps_in,
@@ -34,7 +62,7 @@ class Convolution(torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_out)
         self.num_neighbors = num_neighbors
 
-        self.si = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_out)
+        self.sc = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_out)
 
         self.lin1 = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_in)
 
@@ -72,14 +100,14 @@ class Convolution(torch.nn.Module):
 
         x = node_input
 
-        si = self.si(x, node_attr)
+        sc = self.sc(x, node_attr)
         x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
         x = scatter(edge_features, edge_dst, dim=0, dim_size=len(x)).div(self.num_neighbors**0.5)
 
         x = self.lin2(x, node_attr)
-        return si + 0.5 * x
+        return sc + 0.5 * x
 
 
 def smooth_cutoff(x):
