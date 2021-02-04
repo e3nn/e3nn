@@ -5,14 +5,16 @@ Exact equivariance to :math:`E(3)`
 version of january 2021
 """
 import math
+
 import torch
 from torch_cluster import radius_graph
+from torch_geometric.data import Data, DataLoader
 from torch_scatter import scatter
 
 from e3nn import o3
-from e3nn.nn import FullyConnectedNet, Gate
-from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
 from e3nn.math import soft_one_hot_linspace, swish
+from e3nn.nn import FullyConnectedNet, Gate
+from e3nn.o3 import FullyConnectedTensorProduct, TensorProduct
 
 
 class Convolution(torch.nn.Module):
@@ -100,14 +102,18 @@ class Convolution(torch.nn.Module):
 
         x = node_input
 
-        sc = self.sc(x, node_attr)
+        s = self.sc(x, node_attr)
         x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
         x = scatter(edge_features, edge_dst, dim=0, dim_size=len(x)).div(self.num_neighbors**0.5)
 
         x = self.lin2(x, node_attr)
-        return sc + 0.5 * x
+
+        c_s, c_x = math.sin(math.pi / 8), math.cos(math.pi / 8)
+        m = self.sc.output_mask
+        c_x = (1 - m) + c_x * m
+        return c_s * s + c_x * x
 
 
 def smooth_cutoff(x):
@@ -218,7 +224,10 @@ class Network(torch.nn.Module):
         self.irreps_node_attr = o3.Irreps(irreps_node_attr) if irreps_node_attr is not None else o3.Irreps("0e")
         self.irreps_edge_attr = o3.Irreps(irreps_edge_attr)
 
-        irreps = self.irreps_in if self.irreps_in is not None else self.irreps_edge_attr
+        self.input_has_node_in = (irreps_in is not None)
+        self.input_has_node_attr = (irreps_node_attr is not None)
+
+        irreps = self.irreps_in if self.irreps_in is not None else o3.Irreps("0e")
 
         act = {
             1: swish,
@@ -280,6 +289,9 @@ class Network(torch.nn.Module):
             - ``z`` the attributes of the nodes, for instance the atom type, optional
             - ``batch`` the graph to which the node belong, optional
         """
+        if not isinstance(data, Data):
+            data = next(iter(DataLoader(data, batch_size=len(data))))
+
         if hasattr(data, 'batch'):
             batch = data.batch
         else:
@@ -287,23 +299,23 @@ class Network(torch.nn.Module):
 
         edge_src, edge_dst = radius_graph(data.pos, self.max_radius, batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, normalization='component', normalize=True)
+        edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, True, normalization='component')
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
         edge_attr = smooth_cutoff(edge_length / self.max_radius)[:, None] * edge_sh
 
-        if 'x' in data:
+        if self.input_has_node_in and 'x' in data:
             assert self.irreps_in is not None
             x = data.x
         else:
             assert self.irreps_in is None
-            x = scatter(edge_attr, edge_dst, dim=0, dim_size=len(data.pos)).div(self.num_neighbors**0.5)
+            x = data.pos.new_ones(data.pos.shape[0], 1)
 
-        if 'z' in data:
+        if self.input_has_node_attr and 'z' in data:
             z = data.z
         else:
             assert self.irreps_node_attr == o3.Irreps("0e")
-            z = x.new_ones(x.shape[0], 1)
+            z = data.pos.new_ones(data.pos.shape[0], 1)
 
         for lay in self.layers:
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
