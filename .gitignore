@@ -11,3 +11,4 @@ wandb
 _build
 build
 dist
+.ipynb_checkpoints
