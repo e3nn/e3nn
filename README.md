@@ -1,6 +1,6 @@
 # e3nn
 
-**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)**
+**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)**
 
 The aim of this library it to help the developement of E3 equivariant neural networks.
 It contains fundamental mathematical operations such as tensor products and spherical harmonics.
