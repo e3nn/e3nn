@@ -90,15 +90,15 @@ class Irrep(tuple):
         ----------
         alpha : `torch.Tensor`
             tensor of shape :math:`(...)`
-            Rotation :math:`\alpha` around Z axis, applied third.
+            Rotation :math:`\alpha` around Y axis, applied third.
 
         beta : `torch.Tensor`
             tensor of shape :math:`(...)`
-            Rotation :math:`\beta` around Y axis, applied second.
+            Rotation :math:`\beta` around X axis, applied second.
 
         gamma : `torch.Tensor`
             tensor of shape :math:`(...)`
-            Rotation :math:`\gamma` around Z axis, applied first.
+            Rotation :math:`\gamma` around Y axis, applied first.
 
         k : `torch.Tensor`, optional
             tensor of shape :math:`(...)`
