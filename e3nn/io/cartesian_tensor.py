@@ -1,4 +1,3 @@
-import torch
 from e3nn import o3
 
 
