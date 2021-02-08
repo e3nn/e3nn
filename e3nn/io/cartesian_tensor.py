@@ -13,6 +13,7 @@ class CartesianTensor(o3.Irreps):
     Examples
     --------
 
+    >>> import torch
     >>> CartesianTensor("ij=-ji")
     1x1e
 
