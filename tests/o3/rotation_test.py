@@ -9,7 +9,7 @@ def test_xyz(float_tolerance):
 
     a, b, c = o3.matrix_to_angles(R)
     pos1 = o3.angles_to_xyz(a, b)
-    pos2 = R @ torch.tensor([0, 0, 1.0])
+    pos2 = R @ torch.tensor([0, 1.0, 0])
     assert torch.allclose(pos1, pos2)
 
     a2, b2 = o3.xyz_to_angles(pos2)

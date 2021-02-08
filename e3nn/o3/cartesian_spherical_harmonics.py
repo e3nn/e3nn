@@ -103,7 +103,7 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
 
 
 @torch.jit.script
-def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+def _spherical_harmonics(lmax: int, y: torch.Tensor, z: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     sh_0_0 = torch.ones(x.shape, dtype=x.dtype, device=x.device)
     if lmax == 0:
         return torch.stack([

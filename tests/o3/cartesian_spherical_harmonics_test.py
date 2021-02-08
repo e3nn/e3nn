@@ -95,7 +95,7 @@ def test_recurrence_relation(float_tolerance, l):
         'ijk,j,k->i',
         o3.wigner_3j(l + 1, l, 1),
         o3.spherical_harmonics(l, x, False),
-        x[[1, 2, 0]]
+        x
     )
 
     alpha = b.norm() / a.norm()
@@ -106,7 +106,6 @@ def test_recurrence_relation(float_tolerance, l):
         return o3.spherical_harmonics(l + 1, x, False)
 
     a = torch.autograd.functional.jacobian(f, x)
-    a = a[:, [1, 2, 0]]
 
     b = (l + 1) / alpha * torch.einsum(
         'ijk,j->ik',
