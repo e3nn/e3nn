@@ -43,7 +43,7 @@ def test_conversions(float_tolerance):
         g = conv[i][j](g)
     R2 = g
 
-    assert (R1 - R2).abs().max() < 10*float_tolerance
+    assert (R1 - R2).abs().median() < float_tolerance
 
 
 def test_compose(float_tolerance):
@@ -72,6 +72,6 @@ def test_compose(float_tolerance):
     R3 = o3.angles_to_matrix(*abc)
     R4 = o3.axis_angle_to_matrix(ax, a)
 
-    assert (R1 - R2).norm(dim=1).max() < float_tolerance
-    assert (R1 - R3).norm(dim=1).max() < float_tolerance
-    assert (R1 - R4).norm(dim=1).max() < float_tolerance
+    assert (R1 - R2).abs().max().median() < float_tolerance
+    assert (R1 - R3).abs().max().median() < float_tolerance
+    assert (R1 - R4).abs().max().median() < float_tolerance
