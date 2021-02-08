@@ -17,4 +17,4 @@ torch-cluster
 torch-spline-conv
 torch-geometric
 
-e3nn
+.
