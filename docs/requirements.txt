@@ -3,6 +3,8 @@ myst-parser
 sphinx
 sphinx-rtd-theme
 sympy
+
+ipykernel
 nbsphinx
 
 --find-links https://download.pytorch.org/whl/torch_stable.html
