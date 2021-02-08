@@ -38,21 +38,7 @@ class CartesianTensor(o3.Irreps):
         return data.flatten(-self.num_index) @ Q.T
 
     def from_vectors(self, *xs):
-        A = torch.tensor([
-            [0, 1, 0],
-            [0, 0, 1],
-            [1, 0, 0.0],
-        ])
-        xs = [x @ A.T for x in xs]
         return self._rtp(*xs)
 
     def change_of_basis(self):
-        A = torch.tensor([
-            [0, 1, 0],
-            [0, 0, 1],
-            [1, 0, 0.0],
-        ])
-        i = 'abcdefghijkl'[:self.num_index]
-        j = ',am,bn,co,dp,eq,fr,gs,ht,iu,jv,kw,lx'[:3 * self.num_index]
-        k = 'mnopqrstuvwx'[:self.num_index]
-        return torch.einsum(f"z{i}{j}->z{k}", self._rtp.change_of_basis, *[A] * self.num_index)
+        return self._rtp.change_of_basis
