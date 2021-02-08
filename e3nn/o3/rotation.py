@@ -278,12 +278,12 @@ def compose_axis_angle(axis1, angle1, axis2, angle2):
 # conversions
 
 
-def matrix_x(beta):
+def matrix_x(angle: torch.Tensor) -> torch.Tensor:
     r"""matrix of rotation around X axis
 
     Parameters
     ----------
-    beta : `torch.Tensor`
+    angle : `torch.Tensor`
         tensor of any shape :math:`(...)`
 
     Returns
@@ -291,10 +291,10 @@ def matrix_x(beta):
     `torch.Tensor`
         matrices of shape :math:`(..., 3, 3)`
     """
-    c = beta.cos()
-    s = beta.sin()
-    o = torch.ones_like(beta)
-    z = torch.zeros_like(beta)
+    c = angle.cos()
+    s = angle.sin()
+    o = torch.ones_like(angle)
+    z = torch.zeros_like(angle)
     return torch.stack([
         torch.stack([o, z, z], dim=-1),
         torch.stack([z, c, -s], dim=-1),
@@ -302,12 +302,12 @@ def matrix_x(beta):
     ], dim=-2)
 
 
-def matrix_y(gamma):
+def matrix_y(angle: torch.Tensor) -> torch.Tensor:
     r"""matrix of rotation around Y axis
 
     Parameters
     ----------
-    gamma : `torch.Tensor`
+    angle : `torch.Tensor`
         tensor of any shape :math:`(...)`
 
     Returns
@@ -315,10 +315,10 @@ def matrix_y(gamma):
     `torch.Tensor`
         matrices of shape :math:`(..., 3, 3)`
     """
-    c = gamma.cos()
-    s = gamma.sin()
-    o = torch.ones_like(gamma)
-    z = torch.zeros_like(gamma)
+    c = angle.cos()
+    s = angle.sin()
+    o = torch.ones_like(angle)
+    z = torch.zeros_like(angle)
     return torch.stack([
         torch.stack([c, z, s], dim=-1),
         torch.stack([z, o, z], dim=-1),
@@ -326,12 +326,12 @@ def matrix_y(gamma):
     ], dim=-2)
 
 
-def matrix_z(delta):
+def matrix_z(angle: torch.Tensor) -> torch.Tensor:
     r"""matrix of rotation around Z axis
 
     Parameters
     ----------
-    delta : `torch.Tensor`
+    angle : `torch.Tensor`
         tensor of any shape :math:`(...)`
 
     Returns
@@ -339,10 +339,10 @@ def matrix_z(delta):
     `torch.Tensor`
         matrices of shape :math:`(..., 3, 3)`
     """
-    c = delta.cos()
-    s = delta.sin()
-    o = torch.ones_like(delta)
-    z = torch.zeros_like(delta)
+    c = angle.cos()
+    s = angle.sin()
+    o = torch.ones_like(angle)
+    z = torch.zeros_like(angle)
     return torch.stack([
         torch.stack([c, -s, z], dim=-1),
         torch.stack([s, c, z], dim=-1),
@@ -393,7 +393,7 @@ def matrix_to_angles(R):
         tensor of shape :math:`(...)`
     """
     assert torch.allclose(torch.det(R), torch.tensor(1.0))
-    x = R @ R.new_tensor([0, 1, 0])
+    x = R @ R.new_tensor([0.0, 1.0, 0.0])
     a, b = xyz_to_angles(x)
     R = angles_to_matrix(a, b, a.new_zeros(a.shape)).transpose(-1, -2) @ R
     c = torch.atan2(R[..., 0, 2], R[..., 0, 0])
@@ -420,9 +420,9 @@ def angles_to_quaternion(alpha, beta, gamma):
         matrices of shape :math:`(..., 4)`
     """
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    qa = axis_angle_to_quaternion(torch.tensor([0, 1, 0.0]), alpha)
-    qb = axis_angle_to_quaternion(torch.tensor([1, 0, 0.0]), beta)
-    qc = axis_angle_to_quaternion(torch.tensor([0, 1, 0.0]), gamma)
+    qa = axis_angle_to_quaternion(torch.tensor([0.0, 1.0, 0.0]), alpha)
+    qb = axis_angle_to_quaternion(torch.tensor([1.0, 0.0, 0.0]), beta)
+    qc = axis_angle_to_quaternion(torch.tensor([0.0, 1.0, 0.0]), gamma)
     return compose_quaternion(qa, compose_quaternion(qb, qc))
 
 
