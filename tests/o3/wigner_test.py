@@ -22,3 +22,10 @@ def test_wigner_3j(float_tolerance):
 
     C2 = torch.einsum("ijk,zil,zjm,zkn->zlmn", C, D1, D2, D3)
     assert (C - C2).abs().max() < float_tolerance
+
+
+def test_cartesian(float_tolerance):
+    abc = o3.rand_angles(10)
+    R = o3.angles_to_matrix(*abc)
+    D = o3.wigner_D(1, *abc)
+    assert (R - D).abs().max() < float_tolerance
