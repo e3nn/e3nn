@@ -279,7 +279,7 @@ def compose_axis_angle(axis1, angle1, axis2, angle2):
 
 
 def matrix_x(beta):
-    r"""matrix of rotation around Y axis
+    r"""matrix of rotation around X axis
 
     Parameters
     ----------
