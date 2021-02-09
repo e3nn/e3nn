@@ -183,6 +183,8 @@ class Gate(torch.nn.Module):
             tensor of shape ``(..., irreps_out.dim)``
         '''
         with torch.autograd.profiler.record_function(repr(self)):
+            assert features.shape[-1] == self.irreps_in.dim, f"Incorrect feature dimension. Expected {self.irreps_in.dim} for the last dimension."
+
             scalars, gates = self.sc(features)
             nonscalars = features[..., scalars.shape[-1] + gates.shape[-1]:]
 
