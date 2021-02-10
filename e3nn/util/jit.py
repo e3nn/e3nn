@@ -10,7 +10,14 @@ _MAKE_TRACING_INPUTS = '_make_tracing_inputs'
 
 
 def compile_mode(mode: str):
-    if not mode in ['trace', 'script']:
+    """Decorator to set the compile mode of a module.
+
+    Parameters
+    ----------
+        mode : str
+            'script', 'trace', or None
+    """
+    if not mode in ['trace', 'script', None]:
         raise ValueError("Invalid compile mode")
     def decorator(obj):
         if not (inspect.isclass(obj) and issubclass(obj, torch.nn.Module)):
@@ -24,6 +31,16 @@ def compile_mode(mode: str):
 
 
 def get_compile_mode(mod: torch.nn.Module) -> str:
+    """Get the compilation mode of a module.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+
+    Returns
+    -------
+    'script', 'trace', or None if the module was not decorated with @compile_mode
+    """
     if hasattr(mod, _E3NN_COMPILE_MODE):
         mode = getattr(mod, _E3NN_COMPILE_MODE)
     else:
@@ -38,9 +55,24 @@ def compile(
     script_options: dict = {},
     trace_options: dict = {},
 ):
-    """Recursively compile all submodules according to their decorators.
+    """Recursively compile a module and all submodules according to their decorators.
 
-    Submodules without decorators will be unaffected.
+    (Sub)modules without decorators will be unaffected.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+            The module to compile. The module will have its submodules compiled replaced in-place.
+        n_trace_checks : int, default = 1
+            How many random example inputs to generate when tracing a module. Must be at least one in order to have a tracing input. Extra example inputs will be pased to ``torch.jit.trace`` to confirm that the traced copmute graph doesn't change.
+        script_options : dict, default = {}
+            Extra kwargs for ``torch.jit.script``.
+        trace_options : dict, default = {}
+            Extra kwargs for ``torch.jit.trace``.
+
+    Returns
+    -------
+    Returns the compiled module.
     """
     # TODO: debug logging
     assert n_trace_checks >= 1
@@ -78,6 +110,23 @@ def compile(
 
 
 def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
+    """Get random tracing inputs for ``mod``.
+
+    First checks if ``mod`` has a ``_make_tracing_inputs`` method. If so, calls it with ``n`` as the single argument and returns its results.
+
+    Otherwise, attempts to infer the input signature of the module using ``e3nn.util._argtools._get_io_irreps``.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+        n : int, default = 1
+            A hint for how many inputs are wanted. Usually n will be returned, but modules don't necessarily have to.
+
+    Returns
+    -------
+    list of dict
+        Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of arguments.
+    """
     if hasattr(mod, _MAKE_TRACING_INPUTS):
         # This returns a trace_module style dict of method names to test inputs
         trace_inputs = mod._make_tracing_inputs(n)
@@ -100,6 +149,19 @@ def trace_module(
     inputs: dict = None,
     check_inputs: list = [],
 ):
+    """Trace a module.
+
+    Identical signature to ``torch.jit.trace_module``, but first recursively compiles ``mod`` using ``compile``.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+        inputs : dict
+        check_inputs : list of dict
+    Returns
+    -------
+    Traced module.
+    """
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
     if old_mode is not None and old_mode != 'trace':
@@ -132,6 +194,19 @@ def trace(
     example_inputs: tuple = None,
     check_inputs: list = [],
 ):
+    """Trace a module.
+
+    Identical signature to ``torch.jit.trace``, but first recursively compiles ``mod`` using :func:``compile``.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+        example_inputs : tuple
+        check_inputs : list of tuple
+    Returns
+    -------
+    Traced module.
+    """
     return trace_module(
         mod=mod,
         inputs=({'forward': example_inputs} if example_inputs is not None else None),
@@ -140,6 +215,17 @@ def trace(
 
 
 def script(mod: torch.nn.Module):
+    """Script a module.
+
+    Like ``torch.jit.script``, but first recursively compiles ``mod`` using :func:``compile``.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+    Returns
+    -------
+    Scripted module.
+    """
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
     if old_mode is not None and old_mode != 'script':
