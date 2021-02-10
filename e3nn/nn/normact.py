@@ -1,8 +1,10 @@
 import torch
 
 from e3nn import o3
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('trace')
 class NormActivation(torch.nn.Module):
     r"""Norm-based activation function
 
