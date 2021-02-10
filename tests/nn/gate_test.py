@@ -17,6 +17,6 @@ def test_gate():
     sc = _Sortcut(irreps_scalars, irreps_gates)
     assert_auto_jitable(sc)
 
-    # g = Gate(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_nonscalars)
-    # assert_equivariant(g)
-    # assert_auto_jitable(g)
+    g = Gate(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_nonscalars)
+    assert_equivariant(g)
+    assert_auto_jitable(g)
