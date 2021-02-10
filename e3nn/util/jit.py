@@ -103,7 +103,7 @@ def trace_module(
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
     if old_mode is not None and old_mode != 'trace':
-        warnings.warn("Trying to trace a module marked with @compile_mode != 'trace', expect errors!")
+        warnings.warn(f"Trying to trace a module of type {type(mod).__name__} marked with @compile_mode != 'trace', expect errors!")
     setattr(mod, _E3NN_COMPILE_MODE, 'trace')
 
     # If inputs are provided, set make_tracing_input temporarily
@@ -143,7 +143,7 @@ def script(mod: torch.nn.Module):
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
     if old_mode is not None and old_mode != 'script':
-        warnings.warn("Trying to script a module marked with @compile_mode != 'script', expect errors!")
+        warnings.warn(f"Trying to script a module of type {type(mod).__name__} marked with @compile_mode != 'script', expect errors!")
     setattr(mod, _E3NN_COMPILE_MODE, 'script')
 
     # Compile
