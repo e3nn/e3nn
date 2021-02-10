@@ -12,12 +12,23 @@ from e3nn.math import soft_one_hot_linspace
 
 
 class Convolution(torch.nn.Module):
-    def __init__(self, irreps_in, irreps_out, size, steps=(1, 1, 1)):
+    r"""convolution on voxels
+
+    Parameters
+    ----------
+    irreps_in : `Irreps`
+    irreps_out : `Irreps`
+    irreps_sh : `Irreps`
+        set typically to ``o3.Irreps.spherical_harmonics(lmax)``
+    size : int
+    steps : tuple of int
+    """
+    def __init__(self, irreps_in, irreps_out, irreps_sh, size, steps=(1, 1, 1)):
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_out)
-        self.irreps_sh = o3.Irreps.spherical_harmonics(lmax=3)
+        self.irreps_sh = o3.Irreps(irreps_sh)
         self.size = size
         self.num_gaussian = self.size
 
@@ -65,7 +76,7 @@ class Convolution(torch.nn.Module):
 
 
 def test():
-    conv = Convolution("0e + 1e", "0e + 1e + 1o + 2e + 2o", 5)
+    conv = Convolution("0e + 1e", "0e + 1e + 1o + 2e + 2o", o3.Irreps.spherical_harmonics(lmax=3), 5)
 
     x = torch.randn(10, 4, 32, 32, 32)
     conv(x)
