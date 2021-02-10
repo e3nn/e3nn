@@ -2,6 +2,8 @@ import pytest
 
 import warnings
 import random
+import tempfile
+import subprocess
 
 import torch
 from torch_geometric.data import Data
@@ -79,3 +81,23 @@ def test_gate_points_2101_jit(network):
 
     dat = random_graph()
     assert torch.allclose(f(dat), f_traced(dat))
+
+    # - Try saving, loading in another process, and running -
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Save stuff
+        f_traced.save(tmpdir + "/model.pt")
+        torch.save(dat, tmpdir + '/dat.pt')
+        # Load in new process
+        with open(tmpdir + '/code.py', 'x') as code:
+            code.write(f"""
+import torch
+f = torch.jit.load('{tmpdir}/model.pt')
+d = torch.load('{tmpdir}/dat.pt')
+out = f(d)
+torch.save(out, '{tmpdir}/out.pt')
+""")
+        # Run
+        subprocess.run(['python', tmpdir + '/code.py'])
+        # Check
+        out = torch.load(tmpdir + '/out.pt')
+        assert torch.allclose(f(dat), out)
