@@ -58,8 +58,8 @@ def test_closure():
     integral of Ylm * Yjn = delta_lj delta_mn
     integral of 1 over the unit sphere = 4 pi
     """
-    x = torch.randn(300_000, 3)
-    Ys = [o3.spherical_harmonics(l, x, normalize=True) for l in range(0, 3 + 1)]
+    x = torch.randn(1_000_000, 3)
+    Ys = [o3.spherical_harmonics(l, x, True) for l in range(0, 3 + 1)]
     for l1, Y1 in enumerate(Ys):
         for l2, Y2 in enumerate(Ys):
             m = Y1[:, :, None] * Y2[:, None, :]
@@ -95,7 +95,7 @@ def test_recurrence_relation(float_tolerance, l):
         'ijk,j,k->i',
         o3.wigner_3j(l + 1, l, 1),
         o3.spherical_harmonics(l, x, False),
-        x[[1, 2, 0]]
+        x
     )
 
     alpha = b.norm() / a.norm()
@@ -106,7 +106,6 @@ def test_recurrence_relation(float_tolerance, l):
         return o3.spherical_harmonics(l + 1, x, False)
 
     a = torch.autograd.functional.jacobian(f, x)
-    a = a[:, [1, 2, 0]]
 
     b = (l + 1) / alpha * torch.einsum(
         'ijk,j->ik',

@@ -15,9 +15,9 @@ def test_sh_equivariance1(float_tolerance):
         alpha, beta, gamma = o3.rand_angles()
 
         ra, rb, _ = o3.compose_angles(alpha, beta, gamma, a, b, torch.tensor(0.0))
-        Yrx = o3.spherical_harmonics_alpha_beta([l], ra, rb)
+        Yrx = o3.spherical_harmonics_alpha_beta(l, ra, rb)
 
-        Y = o3.spherical_harmonics_alpha_beta([l], a, b)
+        Y = o3.spherical_harmonics_alpha_beta(l, a, b)
         DrY = o3.wigner_D(l, alpha, beta, gamma) @ Y
 
         assert (Yrx - DrY).abs().max() < float_tolerance * Y.abs().max()
@@ -26,6 +26,16 @@ def test_sh_equivariance1(float_tolerance):
 def test_sh_is_in_irrep(float_tolerance):
     for l in range(4 + 1):
         a, b, _ = o3.rand_angles()
-        Y = o3.spherical_harmonics_alpha_beta([l], a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1) * (-1) ** l
+        Y = o3.spherical_harmonics_alpha_beta(l, a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1)
         D = o3.wigner_D(l, a, b, torch.zeros(()))
         assert (Y - D[:, l]).abs().max() < float_tolerance
+
+
+def test_sh_same(float_tolerance):
+    for l in range(4 + 1):
+        x = torch.randn(10, 3)
+        a, b = o3.xyz_to_angles(x)
+
+        y1 = o3.spherical_harmonics(l, x, True)
+        y2 = o3.spherical_harmonics_alpha_beta(l, a, b)
+        assert (y1 - y2).abs().max() < float_tolerance

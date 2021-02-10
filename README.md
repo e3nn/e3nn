@@ -1,6 +1,6 @@
 # e3nn
 
-**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)**
+**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)**
 
 The aim of this library it to help the developement of E3 equivariant neural networks.
 It contains fundamental mathematical operations such as tensor products and spherical harmonics.
@@ -27,10 +27,10 @@ If you want to get involved in and contribute to the development, improvement, a
 Our community abides by the [Contributor Covenant Code of Conduct](https://github.com/e3nn/e3nn/blob/main/code_of_conduct.md).
 
 ## Citing
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3724963.svg)](https://doi.org/10.5281/zenodo.3724963)
+[![DOI](https://zenodo.org/badge/237431920.svg)](https://zenodo.org/badge/latestdoi/237431920)
 
 ```
-@software{e3nn_2020_3724963,
+@software{e3nn_2021_4522091,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Benjamin K. Miller and
@@ -38,17 +38,18 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Kostiantyn Lapchevskyi and
                   Maurice Weiler and
                   Michał Tyszkiewicz and
+                  Alby M. and
                   Bradley Dice and
                   Jes Frellsen and
                   Sophia Sanborn and
-                  M. Alby},
+                  Nuri Jung},
   title        = {\texttt{e3nn}: a modular framework for Euclidean Neural Networks, github.com/e3nn/e3nn}},
-  month        = dec,
-  year         = 2020,
+  month        = feb,
+  year         = 2021,
   publisher    = {Zenodo},
-  version      = {0.1.1},
-  doi          = {10.5281/zenodo.3724963},
-  url          = {https://doi.org/10.5281/zenodo.3724963}
+  version      = {0.2.2},
+  doi          = {10.5281/zenodo.4522091},
+  url          = {https://doi.org/10.5281/zenodo.4522091}
 }
 ```
 

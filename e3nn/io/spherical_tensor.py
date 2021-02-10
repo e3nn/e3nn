@@ -1,4 +1,5 @@
 from math import pi
+from collections import namedtuple
 
 import scipy.signal
 import torch
@@ -24,12 +25,20 @@ def _find_peaks_2d(x):
 class SphericalTensor(o3.Irreps):
     r"""representation of a signal on the sphere
 
+    A `SphericalTensor` contains the coefficients :math:`A^l` of a function :math:`f` defined on the sphere
+
     .. math::
         f(x) = \sum_{l=0}^{l_\mathrm{max}} A^l \cdot Y^l(x)
 
-        (P f)(x) = p_v f(p_a x)
 
-        (P f)(x) = \sum_{l=0}^{l_\mathrm{max}} p_v p_a^l A^l \cdot Y^l(x)
+    The way this function is transformed by parity :math:`f \longrightarrow P f` is described by the two parameters :math:`p_v` and :math:`p_a`
+
+    .. math::
+        (P f)(x) &= p_v f(p_a x)
+
+        &= \sum_{l=0}^{l_\mathrm{max}} p_v p_a^l A^l \cdot Y^l(x)
+
+    See :ref:`user_guide` for a visualization of the effect of :math:`p_v` and :math:`p_a`
 
     Parameters
     ----------
@@ -143,8 +152,9 @@ class SphericalTensor(o3.Irreps):
     def signal_on_grid(self, signal, res=100, normalization='integral'):
         r"""Evaluate the signal on a grid on the sphere
         """
+        Ret = namedtuple("Return", "grid, values")
         s2 = ToS2Grid(lmax=self.lmax, res=res, normalization=normalization)
-        return s2.grid, s2(signal)
+        return Ret(s2.grid, s2(signal))
 
     def plotly_surface(self, signals, centers=None, res=100, radius=True, relu=False, normalization='integral'):
         r"""Create traces for plotly
@@ -184,8 +194,8 @@ class SphericalTensor(o3.Irreps):
         f = f.relu() if relu else f
 
         # beta: [0, pi]
-        r[0] = r.new_tensor([0, 0, 1])
-        r[-1] = r.new_tensor([0, 0, -1])
+        r[0] = r.new_tensor([0.0, 1.0, 0.0])
+        r[-1] = r.new_tensor([0.0, -1.0, 0.0])
         f[0] = f[0].mean()
         f[-1] = f[-1].mean()
 

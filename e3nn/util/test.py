@@ -246,7 +246,7 @@ def assert_auto_jitable(
             for method, bad_args in all_bad_args.items():
                 # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
                 bad_which = random.randint(0, len(bad_args)-1)
-                bad_args = list(bad_args)                
+                bad_args = list(bad_args)
                 bad_args[bad_which] = bad_args[bad_which][..., :-random.randint(1, 3)]  # make bad shape
                 try:
                     if method == 'forward':

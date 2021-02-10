@@ -14,7 +14,7 @@ Another representation is the discretization around the sphere. For this represe
 
 .. math::
 
-    x_{ij} &= (\sin(\beta_i) \cos(\alpha_j), \sin(\beta_i) \sin(\alpha_j), \cos(\beta_i))
+    x_{ij} &= (\sin(\beta_i) \sin(\alpha_j), \cos(\beta_i), \sin(\beta_i) \cos(\alpha_j))
 
     \beta_i &= \pi (i + 0.5) / N
 

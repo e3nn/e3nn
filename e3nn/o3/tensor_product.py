@@ -256,7 +256,6 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             return ((base_indent + indent_level) * 4) * " "
         s = indent_for_level(0)
 
-        wshapes = []
         wigners = []
 
         for i_1, (mul_1, (l_1, p_1)) in enumerate(self.irreps_in1):
@@ -276,23 +275,35 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
         last_ss = None
 
-        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight")
+        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, weight_shape")
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
         self.instructions = [
-            Instruction(i_1, i_2, i_out, mode, weight, path_weight)
-            for i_1, i_2, i_out, mode, weight, path_weight in instructions
+            Instruction(
+                i_in1, i_in2, i_out, connection_mode, has_weight, path_weight,
+                {
+                    'uvw': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
+                    'uvu': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uvv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
+                    'uuu': (self.irreps_in1[i_in1].mul,),
+                    'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                }[connection_mode] if has_weight else None
+            )
+            for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
         ]
 
-        for i_1, i_2, i_out, mode, weight, path_weight in self.instructions:
-            mul_1, (l_1, p_1) = self.irreps_in1[i_1]
-            mul_2, (l_2, p_2) = self.irreps_in2[i_2]
-            mul_out, (l_out, p_out) = self.irreps_out[i_out]
+        index_w = -1
+
+        for ins in self.instructions:
+            mul_1, (l_1, p_1) = self.irreps_in1[ins.i_in1]
+            mul_2, (l_2, p_2) = self.irreps_in2[ins.i_in2]
+            mul_out, (l_out, p_out) = self.irreps_out[ins.i_out]
             dim_1 = mul_1 * (2 * l_1 + 1)
             dim_2 = mul_2 * (2 * l_2 + 1)
             dim_out = mul_out * (2 * l_out + 1)
-            index_1 = self.irreps_in1[:i_1].dim
-            index_2 = self.irreps_in2[:i_2].dim
-            index_out = self.irreps_out[:i_out].dim
+            index_1 = self.irreps_in1[:ins.i_in1].dim
+            index_2 = self.irreps_in2[:ins.i_in2].dim
+            index_out = self.irreps_out[:ins.i_out].dim
 
             assert p_1 * p_2 == p_out
             assert abs(l_1 - l_2) <= l_out <= l_1 + l_2
@@ -300,28 +311,28 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             if dim_1 == 0 or dim_2 == 0 or dim_out == 0:
                 continue
 
-            alpha = path_weight * out_var[i_out] / sum(in1_var[i_1_] * in2_var[i_2_] for i_1_, i_2_, i_out_, _, _, _ in self.instructions if i_out_ == i_out)
+            alpha = ins.path_weight * out_var[ins.i_out] / sum(in1_var[i.i_in1] * in2_var[i.i_in2] for i in self.instructions if i.i_out == ins.i_out)
 
             s = indent_for_level(0)
 
             line = (
                 f"{s}with torch.autograd.profiler.record_function("
-                f"'{self.irreps_in1[i_1:i_1+1]} x {self.irreps_in2[i_2:i_2+1]} "
-                f"= {self.irreps_out[i_out:i_out+1]} {mode} {weight}'):\n"
+                f"'{self.irreps_in1[ins.i_in1:ins.i_in1+1]} x {self.irreps_in2[ins.i_in2:ins.i_in2+1]} "
+                f"= {self.irreps_out[ins.i_out:ins.i_out+1]} {ins.connection_mode} {ins.has_weight}'):\n"
             )
             code_out += line
             code_right += line
 
             s = indent_for_level(1)
 
-            code_out += f"{s}s1 = x1_{i_1}\n"
+            code_out += f"{s}s1 = x1_{ins.i_in1}\n"
             code_right += f"{s}e1 = torch.eye({mul_1}, dtype=x2.dtype, device=x2.device)\n"
 
-            line = f"{s}s2 = x2_{i_2}\n"
+            line = f"{s}s2 = x2_{ins.i_in2}\n"
             code_out += line
             code_right += line
 
-            assert mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
+            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
             alpha = sqrt(alpha / {
                 'uvw': (mul_1 * mul_2),
@@ -330,18 +341,10 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                 'uuw': mul_1,
                 'uuu': 1,
                 'uvuv': 1,
-            }[mode])
+            }[ins.connection_mode])
 
-            index_w = len(wshapes)
-            if weight:
-                wshapes.append({
-                    'uvw': (mul_1, mul_2, mul_out),
-                    'uvu': (mul_1, mul_2),
-                    'uvv': (mul_1, mul_2),
-                    'uuw': (mul_1, mul_out),
-                    'uuu': (mul_1,),
-                    'uvuv': (mul_1, mul_2),
-                }[mode])
+            if ins.has_weight:
+                index_w += 1
 
             line_out = f"{s}out[:, {index_out}:{index_out+dim_out}] += {alpha} * {{}}.reshape(batch, {dim_out})\n\n"
             line_right = f"{s}out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += {alpha} * {{}}.reshape(batch, {dim_1}, {dim_out})\n\n"
@@ -354,72 +357,72 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                 # L x L = 0
                 # 1 x 1 = 1
 
-                if (l_1, l_2, l_out) == (0, 0, 0) and mode in ['uvw', 'uvu'] and normalization in ['component', 'norm'] and weight:
+                if (l_1, l_2, l_out) == (0, 0, 0) and ins.connection_mode in ['uvw', 'uvu'] and normalization in ['component', 'norm'] and ins.has_weight:
                     code_out += f"{s}s1 = s1.reshape(batch, {mul_1})\n"
                     line = f"{s}s2 = s2.reshape(batch, {mul_2})\n"
                     code_out += line
                     code_right += line
 
-                    if mode == 'uvw':
+                    if ins.connection_mode == 'uvw':
                         code_out += line_out.format(f"ein('{z}uvw,zu,zv->zw', ws[{index_w}], s1, s2)")
                         code_right += line_right.format(f"ein('{z}uvw,zv->zuw', ws[{index_w}], s2)")
-                    if mode == 'uvu':
+                    if ins.connection_mode == 'uvu':
                         code_out += line_out.format(f"ein('{z}uv,zu,zv->zu', ws[{index_w}], s1, s2)")
                         code_right += line_right.format(f"ein('{z}uv,uw,zv->zuw', ws[{index_w}], e1, s2)")
 
                     continue
 
-                if l_1 == 0 and l_2 == l_out and mode in ['uvw', 'uvu'] and normalization == 'component' and weight:
+                if l_1 == 0 and l_2 == l_out and ins.connection_mode in ['uvw', 'uvu'] and normalization == 'component' and ins.has_weight:
                     code_out += f"{s}s1 = s1.reshape(batch, {mul_1})\n"
 
-                    if mode == 'uvw':
+                    if ins.connection_mode == 'uvw':
                         code_out += line_out.format(f"ein('{z}uvw,zu,zvi->zwi', ws[{index_w}], s1, s2)")
                         code_right += line_right.format(f"ein('{z}uvw,zvi->zuwi', ws[{index_w}], s2)")
-                    if mode == 'uvu':
+                    if ins.connection_mode == 'uvu':
                         code_out += line_out.format(f"ein('{z}uv,zu,zvi->zui', ws[{index_w}], s1, s2)")
                         code_right += line_right.format(f"ein('{z}uv,uw,zvi->zuwi', ws[{index_w}], e1, s2)")
 
                     continue
 
-                if l_1 == l_out and l_2 == 0 and mode in ['uvw', 'uvu'] and normalization == 'component' and weight:
+                if l_1 == l_out and l_2 == 0 and ins.connection_mode in ['uvw', 'uvu'] and normalization == 'component' and ins.has_weight:
                     code_out += f"{s}s2 = s2.reshape(batch, {mul_2})\n"
                     code_right += f"{s}s2 = s2.reshape(batch, {mul_2})\n"
                     code_right += f"{s}wig = torch.eye({2 * l_1 + 1}, dtype=x2.dtype, device=x2.device)\n"
 
-                    if mode == 'uvw':
+                    if ins.connection_mode == 'uvw':
                         code_out += line_out.format(f"ein('{z}uvw,zui,zv->zwi', ws[{index_w}], s1, s2)")
                         code_right += line_right.format(f"ein('{z}uvw,ij,zv->zuiwj', ws[{index_w}], wig, s2)")
-                    if mode == 'uvu':
+                    if ins.connection_mode == 'uvu':
                         code_out += line_out.format(f"ein('{z}uv,zui,zv->zui', ws[{index_w}], s1, s2)")
                         code_right += line_right.format(f"ein('{z}uv,ij,uw,zv->zuiwj', ws[{index_w}], wig, e1, s2)")
 
                     continue
 
-                if l_1 == l_2 and l_out == 0 and mode == 'uvw' and normalization == 'component' and weight:
+                if l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uvw' and normalization == 'component' and ins.has_weight:
                     # Cl_l_0 = eye / sqrt(2L+1)
                     code_out += line_out.format(f"ein('{z}uvw,zui,zvi->zw', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, s1, s2)")
                     code_right += line_right.format(f"ein('{z}uvw,zvi->zuiw', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, s2)")
                     continue
 
-                if l_1 == l_2 and l_out == 0 and mode == 'uvu' and normalization == 'component' and weight:
+                if l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uvu' and normalization == 'component' and ins.has_weight:
                     # Cl_l_0 = eye / sqrt(2L+1)
                     code_out += line_out.format(f"ein('{z}uv,zui,zvi->zu', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, s1, s2)")
                     code_right += line_right.format(f"ein('{z}uv,uw,zvi->zuiw', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, e1, s2)")
                     continue
 
-                if l_1 == l_2 and l_out == 0 and mode == 'uuu' and normalization == 'component' and weight:
+                if l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uuu' and normalization == 'component' and ins.has_weight:
                     # Cl_l_0 = eye / sqrt(2L+1)
                     code_out += line_out.format(f"ein('{z}u,zui,zui->zu', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, s1, s2)")
                     code_right += line_right.format(f"ein('{z}u,uw,zui->zuiw', ws[{index_w}] / {sqrt(2 * l_1 + 1)}, e1, s2)")
                     continue
 
-                if l_1 == l_2 and l_out == 0 and mode == 'uuu' and normalization == 'component' and not weight:
+                if l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uuu' and normalization == 'component' and not ins.has_weight:
                     # Cl_l_0 = eye / sqrt(2L+1)
                     code_out += line_out.format(f"ein('zui,zui->zu', s1, s2).div({sqrt(2 * l_1 + 1)})")
                     code_right += line_right.format(f"ein('uw,zui->zuiw', e1, s2).div({sqrt(2 * l_1 + 1)})")
                     continue
 
-                if (l_1, l_2, l_out) == (1, 1, 1) and mode == 'uvw' and normalization == 'component' and weight:
+                if (l_1, l_2, l_out) == (1, 1, 1) and ins.connection_mode == 'uvw' and normalization == 'component' and ins.has_weight:
                     # C1_1_1 = levi-civita / sqrt(2)
                     code_out += f"{s}s1 = s1.reshape(batch, {mul_1}, 1, {2 * l_1 + 1})\n"
                     code_out += f"{s}s2 = s2.reshape(batch, 1, {mul_2}, {2 * l_2 + 1})\n"
@@ -435,7 +438,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('{z}uvw,ijk,zvj->zuiwk', ws[{index_w}], w3j[{index_w3j}], s2)")
                     continue
 
-                if (l_1, l_2, l_out) == (1, 1, 1) and mode == 'uvu' and normalization == 'component' and weight:
+                if (l_1, l_2, l_out) == (1, 1, 1) and ins.connection_mode == 'uvu' and normalization == 'component' and ins.has_weight:
                     # C1_1_1 = levi-civita / sqrt(2)
                     code_out += f"{s}s1 = s1.reshape(batch, {mul_1}, 1, {2 * l_1 + 1})\n"
                     code_out += f"{s}s2 = s2.reshape(batch, 1, {mul_2}, {2 * l_2 + 1})\n"
@@ -451,12 +454,12 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwk', ws[{index_w}], w3j[{index_w3j}], e1, s2)")
                     continue
 
-            if last_ss != (i_1, i_2, mode[:2]):
-                if mode[:2] == 'uv':
+            if last_ss != (ins.i_in1, ins.i_in2, ins.connection_mode[:2]):
+                if ins.connection_mode[:2] == 'uv':
                     code_out += f"{s}ss = ein('zui,zvj->zuvij', s1, s2)\n"
-                if mode[:2] == 'uu':
+                if ins.connection_mode[:2] == 'uu':
                     code_out += f"{s}ss = ein('zui,zuj->zuij', s1, s2)\n"
-                last_ss = (i_1, i_2, mode[:2])
+                last_ss = (ins.i_in1, ins.i_in2, ins.connection_mode[:2])
 
             if (l_1, l_2, l_out) in wigners:
                 index_w3j = wigners.index((l_1, l_2, l_out))
@@ -464,46 +467,46 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                 index_w3j = len(wigners)
                 wigners += [(l_1, l_2, l_out)]
 
-            if mode == 'uvw':
-                assert weight
+            if ins.connection_mode == 'uvw':
+                assert ins.has_weight
                 code_out += line_out.format(f"ein('{z}uvw,ijk,zuvij->zwk', ws[{index_w}], w3j[{index_w3j}], ss)")
                 code_right += line_right.format(f"ein('{z}uvw,ijk,zvj->zuiwk', ws[{index_w}], w3j[{index_w3j}], s2)")
-            if mode == 'uvu':
+            if ins.connection_mode == 'uvu':
                 assert mul_1 == mul_out
-                if weight:
+                if ins.has_weight:
                     code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zuk', ws[{index_w}], w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwk', ws[{index_w}], w3j[{index_w3j}], e1, s2)")
                 else:
                     code_out += line_out.format(f"ein('ijk,zuvij->zuk', w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwk', w3j[{index_w3j}], e1, s2)")
-            if mode == 'uvv':
+            if ins.connection_mode == 'uvv':
                 assert mul_2 == mul_out
-                if weight:
+                if ins.has_weight:
                     code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zvk', ws[{index_w}], w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('{z}uv,ijk,zvj->zuivk', ws[{index_w}], w3j[{index_w3j}], s2)")
                 else:
                     code_out += line_out.format(f"ein('ijk,zuvij->zvk', w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('u,ijk,zvj->zuivk', s2.new_zeros({mul_1}).fill_(1.0), w3j[{index_w3j}], s2)")
-            if mode == 'uuw':
+            if ins.connection_mode == 'uuw':
                 assert mul_1 == mul_2
-                if weight:
+                if ins.has_weight:
                     code_out += line_out.format(f"ein('{z}uw,ijk,zuij->zwk', ws[{index_w}], w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('{z}uw,ijk,zuj->zuiwk', ws[{index_w}], w3j[{index_w3j}], s2)")
                 else:
                     assert mul_out == 1
                     code_out += line_out.format(f"ein('ijk,zuij->zk', w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('ijk,zuj->zuik', w3j[{index_w3j}], s2)")
-            if mode == 'uuu':
+            if ins.connection_mode == 'uuu':
                 assert mul_1 == mul_2 == mul_out
-                if weight:
+                if ins.has_weight:
                     code_out += line_out.format(f"ein('{z}u,ijk,zuij->zuk', ws[{index_w}], w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('{z}u,ijk,uw,zuj->zuiwk', ws[{index_w}], w3j[{index_w3j}], e1, s2)")
                 else:
                     code_out += line_out.format(f"ein('ijk,zuij->zuk', w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('ijk,uw,zuj->zuiwk', w3j[{index_w3j}], e1, s2)")
-            if mode == 'uvuv':
+            if ins.connection_mode == 'uvuv':
                 assert mul_1 * mul_2 == mul_out
-                if weight:
+                if ins.has_weight:
                     code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zuvk', ws[{index_w}], w3j[{index_w3j}], ss)")
                     code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwvk', ws[{index_w}], w3j[{index_w3j}], e1, s2)")
                 else:
@@ -532,27 +535,24 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             self.register_buffer(f"C{i}", wig)
 
         # weights
-        self.weight_shapes = wshapes
-        self.weight_numel = sum(_prod(shape) for shape in self.weight_shapes)
-        self.weight_infos = [
-            (i_1, i_2, i_out, mode, path_weight, shape)
-            for (i_1, i_2, i_out, mode, path_weight), shape in zip(
-                [
-                    (i_1, i_2, i_out, mode, path_weight)
-                    for i_1, i_2, i_out, mode, weight, path_weight in self.instructions
-                    if weight
-                ],
-                wshapes
-            )
-        ]
+        self.weight_numel = sum(_prod(ins.weight_shape) for ins in self.instructions if ins.has_weight)
 
         self.internal_weights = internal_weights
         if internal_weights:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.ParameterDict()
-            for i_1, i_2, i_out, mode, path_weight, shape in self.weight_infos:
-                name = f'[{i_1}:{self.irreps_in1[i_1:i_1+1]}] x [{i_2}:{self.irreps_in2[i_2:i_2+1]}] -> [{i_out}:{self.irreps_out[i_out:i_out+1]}]'
-                self.weight[name] = torch.nn.Parameter(torch.randn(shape))
+            for ins in self.instructions:
+                if ins.has_weight:
+                    name = f'[{ins.i_in1}:{self.irreps_in1[ins.i_in1]}] x [{ins.i_in2}:{self.irreps_in2[ins.i_in2]}] -> [{ins.i_out}:{self.irreps_out[ins.i_out]}]'
+                    self.weight[name] = torch.nn.Parameter(torch.randn(ins.weight_shape))
+
+        output_mask = torch.cat([
+            torch.ones(mul * ir.dim)
+            if any(i.i_out == i_out and i.path_weight > 0 for i in self.instructions)
+            else torch.zeros(mul * ir.dim)
+            for i_out, (mul, ir) in enumerate(self.irreps_out)
+        ])
+        self.register_buffer('output_mask', output_mask)
 
         self.to(dtype=torch.get_default_dtype())
 
@@ -576,6 +576,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
     def prepare_weight_list(self, weight):
         if self.weight_numel:
+            weight_shapes = [ins.weight_shape for ins in self.instructions if ins.has_weight]
+
             if weight is None:
                 if not self.internal_weights:
                     raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
@@ -583,7 +585,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             if torch.is_tensor(weight):
                 ws = []
                 i = 0
-                for shape in self.weight_shapes:
+                for shape in weight_shapes:
                     d = _prod(shape)
                     if not self.shared_weights:
                         ws += [weight[..., i:i+d].reshape((-1,) + shape)]
@@ -593,9 +595,9 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                 weight = ws
             if isinstance(weight, list):
                 if not self.shared_weights:
-                    weight = [w.reshape(-1, *shape) for w, shape in zip(weight, self.weight_shapes)]
+                    weight = [w.reshape(-1, *shape) for w, shape in zip(weight, weight_shapes)]
                 else:
-                    weight = [w.reshape(*shape) for w, shape in zip(weight, self.weight_shapes)]
+                    weight = [w.reshape(*shape) for w, shape in zip(weight, weight_shapes)]
         else:
             weight = []
         return weight
@@ -675,8 +677,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             required if ``internal_weights`` is ``False``
             tensor of shape ``(self.weight_numel,)`` if ``shared_weights`` is ``True``
             tensor of shape ``(..., self.weight_numel)`` if ``shared_weights`` is ``False``
-            or list of tensors of shapes ``self.weight_shapes`` / ``(...) + self.weight_shapes``.
-            Use ``self.weight_infos`` to know what are the weights used for.
+            or list of tensors of shapes ``weight_shape`` / ``(...) + weight_shape``.
+            Use ``self.instructions`` to know what are the weights used for.
 
         Returns
         -------
@@ -704,8 +706,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             required if ``internal_weights`` is ``False``
             tensor of shape ``(self.weight_numel,)`` if ``shared_weights`` is ``True``
             tensor of shape ``(..., self.weight_numel)`` if ``shared_weights`` is ``False``
-            or list of tensors of shapes ``self.weight_shapes`` / ``(...) + self.weight_shapes``.
-            Use ``self.weight_infos`` to know what are the weights used for.
+            or list of tensors of shapes ``weight_shape`` / ``(...) + weight_shape``.
+            Use ``self.instructions`` to know what are the weights used for.
 
         Returns
         -------
@@ -980,14 +982,6 @@ class Linear(TensorProduct):
 
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
-
-        output_mask = torch.cat([
-            torch.ones(mul * (2 * l + 1))
-            if any(l_in == l and p_in == p for _, (l_in, p_in) in self.irreps_in)
-            else torch.zeros(mul * (2 * l + 1))
-            for mul, (l, p) in self.irreps_out
-        ])
-        self.register_buffer('output_mask', output_mask)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"

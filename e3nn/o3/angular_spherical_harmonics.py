@@ -12,7 +12,7 @@ from e3nn import o3
 
 
 def spherical_harmonics_alpha_beta(l, alpha, beta):
-    r"""Spherical harmonics of :math:`\vec r = R_z(\alpha) R_y(\beta) e_z`
+    r"""Spherical harmonics of :math:`\vec r = R_y(\alpha) R_x(\beta) e_z`
 
     .. math:: Y^l(\alpha, \beta) = S^l(\alpha) P^l(\cos(\beta))
 
@@ -42,11 +42,11 @@ def spherical_harmonics_alpha_beta(l, alpha, beta):
     else:
         ls = list(l)
 
-    z, y = beta.cos(), beta.sin()
+    y, z = beta.cos(), beta.sin()
     sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
-    shz = legendre(ls, z.flatten(), y.flatten())  # [z, l * m]
-    out = _mul_m_lm([(1, l) for l in ls], sha, shz)
-    return out.reshape(alpha.shape + (shz.shape[1],))
+    shy = legendre(ls, y.flatten(), z.flatten())  # [z, l * m]
+    out = _mul_m_lm([(1, l) for l in ls], sha, shy)
+    return out.reshape(alpha.shape + (shy.shape[1],))
 
 
 @torch.jit.script
@@ -164,6 +164,7 @@ def _sympy_legendre(l, m):
     en.wikipedia.org/wiki/Associated_Legendre_polynomials
     - remove two times (-1)^m
     - use another normalization such that P(l, -m) = P(l, m)
+    - remove (-1)^l
 
     y = sqrt(1 - z^2)
     """
@@ -171,7 +172,7 @@ def _sympy_legendre(l, m):
     m = Integer(abs(m))
     z, y = symbols('z y', real=True)
     ex = 1 / (2**l * factorial(l)) * y**m * diff((z**2 - 1)**l, z, l + m)
-    ex *= (-1)**l * sqrt((2 * l + 1) / (4 * pi) * factorial(l - m) / factorial(l + m))
+    ex *= sqrt((2 * l + 1) / (4 * pi) * factorial(l - m) / factorial(l + m))
     return ex
 
 

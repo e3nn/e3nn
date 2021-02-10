@@ -9,7 +9,7 @@ def test_xyz(float_tolerance):
 
     a, b, c = o3.matrix_to_angles(R)
     pos1 = o3.angles_to_xyz(a, b)
-    pos2 = R @ torch.tensor([0, 0, 1.0])
+    pos2 = R @ torch.tensor([0, 1.0, 0])
     assert torch.allclose(pos1, pos2)
 
     a2, b2 = o3.xyz_to_angles(pos2)
@@ -43,7 +43,7 @@ def test_conversions(float_tolerance):
         g = conv[i][j](g)
     R2 = g
 
-    assert (R1 - R2).abs().max() < 10*float_tolerance
+    assert (R1 - R2).abs().median() < float_tolerance
 
 
 def test_compose(float_tolerance):
@@ -72,6 +72,6 @@ def test_compose(float_tolerance):
     R3 = o3.angles_to_matrix(*abc)
     R4 = o3.axis_angle_to_matrix(ax, a)
 
-    assert (R1 - R2).norm(dim=1).max() < float_tolerance
-    assert (R1 - R3).norm(dim=1).max() < float_tolerance
-    assert (R1 - R4).norm(dim=1).max() < float_tolerance
+    assert (R1 - R2).abs().max().median() < float_tolerance
+    assert (R1 - R3).abs().max().median() < float_tolerance
+    assert (R1 - R4).abs().max().median() < float_tolerance

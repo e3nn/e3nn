@@ -13,14 +13,42 @@ from torch_cluster import radius_graph
 from torch_scatter import scatter
 
 from e3nn import o3
+from e3nn.math import soft_one_hot_linspace
 from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
-from e3nn.math import soft_one_hot_linspace, swish
 from e3nn.util.jit import compile_mode
 
 
 @compile_mode('script')
 class Convolution(torch.nn.Module):
+    r"""equivariant convolution
+
+    Parameters
+    ----------
+    irreps_in : `Irreps`
+        representation of the input node features
+
+    irreps_node_attr : `Irreps`
+        representation of the node attributes
+
+    irreps_edge_attr : `Irreps`
+        representation of the edge attributes
+
+    irreps_out : `Irreps` or None
+        representation of the output node features
+
+    number_of_basis : int
+        number of basis on which the edge length are projected
+
+    radial_layers : int
+        number of hidden layers in the radial fully connected network
+
+    radial_neurons : int
+        number of neurons in the hidden layers of the radial fully connected network
+
+    num_neighbors : float
+        typical number of nodes convolved over
+    """
     def __init__(
             self,
             irreps_in,
@@ -39,7 +67,7 @@ class Convolution(torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_out)
         self.num_neighbors = num_neighbors
 
-        self.si = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_out)
+        self.sc = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_out)
 
         self.lin1 = FullyConnectedTensorProduct(self.irreps_in, self.irreps_node_attr, self.irreps_in)
 
@@ -68,7 +96,7 @@ class Convolution(torch.nn.Module):
             internal_weights=False,
             shared_weights=False,
         )
-        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], swish)
+        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.nn.functional.silu)
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_out)
@@ -78,14 +106,18 @@ class Convolution(torch.nn.Module):
 
         x = node_input
 
-        si = self.si(x, node_attr)
+        s = self.sc(x, node_attr)
         x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
         x = scatter(edge_features, edge_dst, dim=0, dim_size=x.shape[0]).div(self.num_neighbors**0.5)
 
         x = self.lin2(x, node_attr)
-        return si + 0.5 * x
+
+        c_s, c_x = math.sin(math.pi / 8), math.cos(math.pi / 8)
+        m = self.sc.output_mask
+        c_x = (1 - m) + c_x * m
+        return c_s * s + c_x * x
 
 
 def smooth_cutoff(x):
@@ -113,6 +145,8 @@ class Compose(torch.nn.Module):
         super().__init__()
         self.first = first
         self.second = second
+        self.irreps_in = self.first.irreps_in
+        self.irreps_out = self.second.irreps_out
 
     def forward(self, *input):
         x = self.first(*input)
@@ -194,10 +228,13 @@ class Network(torch.nn.Module):
         self.irreps_node_attr = o3.Irreps(irreps_node_attr) if irreps_node_attr is not None else o3.Irreps("0e")
         self.irreps_edge_attr = o3.Irreps(irreps_edge_attr)
 
-        irreps = self.irreps_in if self.irreps_in is not None else self.irreps_edge_attr
+        self.input_has_node_in = (irreps_in is not None)
+        self.input_has_node_attr = (irreps_node_attr is not None)
+
+        irreps = self.irreps_in if self.irreps_in is not None else o3.Irreps("0e")
 
         act = {
-            1: swish,
+            1: torch.nn.functional.silu,
             -1: torch.tanh,
         }
         act_gates = {
@@ -263,23 +300,23 @@ class Network(torch.nn.Module):
 
         edge_src, edge_dst = radius_graph(data['pos'], self.max_radius, batch)
         edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
-        edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, normalization='component', normalize=True)
+        edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, True, normalization='component')
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
         edge_attr = smooth_cutoff(edge_length / self.max_radius)[:, None] * edge_sh
 
-        if 'x' in data:
+        if self.input_has_node_in and 'x' in data:
             assert self.irreps_in is not None
             x = data['x']
         else:
             assert self.irreps_in is None
-            x = scatter(edge_attr, edge_dst, dim=0, dim_size=len(data['pos'])).div(self.num_neighbors**0.5)
+            x = data['pos'].new_ones(data['pos'].shape[0], 1)
 
-        if 'z' in data:
+        if self.input_has_node_attr and 'z' in data:
             z = data['z']
         else:
             assert self.irreps_node_attr == o3.Irreps("0e")
-            z = x.new_ones(x.shape[0], 1)
+            z = data['pos'].new_ones(data['pos'].shape[0], 1)
 
         for lay in self.layers:
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
