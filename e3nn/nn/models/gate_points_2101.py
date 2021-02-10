@@ -5,7 +5,10 @@ Exact equivariance to :math:`E(3)`
 version of january 2021
 """
 import math
+from typing import Dict, Union
+
 import torch
+from torch_geometric.data import Data
 from torch_cluster import radius_graph
 from torch_scatter import scatter
 
@@ -13,8 +16,10 @@ from e3nn import o3
 from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
 from e3nn.math import soft_one_hot_linspace, swish
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('script')
 class Convolution(torch.nn.Module):
     def __init__(
             self,
@@ -60,6 +65,7 @@ class Convolution(torch.nn.Module):
             self.irreps_edge_attr,
             irreps_mid,
             instructions,
+            internal_weights=False,
             shared_weights=False,
         )
         self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], swish)
@@ -76,7 +82,7 @@ class Convolution(torch.nn.Module):
         x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
-        x = scatter(edge_features, edge_dst, dim=0, dim_size=len(x)).div(self.num_neighbors**0.5)
+        x = scatter(edge_features, edge_dst, dim=0, dim_size=x.shape[0]).div(self.num_neighbors**0.5)
 
         x = self.lin2(x, node_attr)
         return si + 0.5 * x
@@ -238,25 +244,25 @@ class Network(torch.nn.Module):
             )
         )
 
-    def forward(self, data) -> torch.Tensor:
+    def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
         """evaluate the network
 
         Parameters
         ----------
-        data : `torch_geometric.data.Data`
+        data : `torch_geometric.data.Data` or dict
             data object containing
             - ``pos`` the position of the nodes (atoms)
             - ``x`` the input features of the nodes, optional
             - ``z`` the attributes of the nodes, for instance the atom type, optional
             - ``batch`` the graph to which the node belong, optional
         """
-        if hasattr(data, 'batch'):
-            batch = data.batch
+        if 'batch' in data:
+            batch = data['batch']
         else:
-            batch = None
+            batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
 
-        edge_src, edge_dst = radius_graph(data.pos, self.max_radius, batch)
-        edge_vec = data.pos[edge_src] - data.pos[edge_dst]
+        edge_src, edge_dst = radius_graph(data['pos'], self.max_radius, batch)
+        edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, normalization='component', normalize=True)
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
@@ -264,13 +270,13 @@ class Network(torch.nn.Module):
 
         if 'x' in data:
             assert self.irreps_in is not None
-            x = data.x
+            x = data['x']
         else:
             assert self.irreps_in is None
-            x = scatter(edge_attr, edge_dst, dim=0, dim_size=len(data.pos)).div(self.num_neighbors**0.5)
+            x = scatter(edge_attr, edge_dst, dim=0, dim_size=len(data['pos'])).div(self.num_neighbors**0.5)
 
         if 'z' in data:
-            z = data.z
+            z = data['z']
         else:
             assert self.irreps_node_attr == o3.Irreps("0e")
             z = x.new_ones(x.shape[0], 1)
