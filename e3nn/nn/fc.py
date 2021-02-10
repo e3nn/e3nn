@@ -80,3 +80,10 @@ class FullyConnectedNet(torch.nn.Module):
                     x = x * self.variance_out**0.5
 
             return x
+
+    def _make_tracing_inputs(self, n: int = 1):
+        import random
+        return [
+            {'forward': (torch.randn(random.randint(1, 5), self.hs[0]),)}
+            for _ in range(n)
+        ]

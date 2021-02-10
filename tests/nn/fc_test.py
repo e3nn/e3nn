@@ -2,7 +2,7 @@ import torch
 
 import pytest
 from e3nn.nn import FullyConnectedNet
-from e3nn.util.test import assert_jit_trace
+from e3nn.util.test import assert_auto_jitable
 
 
 @pytest.mark.parametrize('var_in, var_out, out_act', [(1, 1, False), (1, 1, True), (0.1, 10.0, False), (0.1, 0.05, True)])
@@ -17,4 +17,4 @@ def test_variance(var_in, var_out, out_act):
 
     assert y.var(0).mean().log10().abs() < torch.tensor(1.5).log10()
 
-    assert_jit_trace(f, args_in=[x], irreps_in=[None], irreps_out=[None])
+    assert_auto_jitable(f)
