@@ -13,8 +13,6 @@ def _transform(dat, irreps_dat, rot_mat, translation=0.):
             out.append(a)
         elif irreps == 'cartesian_points':
             out.append((a @ rot_mat.T) + translation)
-        elif irreps == 'cartesian_vectors':
-            out.append((a @ rot_mat.T))
         else:
             # For o3.Irreps
             out.append(a @ irreps.D_from_matrix(rot_mat).T)
@@ -23,7 +21,7 @@ def _transform(dat, irreps_dat, rot_mat, translation=0.):
 
 def _get_io_irreps(func, irreps_in=None, irreps_out=None):
     """Preprocess or, if not given, try to infer the I/O irreps for ``func``."""
-    SPECIAL_VALS = ['cartesian_points', 'cartesian_vectors', None]
+    SPECIAL_VALS = ['cartesian_points', None]
 
     if irreps_in is None:
         if hasattr(func, 'irreps_in'):
