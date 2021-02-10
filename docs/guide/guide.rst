@@ -1,3 +1,5 @@
+.. _user_guide:
+
 User Guide
 ==========
 
@@ -5,4 +7,4 @@ User Guide
     installation
     equivar_testing
     first_steps.ipynb
-    spherical_tensor_parity.ipynb
+    parity_sphericaltensor.ipynb
