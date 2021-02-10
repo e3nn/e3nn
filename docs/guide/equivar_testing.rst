@@ -1,9 +1,6 @@
 Equivariance Testing
 ====================
 
-Equivariance Testing
---------------------
-
 In `e3nn.util.test`, the library provides some tools for confirming that functions are equivariant. The main tool is `equivariance_error`, which computes the largest absolute change in output between the function applied to transformed arguments and the transform applied to the function::
 
     In [1]: import e3nn.o3
