@@ -12,7 +12,7 @@ from torch_geometric.data import Data, DataLoader
 from torch_scatter import scatter
 
 from e3nn import o3
-from e3nn.math import soft_one_hot_linspace, swish
+from e3nn.math import soft_one_hot_linspace
 from e3nn.nn import FullyConnectedNet, Gate
 from e3nn.o3 import FullyConnectedTensorProduct, TensorProduct
 
@@ -92,7 +92,7 @@ class Convolution(torch.nn.Module):
             instructions,
             shared_weights=False,
         )
-        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], swish)
+        self.fc = FullyConnectedNet([number_of_basis] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.nn.functional.silu)
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_out)
@@ -230,7 +230,7 @@ class Network(torch.nn.Module):
         irreps = self.irreps_in if self.irreps_in is not None else o3.Irreps("0e")
 
         act = {
-            1: swish,
+            1: torch.nn.functional.silu,
             -1: torch.tanh,
         }
         act_gates = {
