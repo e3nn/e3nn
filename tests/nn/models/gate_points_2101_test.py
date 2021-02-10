@@ -91,13 +91,17 @@ def test_gate_points_2101_jit(network):
         with open(tmpdir + '/code.py', 'x') as code:
             code.write(f"""
 import torch
+# Needed for the TorchScript kernels for scatter and radius_graph
+import torch_scatter
+import torch_cluster
 f = torch.jit.load('{tmpdir}/model.pt')
 d = torch.load('{tmpdir}/dat.pt')
 out = f(d)
 torch.save(out, '{tmpdir}/out.pt')
 """)
         # Run
-        subprocess.run(['python', tmpdir + '/code.py'])
+        proc_res = subprocess.run(['python', tmpdir + '/code.py'])
+        proc_res.check_returncode()
         # Check
         out = torch.load(tmpdir + '/out.pt')
         assert torch.allclose(f(dat), out)
