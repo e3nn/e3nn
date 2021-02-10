@@ -5,7 +5,7 @@ import warnings
 import torch
 
 from e3nn import o3
-from e3nn.util.jit import compile, get_tracing_inputs
+from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode
 from ._argtools import _get_args_in, _get_io_irreps, _transform
 
 
@@ -92,7 +92,6 @@ def assert_equivariant(
     problems = {case: err for case, err in errors.items() if err > tolerance}
 
     if len(problems) != 0:
-        print(problems)
         errstr = (
             "Largest componentwise equivariance error was too large for: " + \
             '; '.join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
@@ -197,12 +196,13 @@ def equivariance_error(
     return biggest_errs
 
 
+# TODO: this is only for things marked with @compile_mode.
+# Make something else for general script/tracability
 def assert_auto_jitable(
     func,
     error_on_warnings=True,
     n_trace_checks=2,
     strict_shapes=True,
-    **kwargs
 ):
     r"""Assert that submodule ``func`` is automatically JITable.
 
@@ -222,6 +222,9 @@ def assert_auto_jitable(
     """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
+
+    if get_compile_mode(func) is None:
+        raise ValueError("assert_auto_jitable is only for modules marked with @compile_mode")
 
     # Test tracing
     with warnings.catch_warnings():
@@ -250,9 +253,9 @@ def assert_auto_jitable(
                         func_jit(*bad_args)
                     else:
                         getattr(func_jit, method)(*bad_args)
-                except (torch.jit.Error, RuntimeError) as e:
-                    # As far as I can tell, there's no good way to introspect TorchScript exceptions. Checking for RuntimeError at least eliminates particlar possibilities
-                    assert "RuntimeError" in str(e), "TorchScript threw an unexpectedly strange error"
+                except (torch.jit.Error, RuntimeError):
+                    # As far as I can tell, there's no good way to introspect TorchScript exceptions.
+                    pass
                 else:
                     raise AssertionError("Traced function didn't error on bad input shape")
 

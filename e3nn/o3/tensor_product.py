@@ -546,6 +546,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             )
         ]
 
+        self.internal_weights = internal_weights
         if internal_weights:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.ParameterDict()
@@ -576,6 +577,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
     def prepare_weight_list(self, weight):
         if self.weight_numel:
             if weight is None:
+                if not self.internal_weights:
+                    raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
                 weight = list(self.weight.values())
             if torch.is_tensor(weight):
                 ws = []
@@ -596,6 +599,67 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         else:
             weight = []
         return weight
+
+    def _make_tracing_inputs(self, n: int):
+        import inspect
+        import random
+        MAX_N_BATCH = 3
+        # - Inspect forward() -
+        # Check if forward has weights:
+        forward_params = list(inspect.signature(self.forward).parameters)
+        arg_generators = []
+        forward_has_weight = forward_params[-1] == 'weight'
+        if forward_has_weight:
+            forward_params = forward_params[:-1]
+
+        if len(forward_params) == 1:
+            # Something like Norm or Linear with irreps_in
+            arg_generators.append(
+                lambda bdim: self.irreps_in.randn(bdim, -1)
+            )
+        elif len(forward_params) == 2:
+            # A normal TensorProduct with two inputs
+            arg_generators.append(
+                lambda bdim: self.irreps_in1.randn(bdim, -1)
+            )
+            arg_generators.append(
+                lambda bdim: self.irreps_in2.randn(bdim, -1)
+            )
+        else:
+            raise NotImplementedError("Tried to trace compile an atypical TensorProduct subclass; please override make_tracing_input() for your class.")
+
+        # - Deal with weights -
+        # We only trace a weight input if the TP has no internal weights:
+        # in TorchScript, a TP either always uses internal weights or always
+        # uses input weights
+        trace_weights = bool(self.weight_numel) and not self.internal_weights
+        # No reason to trace weights when there aren't any, even if they aren't internal:
+        trace_weights = trace_weights and self.weight_numel > 0
+        if trace_weights:
+            if self.shared_weights:
+                def make_weights(bdim):
+                    return torch.randn(self.weight_numel)
+            else:
+                # By tracing it this way, we do enforce that non-shared weights are always passed in (..., self.weight_numel) form, which is fine, since lists don't play nice with compilation anyway
+                def make_weights(bdim):
+                    return torch.randn(bdim, self.weight_numel)
+            arg_generators.append(make_weights)
+
+        # - Make outputs -
+        out = []
+        for _ in range(n):
+            # Choose a random batch dimension
+            bdim = random.randint(1, MAX_N_BATCH)
+            # right() always takes irreps_in2 so we build it here:
+            right_args = (self.irreps_in2.randn(bdim, -1),)
+            if trace_weights:
+                right_args = right_args + (make_weights(bdim),)
+            # put it in
+            out.append({
+                'forward': tuple(g(bdim) for g in arg_generators),
+                'right': right_args
+            })
+        return out
 
     def right(self, features_2, weight=None):
         r"""evaluate partially :math:`w x \cdot \otimes y`

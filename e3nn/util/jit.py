@@ -23,6 +23,15 @@ def compile_mode(mode: str):
     return decorator
 
 
+def get_compile_mode(mod: torch.nn.Module) -> str:
+    if hasattr(mod, _E3NN_COMPILE_MODE):
+        mode = getattr(mod, _E3NN_COMPILE_MODE)
+    else:
+        mode = getattr(type(mod), _E3NN_COMPILE_MODE, None)
+    assert mode in ['script', 'trace', None], "Invalid compile mode `%r`" % mode
+    return mode
+
+
 def compile(
     mod: torch.nn.Module,
     n_trace_checks: int = 1,
@@ -33,6 +42,7 @@ def compile(
 
     Submodules without decorators will be unaffected.
     """
+    # TODO: debug logging
     assert n_trace_checks >= 1
     # == recurse to children ==
     # This allows us to trace compile submodules of modules we are going to script
@@ -48,16 +58,11 @@ def compile(
             )
         )
     # == Compile this module now ==
-    if hasattr(mod, _E3NN_COMPILE_MODE):
-        compile_mode = getattr(mod, _E3NN_COMPILE_MODE)
-    else:
-        compile_mode = getattr(type(mod), _E3NN_COMPILE_MODE, None)
-    assert compile_mode in ['script', 'trace', None]
+    mode = get_compile_mode(mod)
 
-    if compile_mode == 'script':
-        print('mod', mod)
+    if mode == 'script':
         mod = torch.jit.script(mod, **script_options)
-    elif compile_mode == 'trace':
+    elif mode == 'trace':
         # These are always modules, so we're always using trace_module
         # We need tracing inputs:
         check_inputs = get_tracing_inputs(mod, n_trace_checks)
