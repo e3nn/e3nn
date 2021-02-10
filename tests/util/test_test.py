@@ -2,7 +2,7 @@ import pytest
 
 import torch
 
-from e3nn.util.test import assert_equivariant, assert_jit_trace
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 @pytest.mark.xfail
@@ -23,4 +23,4 @@ def test_jit_trace():
             return torch.randn(8, 3)
     not_tracable.irreps_in = "2x0e"
     not_tracable.irreps_out = "1x1o"
-    assert_jit_trace(not_tracable)
+    assert_auto_jitable(not_tracable)

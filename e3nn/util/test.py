@@ -5,8 +5,8 @@ import warnings
 import torch
 
 from e3nn import o3
-from e3nn.util.jit import trace_module
-from ._argtools import _get_args_in, _get_io_irreps, _rand_args, _transform
+from e3nn.util.jit import compile, get_tracing_inputs
+from ._argtools import _get_args_in, _get_io_irreps, _transform
 
 
 FLOAT_TOLERANCE = {
@@ -197,42 +197,25 @@ def equivariance_error(
     return biggest_errs
 
 
-def assert_jit_trace(
+def assert_auto_jitable(
     func,
-    method_name=None,
-    args_in=None,
-    test_args=None,
-    irreps_in=None,
-    irreps_out=None,
     error_on_warnings=True,
-    n_random_tests=2,
+    n_trace_checks=2,
     strict_shapes=True,
     **kwargs
 ):
-    r"""Assert that ``func`` can be traced to TorchScript.
+    r"""Assert that submodule ``func`` is automatically JITable.
 
     Parameters
     ----------
         func : Callable
             The function to trace.
-        method_name : str or None (default)
-            If ``func`` is a module, methods other than ``forward()`` can be traced by giving their name as a string. (This uses ``torch.jit.trace_module`` instead of ``torch.jit.trace``.)
-        args_in : list or None
-            the original input arguments for the function. If ``None`` and the function has ``irreps_in`` consisting only of ``o3.Irreps`` and ``'cartesian'``, random test inputs will be generated.
-        test_args : list of tuple or None
-            Additional arguments with which to test the trace.
-        irreps_in : object
-            see ``equivariance_error``
-        irreps_out : object
-            see ``equivariance_error``
         error_on_warnings : bool
             If True (default), TracerWarnings emitted by ``torch.jit.trace`` will be treated as errors.
         n_random_tests : int
             If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be generated as test inputs for ``torch.jit.trace``.
         strict_shapes : bool
             Test that the traced function errors on inputs with feature dimensions that don't match the input irreps.
-        **kwargs : kwargs
-            passed through to ``torch.jit.trace``.
     Returns
     -------
         The traced TorchScript function.
@@ -240,52 +223,37 @@ def assert_jit_trace(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    random_tests = (args_in is None)
-
-    args_in, irreps_in, irreps_out = _get_args_in(
-        func,
-        args_in=args_in,
-        irreps_in=irreps_in,
-        irreps_out=irreps_out
-    )
-
-    if random_tests:
-        test_inputs = [args_in] + [_rand_args(irreps_in) for _ in range(n_random_tests)]
-    else:
-        test_inputs = [args_in]
-    if test_args is not None:
-        test_inputs.extend(test_args)
-
     # Test tracing
     with warnings.catch_warnings():
         if error_on_warnings:
             warnings.filterwarnings('error', category=torch.jit.TracerWarning)
-        if method_name is not None:
-            func_trace = trace_module(
-                func,
-                inputs={method_name: tuple(args_in)},
-                check_inputs=[{method_name: t} for t in test_inputs]
-            )
-            func_trace = getattr(func_trace, method_name)
-        else:
-            func_trace = torch.jit.trace(
-                func,
-                example_inputs=tuple(args_in),
-                check_inputs=test_inputs
-            )
+        func_jit = compile(
+            func,
+            n_trace_checks=n_trace_checks
+        )
 
     # Confirm that it rejects incorrect shapes
-    if random_tests and strict_shapes:
-        bad_args = _rand_args(irreps_in)
-        # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
-        bad_which = random.randint(0, len(bad_args)-1)
-        bad_args[bad_which] = bad_args[bad_which][..., :-random.randint(1, 3)]  # make bad shape
+    if strict_shapes:
         try:
-            func_trace(*bad_args)
-        except torch.jit.Error as e:
-            # As far as I can tell, there's no good way to introspect TorchScript exceptions. Checking for RuntimeError at least eliminates particlar possibilities
-            assert "RuntimeError" in str(e), "TorchScript through an unexpectedly strange error"
+            all_bad_args = get_tracing_inputs(func, n=1)[0]
+        except ValueError:
+            # couldn't infer, don't check
+            pass
         else:
-            raise AssertionError("Traced function didn't error on bad input shape")
+            for method, bad_args in all_bad_args.items():
+                # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
+                bad_which = random.randint(0, len(bad_args)-1)
+                bad_args = list(bad_args)                
+                bad_args[bad_which] = bad_args[bad_which][..., :-random.randint(1, 3)]  # make bad shape
+                try:
+                    if method == 'forward':
+                        func_jit(*bad_args)
+                    else:
+                        getattr(func_jit, method)(*bad_args)
+                except (torch.jit.Error, RuntimeError) as e:
+                    # As far as I can tell, there's no good way to introspect TorchScript exceptions. Checking for RuntimeError at least eliminates particlar possibilities
+                    assert "RuntimeError" in str(e), "TorchScript threw an unexpectedly strange error"
+                else:
+                    raise AssertionError("Traced function didn't error on bad input shape")
 
-    return func_trace
+    return func_jit

@@ -4,7 +4,7 @@ import copy
 import pytest
 import torch
 from e3nn.o3 import TensorProduct
-from e3nn.util.test import assert_equivariant, assert_jit_trace
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
@@ -85,7 +85,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
 
     # Check the tensor product
-    tp_trace = assert_jit_trace(tp)
+    tp_trace = assert_auto_jitable(tp)
 
     # Confirm equivariance of traced model
     assert_equivariant(
@@ -95,7 +95,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     )
 
     # Check right()
-    assert_jit_trace(
+    assert_auto_jitable(
         tp,
         method_name='right',
         irreps_in=tp.irreps_in2,

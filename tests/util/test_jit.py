@@ -64,7 +64,7 @@ def test_submod_scripting():
     parent_trace = trace_module(
         parent,
         inputs={
-            'forward': (torch.randn(7, 4))  # get the conditional behaviour
+            'forward': (torch.randn(7, 4),)  # get the conditional behaviour
         }
     )
     # Does it get the behaviour it was traced for?

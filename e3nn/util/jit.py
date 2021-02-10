@@ -6,7 +6,7 @@ import torch
 from ._argtools import _get_io_irreps, _rand_args
 
 _E3NN_COMPILE_MODE = "__e3nn_compile_mode__"
-_MAKE_TRACING_INPUT = 'make_tracing_input'
+_MAKE_TRACING_INPUTS = '_make_tracing_inputs'
 
 
 def compile_mode(mode: str):
@@ -14,17 +14,18 @@ def compile_mode(mode: str):
         raise ValueError("Invalid compile mode")
     def decorator(obj):
         if not (inspect.isclass(obj) and issubclass(obj, torch.nn.Module)):
-            raise TypeError("@e3nn.util.jit.script_if_tracing can only decorate classes derived from torch.nn.Module")
+            raise TypeError("@e3nn.util.jit.compile_mode can only decorate classes derived from torch.nn.Module")
         if hasattr(obj, _E3NN_COMPILE_MODE):
-            warnings.warn("Something is strange — did this class get marked twice with @e3nn.util.jit.script_if_tracing?")
+            # TODO: is this right for subclasses?
+            warnings.warn("Something is strange — did this class get marked twice with @e3nn.util.jit.compile_mode?")
         setattr(obj, _E3NN_COMPILE_MODE, mode)
         return obj
     return decorator
 
 
-def _compile_submodules(
+def compile(
     mod: torch.nn.Module,
-    n_extra_trace_checks: int = 0,
+    n_trace_checks: int = 1,
     script_options: dict = {},
     trace_options: dict = {},
 ):
@@ -32,15 +33,16 @@ def _compile_submodules(
 
     Submodules without decorators will be unaffected.
     """
+    assert n_trace_checks >= 1
     # == recurse to children ==
     # This allows us to trace compile submodules of modules we are going to script
     for submod_name, submod in mod.named_children():
         setattr(
             mod,
             submod_name,
-            _compile_submodules(
+            compile(
                 submod,
-                n_extra_trace_checks=n_extra_trace_checks,
+                n_trace_checks=n_trace_checks,
                 script_options=script_options,
                 trace_options=trace_options
             )
@@ -53,21 +55,13 @@ def _compile_submodules(
     assert compile_mode in ['script', 'trace', None]
 
     if compile_mode == 'script':
+        print('mod', mod)
         mod = torch.jit.script(mod, **script_options)
     elif compile_mode == 'trace':
         # These are always modules, so we're always using trace_module
         # We need tracing inputs:
-        if hasattr(mod, _MAKE_TRACING_INPUT):
-            # This returns a trace_module style dict of method names to test inputs
-            check_inputs = [mod.make_tracing_input() for _ in range(n_extra_trace_checks+1)]
-            assert all(isinstance(e, dict) for e in check_inputs), "make_tracing_input must return a dict"
-        else:
-            # Try to infer. This will throw if it can't.
-            irreps_in, _ = _get_io_irreps(
-                mod,
-                irreps_out=[None]  # we're only trying to infer inputs
-            )
-            check_inputs = [{'forward': _rand_args(irreps_in)} for _ in range(n_extra_trace_checks+1)]
+        check_inputs = get_tracing_inputs(mod, n_trace_checks)
+        assert len(check_inputs) >= 1, "Must have at least one tracing input."
         # Do the actual trace
         mod = torch.jit.trace_module(
             mod,
@@ -78,60 +72,77 @@ def _compile_submodules(
     return mod
 
 
+def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
+    if hasattr(mod, _MAKE_TRACING_INPUTS):
+        # This returns a trace_module style dict of method names to test inputs
+        trace_inputs = mod._make_tracing_inputs(n)
+        assert isinstance(trace_inputs, list)
+        for d in trace_inputs:
+            assert isinstance(d, dict), "_make_tracing_inputs must return a list of dict[str, tuple]"
+            assert all(isinstance(k, str) and isinstance(v, tuple) for k, v in d.items()), "_make_tracing_inputs must return a list of dict[str, tuple]"
+    else:
+        # Try to infer. This will throw if it can't.
+        irreps_in, _ = _get_io_irreps(
+            mod,
+            irreps_out=[None]  # we're only trying to infer inputs
+        )
+        trace_inputs = [{'forward': _rand_args(irreps_in)} for _ in range(n)]
+    return trace_inputs
+
+
 def trace_module(
     mod: torch.nn.Module,
     inputs: dict = None,
-    n_extra_trace_checks: int = 0,
-    script_options: dict = {},
-    trace_options: dict = {}
+    check_inputs: list = [],
 ):
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
+    if old_mode is not None and old_mode != 'trace':
+        warnings.warn("Trying to trace a module marked with @compile_mode != 'trace', expect errors!")
     setattr(mod, _E3NN_COMPILE_MODE, 'trace')
 
     # If inputs are provided, set make_tracing_input temporarily
     old_make_tracing_input = None
     if inputs is not None:
-        old_make_tracing_input = getattr(mod, _MAKE_TRACING_INPUT, None)
+        old_make_tracing_input = getattr(mod, _MAKE_TRACING_INPUTS, None)
         setattr(
             mod,
-            _MAKE_TRACING_INPUT,
-            lambda: inputs
+            _MAKE_TRACING_INPUTS,
+            lambda num: ([inputs] + check_inputs)
         )
 
     # Compile
-    out = _compile_submodules(
-        mod,
-        n_extra_trace_checks=n_extra_trace_checks,
-        script_options=script_options,
-        trace_options=trace_options
-    )
+    out = compile(mod)
 
     # Restore old values, if we had them
     if old_mode is not None:
         setattr(mod, _E3NN_COMPILE_MODE, old_mode)
     if old_make_tracing_input is not None:
-        setattr(mod, _MAKE_TRACING_INPUT, old_make_tracing_input)
+        setattr(mod, _MAKE_TRACING_INPUTS, old_make_tracing_input)
     return out
 
 
-def script(
+def trace(
     mod: torch.nn.Module,
-    n_extra_trace_checks: int = 0,
-    script_options: dict = {},
-    trace_options: dict = {}
+    example_inputs: tuple = None,
+    check_inputs: list = [],
 ):
+    return trace_module(
+        mod=mod,
+        inputs=({'forward': example_inputs} if example_inputs is not None else None),
+        check_inputs=[{'forward': c} for c in check_inputs],
+    )
+
+
+def script(mod: torch.nn.Module):
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
+    if old_mode is not None and old_mode != 'script':
+        warnings.warn("Trying to script a module marked with @compile_mode != 'script', expect errors!")
     setattr(mod, _E3NN_COMPILE_MODE, 'script')
 
     # Compile
-    out = _compile_submodules(
-        mod,
-        n_extra_trace_checks=n_extra_trace_checks,
-        script_options=script_options,
-        trace_options=trace_options
-    )
+    out = compile(mod)
 
     # Restore old values, if we had them
     if old_mode is not None:

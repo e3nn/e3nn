@@ -4,7 +4,7 @@ import torch
 
 import e3nn
 from e3nn.nn import NormActivation
-from e3nn.util.test import assert_equivariant, assert_jit_trace
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 @pytest.mark.parametrize('do_bias', [True, False])
@@ -93,4 +93,4 @@ def test_norm_activation_equivariant(do_bias, nonlin):
         norm_act.biases[:] = torch.randn(norm_act.biases.shape)
 
     assert_equivariant(norm_act)
-    assert_jit_trace(norm_act)
+    assert_auto_jitable(norm_act)
