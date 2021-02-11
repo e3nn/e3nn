@@ -5,6 +5,7 @@ import random
 import sys
 import tempfile
 import subprocess
+import copy
 
 import torch
 from torch_geometric.data import Data
@@ -107,3 +108,10 @@ torch.save(out, '{tmpdir}/out.pt')
         # Check
         out = torch.load(tmpdir + '/out.pt')
         assert torch.allclose(f(dat), out)
+
+
+def test_copy(network):
+    f, random_graph = network
+    fcopy = copy.deepcopy(f)
+    g = random_graph()
+    assert torch.allclose(f(g), fcopy(g))

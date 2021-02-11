@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import torch
 from e3nn import o3
-from e3nn.util import eval_code
+from e3nn.util import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
 
@@ -16,7 +16,7 @@ def _prod(x):
 
 # This decorator applies to all the subclasses as well.
 @compile_mode('trace')
-class TensorProduct(torch.nn.Module):
+class TensorProduct(CodeGenMixin, torch.nn.Module):
     r"""Tensor Product with parametrizable paths
 
     Parameters
@@ -517,10 +517,10 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         code_out += f"{s}return out.reshape(outsize)"
         code_right += f"{s}return out.reshape(outsize)"
 
-        self.code_out = code_out
-        self._compiled_main_out = eval_code(self.code_out).main
-        self.code_right = code_right
-        self._compiled_main_right = eval_code(self.code_right).main
+        self._codegen_register({
+            '_compiled_main_out': code_out,
+            '_compiled_main_right': code_right,
+        })
 
         # w3j
         self.wigners = wigners
@@ -637,6 +637,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         trace_weights = bool(self.weight_numel) and not self.internal_weights
         # No reason to trace weights when there aren't any, even if they aren't internal:
         trace_weights = trace_weights and self.weight_numel > 0
+        make_weights = None
         if trace_weights:
             if self.shared_weights:
                 def make_weights(bdim):
@@ -719,27 +720,6 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
             return self._compiled_main_out(features_1, features_2, weight, wigners)
-
-    # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
-    # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances
-    # torch.nn.Module does not currently impliment __get/setstate__ but may in the future, which is why we have these hasattr checks.
-    def __getstate__(self):
-        if hasattr(super(), "__getstate__"):
-            out = super().__getstate__().copy()
-        else:
-            out = self.__dict__.copy()
-        del out['_compiled_main_out']
-        del out['_compiled_main_right']
-        return out
-
-    def __setstate__(self, d):
-        d = d.copy()
-        d["_compiled_main_out"] = eval_code(d['code_out']).main
-        d["_compiled_main_right"] = eval_code(d['code_right']).main
-        if hasattr(super(), "__setstate__"):
-            super().__setstate__(d)
-        else:
-            self.__dict__.update(d)
 
 
 class FullyConnectedTensorProduct(TensorProduct):

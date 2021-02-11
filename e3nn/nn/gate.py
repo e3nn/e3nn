@@ -2,7 +2,7 @@ import torch
 
 from e3nn import o3
 from e3nn.math import normalize2mom
-from e3nn.util import eval_code
+from e3nn.util import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
 
@@ -95,7 +95,7 @@ class Activation(torch.nn.Module):
 
 
 @compile_mode('trace')
-class _Sortcut(torch.nn.Module):
+class _Sortcut(CodeGenMixin, torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
         self.irreps_outs = tuple(irreps.simplify() for irreps in irreps_outs)
@@ -131,9 +131,8 @@ class _Sortcut(torch.nn.Module):
                     i_out += d
 
         code_out.append(f"{s}return out")
-
-        self.code_out = "\n".join(code_out)
-        self._compiled_main_out = eval_code(self.code_out).main
+        code_out = "\n".join(code_out)
+        self._codegen_register({'_compiled_main_out': code_out})
 
     def forward(self, x):
         return self._compiled_main_out(x)
