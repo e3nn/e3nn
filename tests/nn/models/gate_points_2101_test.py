@@ -2,6 +2,7 @@ import pytest
 
 import warnings
 import random
+import sys
 import tempfile
 import subprocess
 
@@ -100,7 +101,8 @@ out = f(d)
 torch.save(out, '{tmpdir}/out.pt')
 """)
         # Run
-        proc_res = subprocess.run(['python', tmpdir + '/code.py'])
+        # sys.executable gives the path to the current python interpreter
+        proc_res = subprocess.run([sys.executable, tmpdir + '/code.py'])
         proc_res.check_returncode()
         # Check
         out = torch.load(tmpdir + '/out.pt')
