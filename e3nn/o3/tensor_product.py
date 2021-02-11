@@ -517,6 +517,41 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         code_out += f"{s}return out.reshape(outsize)"
         code_right += f"{s}return out.reshape(outsize)"
 
+        if self.irreps_in1.dim == 0 or self.irreps_in2.dim == 0 or self.irreps_out.dim == 0:
+            code_out = f"""
+from typing import List
+
+import torch
+
+from e3nn.util import broadcast_tensors
+
+@torch.jit.script
+def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+    x1, x2 = broadcast_tensors(x1, x2)
+    size = x1.shape[:-1]
+    outsize = size + ({self.irreps_out.dim},)
+    assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+
+    return x1.new_zeros(outsize)
+"""
+
+            code_right = f"""
+from typing import List
+
+import torch
+
+from e3nn.util import broadcast_tensors
+
+@torch.jit.script
+def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+    size = x2.shape[:-1]
+    outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+
+    return x2.new_zeros(outsize)
+"""
+
         self._codegen_register({
             '_compiled_main_out': code_out,
             '_compiled_main_right': code_right,
@@ -546,12 +581,15 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     name = f'[{ins.i_in1}:{self.irreps_in1[ins.i_in1]}] x [{ins.i_in2}:{self.irreps_in2[ins.i_in2]}] -> [{ins.i_out}:{self.irreps_out[ins.i_out]}]'
                     self.weight[name] = torch.nn.Parameter(torch.randn(ins.weight_shape))
 
-        output_mask = torch.cat([
-            torch.ones(mul * ir.dim)
-            if any(i.i_out == i_out and i.path_weight > 0 for i in self.instructions)
-            else torch.zeros(mul * ir.dim)
-            for i_out, (mul, ir) in enumerate(self.irreps_out)
-        ])
+        if self.irreps_out.dim > 0:
+            output_mask = torch.cat([
+                torch.ones(mul * ir.dim)
+                if any(i.i_out == i_out and i.path_weight > 0 for i in self.instructions)
+                else torch.zeros(mul * ir.dim)
+                for i_out, (mul, ir) in enumerate(self.irreps_out)
+            ])
+        else:
+            output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
 
         self.to(dtype=torch.get_default_dtype())
