@@ -127,6 +127,7 @@ def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
     list of dict
         Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of arguments.
     """
+    # - Get inputs -
     if hasattr(mod, _MAKE_TRACING_INPUTS):
         # This returns a trace_module style dict of method names to test inputs
         trace_inputs = mod._make_tracing_inputs(n)
@@ -141,6 +142,25 @@ def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
             irreps_out=[None]  # we're only trying to infer inputs
         )
         trace_inputs = [{'forward': _rand_args(irreps_in)} for _ in range(n)]
+    # - Put them on the right device -
+    # Try to a get a parameter
+    a_buf = next(mod.parameters(), None)
+    if a_buf is None:
+        # If there isn't one, try to get a buffer
+        a_buf = next(mod.buffers(), None)
+    device = a_buf.device if a_buf is not None else 'cpu'
+    # Move them
+    # TODO: do this better
+    trace_inputs = [
+        {
+            k: tuple(
+                t.to(device=device) if isinstance(t, torch.Tensor) else t for t in v
+            )
+            for k, v in d.items()
+        }
+        for d in trace_inputs
+    ]
+
     return trace_inputs
 
 
