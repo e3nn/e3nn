@@ -38,7 +38,6 @@ class SphericalTensor(o3.Irreps):
 
         &= \sum_{l=0}^{l_\mathrm{max}} p_v p_a^l A^l \cdot Y^l(x)
 
-    See :ref:`user_guide` for a visualization of the effect of :math:`p_v` and :math:`p_a`
 
     Parameters
     ----------
