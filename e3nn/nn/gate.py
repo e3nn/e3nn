@@ -2,8 +2,11 @@ import torch
 
 from e3nn import o3
 from e3nn.math import normalize2mom
+from e3nn.util import CodeGenMixin
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('trace')
 class Activation(torch.nn.Module):
     r"""Scalar activation function
 
@@ -91,7 +94,8 @@ class Activation(torch.nn.Module):
                 return torch.zeros_like(features)
 
 
-class _Sortcut(torch.nn.Module):
+@compile_mode('trace')
+class _Sortcut(CodeGenMixin, torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
         self.irreps_outs = tuple(irreps.simplify() for irreps in irreps_outs)
@@ -100,21 +104,41 @@ class _Sortcut(torch.nn.Module):
             return (l, p)
         self.irreps_in = o3.Irreps(sorted((x for irreps in self.irreps_outs for x in irreps), key=key)).simplify()
 
-    def forward(self, x):
-        outs = tuple(x.new_zeros(x.shape[:-1] + (irreps.dim,)) for irreps in self.irreps_outs)
+        code_out = [
+            "import torch",
+            "@torch.jit.script",
+            "def main(x: torch.Tensor):",
+            "    out = ("
+        ]
+        s = " "*4
+        for irreps in self.irreps_outs:
+            code_out.append(
+                f"{s}{s}x.new_zeros(x.shape[:-1] + ({irreps.dim},)),"
+            )
+        code_out.append(f"{s})")  # close the out
+
         i_in = 0
         for _, (l_in, p_in) in self.irreps_in:
-            for irreps_out, out in zip(self.irreps_outs, outs):
+            for out_i, irreps_out in enumerate(self.irreps_outs):
                 i_out = 0
                 for mul_out, (l_out, p_out) in irreps_out:
                     d = mul_out * (2 * l_out + 1)
                     if (l_in, p_in) == (l_out, p_out):
-                        out[..., i_out:i_out + d] = x[..., i_in:i_in + d]
+                        code_out.append(
+                            f"{s}out[{out_i}][..., {i_out}:{i_out + d}] = x[..., {i_in}:{i_in + d}]"
+                        )
                         i_in += d
                     i_out += d
-        return outs
+
+        code_out.append(f"{s}return out")
+        code_out = "\n".join(code_out)
+        self._codegen_register({'_compiled_main_out': code_out})
+
+    def forward(self, x):
+        return self._compiled_main_out(x)
 
 
+@compile_mode('script')
 class Gate(torch.nn.Module):
     r"""Gate activation function
 
@@ -182,9 +206,7 @@ class Gate(torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         '''
-        with torch.autograd.profiler.record_function(repr(self)):
-            assert features.shape[-1] == self.irreps_in.dim, f"Incorrect feature dimension. Expected {self.irreps_in.dim} for the last dimension."
-
+        with torch.autograd.profiler.record_function('Gate'):
             scalars, gates = self.sc(features)
             nonscalars = features[..., scalars.shape[-1] + gates.shape[-1]:]
 

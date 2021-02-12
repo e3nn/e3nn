@@ -1,8 +1,10 @@
 import torch
 
 from e3nn import o3
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('trace')
 class Identity(torch.nn.Module):
     r"""Identity operation
 

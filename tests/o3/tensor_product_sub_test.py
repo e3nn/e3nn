@@ -3,7 +3,7 @@ import torch
 from e3nn import o3
 from e3nn.nn import Identity
 from e3nn.o3 import FullyConnectedTensorProduct, Linear, FullTensorProduct, Norm
-from e3nn.util.test import assert_equivariant, assert_jit_trace
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 def test_fully_connected():
@@ -15,7 +15,7 @@ def test_fully_connected():
     m(torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim))
 
     assert_equivariant(m)
-    assert_jit_trace(m)
+    assert_auto_jitable(m)
 
 
 def test_id():
@@ -26,7 +26,7 @@ def test_id():
     m(torch.randn(irreps_in.dim))
 
     assert_equivariant(m)
-    assert_jit_trace(m, strict_shapes=False)
+    assert_auto_jitable(m, strict_shapes=False)
 
 
 def test_linear():
@@ -37,7 +37,7 @@ def test_linear():
     m(torch.randn(irreps_in.dim))
 
     assert_equivariant(m)
-    assert_jit_trace(m)
+    assert_auto_jitable(m)
 
 
 def test_full():
@@ -47,7 +47,7 @@ def test_full():
     print(m)
 
     assert_equivariant(m)
-    assert_jit_trace(m)
+    assert_auto_jitable(m)
 
 
 def test_norm():
@@ -66,4 +66,4 @@ def test_norm():
     assert torch.allclose(out_norms[0, 3:], true_vec_norms)
 
     assert_equivariant(norm)
-    assert_jit_trace(norm)
+    assert_auto_jitable(norm)

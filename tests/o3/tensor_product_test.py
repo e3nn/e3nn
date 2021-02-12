@@ -3,8 +3,8 @@ import copy
 
 import pytest
 import torch
-from e3nn.o3 import TensorProduct
-from e3nn.util.test import assert_equivariant, assert_jit_trace
+from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
@@ -85,7 +85,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
 
     # Check the tensor product
-    tp_trace = assert_jit_trace(tp)
+    tp_trace = assert_auto_jitable(tp)
 
     # Confirm equivariance of traced model
     assert_equivariant(
@@ -94,12 +94,62 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
         irreps_out=tp.irreps_out
     )
 
-    # Check right()
-    assert_jit_trace(
-        tp,
-        method_name='right',
-        irreps_in=tp.irreps_in2,
-        irreps_out=tp.irreps_out
+    # Confirm that it gives same results
+    x1 = tp.irreps_in1.randn(2, -1)
+    x2 = tp.irreps_in2.randn(2, -1)
+    assert torch.allclose(
+        tp(x1, x2),
+        tp_trace(x1, x2)
+    )
+
+
+def test_input_weights_jit():
+    irreps_in1 = Irreps("1e + 2e + 3x3o")
+    irreps_in2 = Irreps("1e + 2e + 3x3o")
+    irreps_out = Irreps("1e + 2e + 3x3o")
+    # - shared_weights = False -
+    m = FullyConnectedTensorProduct(
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        internal_weights=False,
+        shared_weights=False
+    )
+    traced = assert_auto_jitable(m)
+    x1 = irreps_in1.randn(2, -1)
+    x2 = irreps_in2.randn(2, -1)
+    w = torch.randn(2, m.weight_numel)
+    with pytest.raises(RuntimeError):
+        m(x1, x2)  # it should require weights
+    with pytest.raises(RuntimeError):
+        traced(x1, x2)  # it should also require weights
+    with pytest.raises(RuntimeError):
+        traced(x1, x2, w[0])  # it should reject insufficient weights
+    # Does the trace give right results?
+    assert torch.allclose(
+        m(x1, x2, w),
+        traced(x1, x2, w)
+    )
+    # - shared_weights = True -
+    m = FullyConnectedTensorProduct(
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        internal_weights=False,
+        shared_weights=True
+    )
+    traced = assert_auto_jitable(m)
+    w = torch.randn(m.weight_numel)
+    with pytest.raises(RuntimeError):
+        m(x1, x2)  # it should require weights
+    with pytest.raises(RuntimeError):
+        traced(x1, x2)  # it should also require weights
+    with pytest.raises(RuntimeError):
+        traced(x1, x2, torch.randn(2, m.weight_numel))  # it should reject too many weights
+    # Does the trace give right results?
+    assert torch.allclose(
+        m(x1, x2, w),
+        traced(x1, x2, w)
     )
 
 

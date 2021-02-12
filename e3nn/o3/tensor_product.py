@@ -3,7 +3,8 @@ from collections import namedtuple
 
 import torch
 from e3nn import o3
-from e3nn.util import eval_code
+from e3nn.util import CodeGenMixin
+from e3nn.util.jit import compile_mode
 
 
 def _prod(x):
@@ -13,7 +14,9 @@ def _prod(x):
     return out
 
 
-class TensorProduct(torch.nn.Module):
+# This decorator applies to all the subclasses as well.
+@compile_mode('trace')
+class TensorProduct(CodeGenMixin, torch.nn.Module):
     r"""Tensor Product with parametrizable paths
 
     Parameters
@@ -514,10 +517,45 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         code_out += f"{s}return out.reshape(outsize)"
         code_right += f"{s}return out.reshape(outsize)"
 
-        self.code_out = code_out
-        self._compiled_main_out = eval_code(self.code_out).main
-        self.code_right = code_right
-        self._compiled_main_right = eval_code(self.code_right).main
+        if self.irreps_in1.dim == 0 or self.irreps_in2.dim == 0 or self.irreps_out.dim == 0:
+            code_out = f"""
+from typing import List
+
+import torch
+
+from e3nn.util import broadcast_tensors
+
+@torch.jit.script
+def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+    x1, x2 = broadcast_tensors(x1, x2)
+    size = x1.shape[:-1]
+    outsize = size + ({self.irreps_out.dim},)
+    assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+
+    return x1.new_zeros(outsize)
+"""
+
+            code_right = f"""
+from typing import List
+
+import torch
+
+from e3nn.util import broadcast_tensors
+
+@torch.jit.script
+def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+    size = x2.shape[:-1]
+    outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
+    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+
+    return x2.new_zeros(outsize)
+"""
+
+        self._codegen_register({
+            '_compiled_main_out': code_out,
+            '_compiled_main_right': code_right,
+        })
 
         # w3j
         self.wigners = wigners
@@ -534,6 +572,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         # weights
         self.weight_numel = sum(_prod(ins.weight_shape) for ins in self.instructions if ins.has_weight)
 
+        self.internal_weights = internal_weights
         if internal_weights:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.ParameterDict()
@@ -542,12 +581,15 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
                     name = f'[{ins.i_in1}:{self.irreps_in1[ins.i_in1]}] x [{ins.i_in2}:{self.irreps_in2[ins.i_in2]}] -> [{ins.i_out}:{self.irreps_out[ins.i_out]}]'
                     self.weight[name] = torch.nn.Parameter(torch.randn(ins.weight_shape))
 
-        output_mask = torch.cat([
-            torch.ones(mul * ir.dim)
-            if any(i.i_out == i_out and i.path_weight > 0 for i in self.instructions)
-            else torch.zeros(mul * ir.dim)
-            for i_out, (mul, ir) in enumerate(self.irreps_out)
-        ])
+        if self.irreps_out.dim > 0:
+            output_mask = torch.cat([
+                torch.ones(mul * ir.dim)
+                if any(i.i_out == i_out and i.path_weight > 0 for i in self.instructions)
+                else torch.zeros(mul * ir.dim)
+                for i_out, (mul, ir) in enumerate(self.irreps_out)
+            ])
+        else:
+            output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
 
         self.to(dtype=torch.get_default_dtype())
@@ -575,6 +617,8 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             weight_shapes = [ins.weight_shape for ins in self.instructions if ins.has_weight]
 
             if weight is None:
+                if not self.internal_weights:
+                    raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
                 weight = list(self.weight.values())
             if torch.is_tensor(weight):
                 ws = []
@@ -595,6 +639,68 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         else:
             weight = []
         return weight
+
+    def _make_tracing_inputs(self, n: int):
+        import inspect
+        import random
+        MAX_N_BATCH = 3
+        # - Inspect forward() -
+        # Check if forward has weights:
+        forward_params = list(inspect.signature(self.forward).parameters)
+        arg_generators = []
+        forward_has_weight = forward_params[-1] == 'weight'
+        if forward_has_weight:
+            forward_params = forward_params[:-1]
+
+        if len(forward_params) == 1:
+            # Something like Norm or Linear with irreps_in
+            arg_generators.append(
+                lambda bdim: self.irreps_in.randn(bdim, -1)
+            )
+        elif len(forward_params) == 2:
+            # A normal TensorProduct with two inputs
+            arg_generators.append(
+                lambda bdim: self.irreps_in1.randn(bdim, -1)
+            )
+            arg_generators.append(
+                lambda bdim: self.irreps_in2.randn(bdim, -1)
+            )
+        else:
+            raise NotImplementedError("Tried to trace compile an atypical TensorProduct subclass; please override make_tracing_input() for your class.")
+
+        # - Deal with weights -
+        # We only trace a weight input if the TP has no internal weights:
+        # in TorchScript, a TP either always uses internal weights or always
+        # uses input weights
+        trace_weights = bool(self.weight_numel) and not self.internal_weights
+        # No reason to trace weights when there aren't any, even if they aren't internal:
+        trace_weights = trace_weights and self.weight_numel > 0
+        make_weights = None
+        if trace_weights:
+            if self.shared_weights:
+                def make_weights(bdim):
+                    return torch.randn(self.weight_numel)
+            else:
+                # By tracing it this way, we do enforce that non-shared weights are always passed in (..., self.weight_numel) form, which is fine, since lists don't play nice with compilation anyway
+                def make_weights(bdim):
+                    return torch.randn(bdim, self.weight_numel)
+            arg_generators.append(make_weights)
+
+        # - Make outputs -
+        out = []
+        for _ in range(n):
+            # Choose a random batch dimension
+            bdim = random.randint(1, MAX_N_BATCH)
+            # right() always takes irreps_in2 so we build it here:
+            right_args = (self.irreps_in2.randn(bdim, -1),)
+            if trace_weights:
+                right_args = right_args + (make_weights(bdim),)
+            # put it in
+            out.append({
+                'forward': tuple(g(bdim) for g in arg_generators),
+                'right': right_args
+            })
+        return out
 
     def right(self, features_2, weight=None):
         r"""evaluate partially :math:`w x \cdot \otimes y`
@@ -652,27 +758,6 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
 
             return self._compiled_main_out(features_1, features_2, weight, wigners)
-
-    # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
-    # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances
-    # torch.nn.Module does not currently impliment __get/setstate__ but may in the future, which is why we have these hasattr checks.
-    def __getstate__(self):
-        if hasattr(super(), "__getstate__"):
-            out = super().__getstate__().copy()
-        else:
-            out = self.__dict__.copy()
-        del out['_compiled_main_out']
-        del out['_compiled_main_right']
-        return out
-
-    def __setstate__(self, d):
-        d = d.copy()
-        d["_compiled_main_out"] = eval_code(d['code_out']).main
-        d["_compiled_main_right"] = eval_code(d['code_right']).main
-        if hasattr(super(), "__setstate__"):
-            super().__setstate__(d)
-        else:
-            self.__dict__.update(d)
 
 
 class FullyConnectedTensorProduct(TensorProduct):
