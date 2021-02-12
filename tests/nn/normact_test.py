@@ -9,7 +9,7 @@ from e3nn.util.test import assert_equivariant
 
 @pytest.mark.parametrize('do_bias', [True, False])
 @pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
-def test_norm_activation(do_bias, nonlin):
+def test_norm_activation(float_tolerance, do_bias, nonlin):
     irreps_in = e3nn.o3.Irreps("4x0e + 5x1o")
     N_batch = 3
     in_features = torch.randn(N_batch, irreps_in.dim)
@@ -44,7 +44,8 @@ def test_norm_activation(do_bias, nonlin):
             true_nonlin_arg = scalar_in.abs()
         assert torch.allclose(
             torch.sign(scalar_in)*nonlin(true_nonlin_arg),
-            out[batch, :4]
+            out[batch, :4],
+            atol=float_tolerance
         )
         # vectors
         # first, check norms:
@@ -59,9 +60,9 @@ def test_norm_activation(do_bias, nonlin):
         else:
             true_nonlin_arg = in_norms
         # Check norms for nonzero vectors
-        assert torch.allclose(nonlin(true_nonlin_arg).abs()[mask], out_norms[mask])
+        assert torch.allclose(nonlin(true_nonlin_arg).abs()[mask], out_norms[mask], atol=float_tolerance)
         # Check that zeros maintained for zero inputs
-        assert torch.allclose(in_norms[~mask], out_norms[~mask])
+        assert torch.allclose(in_norms[~mask], out_norms[~mask], atol=float_tolerance)
         # then that directions are unchanged up to sign:
         assert torch.allclose(
             torch.einsum(  # dot products
@@ -69,7 +70,8 @@ def test_norm_activation(do_bias, nonlin):
                 vector_in[mask] / in_norms[mask, None],
                 vector_out[mask] / out_norms[mask, None],
             ).abs(),
-            torch.ones(mask.sum())
+            torch.ones(mask.sum()),
+            atol=float_tolerance
         )
 
 
