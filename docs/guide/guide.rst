@@ -7,4 +7,3 @@ User Guide
     installation
     first_steps.ipynb
     equivar_testing
-    parity_sphericaltensor.ipynb
