@@ -2,7 +2,7 @@ import random
 
 import torch
 
-from e3nn import o3
+from e3nn.o3 import Irreps
 
 
 def _transform(dat, irreps_dat, rot_mat, translation=0.):
@@ -36,19 +36,19 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
         else:
             raise ValueError("Cannot infer irreps_out for %r; provide them explicitly" % func)
 
-    if isinstance(irreps_in, o3.Irreps) or irreps_in in SPECIAL_VALS:
+    if isinstance(irreps_in, Irreps) or irreps_in in SPECIAL_VALS:
         irreps_in = [irreps_in]
     elif isinstance(irreps_in, list) or isinstance(irreps_in, tuple):
-        irreps_in = [i if i in SPECIAL_VALS else o3.Irreps(i) for i in irreps_in]
+        irreps_in = [i if i in SPECIAL_VALS else Irreps(i) for i in irreps_in]
     else:
-        irreps_in = [o3.Irreps(irreps_in)]
+        irreps_in = [Irreps(irreps_in)]
 
-    if isinstance(irreps_out, o3.Irreps) or irreps_out in SPECIAL_VALS:
+    if isinstance(irreps_out, Irreps) or irreps_out in SPECIAL_VALS:
         irreps_out = [irreps_out]
     elif isinstance(irreps_out, list) or isinstance(irreps_out, tuple):
-        irreps_out = [i if i in SPECIAL_VALS else o3.Irreps(i) for i in irreps_out]
+        irreps_out = [i if i in SPECIAL_VALS else Irreps(i) for i in irreps_out]
     else:
-        irreps_out = [o3.Irreps(irreps_out)]
+        irreps_out = [Irreps(irreps_out)]
 
     return irreps_in, irreps_out
 
@@ -62,7 +62,7 @@ def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
 
 
 def _rand_args(irreps_in):
-    if not all((isinstance(i, o3.Irreps) or i == 'cartesian_points') for i in irreps_in):
+    if not all((isinstance(i, Irreps) or i == 'cartesian_points') for i in irreps_in):
         raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
     # Generate random args with random size batch dim between 1 and 4:
     batch_size = random.randint(1, 4)
