@@ -71,3 +71,16 @@ def _rand_args(irreps_in):
         for irreps in irreps_in
     ]
     return args_in
+
+
+def _to_device(args, device):
+    if isinstance(args, torch.Tensor):
+        return args.to(device=device)
+    elif isinstance(args, tuple):
+        return tuple(_to_device(e, device) for e in args)
+    elif isinstance(args, list):
+        return [_to_device(e, device) for e in args]
+    elif isinstance(args, dict):
+        return{k: _to_device(v, device) for k, v in args.items()}
+    else:
+        raise TypeError("Only (nested) dict/tuple/lists of Tensors can be moved to a device.")
