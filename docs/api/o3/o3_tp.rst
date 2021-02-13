@@ -15,55 +15,34 @@ Each class implements a special case of tensor product.
     :hide-code:
 
     from e3nn import o3
-    from e3nn.util import visualize_tensor_product
 
 
 .. jupyter-execute::
 
-    tp = o3.FullTensorProduct('2x0e + 3x1o', '5x0e + 7x1e')
+    o3.FullTensorProduct('2x0e + 3x1o', '5x0e + 7x1e').visualize()
 
-.. jupyter-execute::
-    :hide-code:
-
-    visualize_tensor_product(tp)
-
-This tensor product is the "natural" one. Each possible outputs are created and they are not mixed with each other.
+This tensor product is the "natural" one. Each possible outputs are created and they are not mixed with each other. Note how the multiplicites of the ouputs are the product of the multiplicities of the respective inputs.
 
 
 .. jupyter-execute::
 
-    tp = o3.FullyConnectedTensorProduct('5x0e + 5x1e', '6x0e + 4x1e', '15x0e + 3x1e')
+    o3.FullyConnectedTensorProduct('5x0e + 5x1e', '6x0e + 4x1e', '15x0e + 3x1e').visualize()
 
-.. jupyter-execute::
-    :hide-code:
-
-    visualize_tensor_product(tp)
-
-In this example all possible path are created. The outputs are mixed together with learanble parameters. The red color indicates that the path is learned.
+In this example all possible path are created. The outputs are mixed together with learnable parameters. The red color indicates that the path is learned.
 
 
 .. jupyter-execute::
 
-    tp = o3.ElementwiseTensorProduct('5x0e + 5x1e', '4x0e + 6x1e')
+    o3.ElementwiseTensorProduct('5x0e + 5x1e', '4x0e + 6x1e').visualize()
 
-.. jupyter-execute::
-    :hide-code:
-
-    visualize_tensor_product(tp)
-
-Here the irreps are multiplied one by one. Note the multiplicity of 5 in the outputs.
+Here the irreps are multiplied one by one. Note how the inputs has been split and how the multiplicities of the outputs match with the multiplicities of the input.
 
 
 .. jupyter-execute::
 
-    tp = o3.Linear('5x0e + 4x1e', '6x0e + 7x1e')
+    o3.Linear('5x0e + 4x1e', '6x0e + 7x1e').visualize()
 
-.. jupyter-execute::
-    :hide-code:
-
-    visualize_tensor_product(tp)
-
-The linear operation is a special case of a tensor product with a constant scalar ``1``.
+The linear operation is a special case of a tensor product with a constant scalar ``1.0``.
 
 
 .. automodule:: e3nn.o3.tensor_product
