@@ -1,3 +1,4 @@
 from .eval_code import *  # noqa
 from .default_dtype import *  # noqa
 from .broadcast import *  # noqa
+from .visualize_tensor_product import *  # noqa
