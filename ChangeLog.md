@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - swish, use `torch.nn.functional.silu` instead
 - `"cartesian_vectors"` for equivariance testing — since the 0.2.2 Euler angle convention change, L=1 irreps are equivalent
 ### Fixed
+- Modules that generate code now clean up their temporary files
 - `NormActivation` now works on GPU
 
 ## [0.2.2] - 2021-02-09
