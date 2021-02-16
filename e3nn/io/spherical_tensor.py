@@ -110,7 +110,6 @@ class SphericalTensor(o3.Irreps):
         if len(vectors) == 0:
             return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
 
-
         assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
 
         vectors = vectors.reshape(-1, 3)
