@@ -298,7 +298,9 @@ class Network(torch.nn.Module):
         else:
             batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
 
-        edge_src, edge_dst = radius_graph(data['pos'], self.max_radius, batch)
+        edge_index = radius_graph(data['pos'], self.max_radius, batch)
+        edge_src = edge_index[0]
+        edge_dst = edge_index[1]
         edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, True, normalization='component')
         edge_length = edge_vec.norm(dim=1)
