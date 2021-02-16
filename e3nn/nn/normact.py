@@ -51,7 +51,7 @@ class NormActivation(torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_in)
         self.norm = o3.Norm(irreps_in)
         self.scalar_nonlinearity = scalar_nonlinearity
-        self.epsilon = torch.as_tensor(epsilon)
+        self.register_buffer('epsilon', torch.as_tensor(epsilon))
         self.normalize = normalize
         self.bias = bias
         if self.bias:
