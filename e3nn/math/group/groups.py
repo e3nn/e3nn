@@ -79,9 +79,9 @@ class Sn(FiniteGroup):
             def rep(p):
                 return perm.sign(p) * perm.standard_representation(p)
             return rep
-        if r == 'natural':
+        if r == 'natural':  # pragma: no cover
             return perm.natural_representation
-        if r == 'sign natural':
+        if r == 'sign natural':  # pragma: no cover
             def rep(p):
                 return perm.sign(p) * perm.natural_representation(p)
             return rep

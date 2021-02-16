@@ -73,6 +73,12 @@ class Irrep(tuple):
     @classmethod
     def iterator(cls, lmax=None):
         r"""Iterator through all the irreps of :math:`O(3)`
+
+        Examples
+        --------
+        >>> it = Irrep.iterator()
+        >>> next(it), next(it), next(it), next(it)
+        (0e, 0o, 1o, 1e)
         """
         for l in itertools.count():
             yield Irrep(l, (-1)**l)
@@ -153,6 +159,14 @@ class Irrep(tuple):
         -------
         `torch.Tensor`
             tensor of shape :math:`(..., 2l+1, 2l+1)`
+
+        Examples
+        --------
+        >>> m = Irrep(1, -1).D_from_matrix(-torch.eye(3))
+        >>> m.long()
+        tensor([[-1,  0,  0],
+                [ 0, -1,  0],
+                [ 0,  0, -1]])
         """
         d = torch.det(R).sign()
         R = d[..., None, None] * R
@@ -191,6 +205,10 @@ class Irrep(tuple):
         raise NotImplementedError
 
     def __rmul__(self, mul):
+        r"""
+        >>> 3 * Irrep('1e')
+        3x1e
+        """
         assert isinstance(mul, int)
         return Irreps([(mul, self)])
 
@@ -421,11 +439,19 @@ class Irreps(tuple):
         return Irreps(super().__add__(irreps))
 
     def __mul__(self, other):
+        r"""
+        >>> (Irreps('2x1e') * 3).simplify()
+        6x1e
+        """
         if isinstance(other, Irreps):
             raise NotImplementedError("Use o3.TensorProduct for this, see the documentation")
         return Irreps(super().__mul__(other))
 
     def __rmul__(self, other):
+        r"""
+        >>> 2 * Irreps('0e + 1e')
+        1x0e+1x1e+1x0e+1x1e
+        """
         return Irreps(super().__rmul__(other))
 
     def simplify(self):
