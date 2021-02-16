@@ -341,8 +341,24 @@ class Irreps(tuple):
         """
         return Irreps([(1, (l, (-1)**l)) for l in range(lmax + 1)])
 
+    def slices(self):
+        r"""list of slice and ``mul_ir``
+
+        Examples
+        --------
+
+        >>> Irreps('2x0e + 1e').slices()
+        [(slice(0, 2, None), 2x0e), (slice(2, 5, None), 1x1e)]
+        """
+        s = []
+        i = 0
+        for mul_ir in self:
+            s += [(slice(i, i + mul_ir.dim), mul_ir)]
+            i += mul_ir.dim
+        return s
+
     def randn(self, *size, normalization='component', dtype=None, device=None, requires_grad=False):
-        """random tensor
+        r"""random tensor
 
         Parameters
         ----------
@@ -375,12 +391,10 @@ class Irreps(tuple):
         if normalization == 'norm':
             x = torch.zeros(*lsize, self.dim, *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
             with torch.no_grad():
-                start = 0
-                for mul, ir in self:
+                for s, (mul, ir) in self.slices():
                     r = torch.randn(*lsize, mul, ir.dim, *rsize)
                     r.div_(r.norm(2, dim=di + 1, keepdim=True))
-                    x.narrow(di, start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
-                    start += mul * ir.dim
+                    x.narrow(di, s.start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
             return x
 
         assert False, "normalization needs to be 'norm' or 'component'"

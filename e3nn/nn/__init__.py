@@ -1,3 +1,4 @@
+from .extract import *  # noqa
 from .batchnorm import *  # noqa
 from .fc import *  # noqa
 from .gate import *  # noqa
