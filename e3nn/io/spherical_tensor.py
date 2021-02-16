@@ -79,11 +79,11 @@ class SphericalTensor(o3.Irreps):
         >>> x.signal_xyz(d, p)
         tensor([1.0000, 5.0000])
         """
-        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
-
         # empty set of vectors returns a 0 spherical tensor
         if len(vectors) == 0:
             return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
+
+        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
 
         vectors = vectors.reshape(-1, 3)
         radii = vectors.norm(dim=1)  # [batch]
@@ -106,11 +106,12 @@ class SphericalTensor(o3.Irreps):
 
         TODO rename this function?
         """
-        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
-
         # empty set of vectors returns a 0 spherical tensor
         if len(vectors) == 0:
             return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
+
+
+        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
 
         vectors = vectors.reshape(-1, 3)
         radii = vectors.norm(dim=1)
@@ -127,6 +128,9 @@ class SphericalTensor(o3.Irreps):
 
         TODO rename this function?
         """
+        if len(positions) == 0:
+            return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
+
         positions = positions.reshape(-1, 3)
         values = values.reshape(-1)
         positions /= positions.norm(dim=1, keepdim=True)
