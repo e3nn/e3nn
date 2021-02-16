@@ -11,7 +11,7 @@ import torch
 from torch_geometric.data import Data
 
 from e3nn import o3
-from e3nn.nn.models.gate_points_2101 import Network
+from e3nn.nn.models.gate_points_2102 import Network
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 from e3nn.util.jit import trace
 
@@ -55,7 +55,7 @@ def test_convolution_jit(network):
     assert_auto_jitable(f.layers[0].first)
 
 
-def test_gate_points_2101_equivariant(network):
+def test_gate_points_2102_equivariant(network):
     f, random_graph = network
     # -- Test equivariance: --
     def wrapper(pos, x, z):
@@ -69,7 +69,7 @@ def test_gate_points_2101_equivariant(network):
     )
 
 
-def test_gate_points_2101_jit(network):
+def test_gate_points_2102_jit(network):
     f, random_graph = network
 
     with warnings.catch_warnings():
