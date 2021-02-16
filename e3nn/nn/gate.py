@@ -1,7 +1,7 @@
 import torch
 
 from e3nn import o3
-from e3nn.nn import Cut
+from e3nn.nn import Extract
 from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
 
@@ -99,7 +99,7 @@ class _Sortcut(torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
         self.irreps_outs = tuple(o3.Irreps(irreps).simplify() for irreps in irreps_outs)
-        irreps_in = sum(self.irreps_outs, start=o3.Irreps([]))
+        irreps_in = sum(self.irreps_outs, o3.Irreps([]))
 
         i = 0
         instructions = []
@@ -111,7 +111,7 @@ class _Sortcut(torch.nn.Module):
         irreps_in, p, _ = irreps_in.sort()
         instructions = [tuple(p[i] for i in x) for x in instructions]
 
-        self.cut = Cut(irreps_in, self.irreps_outs, instructions)
+        self.cut = Extract(irreps_in, self.irreps_outs, instructions)
         self.irreps_in = irreps_in.simplify()
 
     def forward(self, x):

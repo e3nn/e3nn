@@ -5,9 +5,9 @@ from e3nn import o3
 
 
 @compile_mode('trace')
-class Cut(CodeGenMixin, torch.nn.Module):
+class Extract(CodeGenMixin, torch.nn.Module):
     def __init__(self, irreps_in, irreps_outs, instructions):
-        r"""Cut irreps in pieces
+        r"""Extract sub sets of irreps
 
         Parameters
         ----------
@@ -24,7 +24,7 @@ class Cut(CodeGenMixin, torch.nn.Module):
         Examples
         --------
 
-        >>> c = Cut('1e + 0e + 0e', ['0e', '0e'], [(1,), (2,)])
+        >>> c = Extract('1e + 0e + 0e', ['0e', '0e'], [(1,), (2,)])
         >>> c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
         (tensor([1.]), tensor([2.]))
         """
@@ -51,14 +51,12 @@ class Cut(CodeGenMixin, torch.nn.Module):
         code_out.append(f"{s})")  # close the out
 
         for i, (irreps_out, ins) in enumerate(zip(self.irreps_outs, self.instructions)):
-            i_out = 0
-            for mul_ir_out, i_in in zip(irreps_out, ins):
+            for (s_out, _), i_in in zip(irreps_out.slices(), ins):
                 i_in1 = self.irreps_in[:i_in].dim
                 i_in2 = self.irreps_in[:i_in + 1].dim
                 code_out.append(
-                    f"{s}out[{i}][..., {i_out}:{i_out + mul_ir_out.dim}] = x[..., {i_in1}:{i_in2}]"
+                    f"{s}out[{i}][..., {s_out.start}:{s_out.stop}] = x[..., {i_in1}:{i_in2}]"
                 )
-                i_out += mul_ir_out.dim
 
         code_out.append(f"{s}return out")
         code_out = "\n".join(code_out)
@@ -66,3 +64,26 @@ class Cut(CodeGenMixin, torch.nn.Module):
 
     def forward(self, x):
         return self._compiled_main_out(x)
+
+
+class ExtractIr(torch.nn.Module):
+    def __init__(self, irreps_in, ir):
+        r"""Extract ``ir`` from irreps
+
+        Parameters
+        ----------
+        irreps_in : `Irreps`
+            representation of the input
+
+        ir : list of `Irrep`
+            representation to extract
+        """
+        super().__init__()
+        self.irreps_in = o3.Irreps(irreps_in)
+        self.irreps_out = o3.Irreps([mul_ir for mul_ir in self.irreps_in if mul_ir.ir == ir])
+        instructions = [tuple(i for i, mul_ir in enumerate(self.irreps_in) if mul_ir.ir == ir)]
+
+        self.ext = Extract(self.irreps_in, [self.irreps_out], instructions)
+
+    def forward(self, x):
+        return self.ext(x)
