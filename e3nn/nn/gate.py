@@ -1,8 +1,8 @@
 import torch
 
 from e3nn import o3
+from e3nn.nn import Cut
 from e3nn.math import normalize2mom
-from e3nn.util import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
 
@@ -95,47 +95,27 @@ class Activation(torch.nn.Module):
 
 
 @compile_mode('trace')
-class _Sortcut(CodeGenMixin, torch.nn.Module):
+class _Sortcut(torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
-        self.irreps_outs = tuple(irreps.simplify() for irreps in irreps_outs)
-        def key(mul_ir):
-            _mul, (l, p) = mul_ir
-            return (l, p)
-        self.irreps_in = o3.Irreps(sorted((x for irreps in self.irreps_outs for x in irreps), key=key)).simplify()
+        self.irreps_outs = tuple(o3.Irreps(irreps).simplify() for irreps in irreps_outs)
+        irreps_in = sum(self.irreps_outs, start=o3.Irreps([]))
 
-        code_out = [
-            "import torch",
-            "@torch.jit.script",
-            "def main(x: torch.Tensor):",
-            "    out = ("
-        ]
-        s = " "*4
-        for irreps in self.irreps_outs:
-            code_out.append(
-                f"{s}{s}x.new_zeros(x.shape[:-1] + ({irreps.dim},)),"
-            )
-        code_out.append(f"{s})")  # close the out
+        i = 0
+        instructions = []
+        for irreps_out in self.irreps_outs:
+            instructions += [tuple(range(i, i + len(irreps_out)))]
+            i += len(irreps_out)
+        assert len(irreps_in) == i, (len(irreps_in), i)
 
-        i_in = 0
-        for _, (l_in, p_in) in self.irreps_in:
-            for out_i, irreps_out in enumerate(self.irreps_outs):
-                i_out = 0
-                for mul_out, (l_out, p_out) in irreps_out:
-                    d = mul_out * (2 * l_out + 1)
-                    if (l_in, p_in) == (l_out, p_out):
-                        code_out.append(
-                            f"{s}out[{out_i}][..., {i_out}:{i_out + d}] = x[..., {i_in}:{i_in + d}]"
-                        )
-                        i_in += d
-                    i_out += d
+        irreps_in, p, _ = irreps_in.sort()
+        instructions = [tuple(p[i] for i in x) for x in instructions]
 
-        code_out.append(f"{s}return out")
-        code_out = "\n".join(code_out)
-        self._codegen_register({'_compiled_main_out': code_out})
+        self.cut = Cut(irreps_in, self.irreps_outs, instructions)
+        self.irreps_in = irreps_in.simplify()
 
     def forward(self, x):
-        return self._compiled_main_out(x)
+        return self.cut(x)
 
 
 @compile_mode('script')
