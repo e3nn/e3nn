@@ -92,4 +92,4 @@ class ExtractIr(torch.nn.Module):
         self.ext = Extract(self.irreps_in, [self.irreps_out], instructions)
 
     def forward(self, x):
-        return self.ext(x)
+        return self.ext(x)[0]
