@@ -235,6 +235,7 @@ class Network(torch.nn.Module):
         self.input_has_node_attr = (irreps_node_attr is not None)
 
         self.ext_z = ExtractIr(self.irreps_node_attr, '0e')
+        number_of_edge_features = number_of_basis + 2 * self.irreps_node_attr.count('0e')
 
         irreps = self.irreps_in if self.irreps_in is not None else o3.Irreps("0e")
 
@@ -265,7 +266,7 @@ class Network(torch.nn.Module):
                 self.irreps_node_attr,
                 self.irreps_edge_attr,
                 gate.irreps_in,
-                number_of_basis + 2 * self.irreps_node_attr.count('0e'),
+                number_of_edge_features,
                 radial_layers,
                 radial_neurons,
                 num_neighbors
@@ -279,7 +280,7 @@ class Network(torch.nn.Module):
                 self.irreps_node_attr,
                 self.irreps_edge_attr,
                 self.irreps_out,
-                number_of_basis,
+                number_of_edge_features,
                 radial_layers,
                 radial_neurons,
                 num_neighbors
