@@ -760,7 +760,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
 
             return self._compiled_main_out(features_1, features_2, weight, wigners)
 
-    def visualize(self):
+    def visualize(self):  # pragma: no cover
         import numpy as np
 
         def _intersection(x, u, y, v):

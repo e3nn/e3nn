@@ -6,11 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `e3nn.nn.models.gate_points_2102` using node attributes along the length embedding to feed the radial network
 - `Irreps.slices()`
 - Module `Extract` (and `ExtractIr`) to extract subsets of irreps tensors
 - Recursive TorchScript compiler `e3nn.util.jit`
 - TorchScript support for `TensorProduct` and subclasses, `NormActivation`, `Gate`, `FullyConnectedNet`, and `gate_points_2101.Network`
 ### Removed
+- `e3nn.math.reduce.reduce_tensor` in favor of `e3nn.o3.ReducedTensorProducts`
 - swish, use `torch.nn.functional.silu` instead
 - `"cartesian_vectors"` for equivariance testing — since the 0.2.2 Euler angle convention change, L=1 irreps are equivalent
 ### Fixed

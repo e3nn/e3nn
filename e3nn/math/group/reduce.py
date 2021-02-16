@@ -1,9 +1,7 @@
 import itertools
 
 import torch
-from e3nn.math import direct_sum, kron, perm
-from e3nn.math.group import Group, has_rep_in_rep, is_representation
-from e3nn.util import torch_default_dtype
+from e3nn.math import perm
 
 
 def germinate_formulas(formula):
@@ -104,85 +102,3 @@ def reduce_permutation(f0, formulas, **dims):
 
     Q = Q.reshape(d_sym, *dims)
     return Q, ret
-
-
-def reduce_tensor(group: Group, formula, eps=1e-9, **kw_representations):
-    r"""reduce a tensor with symmetries into irreducible representations
-    Usage
-    irreps, Q = rs.reduce_tensor('ijkl=jikl=ikjl=ijlk', i=rep)
-    irreps = [(mul1, r1), (mul2, r2), ...]
-    Q = tensor of shape [15, 3, 3, 3, 3]
-    """
-    dtype = torch.get_default_dtype()
-    with torch_default_dtype(torch.float64):
-        f0, formulas = germinate_formulas(formula)
-
-        # here we check that each index has one and only one representation
-        for _s, p in formulas:
-            f = "".join(f0[i] for i in p)
-            for i, j in zip(f0, f):
-                if i in kw_representations and j in kw_representations and kw_representations[i] != kw_representations[j]:
-                    raise RuntimeError(f'rep of {i} and {j} should be the same')
-                if i in kw_representations:
-                    kw_representations[j] = kw_representations[i]
-                if j in kw_representations:
-                    kw_representations[i] = kw_representations[j]
-
-        for i in f0:
-            if i not in kw_representations:
-                raise RuntimeError(f'index {i} has no representations associated to it')
-
-        ide = group.identity()
-        dims = {i: len(kw_representations[i](ide)) for i in f0}  # dimension of each index
-
-        Q, _ = reduce_permutation(f0, formulas, **dims)
-        d_sym = len(Q)
-
-        if d_sym == 0:
-            return [], torch.zeros(d_sym, *[dims[i] for i in f0]).to(dtype=dtype)
-
-        Q = Q.reshape(len(Q), -1)
-
-        # up to now, the only used information about the representations was their dimensions
-
-        # We project the representation on the basis `base`
-        def representation(g):
-            m = kron(*(kw_representations[i](g) for i in f0))
-            return Q @ m @ Q.T
-
-        # And check that after this projection it is still a representation
-        assert is_representation(group, representation, eps)
-
-        # The rest of the code simply extract the irreps present in this representation
-        irreps = []
-        A = Q.clone()
-        for ir in group.irrep_indices():
-            if group.rep(ir)(ide).shape[0] > d_sym - sum(mul * group.rep_dim(ir) for mul, ir in irreps):
-                break
-
-            mul, B, representation = has_rep_in_rep(group, representation, group.rep(ir), eps)
-            A = direct_sum(torch.eye(d_sym - B.shape[0]), B) @ A
-            A = _round_sqrt(A, eps)
-
-            if mul > 0:
-                irreps += [(mul, ir)]
-
-            if sum(mul * group.rep_dim(ir) for mul, ir in irreps) == d_sym:
-                break
-
-        if sum(mul * group.rep_dim(ir) for mul, ir in irreps) != d_sym:
-            raise RuntimeError('unable to decompose into irreducible representations')
-
-        A = A.reshape(len(A), *[dims[i] for i in f0])
-        return irreps, A.to(dtype=dtype)
-
-
-def _round_sqrt(x, eps):
-    # round off x assuming it contains terms of the form +-1/sqrt(N)
-    x[x.abs() < eps] = 0
-    x = x.sign() / x.pow(2)
-    x = x.div(eps).round().mul(eps)
-    x = x.sign() / x.abs().sqrt()
-    x[torch.isnan(x)] = 0
-    x[torch.isinf(x)] = 0
-    return x

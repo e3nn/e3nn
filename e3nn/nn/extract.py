@@ -51,12 +51,17 @@ class Extract(CodeGenMixin, torch.nn.Module):
         code_out.append(f"{s})")  # close the out
 
         for i, (irreps_out, ins) in enumerate(zip(self.irreps_outs, self.instructions)):
-            for (s_out, _), i_in in zip(irreps_out.slices(), ins):
-                i_in1 = self.irreps_in[:i_in].dim
-                i_in2 = self.irreps_in[:i_in + 1].dim
+            if ins == tuple(range(len(self.irreps_in))):
                 code_out.append(
-                    f"{s}out[{i}][..., {s_out.start}:{s_out.stop}] = x[..., {i_in1}:{i_in2}]"
+                    f"{s}out[{i}] = x"
                 )
+            else:
+                for (s_out, _), i_in in zip(irreps_out.slices(), ins):
+                    i_in1 = self.irreps_in[:i_in].dim
+                    i_in2 = self.irreps_in[:i_in + 1].dim
+                    code_out.append(
+                        f"{s}out[{i}][..., {s_out.start}:{s_out.stop}] = x[..., {i_in1}:{i_in2}]"
+                    )
 
         code_out.append(f"{s}return out")
         code_out = "\n".join(code_out)
@@ -79,6 +84,7 @@ class ExtractIr(torch.nn.Module):
             representation to extract
         """
         super().__init__()
+        ir = o3.Irrep(ir)
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps([mul_ir for mul_ir in self.irreps_in if mul_ir.ir == ir])
         instructions = [tuple(i for i, mul_ir in enumerate(self.irreps_in) if mul_ir.ir == ir)]
