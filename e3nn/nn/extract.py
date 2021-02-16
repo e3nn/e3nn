@@ -53,7 +53,7 @@ class Extract(CodeGenMixin, torch.nn.Module):
         for i, (irreps_out, ins) in enumerate(zip(self.irreps_outs, self.instructions)):
             if ins == tuple(range(len(self.irreps_in))):
                 code_out.append(
-                    f"{s}out[{i}] = x"
+                    f"{s}out[{i}][:] = x"
                 )
             else:
                 for (s_out, _), i_in in zip(irreps_out.slices(), ins):
