@@ -13,7 +13,7 @@ class torch_default_tensor_type(AbstractContextDecoratorManager):
 
     def __enter__(self):
         if self.dtype is not None or self.device is not None:
-            self.saved_ttype = torch.empty(0).type()
+            self.saved_ttype = torch_get_default_tensor_type()
             torch.set_default_tensor_type(self.ttype)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -46,6 +46,19 @@ class torch_default_dtype(AbstractContextDecoratorManager):
 class torch_default_device(torch_default_tensor_type):
     def __init__(self, device):
         super().__init__(None, device)
+
+
+def torch_get_default_tensor_type():
+    return torch.empty(0).type()
+
+
+def torch_get_default_device():
+    return torch.empty(0).device
+
+
+def torch_set_default_device(device):
+    ttype = torch_default_device(device).ttype
+    torch.set_default_tensor_type(ttype)
 
 
 def add_type_kwargs(f):
