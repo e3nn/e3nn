@@ -5,7 +5,7 @@ import os
 import torch
 
 from e3nn import o3
-from e3nn.util import torch_default_tensor_type, add_type_kwargs
+from e3nn.util import torch_default_tensor_type, torch_get_default_device, add_type_kwargs
 
 _Jd, _W3j = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
 
@@ -131,9 +131,11 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
 
+    # must explicitly set to the default dtype and device, since Tensor.to(dtype|device=None) is no-op
     if dtype is None:
-        # must explicitly set to the default dtype, since Tensor.to(dtype=None) is no-op
         dtype = torch.get_default_dtype()
+    if device is None:
+        device = torch_get_default_device()
     return out.to(dtype=dtype, device=device)
 
 
