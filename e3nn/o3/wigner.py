@@ -76,7 +76,8 @@ def wigner_D(l, alpha, beta, gamma):
     return Xa @ J @ Xb @ J @ Xc
 
 
-def wigner_3j(l1, l2, l3, dtype=None, device=None):
+@add_type_kwargs
+def wigner_3j(l1, l2, l3):
     r"""Wigner 3j symbols
 
     It satifies the following two properties:
@@ -131,12 +132,7 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
 
-    # must explicitly set to the default dtype and device, since Tensor.to(dtype|device=None) is no-op
-    if dtype is None:
-        dtype = torch.get_default_dtype()
-    if device is None:
-        device = torch_get_default_device()
-    return out.to(dtype=dtype, device=device)
+    return out.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
 
 
 @add_type_kwargs

@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import torch
 from e3nn import o3
-from e3nn.util import CodeGenMixin
+from e3nn.util import CodeGenMixin, torch_get_default_device
 from e3nn.util.jit import compile_mode
 
 
@@ -55,6 +55,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         * `False` :math:`z_i = w_i x_i \otimes y_i`
 
         where here :math:`i` denotes a *batch-like* index
+
+    dtype : torch.dtype or None
+        ``dtype`` of the returned tensor. If ``None`` then set to ``torch.get_default_dtype()``.
+
+    device : torch.device or None
+        ``device`` of the returned tensor. If ``None`` then set to the default device of the current context.
 
     Examples
     --------
@@ -156,6 +162,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             normalization='component',
             internal_weights=None,
             shared_weights=None,
+            dtype=None,
+            device=None,
             _specialized_code=True,
                 ):
         super().__init__()
@@ -592,7 +600,12 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
             output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
 
-        self.to(dtype=torch.get_default_dtype())
+        # must explicitly set to the default dtype and device, since Tensor.to(dtype|device=None) is no-op
+        if dtype is None:
+            dtype = torch.get_default_dtype()
+        if device is None:
+            device=torch_get_default_device()
+        self.to(dtype=dtype, device=device)
 
     def __repr__(self):
         npath = sum(

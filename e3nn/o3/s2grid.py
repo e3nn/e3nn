@@ -31,7 +31,7 @@ import math
 import torch
 import torch.fft
 from e3nn import o3
-from e3nn.util import torch_default_device, add_type_kwargs
+from e3nn.util import torch_get_default_device, add_type_kwargs
 
 
 @add_type_kwargs
@@ -55,7 +55,8 @@ def _quadrature_weights(b):
     return w
 
 
-def s2_grid(res_beta, res_alpha, dtype=None, device=None):
+@add_type_kwargs
+def s2_grid(res_beta, res_alpha):
     r"""grid on the sphere
 
     Parameters
@@ -80,16 +81,13 @@ def s2_grid(res_beta, res_alpha, dtype=None, device=None):
     alphas : `torch.Tensor`
         tensor of shape ``(res_alpha)``
     """
-    if dtype is None:
-        dtype = torch.get_default_dtype()
 
-    with torch_default_device(device):
-        i = torch.arange(res_beta, dtype=dtype)
-        betas = (i + 0.5) / res_beta * math.pi
+    i = torch.arange(res_beta, dtype=torch.get_default_dtype())
+    betas = (i + 0.5) / res_beta * math.pi
 
-        i = torch.arange(res_alpha, dtype=dtype)
-        alphas = i / res_alpha * 2 * math.pi
-        return betas, alphas
+    i = torch.arange(res_alpha, dtype=torch.get_default_dtype())
+    alphas = i / res_alpha * 2 * math.pi
+    return betas, alphas
 
 
 @add_type_kwargs
@@ -342,7 +340,7 @@ class ToS2Grid(torch.nn.Module):
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
-        self.to(torch.get_default_dtype())
+        self.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
@@ -458,7 +456,7 @@ class FromS2Grid(torch.nn.Module):
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
-        self.to(torch.get_default_dtype())
+        self.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
