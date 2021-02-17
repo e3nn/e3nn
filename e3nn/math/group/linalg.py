@@ -3,7 +3,7 @@ import warnings
 import torch
 from e3nn.math import complete_basis, direct_sum, kron
 from e3nn.math.group import Group
-from e3nn.util import torch_default_device
+from e3nn.util import torch_default_tensor_type
 
 
 def intertwiners(group: Group, D1, D2, eps=1e-9):
@@ -59,10 +59,10 @@ def has_rep_in_rep(group: Group, D, D_small, eps=1e-9):
 
     e = group.identity()
     D_e = D(e)
-    dim, device = D_e.shape[0], D_e.device
+    dim, device, dtype = D_e.shape[0], D_e.device, D_e.dtype
     dim_small = D_small(e).shape[0]
 
-    with torch_default_device(device):
+    with torch_default_tensor_type(dtype, device):
         D_rest = D
         bigA = torch.eye(dim)
         n = 0

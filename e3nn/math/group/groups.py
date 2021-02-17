@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 import torch
 from e3nn import o3
 from e3nn.math import perm
-from e3nn.util import torch_default_device
+from e3nn.util import torch_default_tensor_type
 
 
 class Group(ABC):  # pragma: no cover
@@ -66,26 +66,27 @@ class Sn(FiniteGroup):
         for ir in ['trivial', 'sign', 'standard', 'sign standard']:
             yield ir
 
-    def rep(self, r, device=None):
+    def rep(self, r, dtype=None, device=None):
         if r == 'trivial':
             def rep(p):
-                return torch.ones(1, 1, device=device)
+                return torch.ones(1, 1, dtype=dtype, device=device)
             return rep
         if r == 'sign':
             def rep(p):
-                return perm.sign(p) * torch.ones(1, 1, device=device)
+                return perm.sign(p) * torch.ones(1, 1, dtype=dtype, device=device)
             return rep
         if r == 'standard':
-            return partial(perm.standard_representation, device=device)
+            return partial(perm.standard_representation, dtype=dtype, device=device)
         if r == 'sign standard':
             def rep(p):
-                return perm.sign(p) * perm.standard_representation(p, device=device)
+                return perm.sign(p) * perm.standard_representation(p, dtype=dtype, device=device)
+
             return rep
         if r == 'natural':  # pragma: no cover
-            return partial(perm.natural_representation, device=device)
+            return partial(perm.natural_representation, dtype=dtype, device=device)
         if r == 'sign natural':  # pragma: no cover
             def rep(p):
-                return perm.sign(p) * perm.natural_representation(p, device=device)
+                return perm.sign(p) * perm.natural_representation(p, dtype=dtype, device=device)
             return rep
 
     def compose(self, p1, p2):
@@ -179,8 +180,8 @@ def is_representation(group: LieGroup, D, eps):
     e = group.identity()
     I = D(e)
 
-    with torch_default_device(I.device):
-        if not torch.allclose(I, torch.eye(len(I), dtype=I.dtype)):
+    with torch_default_tensor_type(I.dtype, I.device):
+        if not torch.allclose(I, torch.eye(len(I))):
             return False
 
         for _ in range(4):

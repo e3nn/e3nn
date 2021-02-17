@@ -3,7 +3,7 @@ import random
 import math
 import torch
 from e3nn.math import complete_basis
-from e3nn.util import torch_default_device
+from e3nn.util import add_type_kwargs
 
 
 TY_PERM = Tuple[int]
@@ -132,23 +132,23 @@ def sign(p: TY_PERM) -> int:
     return s
 
 
-def standard_representation(p: TY_PERM, device=None) -> torch.Tensor:
+@add_type_kwargs
+def standard_representation(p: TY_PERM) -> torch.Tensor:
     r"""irrep of Sn of dimension n - 1
     """
-    with torch_default_device(device):
-        A = complete_basis(torch.ones(1, len(p)))
-        return A @ natural_representation(p) @ A.T
+    A = complete_basis(torch.ones(1, len(p)))
+    return A @ natural_representation(p) @ A.T
 
 
-def natural_representation(p: TY_PERM, device=None) -> torch.Tensor:
+@add_type_kwargs
+def natural_representation(p: TY_PERM) -> torch.Tensor:
     r"""natural representation of Sn
     """
-    with torch_default_device(device):
-        n = len(p)
-        ip = inverse(p)
-        d = torch.zeros(n, n)
+    n = len(p)
+    ip = inverse(p)
+    d = torch.zeros(n, n)
 
-        for a in range(n):
-            d[a, ip[a]] = 1
+    for a in range(n):
+        d[a, ip[a]] = 1
 
-        return d
+    return d

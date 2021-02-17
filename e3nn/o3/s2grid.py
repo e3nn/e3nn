@@ -72,10 +72,10 @@ def s2_grid(res_beta, res_alpha):
     alphas : `torch.Tensor`
         tensor of shape ``(res_alpha)``
     """
-    i = torch.arange(res_beta).to(dtype=torch.get_default_dtype())
+    i = torch.arange(res_beta, dtype=torch.get_default_dtype())
     betas = (i + 0.5) / res_beta * math.pi
 
-    i = torch.arange(res_alpha).to(dtype=torch.get_default_dtype())
+    i = torch.arange(res_alpha, dtype=torch.get_default_dtype())
     alphas = i / res_alpha * 2 * math.pi
     return betas, alphas
 
