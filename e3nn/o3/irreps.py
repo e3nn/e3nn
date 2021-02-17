@@ -6,6 +6,7 @@ import torch
 
 from e3nn import o3
 from e3nn.math import direct_sum, perm
+from e3nn.util import torch_default_tensor_type
 
 
 class Irrep(tuple):
@@ -399,23 +400,24 @@ class Irreps(tuple):
         >>> Irreps("2o").randn(2, -1, 3, normalization='norm').norm(dim=1).sub(1).abs().max().item() < 1e-5
         True
         """
-        di = size.index(-1)
-        lsize = size[:di]
-        rsize = size[di + 1:]
+        with torch_default_tensor_type(dtype, device):
+            di = size.index(-1)
+            lsize = size[:di]
+            rsize = size[di + 1:]
 
-        if normalization == 'component':
-            return torch.randn(*lsize, self.dim, *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
+            if normalization == 'component':
+                return torch.randn(*lsize, self.dim, *rsize, requires_grad=requires_grad)
 
-        if normalization == 'norm':
-            x = torch.zeros(*lsize, self.dim, *rsize, dtype=dtype, device=device, requires_grad=requires_grad)
-            with torch.no_grad():
-                for s, (mul, ir) in self.slices():
-                    r = torch.randn(*lsize, mul, ir.dim, *rsize)
-                    r.div_(r.norm(2, dim=di + 1, keepdim=True))
-                    x.narrow(di, s.start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
-            return x
+            if normalization == 'norm':
+                x = torch.zeros(*lsize, self.dim, *rsize, requires_grad=requires_grad)
+                with torch.no_grad():
+                    for s, (mul, ir) in self.slices():
+                        r = torch.randn(*lsize, mul, ir.dim, *rsize)
+                        r.div_(r.norm(2, dim=di + 1, keepdim=True))
+                        x.narrow(di, s.start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
+                return x
 
-        assert False, "normalization needs to be 'norm' or 'component'"
+            assert False, "normalization needs to be 'norm' or 'component'"
 
     def __getitem__(self, i):
         x = super().__getitem__(i)

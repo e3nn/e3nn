@@ -3,6 +3,7 @@ import warnings
 import torch
 from e3nn.math import complete_basis, direct_sum, kron
 from e3nn.math.group import Group
+from e3nn.util import torch_default_device
 
 
 def intertwiners(group: Group, D1, D2, eps=1e-9):
@@ -57,28 +58,30 @@ def has_rep_in_rep(group: Group, D, D_small, eps=1e-9):
         return newD
 
     e = group.identity()
-    dim = D(e).shape[0]
+    D_e = D(e)
+    dim, device = D_e.shape[0], D_e.device
     dim_small = D_small(e).shape[0]
 
-    D_rest = D
-    bigA = torch.eye(dim)
-    n = 0
+    with torch_default_device(device):
+        D_rest = D
+        bigA = torch.eye(dim)
+        n = 0
 
-    while True:
-        A = intertwiners(group, D_small, D_rest, eps) * dim_small**0.5
+        while True:
+            A = intertwiners(group, D_small, D_rest, eps) * dim_small**0.5
 
-        # stops if "small" does not appear in "big" anymore
-        if A.shape[0] == 0:
-            break
-        A = A[0]
+            # stops if "small" does not appear in "big" anymore
+            if A.shape[0] == 0:
+                break
+            A = A[0]
 
-        expand = complete_basis(A, eps)
-        A = torch.cat([A, expand])
+            expand = complete_basis(A, eps)
+            A = torch.cat([A, expand])
 
-        bigA = direct_sum(torch.eye(n * dim_small), A) @ bigA
-        n += 1
-        D_rest = change_and_remove(bigA, D, n * dim_small)
+            bigA = direct_sum(torch.eye(n * dim_small), A) @ bigA
+            n += 1
+            D_rest = change_and_remove(bigA, D, n * dim_small)
 
-    g = group.random()
-    assert (bigA @ D(g) @ bigA.T - direct_sum(*[D_small(g)] * n + [D_rest(g)])).abs().max() < eps
-    return n, bigA, D_rest
+        g = group.random()
+        assert (bigA @ D(g) @ bigA.T - direct_sum(*[D_small(g)] * n + [D_rest(g)])).abs().max() < eps
+        return n, bigA, D_rest

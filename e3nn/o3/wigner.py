@@ -5,6 +5,7 @@ import os
 import torch
 
 from e3nn import o3
+from e3nn.util import torch_default_device
 
 _Jd, _W3j = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
 
@@ -19,14 +20,15 @@ def _z_rot_mat(angle, l):
     on the diagonal and anti-diagonal are non-zero, so explicitly constructing
     this matrix is unnecessary.
     """
-    shape = angle.shape
-    M = torch.zeros(*shape, 2 * l + 1, 2 * l + 1, dtype=torch.get_default_dtype())
-    inds = torch.arange(0, 2 * l + 1, 1)
-    reversed_inds = torch.arange(2 * l, -1, -1)
-    frequencies = torch.arange(l, -l - 1, -1, dtype=torch.get_default_dtype())
-    M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
-    M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
-    return M
+    shape, device = angle.shape, angle.device
+    with torch_default_device(device):
+        M = torch.zeros(*shape, 2 * l + 1, 2 * l + 1, dtype=torch.get_default_dtype())
+        inds = torch.arange(0, 2 * l + 1, 1)
+        reversed_inds = torch.arange(2 * l, -1, -1)
+        frequencies = torch.arange(l, -l - 1, -1, dtype=torch.get_default_dtype())
+        M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
+        M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
+        return M
 
 
 def wigner_D(l, alpha, beta, gamma):
@@ -67,14 +69,14 @@ def wigner_D(l, alpha, beta, gamma):
         raise NotImplementedError(f'wigner D maximum l implemented is {len(_Jd) - 1}, send us an email to ask for more')
 
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    J = _Jd[l].to(dtype=torch.get_default_dtype())
+    J = _Jd[l].to(device=alpha.device, dtype=torch.get_default_dtype())
     Xa = _z_rot_mat(alpha, l)
     Xb = _z_rot_mat(beta, l)
     Xc = _z_rot_mat(gamma, l)
     return Xa @ J @ Xb @ J @ Xc
 
 
-def wigner_3j(l1, l2, l3):
+def wigner_3j(l1, l2, l3, device=None):
     r"""Wigner 3j symbols
 
     It satifies the following two properties:
@@ -122,56 +124,57 @@ def wigner_3j(l1, l2, l3):
             out = _W3j[(l3, l1, l2)].transpose(0, 2).transpose(0, 1).clone()
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
-    return out.to(dtype=torch.get_default_dtype())
+    return out.to(device=device, dtype=torch.get_default_dtype())
 
 
-def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
+def _generate_wigner_3j(l1, l2, l3, device=None):  # pragma: no cover
     r"""Computes the 3-j symbol
     """
-    # these three propositions are equivalent
-    assert abs(l2 - l3) <= l1 <= l2 + l3
-    assert abs(l3 - l1) <= l2 <= l3 + l1
-    assert abs(l1 - l2) <= l3 <= l1 + l2
+    with torch_default_device(device):
+        # these three propositions are equivalent
+        assert abs(l2 - l3) <= l1 <= l2 + l3
+        assert abs(l3 - l1) <= l2 <= l3 + l1
+        assert abs(l1 - l2) <= l3 <= l1 + l2
 
-    n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)  # dimension of the 3-j symbol
+        n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)  # dimension of the 3-j symbol
 
-    def _DxDxD(a, b, c):
-        D1 = wigner_D(l1, a, b, c)
-        D2 = wigner_D(l2, a, b, c)
-        D3 = wigner_D(l3, a, b, c)
-        return torch.einsum('il,jm,kn->ijklmn', D1, D2, D3).reshape(n, n)
+        def _DxDxD(a, b, c):
+            D1 = wigner_D(l1, a, b, c)
+            D2 = wigner_D(l2, a, b, c)
+            D3 = wigner_D(l3, a, b, c)
+            return torch.einsum('il,jm,kn->ijklmn', D1, D2, D3).reshape(n, n)
 
-    random_angles = torch.tensor([
-        [4.41301023, 5.56684102, 4.59384642],
-        [4.93325116, 6.12697327, 4.14574096],
-        [0.53878964, 4.09050444, 5.36539036],
-        [2.16017393, 3.48835314, 5.55174441],
-        [2.52385107, 0.29089583, 3.90040975],
-    ])
+        random_angles = torch.tensor([
+            [4.41301023, 5.56684102, 4.59384642],
+            [4.93325116, 6.12697327, 4.14574096],
+            [0.53878964, 4.09050444, 5.36539036],
+            [2.16017393, 3.48835314, 5.55174441],
+            [2.52385107, 0.29089583, 3.90040975],
+        ])
 
-    B = torch.zeros(n, n)
-    for abc in random_angles:
-        D = _DxDxD(*abc) - torch.eye(n)
-        B += D.T @ D
+        B = torch.zeros(n, n)
+        for abc in random_angles:
+            D = _DxDxD(*abc) - torch.eye(n)
+            B += D.T @ D
 
-    eigenvalues, eigenvectors = torch.symeig(B, eigenvectors=True)
-    assert eigenvalues[0] < 1e-10
-    Q = eigenvectors[:, 0]
-    assert (B @ Q).norm() < 1e-10
-    Q = Q.reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+        eigenvalues, eigenvectors = torch.symeig(B, eigenvectors=True)
+        assert eigenvalues[0] < 1e-10
+        Q = eigenvectors[:, 0]
+        assert (B @ Q).norm() < 1e-10
+        Q = Q.reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
 
-    Q[Q.abs() < 1e-14] = 0
+        Q[Q.abs() < 1e-14] = 0
 
-    if Q[l1, l2, l3] != 0:
-        if Q[l1, l2, l3] < 0:
-            Q.neg_()
-    else:
-        if next(x for x in Q.flatten() if x != 0) < 0:
-            Q.neg_()
+        if Q[l1, l2, l3] != 0:
+            if Q[l1, l2, l3] < 0:
+                Q.neg_()
+        else:
+            if next(x for x in Q.flatten() if x != 0) < 0:
+                Q.neg_()
 
-    abc = o3.rand_angles(100)
-    Q2 = torch.einsum("zil,zjm,zkn,lmn->zijk", wigner_D(l1, *abc), wigner_D(l2, *abc), wigner_D(l3, *abc), Q)
-    assert (Q - Q2).norm() < 1e-10
-    assert abs(Q.norm() - 1) < 1e-10
+        abc = o3.rand_angles(100)
+        Q2 = torch.einsum("zil,zjm,zkn,lmn->zijk", wigner_D(l1, *abc), wigner_D(l2, *abc), wigner_D(l3, *abc), Q)
+        assert (Q - Q2).norm() < 1e-10
+        assert abs(Q.norm() - 1) < 1e-10
 
-    return Q
+        return Q

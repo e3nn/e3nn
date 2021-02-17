@@ -2,11 +2,12 @@ import math
 
 import torch
 
+from e3nn.util import torch_default_device
 
 # matrix
 
 
-def rand_matrix(*shape, requires_grad=False):
+def rand_matrix(*shape, requires_grad=False, device=None):
     r"""random rotation matrix
 
     Parameters
@@ -18,14 +19,14 @@ def rand_matrix(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 3, 3)`
     """
-    R = angles_to_matrix(*rand_angles(*shape))
+    R = angles_to_matrix(*rand_angles(*shape, device=device))
     return R.detach().requires_grad_(requires_grad)
 
 
 # angles
 
 
-def identity_angles(*shape, requires_grad=False):
+def identity_angles(*shape, requires_grad=False, device=None):
     r"""angles of the identity rotation
 
     Parameters
@@ -43,10 +44,13 @@ def identity_angles(*shape, requires_grad=False):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    return torch.zeros(*shape, requires_grad=requires_grad), torch.zeros(*shape, requires_grad=requires_grad), torch.zeros(*shape, requires_grad=requires_grad)
+    with torch_default_device(device):
+        return (torch.zeros(*shape, requires_grad=requires_grad),
+                torch.zeros(*shape, requires_grad=requires_grad),
+                torch.zeros(*shape, requires_grad=requires_grad))
 
 
-def rand_angles(*shape, requires_grad=False):
+def rand_angles(*shape, requires_grad=False, device=None):
     r"""random rotation angles
 
     Parameters
@@ -64,12 +68,13 @@ def rand_angles(*shape, requires_grad=False):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    alpha, gamma = 2 * math.pi * torch.rand(2, *shape)
-    beta = torch.rand(shape).mul(2).sub(1).acos()
-    alpha = alpha.detach().requires_grad_(requires_grad)
-    beta = beta.detach().requires_grad_(requires_grad)
-    gamma = gamma.detach().requires_grad_(requires_grad)
-    return alpha, beta, gamma
+    with torch_default_device(device):
+        alpha, gamma = 2 * math.pi * torch.rand(2, *shape)
+        beta = torch.rand(shape).mul(2).sub(1).acos()
+        alpha = alpha.detach().requires_grad_(requires_grad)
+        beta = beta.detach().requires_grad_(requires_grad)
+        gamma = gamma.detach().requires_grad_(requires_grad)
+        return alpha, beta, gamma
 
 
 def compose_angles(a1, b1, c1, a2, b2, c2):
@@ -143,7 +148,7 @@ def inverse_angles(a, b, c):
 # quaternions
 
 
-def identity_quaternion(*shape, requires_grad=False):
+def identity_quaternion(*shape, requires_grad=False, device=None):
     r"""quaternion of identity rotation
 
     Parameters
@@ -155,13 +160,14 @@ def identity_quaternion(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 4)`
     """
-    q = torch.zeros(*shape, 4)
-    q[..., 0] = 1  # or -1...
-    q = q.detach().requires_grad_(requires_grad)
-    return q
+    with torch_default_device(device):
+        q = torch.zeros(*shape, 4)
+        q[..., 0] = 1  # or -1...
+        q = q.detach().requires_grad_(requires_grad)
+        return q
 
 
-def rand_quaternion(*shape, requires_grad=False):
+def rand_quaternion(*shape, requires_grad=False, device=None):
     r"""generate random quaternion
 
     Parameters
@@ -173,7 +179,7 @@ def rand_quaternion(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 4)`
     """
-    q = angles_to_quaternion(*rand_angles(*shape))
+    q = angles_to_quaternion(*rand_angles(*shape, device=device))
     q = q.detach().requires_grad_(requires_grad)
     return q
 
@@ -226,7 +232,7 @@ def inverse_quaternion(q):
 # axis-angle
 
 
-def rand_axis_angle(*shape, requires_grad=False):
+def rand_axis_angle(*shape, requires_grad=False, device=None):
     r"""generate random rotation as axis-angle
 
     Parameters
@@ -241,7 +247,7 @@ def rand_axis_angle(*shape, requires_grad=False):
     angle : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    axis, angle = angles_to_axis_angle(*rand_angles(*shape))
+    axis, angle = angles_to_axis_angle(*rand_angles(*shape, device=device))
     axis = axis.detach().requires_grad_(requires_grad)
     angle = angle.detach().requires_grad_(requires_grad)
     return axis, angle

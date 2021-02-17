@@ -7,7 +7,7 @@ from typing import List, Tuple
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
-from e3nn.util import eval_code
+from e3nn.util import eval_code, torch_default_device
 from e3nn import o3
 
 
@@ -66,21 +66,21 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
     `torch.Tensor`
         a tensor of shape ``(..., 2l+1)``
     """
-    alpha = alpha.unsqueeze(-1)  # [..., 1]
+    with torch_default_device(alpha.device):
+        alpha = alpha.unsqueeze(-1)  # [..., 1]
+        m = torch.arange(1, l + 1, dtype=alpha.dtype)  # [1, 2, 3, ..., l]
+        cos = torch.cos(m * alpha)  # [..., m]
 
-    m = torch.arange(1, l + 1, dtype=alpha.dtype, device=alpha.device)  # [1, 2, 3, ..., l]
-    cos = torch.cos(m * alpha)  # [..., m]
+        m = torch.arange(l, 0, -1, dtype=alpha.dtype)  # [l, l-1, l-2, ..., 1]
+        sin = torch.sin(m * alpha)  # [..., m]
 
-    m = torch.arange(l, 0, -1, dtype=alpha.dtype, device=alpha.device)  # [l, l-1, l-2, ..., 1]
-    sin = torch.sin(m * alpha)  # [..., m]
+        out = torch.cat([
+            math.sqrt(2) * sin,
+            torch.ones_like(alpha),
+            math.sqrt(2) * cos,
+        ], dim=alpha.ndim-1)
 
-    out = torch.cat([
-        math.sqrt(2) * sin,
-        torch.ones_like(alpha),
-        math.sqrt(2) * cos,
-    ], dim=alpha.ndim-1)
-
-    return out  # [..., m]
+        return out  # [..., m]
 
 
 def legendre(l, z, y=None):

@@ -1,10 +1,12 @@
 import itertools
 import math
+from functools import partial
 from abc import ABC, abstractmethod
 
 import torch
 from e3nn import o3
 from e3nn.math import perm
+from e3nn.util import torch_default_device
 
 
 class Group(ABC):  # pragma: no cover
@@ -64,26 +66,26 @@ class Sn(FiniteGroup):
         for ir in ['trivial', 'sign', 'standard', 'sign standard']:
             yield ir
 
-    def rep(self, r):
+    def rep(self, r, device=None):
         if r == 'trivial':
             def rep(p):
-                return torch.ones(1, 1)
+                return torch.ones(1, 1, device=device)
             return rep
         if r == 'sign':
             def rep(p):
-                return perm.sign(p) * torch.ones(1, 1)
+                return perm.sign(p) * torch.ones(1, 1, device=device)
             return rep
         if r == 'standard':
-            return perm.standard_representation
+            return partial(perm.standard_representation, device=device)
         if r == 'sign standard':
             def rep(p):
-                return perm.sign(p) * perm.standard_representation(p)
+                return perm.sign(p) * perm.standard_representation(p, device=device)
             return rep
         if r == 'natural':  # pragma: no cover
-            return perm.natural_representation
+            return partial(perm.natural_representation, device=device)
         if r == 'sign natural':  # pragma: no cover
             def rep(p):
-                return perm.sign(p) * perm.natural_representation(p)
+                return perm.sign(p) * perm.natural_representation(p, device=device)
             return rep
 
     def compose(self, p1, p2):
@@ -177,21 +179,22 @@ def is_representation(group: LieGroup, D, eps):
     e = group.identity()
     I = D(e)
 
-    if not torch.allclose(I, torch.eye(len(I), dtype=I.dtype)):
-        return False
-
-    for _ in range(4):
-        g1 = group.random()
-        g2 = group.random()
-
-        g12 = group.compose(g1, g2)
-        D12 = D(g12)
-
-        D1D2 = D(g1) @ D(g2)
-
-        if (D12 - D1D2).abs().max().item() > eps * D12.abs().max().item():
+    with torch_default_device(I.device):
+        if not torch.allclose(I, torch.eye(len(I), dtype=I.dtype)):
             return False
-    return True
+
+        for _ in range(4):
+            g1 = group.random()
+            g2 = group.random()
+
+            g12 = group.compose(g1, g2)
+            D12 = D(g12)
+
+            D1D2 = D(g1) @ D(g2)
+
+            if (D12 - D1D2).abs().max().item() > eps * D12.abs().max().item():
+                return False
+        return True
 
 
 def is_group(g: LieGroup, eps) -> bool:
