@@ -71,6 +71,7 @@ class Extract(CodeGenMixin, torch.nn.Module):
         return self._compiled_main_out(x)
 
 
+@compile_mode('script')
 class ExtractIr(torch.nn.Module):
     def __init__(self, irreps_in, ir):
         r"""Extract ``ir`` from irreps
