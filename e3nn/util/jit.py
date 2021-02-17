@@ -16,7 +16,7 @@ def compile_mode(mode: str):
         mode : str
             'script', 'trace', or None
     """
-    if not mode in ['trace', 'script', None]:
+    if mode not in ['trace', 'script', None]:
         raise ValueError("Invalid compile mode")
     def decorator(obj):
         if not (inspect.isclass(obj) and issubclass(obj, torch.nn.Module)):
