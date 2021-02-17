@@ -2,6 +2,7 @@ import torch
 
 from e3nn.util import torch_default_dtype
 
+
 @torch_default_dtype(torch.float64)
 def moment(f, n, device=None):
     r"""

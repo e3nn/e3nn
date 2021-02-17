@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from contextlib import AbstractContextManager
 from functools import wraps
 
 
-class AbstractContextDecoratorManager(ABC, AbstractContextManager):
+class AbstractContextDecoratorManager(AbstractContextManager, metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
