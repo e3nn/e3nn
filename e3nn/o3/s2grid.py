@@ -31,8 +31,10 @@ import math
 import torch
 import torch.fft
 from e3nn import o3
+from e3nn.util import torch_default_device, add_type_kwargs
 
 
+@add_type_kwargs
 def _quadrature_weights(b):
     """
     function copied from ``lie_learn.spaces.S3``
@@ -53,7 +55,7 @@ def _quadrature_weights(b):
     return w
 
 
-def s2_grid(res_beta, res_alpha):
+def s2_grid(res_beta, res_alpha, dtype=None, device=None):
     r"""grid on the sphere
 
     Parameters
@@ -64,6 +66,12 @@ def s2_grid(res_beta, res_alpha):
     res_alpha : int
         :math:`M`
 
+    dtype : torch.dtype or None
+        ``dtype`` of the returned tensors. If ``None`` then set to ``torch.get_default_dtype()``.
+
+    device : torch.device or None
+        ``device`` of the returned tensors. If ``None`` then set to the default device of the current context.
+
     Returns
     -------
     betas : `torch.Tensor`
@@ -72,14 +80,19 @@ def s2_grid(res_beta, res_alpha):
     alphas : `torch.Tensor`
         tensor of shape ``(res_alpha)``
     """
-    i = torch.arange(res_beta, dtype=torch.get_default_dtype())
-    betas = (i + 0.5) / res_beta * math.pi
+    if dtype is None:
+        dtype = torch.get_default_dtype()
 
-    i = torch.arange(res_alpha, dtype=torch.get_default_dtype())
-    alphas = i / res_alpha * 2 * math.pi
-    return betas, alphas
+    with torch_default_device(device):
+        i = torch.arange(res_beta, dtype=dtype)
+        betas = (i + 0.5) / res_beta * math.pi
+
+        i = torch.arange(res_alpha, dtype=dtype)
+        alphas = i / res_alpha * 2 * math.pi
+        return betas, alphas
 
 
+@add_type_kwargs
 def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha):
     r"""spherical harmonics evaluated on the grid on the sphere
 
@@ -265,6 +278,8 @@ class ToS2Grid(torch.nn.Module):
     lmax : int
     res : int, tuple of int
     normalization : {'norm', 'component', 'integral'}
+    dtype : torch.dtype or None, optional
+    device : torch.device or None, optional
 
     Examples
     --------
@@ -290,6 +305,7 @@ class ToS2Grid(torch.nn.Module):
         positions on the sphere, tensor of shape ``(..., res, 3)``
     """
 
+    @add_type_kwargs
     def __init__(self, lmax=None, res=None, normalization='component'):
         super().__init__()
 
@@ -374,6 +390,8 @@ class FromS2Grid(torch.nn.Module):
     lmax : int
     normalization : {'norm', 'component', 'integral'}
     lmax_in : int, optional
+    dtype : torch.dtype or None, optional
+    device : torch.device or None, optional
 
     Examples
     --------
@@ -401,6 +419,7 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
+    @add_type_kwargs
     def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None):
         super().__init__()
 

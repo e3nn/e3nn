@@ -102,7 +102,7 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
     l3 : int
         :math:`l_3`
 
-    dtype : torch.dtype
+    dtype : torch.dtype or None
         ``dtype`` of the returned tensor. If ``None`` then set to ``torch.get_default_dtype()``.
 
     device : torch.device or None
