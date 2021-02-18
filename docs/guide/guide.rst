@@ -7,3 +7,4 @@ User Guide
     installation
     first_steps.ipynb
     equivar_testing
+    jit
