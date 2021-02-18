@@ -604,7 +604,7 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         if dtype is None:
             dtype = torch.get_default_dtype()
         if device is None:
-            device=torch_get_default_device()
+            device = torch_get_default_device()
         self.to(dtype=dtype, device=device)
 
     def __repr__(self):

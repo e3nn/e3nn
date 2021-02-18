@@ -132,7 +132,7 @@ def sign(p: TY_PERM) -> int:
     return s
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def standard_representation(p: TY_PERM) -> torch.Tensor:
     r"""irrep of Sn of dimension n - 1
     """
@@ -140,7 +140,7 @@ def standard_representation(p: TY_PERM) -> torch.Tensor:
     return A @ natural_representation(p) @ A.T
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def natural_representation(p: TY_PERM) -> torch.Tensor:
     r"""natural representation of Sn
     """

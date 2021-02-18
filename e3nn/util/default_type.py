@@ -48,6 +48,30 @@ class torch_default_device(torch_default_tensor_type):
         super().__init__(None, device)
 
 
+class add_type_kwargs(object):
+    _DOC_NOTE = r"""
+- dtype and device keyword arguments will be passed to torch_default_tensor_type()
+"""
+
+    def __init__(self, dtype=None, device=None):
+        super().__init__()
+        self.dtype = dtype
+        self.device = device
+
+    def __call__(self, f):
+        @wraps(f)
+        def wrapper(*args, dtype=self.dtype, device=self.device, **kwargs):
+            with torch_default_tensor_type(dtype, device):
+                return f(*args, **kwargs)
+
+        if wrapper.__doc__ is not None:
+            if not wrapper.__doc__.endswith("\n"):
+                wrapper.__doc__ += "\n"
+            wrapper.__doc__ += self._DOC_NOTE
+
+        return wrapper
+
+
 def torch_get_default_tensor_type():
     return torch.empty(0).type()
 
@@ -59,18 +83,3 @@ def torch_get_default_device():
 def torch_set_default_device(device):
     ttype = torch_default_device(device).ttype
     torch.set_default_tensor_type(ttype)
-
-
-def add_type_kwargs(f):
-    @wraps(f)
-    def wrapper(*args, dtype=None, device=None, **kwargs):
-        with torch_default_tensor_type(dtype, device):
-            return f(*args, **kwargs)
-
-    if wrapper.__doc__ is not None:
-        if not wrapper.__doc__.endswith("\n"):
-            wrapper.__doc__ += "\n"
-        wrapper.__doc__ += r"""
-- dtype and device keyword arguments will be passed to torch_default_tensor_type()
-"""
-    return wrapper

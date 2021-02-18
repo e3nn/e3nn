@@ -7,7 +7,7 @@ from e3nn.util import add_type_kwargs
 # matrix
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def rand_matrix(*shape, requires_grad=False):
     r"""random rotation matrix
 
@@ -27,7 +27,7 @@ def rand_matrix(*shape, requires_grad=False):
 # angles
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def identity_angles(*shape, requires_grad=False):
     r"""angles of the identity rotation
 
@@ -51,7 +51,7 @@ def identity_angles(*shape, requires_grad=False):
             torch.zeros(*shape, requires_grad=requires_grad))
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def rand_angles(*shape, requires_grad=False):
     r"""random rotation angles
 
@@ -149,7 +149,7 @@ def inverse_angles(a, b, c):
 # quaternions
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def identity_quaternion(*shape, requires_grad=False):
     r"""quaternion of identity rotation
 
@@ -168,7 +168,7 @@ def identity_quaternion(*shape, requires_grad=False):
     return q
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def rand_quaternion(*shape, requires_grad=False):
     r"""generate random quaternion
 
@@ -234,7 +234,7 @@ def inverse_quaternion(q):
 # axis-angle
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def rand_axis_angle(*shape, requires_grad=False):
     r"""generate random rotation as axis-angle
 

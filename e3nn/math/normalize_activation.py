@@ -3,7 +3,7 @@ import torch
 from e3nn.util import torch_get_default_device, add_type_kwargs
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def moment(f, n):
     r"""
     compute n th moment
@@ -16,7 +16,7 @@ def moment(f, n):
     return f(z).pow(n).mean().item()
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def normalize2mom(f):
     cst = 1 / moment(f, 2) ** 0.5
     if abs(cst - 1) < 1e-4:

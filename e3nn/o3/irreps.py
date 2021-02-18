@@ -376,7 +376,7 @@ class Irreps(tuple):
             i += mul_ir.dim
         return s
 
-    @add_type_kwargs
+    @add_type_kwargs()
     def randn(self, *size, normalization='component', requires_grad=False):
         r"""random tensor
 

@@ -34,7 +34,7 @@ from e3nn import o3
 from e3nn.util import torch_get_default_device, add_type_kwargs
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def _quadrature_weights(b):
     """
     function copied from ``lie_learn.spaces.S3``
@@ -55,7 +55,7 @@ def _quadrature_weights(b):
     return w
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def s2_grid(res_beta, res_alpha):
     r"""grid on the sphere
 
@@ -90,7 +90,7 @@ def s2_grid(res_beta, res_alpha):
     return betas, alphas
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha):
     r"""spherical harmonics evaluated on the grid on the sphere
 
@@ -303,7 +303,7 @@ class ToS2Grid(torch.nn.Module):
         positions on the sphere, tensor of shape ``(..., res, 3)``
     """
 
-    @add_type_kwargs
+    @add_type_kwargs()
     def __init__(self, lmax=None, res=None, normalization='component'):
         super().__init__()
 
@@ -417,7 +417,7 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    @add_type_kwargs
+    @add_type_kwargs()
     def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None):
         super().__init__()
 

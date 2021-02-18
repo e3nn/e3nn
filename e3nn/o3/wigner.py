@@ -76,7 +76,7 @@ def wigner_D(l, alpha, beta, gamma):
     return Xa @ J @ Xb @ J @ Xc
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def wigner_3j(l1, l2, l3):
     r"""Wigner 3j symbols
 
@@ -135,7 +135,7 @@ def wigner_3j(l1, l2, l3):
     return out.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
 
 
-@add_type_kwargs
+@add_type_kwargs()
 def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
     r"""Computes the 3-j symbol
     """
