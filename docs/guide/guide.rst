@@ -4,6 +4,7 @@ User Guide
 ==========
 
 .. toctree::
+    normalization
     installation
     first_steps.ipynb
     equivar_testing
