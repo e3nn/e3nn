@@ -12,7 +12,7 @@ from e3nn import o3
 
 
 def spherical_harmonics_alpha_beta(l, alpha, beta):
-    r"""Spherical harmonics of :math:`\vec r = R_y(\alpha) R_x(\beta) e_z`
+    r"""Spherical harmonics of :math:`\vec r = R_y(\alpha) R_x(\beta) e_y`
 
     .. math:: Y^l(\alpha, \beta) = S^l(\alpha) P^l(\cos(\beta))
 
