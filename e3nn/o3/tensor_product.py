@@ -593,8 +593,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
 
-        self.to(dtype=torch.get_default_dtype())
-
     def __repr__(self):
         npath = sum(
             {

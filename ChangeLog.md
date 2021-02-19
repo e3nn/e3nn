@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Optional arguments `function(..., device=None, dtype=None)` for many functions
 - `e3nn.nn.models.gate_points_2102` using node attributes along the length embedding to feed the radial network
 - `Irreps.slices()`
 - Module `Extract` (and `ExtractIr`) to extract subsets of irreps tensors

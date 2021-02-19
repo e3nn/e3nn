@@ -104,7 +104,7 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
 
 @torch.jit.script
 def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-    sh_0_0 = torch.ones(x.shape, dtype=x.dtype, device=x.device)
+    sh_0_0 = torch.ones_like(x)
     if lmax == 0:
         return torch.stack([
             sh_0_0,
@@ -374,7 +374,7 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
     ], dim=-1)
 
 
-def _generate_spherical_harmonics(lmax):  # pragma: no cover
+def _generate_spherical_harmonics(lmax, device=None):  # pragma: no cover
     r"""code used to generate the code above
 
     based on `wigner_3j`
@@ -412,7 +412,7 @@ def _generate_spherical_harmonics(lmax):  # pragma: no cover
                 for cj, v in zip(cij, [y, z, x])
                 for c, p in zip(cj, names)
             )
-            for cij in o3.wigner_3j(l+1, 1, l)
+            for cij in o3.wigner_3j(l+1, 1, l, device=device)
         ]
         def sub(p, names, polynormz):
             p = p.subs(x, 0).subs(y, 0).subs(z, 1)

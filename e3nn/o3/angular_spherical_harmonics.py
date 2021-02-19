@@ -67,7 +67,6 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
         a tensor of shape ``(..., 2l+1)``
     """
     alpha = alpha.unsqueeze(-1)  # [..., 1]
-
     m = torch.arange(1, l + 1, dtype=alpha.dtype, device=alpha.device)  # [1, 2, 3, ..., l]
     cos = torch.cos(m * alpha)  # [..., m]
 

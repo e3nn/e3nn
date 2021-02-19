@@ -81,7 +81,7 @@ class SphericalTensor(o3.Irreps):
         """
         # empty set of vectors returns a 0 spherical tensor
         if len(vectors) == 0:
-            return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
+            return vectors.new_zeros(o3.Irreps.spherical_harmonics(self.lmax).dim)
 
         assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
 
