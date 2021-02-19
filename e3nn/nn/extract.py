@@ -4,7 +4,7 @@ from e3nn.util.jit import compile_mode
 from e3nn import o3
 
 
-@compile_mode('trace')
+@compile_mode('script')
 class Extract(CodeGenMixin, torch.nn.Module):
     def __init__(self, irreps_in, irreps_outs, instructions):
         r"""Extract sub sets of irreps
@@ -71,6 +71,7 @@ class Extract(CodeGenMixin, torch.nn.Module):
         return self._compiled_main_out(x)
 
 
+@compile_mode('script')
 class ExtractIr(torch.nn.Module):
     def __init__(self, irreps_in, ir):
         r"""Extract ``ir`` from irreps

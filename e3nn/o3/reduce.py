@@ -1,5 +1,3 @@
-r"""Function to decompose a multi-index tensor
-"""
 import collections
 import torch
 from e3nn import o3
@@ -11,10 +9,10 @@ _TP = collections.namedtuple('tp', 'op, args')
 _INPUT = collections.namedtuple('input', 'tensor, start, stop')
 
 
-def _wigner_nj(*irrepss, normalization='component', irreps_mid=None, dtype=None, device=None):
+def _wigner_nj(*irrepss, normalization='component', set_ir_mid=None, dtype=None, device=None):
     irrepss = [o3.Irreps(irreps) for irreps in irrepss]
-    if irreps_mid is not None:
-        irreps_mid = [o3.Irrep(ir) for ir in irreps_mid]
+    if set_ir_mid is not None:
+        set_ir_mid = [o3.Irrep(ir) for ir in set_ir_mid]
 
     if len(irrepss) == 1:
         irreps, = irrepss
@@ -36,7 +34,7 @@ def _wigner_nj(*irrepss, normalization='component', irreps_mid=None, dtype=None,
         i = 0
         for mul, ir in irreps_right:
             for ir_out in ir_left * ir:
-                if irreps_mid is not None and ir_out not in irreps_mid:
+                if set_ir_mid is not None and ir_out not in set_ir_mid:
                     continue
 
                 C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype, device=device)
@@ -78,8 +76,41 @@ def _get_ops(path):
 class ReducedTensorProducts:
     r"""reduce a tensor with symmetries into irreducible representations
 
+    Parameters
+    ----------
+    formula : str
+        String made of letters ``-`` and ``=`` that represent the indices symmetries of the tensor.
+        For instance ``ij=ji`` means that the tensor has to indices and if they are exchanged, its value is the same.
+        ``ij=-ji`` means that the tensor change its sign if the two indices are exchanged.
+
+    irreps : dict of `Irreps`
+        each letter present in the formula has to be present in the ``irreps`` dictionary, unless it can be inferred by the formula.
+        For instance if the formula is ``ij=ji`` you can provide the representation of ``i`` only: ``irreps = {'i': o3.Irreps(...)}``.
+
+    set_ir_out : list of `Irrep`, optional
+        Optional, list of allowed irrep in the output
+
+    set_ir_mid : list of `Irrep`, optional
+        Optional, list of allowed irrep in the intermediary operations
+
+    Attributes
+    ----------
+    irreps_in : tuple of `Irreps`
+        input representations
+
+    irreps_out : `Irreps`
+        output representation
+
+    change_of_basis : `torch.Tensor`
+        tensor of shape ``(irreps_out.dim, irreps_in[0].dim, ..., irreps_in[-1].dim)``
+
     Examples
     --------
+    >>> tp = ReducedTensorProducts('ij=-ji', i='1o')
+    >>> x = torch.tensor([1.0, 0.0, 0.0])
+    >>> y = torch.tensor([0.0, 1.0, 0.0])
+    >>> tp(x, y) + tp(y, x)
+    tensor([0., 0., 0.])
 
     >>> tp = ReducedTensorProducts('ijkl=jikl=ikjl=ijlk', i="1e")
     >>> tp.irreps_out
@@ -91,7 +122,7 @@ class ReducedTensorProducts:
     >>> b = tp(x, y)
     >>> assert torch.allclose(a, b)
     """
-    def __init__(self, formula, irreps_out=None, irreps_mid=None, eps=1e-9, **irreps):
+    def __init__(self, formula, irreps_out=None, set_ir_mid=None, eps=1e-9, **irreps):
         if irreps_out is not None:
             irreps_out = [o3.Irrep(ir) for ir in irreps_out]
 
@@ -124,7 +155,7 @@ class ReducedTensorProducts:
 
         Ps = collections.defaultdict(list)
 
-        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], irreps_mid=irreps_mid, dtype=torch.float64):
+        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], set_ir_mid=set_ir_mid, dtype=torch.float64):
             if irreps_out is None or ir in irreps_out:
                 P = C.flatten(1) @ Q.flatten(1).T
                 Ps[ir].append((P.flatten(), path, C))
@@ -167,7 +198,7 @@ class ReducedTensorProducts:
             op: o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
             for op in tps
         }
-        self.irreps_in = [irreps[i] for i in f0]
+        self.irreps_in = tuple([irreps[i] for i in f0])
         self.irreps_out = o3.Irreps([ir for ir, _ in outputs]).simplify()
 
     def __repr__(self):
