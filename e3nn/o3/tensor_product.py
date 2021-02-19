@@ -1,5 +1,6 @@
 from math import sqrt
 from collections import namedtuple
+import textwrap
 
 import torch
 from e3nn import o3
@@ -203,52 +204,52 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # == TorchScript main operation templates ==
         # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
-        code_out = f"""
-from typing import List
+        code_out = textwrap.dedent(f"""
+        from typing import List
 
-import torch
+        import torch
 
-from e3nn.util import broadcast_tensors
+        from e3nn.util import broadcast_tensors
 
-@torch.jit.script
-def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
-    x1, x2 = broadcast_tensors(x1, x2)
-    size = x1.shape[:-1]
-    outsize = size + ({self.irreps_out.dim},)
-    assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
-    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
-    x1 = x1.reshape(-1, {self.irreps_in1.dim})
-    x2 = x2.reshape(-1, {self.irreps_in2.dim})
+        @torch.jit.script
+        def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+            x1, x2 = broadcast_tensors(x1, x2)
+            size = x1.shape[:-1]
+            outsize = size + ({self.irreps_out.dim},)
+            assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
+            assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+            x1 = x1.reshape(-1, {self.irreps_in1.dim})
+            x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
-    if x1.shape[0] == 0:
-        return x1.new_zeros(outsize)
-    else:
-        batch = x1.shape[0]
-        out = x1.new_zeros((batch, {self.irreps_out.dim}))
-        ein = torch.einsum
-"""
+            if x1.shape[0] == 0:
+                return x1.new_zeros(outsize)
+            else:
+                batch = x1.shape[0]
+                out = x1.new_zeros((batch, {self.irreps_out.dim}))
+                ein = torch.einsum
+        """)
 
-        code_right = f"""
-from typing import List
+        code_right = textwrap.dedent(f"""
+        from typing import List
 
-import torch
+        import torch
 
-from e3nn.util import broadcast_tensors
+        from e3nn.util import broadcast_tensors
 
-@torch.jit.script
-def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
-    size = x2.shape[:-1]
-    outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
-    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
-    x2 = x2.reshape(-1, {self.irreps_in2.dim})
+        @torch.jit.script
+        def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+            size = x2.shape[:-1]
+            outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
+            assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+            x2 = x2.reshape(-1, {self.irreps_in2.dim})
 
-    if x2.shape[0] == 0:
-        return x2.new_zeros(outsize)
-    else:
-        batch = x2.shape[0]
-        out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
-        ein = torch.einsum
-"""
+            if x2.shape[0] == 0:
+                return x2.new_zeros(outsize)
+            else:
+                batch = x2.shape[0]
+                out = x2.new_zeros((batch, {self.irreps_in1.dim}, {self.irreps_out.dim}))
+                ein = torch.einsum
+        """)
         # == end TorchScript templates ==
         # Put everything in the else block
         base_indent = 2
@@ -518,39 +519,39 @@ def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> t
         code_right += f"{s}return out.reshape(outsize)"
 
         if self.irreps_in1.dim == 0 or self.irreps_in2.dim == 0 or self.irreps_out.dim == 0:
-            code_out = f"""
-from typing import List
+            code_out = textwrap.dedent(f"""
+            from typing import List
 
-import torch
+            import torch
 
-from e3nn.util import broadcast_tensors
+            from e3nn.util import broadcast_tensors
 
-@torch.jit.script
-def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
-    x1, x2 = broadcast_tensors(x1, x2)
-    size = x1.shape[:-1]
-    outsize = size + ({self.irreps_out.dim},)
-    assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
-    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+            @torch.jit.script
+            def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+                x1, x2 = broadcast_tensors(x1, x2)
+                size = x1.shape[:-1]
+                outsize = size + ({self.irreps_out.dim},)
+                assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
+                assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
 
-    return x1.new_zeros(outsize)
-"""
+                return x1.new_zeros(outsize)
+            """)
 
-            code_right = f"""
-from typing import List
+            code_right = textwrap.dedent(f"""
+            from typing import List
 
-import torch
+            import torch
 
-from e3nn.util import broadcast_tensors
+            from e3nn.util import broadcast_tensors
 
-@torch.jit.script
-def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
-    size = x2.shape[:-1]
-    outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
-    assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
+            @torch.jit.script
+            def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+                size = x2.shape[:-1]
+                outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
+                assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
 
-    return x2.new_zeros(outsize)
-"""
+                return x2.new_zeros(outsize)
+            """)
 
         self._codegen_register({
             '_compiled_main_out': code_out,
