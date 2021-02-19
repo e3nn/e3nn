@@ -2,13 +2,10 @@ import math
 
 import torch
 
-from e3nn.util import add_type_kwargs
-
 # matrix
 
 
-@add_type_kwargs()
-def rand_matrix(*shape, requires_grad=False):
+def rand_matrix(*shape, requires_grad=False, dtype=None, device=None):
     r"""random rotation matrix
 
     Parameters
@@ -20,15 +17,14 @@ def rand_matrix(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 3, 3)`
     """
-    R = angles_to_matrix(*rand_angles(*shape))
+    R = angles_to_matrix(*rand_angles(*shape, dtype=dtype, device=device))
     return R.detach().requires_grad_(requires_grad)
 
 
 # angles
 
 
-@add_type_kwargs()
-def identity_angles(*shape, requires_grad=False):
+def identity_angles(*shape, requires_grad=False, dtype=None, device=None):
     r"""angles of the identity rotation
 
     Parameters
@@ -46,13 +42,12 @@ def identity_angles(*shape, requires_grad=False):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    return (torch.zeros(*shape, requires_grad=requires_grad),
-            torch.zeros(*shape, requires_grad=requires_grad),
-            torch.zeros(*shape, requires_grad=requires_grad))
+    return (torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device),
+            torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device),
+            torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device))
 
 
-@add_type_kwargs()
-def rand_angles(*shape, requires_grad=False):
+def rand_angles(*shape, requires_grad=False, dtype=None, device=None):
     r"""random rotation angles
 
     Parameters
@@ -70,8 +65,8 @@ def rand_angles(*shape, requires_grad=False):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    alpha, gamma = 2 * math.pi * torch.rand(2, *shape)
-    beta = torch.rand(shape).mul(2).sub(1).acos()
+    alpha, gamma = 2 * math.pi * torch.rand(2, *shape, dtype=dtype, device=device)
+    beta = torch.rand(shape, dtype=dtype, device=device).mul(2).sub(1).acos()
     alpha = alpha.detach().requires_grad_(requires_grad)
     beta = beta.detach().requires_grad_(requires_grad)
     gamma = gamma.detach().requires_grad_(requires_grad)
@@ -149,8 +144,7 @@ def inverse_angles(a, b, c):
 # quaternions
 
 
-@add_type_kwargs()
-def identity_quaternion(*shape, requires_grad=False):
+def identity_quaternion(*shape, requires_grad=False, dtype=None, device=None):
     r"""quaternion of identity rotation
 
     Parameters
@@ -162,14 +156,13 @@ def identity_quaternion(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 4)`
     """
-    q = torch.zeros(*shape, 4)
+    q = torch.zeros(*shape, 4, dtype=dtype, device=device)
     q[..., 0] = 1  # or -1...
     q = q.detach().requires_grad_(requires_grad)
     return q
 
 
-@add_type_kwargs()
-def rand_quaternion(*shape, requires_grad=False):
+def rand_quaternion(*shape, requires_grad=False, dtype=None, device=None):
     r"""generate random quaternion
 
     Parameters
@@ -181,7 +174,7 @@ def rand_quaternion(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 4)`
     """
-    q = angles_to_quaternion(*rand_angles(*shape))
+    q = angles_to_quaternion(*rand_angles(*shape, dtype=dtype, device=device))
     q = q.detach().requires_grad_(requires_grad)
     return q
 
@@ -234,8 +227,7 @@ def inverse_quaternion(q):
 # axis-angle
 
 
-@add_type_kwargs()
-def rand_axis_angle(*shape, requires_grad=False):
+def rand_axis_angle(*shape, requires_grad=False, dtype=None, device=None):
     r"""generate random rotation as axis-angle
 
     Parameters
@@ -250,7 +242,7 @@ def rand_axis_angle(*shape, requires_grad=False):
     angle : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    axis, angle = angles_to_axis_angle(*rand_angles(*shape))
+    axis, angle = angles_to_axis_angle(*rand_angles(*shape, dtype=dtype, device=device))
     axis = axis.detach().requires_grad_(requires_grad)
     angle = angle.detach().requires_grad_(requires_grad)
     return axis, angle
@@ -401,10 +393,10 @@ def matrix_to_angles(R):
     gamma : `torch.Tensor`
         tensor of shape :math:`(...)`
     """
-    assert torch.allclose(torch.det(R), torch.tensor(1.0))
+    assert torch.allclose(torch.det(R), R.new_tensor(1))
     x = R @ R.new_tensor([0.0, 1.0, 0.0])
     a, b = xyz_to_angles(x)
-    R = angles_to_matrix(a, b, a.new_zeros(a.shape)).transpose(-1, -2) @ R
+    R = angles_to_matrix(a, b, torch.zeros_like(a)).transpose(-1, -2) @ R
     c = torch.atan2(R[..., 0, 2], R[..., 0, 0])
     return a, b, c
 
@@ -429,9 +421,9 @@ def angles_to_quaternion(alpha, beta, gamma):
         matrices of shape :math:`(..., 4)`
     """
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    qa = axis_angle_to_quaternion(torch.tensor([0.0, 1.0, 0.0]), alpha)
-    qb = axis_angle_to_quaternion(torch.tensor([1.0, 0.0, 0.0]), beta)
-    qc = axis_angle_to_quaternion(torch.tensor([0.0, 1.0, 0.0]), gamma)
+    qa = axis_angle_to_quaternion(alpha.new_tensor([0.0, 1.0, 0.0]), alpha)
+    qb = axis_angle_to_quaternion(beta.new_tensor([1.0, 0.0, 0.0]), beta)
+    qc = axis_angle_to_quaternion(gamma.new_tensor([0.0, 1.0, 0.0]), gamma)
     return compose_quaternion(qa, compose_quaternion(qb, qc))
 
 
@@ -510,7 +502,7 @@ def matrix_to_axis_angle(R):
     angle : `torch.Tensor`
         tonsor of shape :math:`(...)`
     """
-    assert torch.allclose(torch.det(R), torch.tensor(1.0))
+    assert torch.allclose(torch.det(R), R.new_tensor(1))
     tr = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
     angle = torch.acos(tr.sub(1).div(2).clamp(-1, 1))
     axis = torch.stack([

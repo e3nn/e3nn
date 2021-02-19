@@ -97,7 +97,7 @@ class S2Activation(torch.nn.Module):
         assert features.shape[-1] == self.irreps_in.dim
 
         if self.random_rot:
-            abc = o3.rand_angles(device=features.device)
+            abc = o3.rand_angles(dtype=features.dtype, device=features.device)
             features = torch.einsum('ij,...j->...i', self.irreps_in.D_from_angles(*abc), features)
 
         features = self.to_s2(features)  # [..., beta, alpha]

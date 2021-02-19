@@ -39,7 +39,7 @@ def germinate_formulas(formula):
     return f0, formulas
 
 
-def reduce_permutation(f0, formulas, **dims):
+def reduce_permutation(f0, formulas, dtype=None, device=None, **dims):
 
     # here we check that each index has one and only one dimension
     for _s, p in formulas:
@@ -84,7 +84,7 @@ def reduce_permutation(f0, formulas, **dims):
 
     # First we compute the change of basis (projection) between full_base and base
     d_sym = len(base)
-    Q = torch.zeros(d_sym, len(full_base))
+    Q = torch.zeros(d_sym, len(full_base), dtype=dtype, device=device)
     ret = []
 
     for i, x in enumerate(base):

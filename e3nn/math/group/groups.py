@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 import torch
 from e3nn import o3
 from e3nn.math import perm
-from e3nn.util import torch_default_tensor_type
 
 
 class Group(ABC):  # pragma: no cover
@@ -16,22 +15,22 @@ class Group(ABC):  # pragma: no cover
             yield None
 
     @abstractmethod
-    def rep(self, r):
+    def rep(self, r, dtype=None, device=None):
         return NotImplemented
 
-    def rep_dim(self, r):
-        return self.rep(r)(self.identity()).shape[0]
+    def rep_dim(self, r, dtype=None, device=None):
+        return self.rep(r, dtype=dtype, device=device)(self.identity(dtype=dtype, device=device)).shape[0]
 
     @abstractmethod
     def compose(self, g1, g2):
         return NotImplemented
 
     @abstractmethod
-    def random(self):
+    def random(self, dtype=None, device=None):
         return NotImplemented
 
     @abstractmethod
-    def identity(self):
+    def identity(self, dtype=None, device=None):
         return NotImplemented
 
     @abstractmethod
@@ -92,10 +91,10 @@ class Sn(FiniteGroup):
     def compose(self, p1, p2):
         return perm.compose(p1, p2)
 
-    def random(self):
+    def random(self, **_):
         return perm.rand(self.n)
 
-    def identity(self):
+    def identity(self, **_):
         return perm.identity(self.n)
 
     def inverse(self, p):
@@ -114,20 +113,20 @@ class SO3(LieGroup):
         for l in itertools.count():
             yield l
 
-    def rep(self, l):
+    def rep(self, l, **_):
         return o3.Irrep(l, 1).D_from_quaternion
 
-    def rep_dim(self, l):
+    def rep_dim(self, l, **_):
         return 2 * l + 1
 
     def compose(self, q1, q2):
         return o3.compose_quaternion(q1, q2)
 
-    def random(self):
-        return o3.rand_quaternion()
+    def random(self, dtype=None, device=None):
+        return o3.rand_quaternion(dtype=None, device=None)
 
-    def identity(self):
-        return o3.identity_quaternion()
+    def identity(self, dtype=None, device=None):
+        return o3.identity_quaternion(dtype=None, device=None)
 
     def inverse(self, q):
         return o3.inverse_quaternion(q)
@@ -157,11 +156,13 @@ class O3(LieGroup):
         q2, p2 = g2
         return (o3.compose_quaternion(q1, q2), (p1 + p2) % 2)
 
-    def random(self):
-        return (o3.rand_quaternion(), torch.randint(2, size=()))
+    def random(self, dtype=None, device=None):
+        return (o3.rand_quaternion(dtype=dtype, device=device),
+                torch.randint(2, size=(), dtype=dtype, device=device))
 
-    def identity(self):
-        return (o3.identity_quaternion(), torch.tensor(0))
+    def identity(self, dtype=None, device=None):
+        return (o3.identity_quaternion(dtype=dtype, device=device),
+                torch.tensor(0, dtype=dtype, device=device))
 
     def inverse(self, g):
         q, k = g
@@ -176,26 +177,24 @@ class O3(LieGroup):
             return math.inf
 
 
-def is_representation(group: LieGroup, D, eps):
-    e = group.identity()
+def is_representation(group: LieGroup, D, eps, dtype=None, device=None):
+    e = group.identity(dtype=dtype, device=device)
     I = D(e)
+    if not torch.allclose(I, torch.eye(len(I), dtype=dtype, device=device)):
+        return False
 
-    with torch_default_tensor_type(I.dtype, I.device):
-        if not torch.allclose(I, torch.eye(len(I))):
+    for _ in range(4):
+        g1 = group.random(dtype=dtype, device=device)
+        g2 = group.random(dtype=dtype, device=device)
+
+        g12 = group.compose(g1, g2)
+        D12 = D(g12)
+
+        D1D2 = D(g1) @ D(g2)
+
+        if (D12 - D1D2).abs().max().item() > eps * D12.abs().max().item():
             return False
-
-        for _ in range(4):
-            g1 = group.random()
-            g2 = group.random()
-
-            g12 = group.compose(g1, g2)
-            D12 = D(g12)
-
-            D1D2 = D(g1) @ D(g2)
-
-            if (D12 - D1D2).abs().max().item() > eps * D12.abs().max().item():
-                return False
-        return True
+    return True
 
 
 def is_group(g: LieGroup, eps) -> bool:

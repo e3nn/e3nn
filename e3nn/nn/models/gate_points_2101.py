@@ -312,13 +312,13 @@ class Network(torch.nn.Module):
             x = data['x']
         else:
             assert self.irreps_in is None
-            x = data['pos'].new_ones(data['pos'].shape[0], 1)
+            x = data['pos'].new_ones((data['pos'].shape[0], 1))
 
         if self.input_has_node_attr and 'z' in data:
             z = data['z']
         else:
             assert self.irreps_node_attr == o3.Irreps("0e")
-            z = data['pos'].new_ones(data['pos'].shape[0], 1)
+            z = data['pos'].new_ones((data['pos'].shape[0], 1))
 
         for lay in self.layers:
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)

@@ -4,14 +4,14 @@ import collections
 import torch
 from e3nn import o3
 from e3nn.math import group, orthonormalize
-from e3nn.util import torch_default_dtype
+from e3nn.util import explicit_default_types
 
 
 _TP = collections.namedtuple('tp', 'op, args')
 _INPUT = collections.namedtuple('input', 'tensor, start, stop')
 
 
-def _wigner_nj(*irrepss, normalization='component', irreps_mid=None):
+def _wigner_nj(*irrepss, normalization='component', irreps_mid=None, dtype=None, device=None):
     irrepss = [o3.Irreps(irreps) for irreps in irrepss]
     if irreps_mid is not None:
         irreps_mid = [o3.Irrep(ir) for ir in irreps_mid]
@@ -19,7 +19,7 @@ def _wigner_nj(*irrepss, normalization='component', irreps_mid=None):
     if len(irrepss) == 1:
         irreps, = irrepss
         ret = []
-        e = torch.eye(irreps.dim)
+        e = torch.eye(irreps.dim, dtype=dtype, device=device)
         i = 0
         for mul, ir in irreps:
             for _ in range(mul):
@@ -32,14 +32,14 @@ def _wigner_nj(*irrepss, normalization='component', irreps_mid=None):
 
     *irrepss_left, irreps_right = irrepss
     ret = []
-    for ir_left, path_left, C_left in _wigner_nj(*irrepss_left):
+    for ir_left, path_left, C_left in _wigner_nj(*irrepss_left, dtype=dtype, device=device):
         i = 0
         for mul, ir in irreps_right:
             for ir_out in ir_left * ir:
                 if irreps_mid is not None and ir_out not in irreps_mid:
                     continue
 
-                C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l)
+                C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype, device=device)
                 if normalization == 'component':
                     C *= ir_out.dim**0.5
                 if normalization == 'norm':
@@ -48,7 +48,7 @@ def _wigner_nj(*irrepss, normalization='component', irreps_mid=None):
                 C = torch.einsum('jk,ijl->ikl', C_left.flatten(1), C)
                 C = C.reshape(ir_out.dim, *(irreps.dim for irreps in irrepss_left), ir.dim)
                 for u in range(mul):
-                    E = torch.zeros(ir_out.dim, *(irreps.dim for irreps in irrepss_left), irreps_right.dim)
+                    E = torch.zeros(ir_out.dim, *(irreps.dim for irreps in irrepss_left), irreps_right.dim, dtype=dtype, device=device)
                     sl = slice(i + u * ir.dim, i + (u+1) * ir.dim)
                     E[..., sl] = C
                     ret += [
@@ -92,73 +92,76 @@ class ReducedTensorProducts:
     >>> assert torch.allclose(a, b)
     """
     def __init__(self, formula, irreps_out=None, irreps_mid=None, eps=1e-9, **irreps):
-        with torch_default_dtype(torch.float64):
-            if irreps_out is not None:
-                irreps_out = [o3.Irrep(ir) for ir in irreps_out]
+        if irreps_out is not None:
+            irreps_out = [o3.Irrep(ir) for ir in irreps_out]
 
-            f0, formulas = group.germinate_formulas(formula)
+        f0, formulas = group.germinate_formulas(formula)
 
-            irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
+        irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
 
-            for _s, p in formulas:
-                f = "".join(f0[i] for i in p)
-                for i, j in zip(f0, f):
-                    if i in irreps and j in irreps and irreps[i] != irreps[j]:
-                        raise RuntimeError(f'irreps of {i} and {j} should be the same')
-                    if i in irreps:
-                        irreps[j] = irreps[i]
-                    if j in irreps:
-                        irreps[i] = irreps[j]
+        for _s, p in formulas:
+            f = "".join(f0[i] for i in p)
+            for i, j in zip(f0, f):
+                if i in irreps and j in irreps and irreps[i] != irreps[j]:
+                    raise RuntimeError(f'irreps of {i} and {j} should be the same')
+                if i in irreps:
+                    irreps[j] = irreps[i]
+                if j in irreps:
+                    irreps[i] = irreps[j]
 
-            for i in f0:
-                if i not in irreps:
-                    raise RuntimeError(f'index {i} has no irreps associated to it')
+        for i in f0:
+            if i not in irreps:
+                raise RuntimeError(f'index {i} has no irreps associated to it')
 
-            for i in irreps:
-                if i not in f0:
-                    raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
+        for i in irreps:
+            if i not in f0:
+                raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
 
-            Q, _ = group.reduce_permutation(f0, formulas, **{i: irs.dim for i, irs in irreps.items()})
+        Q, _ = group.reduce_permutation(f0,
+                                        formulas,
+                                        dtype=torch.float64,
+                                        **{i: irs.dim for i, irs in irreps.items()})
 
-            Ps = collections.defaultdict(list)
+        Ps = collections.defaultdict(list)
 
-            for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], irreps_mid=irreps_mid):
-                if irreps_out is None or ir in irreps_out:
-                    P = C.flatten(1) @ Q.flatten(1).T
-                    Ps[ir].append((P.flatten(), path, C))
+        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], irreps_mid=irreps_mid, dtype=torch.float64):
+            if irreps_out is None or ir in irreps_out:
+                P = C.flatten(1) @ Q.flatten(1).T
+                Ps[ir].append((P.flatten(), path, C))
 
-            tps = set()
-            outputs = []
-            change_of_basis = []
+        tps = set()
+        outputs = []
+        change_of_basis = []
 
-            for ir in Ps:
-                P = torch.stack([P for P, _, _ in Ps[ir]])
-                paths = [path for _, path, _ in Ps[ir]]
-                Cs = [C for _, _, C in Ps[ir]]
+        for ir in Ps:
+            P = torch.stack([P for P, _, _ in Ps[ir]])
+            paths = [path for _, path, _ in Ps[ir]]
+            Cs = [C for _, _, C in Ps[ir]]
 
-                _, A = orthonormalize(P, eps)
+            _, A = orthonormalize(P, eps)
 
-                # remove paths
-                paths = [path for path, c in zip(paths, A.norm(dim=0)) if c > eps]
-                A = A[:, A.norm(dim=0) > eps]
-                Cs = [C for C, c in zip(Cs, A.norm(dim=0)) if c > eps]
+            # remove paths
+            paths = [path for path, c in zip(paths, A.norm(dim=0)) if c > eps]
+            A = A[:, A.norm(dim=0) > eps]
+            Cs = [C for C, c in zip(Cs, A.norm(dim=0)) if c > eps]
 
-                assert A.shape[0] == A.shape[1]
+            assert A.shape[0] == A.shape[1]
 
-                for path in paths:
-                    for op in _get_ops(path):
-                        tps.add(op)
+            for path in paths:
+                for op in _get_ops(path):
+                    tps.add(op)
 
-                for path in paths:
-                    outputs.append((
-                        ir, path
-                    ))
+            for path in paths:
+                outputs.append((
+                    ir, path
+                ))
 
-                for C in Cs:
-                    change_of_basis.append(C)
+            for C in Cs:
+                change_of_basis.append(C)
 
+        dtype, _ = explicit_default_types(None, None)
         self.outputs = outputs
-        self.change_of_basis = torch.cat(change_of_basis).to(torch.get_default_dtype())
+        self.change_of_basis = torch.cat(change_of_basis).to(dtype=dtype)
 
         self.tps = {
             op: o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])

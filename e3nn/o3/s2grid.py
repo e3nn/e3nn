@@ -31,32 +31,30 @@ import math
 import torch
 import torch.fft
 from e3nn import o3
-from e3nn.util import torch_get_default_device, add_type_kwargs
+from e3nn.util import explicit_default_types
 
 
-@add_type_kwargs()
-def _quadrature_weights(b):
+def _quadrature_weights(b, dtype=None, device=None):
     """
     function copied from ``lie_learn.spaces.S3``
 
     Compute quadrature weights for the grid used by Kostelec & Rockmore [1, 2].
     """
-    k = torch.arange(b)
+    k = torch.arange(b, device=device)
     w = torch.tensor([
         (
             (2. / b) * torch.sin(math.pi * (2. * j + 1.) / (4. * b)) * (
                 (1. / (2 * k + 1)) * torch.sin((2 * j + 1) * (2 * k + 1) * math.pi / (4. * b))
             ).sum()
         )
-        for j in torch.arange(2 * b)
-    ])
+        for j in torch.arange(2 * b, device=device)
+    ], dtype=dtype, device=device)
 
     w /= 2. * ((2 * b) ** 2)
     return w
 
 
-@add_type_kwargs()
-def s2_grid(res_beta, res_alpha):
+def s2_grid(res_beta, res_alpha, dtype=None, device=None):
     r"""grid on the sphere
 
     Parameters
@@ -81,17 +79,17 @@ def s2_grid(res_beta, res_alpha):
     alphas : `torch.Tensor`
         tensor of shape ``(res_alpha)``
     """
+    dtype, device = explicit_default_types(dtype, device)
 
-    i = torch.arange(res_beta, dtype=torch.get_default_dtype())
+    i = torch.arange(res_beta, dtype=dtype, device=device)
     betas = (i + 0.5) / res_beta * math.pi
 
-    i = torch.arange(res_alpha, dtype=torch.get_default_dtype())
+    i = torch.arange(res_alpha, dtype=dtype, device=device)
     alphas = i / res_alpha * 2 * math.pi
     return betas, alphas
 
 
-@add_type_kwargs()
-def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha):
+def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=None, device=None):
     r"""spherical harmonics evaluated on the grid on the sphere
 
     .. math::
@@ -125,7 +123,7 @@ def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha):
     sha : `torch.Tensor`
         tensor of shape ``(res_alpha, 2 lmax + 1)``
     """
-    betas, alphas = s2_grid(res_beta, res_alpha)
+    betas, alphas = s2_grid(res_beta, res_alpha, dtype=dtype, device=device)
     shb = o3.legendre(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
     sha = o3.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
     return betas, alphas, shb, sha
@@ -157,7 +155,7 @@ def _complete_lmax_res(lmax, res_beta, res_alpha):
     return lmax, res_beta, res_alpha
 
 
-def _expand_matrix(ls, like=None):
+def _expand_matrix(ls, like=None, dtype=None, device=None):
     """
     convertion matrix between a flatten vector (L, m) like that
     (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
@@ -170,11 +168,19 @@ def _expand_matrix(ls, like=None):
     :return: tensor [l, m, l * m]
     """
     lmax = max(ls)
-    zeros = torch.zeros if like is None else like.new_zeros
-    m = zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
+    if like is None:
+        m = torch.zeros(len(ls),
+                        2 * lmax + 1,
+                        sum(2 * l + 1 for l in ls),
+                        dtype=dtype,
+                        device=device)
+    else:
+        m = like.new_zeros((len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls)),
+                           dtype=dtype,
+                           device=device)
     i = 0
     for j, l in enumerate(ls):
-        m[j, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
+        m[j, lmax - l:lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1, dtype=dtype, device=device)
         i += 2 * l + 1
     return m
 
@@ -246,9 +252,9 @@ def irfft(x, res):
     *size, sm = x.shape
     x = x.reshape(-1, sm)
     x = torch.cat([
-        x.new_zeros(x.shape[0], (res - sm) // 2),
+        x.new_zeros((x.shape[0], (res - sm) // 2)),
         x,
-        x.new_zeros(x.shape[0], (res - sm) // 2),
+        x.new_zeros((x.shape[0], (res - sm) // 2)),
     ], dim=-1)
     assert x.shape[1] == res
     l = res // 2
@@ -276,8 +282,6 @@ class ToS2Grid(torch.nn.Module):
     lmax : int
     res : int, tuple of int
     normalization : {'norm', 'component', 'integral'}
-    dtype : torch.dtype or None, optional
-    device : torch.device or None, optional
 
     Examples
     --------
@@ -303,7 +307,6 @@ class ToS2Grid(torch.nn.Module):
         positions on the sphere, tensor of shape ``(..., res, 3)``
     """
 
-    @add_type_kwargs()
     def __init__(self, lmax=None, res=None, normalization='component'):
         super().__init__()
 
@@ -340,7 +343,6 @@ class ToS2Grid(torch.nn.Module):
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
-        self.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
@@ -417,7 +419,6 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    @add_type_kwargs()
     def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None):
         super().__init__()
 
@@ -456,7 +457,6 @@ class FromS2Grid(torch.nn.Module):
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
-        self.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
 
     def __repr__(self):
         return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"

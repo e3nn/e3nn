@@ -5,7 +5,7 @@ import os
 import torch
 
 from e3nn import o3
-from e3nn.util import torch_default_tensor_type, torch_get_default_device, add_type_kwargs
+from e3nn.util import explicit_default_types
 
 _Jd, _W3j = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
 
@@ -21,14 +21,13 @@ def _z_rot_mat(angle, l):
     this matrix is unnecessary.
     """
     shape, device, dtype = angle.shape, angle.device, angle.dtype
-    with torch_default_tensor_type(dtype, device):
-        M = torch.zeros(*shape, 2 * l + 1, 2 * l + 1)
-        inds = torch.arange(0, 2 * l + 1, 1)
-        reversed_inds = torch.arange(2 * l, -1, -1)
-        frequencies = torch.arange(l, -l - 1, -1, dtype=dtype)
-        M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
-        M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
-        return M
+    M = angle.new_zeros((*shape, 2 * l + 1, 2 * l + 1))
+    inds = torch.arange(0, 2 * l + 1, 1, device=device)
+    reversed_inds = torch.arange(2 * l, -1, -1, device=device)
+    frequencies = torch.arange(l, -l - 1, -1, dtype=dtype, device=device)
+    M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
+    M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
+    return M
 
 
 def wigner_D(l, alpha, beta, gamma):
@@ -69,15 +68,14 @@ def wigner_D(l, alpha, beta, gamma):
         raise NotImplementedError(f'wigner D maximum l implemented is {len(_Jd) - 1}, send us an email to ask for more')
 
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    J = _Jd[l].to(device=alpha.device, dtype=alpha.dtype)
+    J = _Jd[l].to(dtype=alpha.dtype, device=alpha.device)
     Xa = _z_rot_mat(alpha, l)
     Xb = _z_rot_mat(beta, l)
     Xc = _z_rot_mat(gamma, l)
     return Xa @ J @ Xb @ J @ Xc
 
 
-@add_type_kwargs()
-def wigner_3j(l1, l2, l3):
+def wigner_3j(l1, l2, l3, dtype=None, device=None):
     r"""Wigner 3j symbols
 
     It satifies the following two properties:
@@ -132,11 +130,11 @@ def wigner_3j(l1, l2, l3):
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
 
-    return out.to(dtype=torch.get_default_dtype(), device=torch_get_default_device())
+    dtype, device = explicit_default_types(dtype, device)
+    return out.to(dtype=dtype, device=device)
 
 
-@add_type_kwargs()
-def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
+def _generate_wigner_3j(l1, l2, l3, dtype=None, device=None):  # pragma: no cover
     r"""Computes the 3-j symbol
     """
     # these three propositions are equivalent
@@ -158,11 +156,11 @@ def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
         [0.53878964, 4.09050444, 5.36539036],
         [2.16017393, 3.48835314, 5.55174441],
         [2.52385107, 0.29089583, 3.90040975],
-    ])
+    ], dtype=dtype, device=device)
 
-    B = torch.zeros(n, n)
+    B = random_angles.new_zeros((n, n))
     for abc in random_angles:
-        D = _DxDxD(*abc) - torch.eye(n)
+        D = _DxDxD(*abc) - torch.eye(n, dtype=dtype, device=device)
         B += D.T @ D
 
     eigenvalues, eigenvectors = torch.symeig(B, eigenvectors=True)
@@ -180,7 +178,7 @@ def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
         if next(x for x in Q.flatten() if x != 0) < 0:
             Q.neg_()
 
-    abc = o3.rand_angles(100)
+    abc = o3.rand_angles(100, dtype=dtype, device=device)
     Q2 = torch.einsum("zil,zjm,zkn,lmn->zijk", wigner_D(l1, *abc), wigner_D(l2, *abc), wigner_D(l3, *abc), Q)
     assert (Q - Q2).norm() < 1e-10
     assert abs(Q.norm() - 1) < 1e-10

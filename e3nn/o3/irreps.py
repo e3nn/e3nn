@@ -6,7 +6,6 @@ import torch
 
 from e3nn import o3
 from e3nn.math import direct_sum, perm
-from e3nn.util import add_type_kwargs
 
 
 class Irrep(tuple):
@@ -376,8 +375,7 @@ class Irreps(tuple):
             i += mul_ir.dim
         return s
 
-    @add_type_kwargs()
-    def randn(self, *size, normalization='component', requires_grad=False):
+    def randn(self, *size, normalization='component', requires_grad=False, dtype=None, device=None):
         r"""random tensor
 
         Parameters
@@ -406,13 +404,13 @@ class Irreps(tuple):
         rsize = size[di + 1:]
 
         if normalization == 'component':
-            return torch.randn(*lsize, self.dim, *rsize, requires_grad=requires_grad)
+            return torch.randn(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
 
         if normalization == 'norm':
-            x = torch.zeros(*lsize, self.dim, *rsize, requires_grad=requires_grad)
+            x = torch.zeros(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
             with torch.no_grad():
                 for s, (mul, ir) in self.slices():
-                    r = torch.randn(*lsize, mul, ir.dim, *rsize)
+                    r = torch.randn(*lsize, mul, ir.dim, *rsize, dtype=dtype, device=device)
                     r.div_(r.norm(2, dim=di + 1, keepdim=True))
                     x.narrow(di, s.start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
             return x
