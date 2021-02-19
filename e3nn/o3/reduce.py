@@ -198,7 +198,7 @@ class ReducedTensorProducts:
             op: o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
             for op in tps
         }
-        self.irreps_in = tuple([irreps[i] for i in f0])
+        self.irreps_in = tuple(irreps[i] for i in f0)
         self.irreps_out = o3.Irreps([ir for ir, _ in outputs]).simplify()
 
     def __repr__(self):
