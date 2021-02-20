@@ -3,7 +3,7 @@ import warnings
 
 import torch
 
-from e3nn.o3 import FullyConnectedTensorProduct, Irreps
+from e3nn.o3 import Linear, Irreps
 from e3nn.util.jit import script, trace_module, compile_mode
 from e3nn.util.test import assert_equivariant
 
@@ -76,32 +76,31 @@ def test_submod_scripting():
 
 
 def test_compilation():
-    irreps_in1 = Irreps("1e + 2e + 3x3o")
-    irreps_in2 = Irreps("1e + 2e + 3x3o")
+    irreps_in = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
 
-    # This module can't be compiled directly by TorchScript, since FullyConnectedTensorProduct is a subclass and calls super() in forward()
+    # This module can't be compiled directly by TorchScript, since Linear is a subclass and calls super() in forward()
     class ParentModule(torch.nn.Module):
-        def __init__(self, irreps_in1, irreps_in2, irreps_out):
+        def __init__(self, irreps_in, irreps_out):
             super().__init__()
-            self.tp = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
+            self.lin = Linear(irreps_in, irreps_out)
             self.alpha = torch.randn(1).squeeze()
 
-        def forward(self, x1, x2):
-            return self.tp(x1, x2) + self.alpha*self.tp(x1, x2)
+        def forward(self, x):
+            return self.lin(x) + self.alpha*self.lin(x)
 
-    mod = ParentModule(irreps_in1, irreps_in2, irreps_out)
+    mod = ParentModule(irreps_in, irreps_out)
     # Try and xfail with torch.jit.script
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         mod_script = torch.jit.script(mod)
     # Compile with our compiler
     mod_script = script(mod)
 
-    x1, x2 = irreps_in1.randn(3, -1), irreps_in2.randn(3, -1)
-    assert torch.allclose(mod(x1, x2), mod_script(x1, x2))
+    x = irreps_in.randn(3, -1)
+    assert torch.allclose(mod(x), mod_script(x))
 
     assert_equivariant(
         mod_script,
-        irreps_in=[irreps_in1, irreps_in2],
+        irreps_in=[irreps_in],
         irreps_out=[irreps_out]
     )
