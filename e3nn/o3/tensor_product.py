@@ -203,16 +203,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         z = '' if self.shared_weights else 'z'
 
         # == TorchScript main operation templates ==
-        # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
-        code_out = textwrap.dedent(f"""
+        code_header = textwrap.dedent("""
         from typing import List
-
         import torch
-
         from e3nn.util import broadcast_tensors
-
+        """)
+        # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
+        funcdef_out = textwrap.dedent(f"""
         @torch.jit.script
-        def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: List[torch.Tensor]) -> torch.Tensor:
+        def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
             x1, x2 = broadcast_tensors(x1, x2)
             size = x1.shape[:-1]
             outsize = size + ({self.irreps_out.dim},)
@@ -229,15 +228,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 ein = torch.einsum
         """)
 
-        code_right = textwrap.dedent(f"""
-        from typing import List
-
-        import torch
-
-        from e3nn.util import broadcast_tensors
-
+        funcdef_right = textwrap.dedent(f"""
         @torch.jit.script
-        def main(x2: torch.Tensor, ws: torch.Tensor, w3j: List[torch.Tensor]) -> torch.Tensor:
+        def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
             size = x2.shape[:-1]
             outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
             assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
@@ -252,6 +245,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         """)
         # == end TorchScript templates ==
         # Put everything in the else block
+        code_out = ""
+        code_right = ""
         base_indent = 2
         def indent_for_level(indent_level):
             return ((base_indent + indent_level) * 4) * " "
@@ -442,7 +437,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                         index_w3j = len(wigners)
                         wigners += [(l_1, l_2, l_out)]
 
-                    code_right += line_right.format(f"ein('{z}uvw,ijk,zvj->zuiwk', ws_{index_w}, w3j[{index_w3j}], s2)")
+                    code_right += line_right.format(f"ein('{z}uvw,ijk,zvj->zuiwk', ws_{index_w}, w3j_{index_w3j}, s2)")
                     continue
 
                 if (l_1, l_2, l_out) == (1, 1, 1) and ins.connection_mode == 'uvu' and normalization == 'component' and ins.has_weight:
@@ -458,8 +453,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                         index_w3j = len(wigners)
                         wigners += [(l_1, l_2, l_out)]
 
-                    code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwk', ws_{index_w}, w3j[{index_w3j}], e1, s2)")
+                    code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwk', ws_{index_w}, w3j_{index_w3j}, e1, s2)")
                     continue
+            # == end specialized code ==
 
             if last_ss != (ins.i_in1, ins.i_in2, ins.connection_mode[:2]):
                 if ins.connection_mode[:2] == 'uv':
@@ -476,56 +472,79 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
             if ins.connection_mode == 'uvw':
                 assert ins.has_weight
-                code_out += line_out.format(f"ein('{z}uvw,ijk,zuvij->zwk', ws_{index_w}, w3j[{index_w3j}], ss)")
-                code_right += line_right.format(f"ein('{z}uvw,ijk,zvj->zuiwk', ws_{index_w}, w3j[{index_w3j}], s2)")
+                code_out += line_out.format(f"ein('{z}uvw,ijk,zuvij->zwk', ws_{index_w}, w3j_{index_w3j}, ss)")
+                code_right += line_right.format(f"ein('{z}uvw,ijk,zvj->zuiwk', ws_{index_w}, w3j_{index_w3j}, s2)")
             if ins.connection_mode == 'uvu':
                 assert mul_1 == mul_out
                 if ins.has_weight:
-                    code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zuk', ws_{index_w}, w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwk', ws_{index_w}, w3j[{index_w3j}], e1, s2)")
+                    code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zuk', ws_{index_w}, w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwk', ws_{index_w}, w3j_{index_w3j}, e1, s2)")
                 else:
-                    code_out += line_out.format(f"ein('ijk,zuvij->zuk', w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwk', w3j[{index_w3j}], e1, s2)")
+                    code_out += line_out.format(f"ein('ijk,zuvij->zuk', w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwk', w3j_{index_w3j}, e1, s2)")
             if ins.connection_mode == 'uvv':
                 assert mul_2 == mul_out
                 if ins.has_weight:
-                    code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zvk', ws_{index_w}, w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('{z}uv,ijk,zvj->zuivk', ws_{index_w}, w3j[{index_w3j}], s2)")
+                    code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zvk', ws_{index_w}, w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('{z}uv,ijk,zvj->zuivk', ws_{index_w}, w3j_{index_w3j}, s2)")
                 else:
-                    code_out += line_out.format(f"ein('ijk,zuvij->zvk', w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('u,ijk,zvj->zuivk', s2.new_zeros({mul_1}).fill_(1.0), w3j[{index_w3j}], s2)")
+                    code_out += line_out.format(f"ein('ijk,zuvij->zvk', w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('u,ijk,zvj->zuivk', s2.new_zeros({mul_1}).fill_(1.0), w3j_{index_w3j}, s2)")
             if ins.connection_mode == 'uuw':
                 assert mul_1 == mul_2
                 if ins.has_weight:
-                    code_out += line_out.format(f"ein('{z}uw,ijk,zuij->zwk', ws_{index_w}, w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('{z}uw,ijk,zuj->zuiwk', ws_{index_w}, w3j[{index_w3j}], s2)")
+                    code_out += line_out.format(f"ein('{z}uw,ijk,zuij->zwk', ws_{index_w}, w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('{z}uw,ijk,zuj->zuiwk', ws_{index_w}, w3j_{index_w3j}, s2)")
                 else:
                     assert mul_out == 1
-                    code_out += line_out.format(f"ein('ijk,zuij->zk', w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('ijk,zuj->zuik', w3j[{index_w3j}], s2)")
+                    code_out += line_out.format(f"ein('ijk,zuij->zk', w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('ijk,zuj->zuik', w3j_{index_w3j}, s2)")
             if ins.connection_mode == 'uuu':
                 assert mul_1 == mul_2 == mul_out
                 if ins.has_weight:
-                    code_out += line_out.format(f"ein('{z}u,ijk,zuij->zuk', ws_{index_w}, w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('{z}u,ijk,uw,zuj->zuiwk', ws_{index_w}, w3j[{index_w3j}], e1, s2)")
+                    code_out += line_out.format(f"ein('{z}u,ijk,zuij->zuk', ws_{index_w}, w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('{z}u,ijk,uw,zuj->zuiwk', ws_{index_w}, w3j_{index_w3j}, e1, s2)")
                 else:
-                    code_out += line_out.format(f"ein('ijk,zuij->zuk', w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('ijk,uw,zuj->zuiwk', w3j[{index_w3j}], e1, s2)")
+                    code_out += line_out.format(f"ein('ijk,zuij->zuk', w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('ijk,uw,zuj->zuiwk', w3j_{index_w3j}, e1, s2)")
             if ins.connection_mode == 'uvuv':
                 assert mul_1 * mul_2 == mul_out
                 if ins.has_weight:
-                    code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zuvk', ws_{index_w}, w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwvk', ws_{index_w}, w3j[{index_w3j}], e1, s2)")
+                    code_out += line_out.format(f"ein('{z}uv,ijk,zuvij->zuvk', ws_{index_w}, w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('{z}uv,ijk,uw,zvj->zuiwvk', ws_{index_w}, w3j_{index_w3j}, e1, s2)")
                 else:
-                    code_out += line_out.format(f"ein('ijk,zuvij->zuvk', w3j[{index_w3j}], ss)")
-                    code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwvk', w3j[{index_w3j}], e1, s2)")
+                    code_out += line_out.format(f"ein('ijk,zuvij->zuvk', w3j_{index_w3j}, ss)")
+                    code_right += line_right.format(f"ein('ijk,uw,zvj->zuiwvk', w3j_{index_w3j}, e1, s2)")
             code_out += "\n"
 
         code_out += f"{s}return out.reshape(outsize)"
         code_right += f"{s}return out.reshape(outsize)"
 
+        # w3j
+        self.wigners = wigners
+        wigner_mats = []
+        flat_wigner_index = 0
+        code_wigners = []
+        s = indent_for_level(0)
+        for i, (l_1, l_2, l_out) in enumerate(self.wigners):
+            wig = o3.wigner_3j(l_1, l_2, l_out)
+
+            if normalization == 'component':
+                wig *= (2 * l_out + 1) ** 0.5
+            if normalization == 'norm':
+                wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
+
+            code_wigners.append(f"{s}w3j_{i} = w3j[{flat_wigner_index}:{flat_wigner_index + _prod(wig.shape)}].reshape({', '.join(str(d) for d in wig.shape)})")
+            wigner_mats.append(wig)
+        code_wigners = '\n'.join(code_wigners)
+        if len(wigner_mats) > 0:
+            self.register_buffer('_wigner_buf', torch.cat([torch.flatten(w) for w in wigner_mats]))
+        else:
+            self.register_buffer('_wigner_buf', torch.Tensor())
+
+        # Finalize the code
         if self.irreps_in1.dim == 0 or self.irreps_in2.dim == 0 or self.irreps_out.dim == 0:
-            code_out = textwrap.dedent(f"""
+            full_code_out = textwrap.dedent(f"""
             from typing import List
 
             import torch
@@ -543,7 +562,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 return x1.new_zeros(outsize)
             """)
 
-            code_right = textwrap.dedent(f"""
+            full_code_right = textwrap.dedent(f"""
             from typing import List
 
             import torch
@@ -558,23 +577,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
                 return x2.new_zeros(outsize)
             """)
+        else:
+            # paste together the pieces
+            full_code_out = "\n\n".join([code_header, funcdef_out, code_wigners, code_out])
+            full_code_right = "\n\n".join([code_header, funcdef_right, code_wigners, code_right])
 
         self._codegen_register({
-            '_compiled_main_out': code_out,
-            '_compiled_main_right': code_right,
+            '_compiled_main_out': full_code_out,
+            '_compiled_main_right': full_code_right,
         })
-
-        # w3j
-        self.wigners = wigners
-        for i, (l_1, l_2, l_out) in enumerate(self.wigners):
-            wig = o3.wigner_3j(l_1, l_2, l_out)
-
-            if normalization == 'component':
-                wig *= (2 * l_out + 1) ** 0.5
-            if normalization == 'norm':
-                wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
-
-            self.register_buffer(f"C{i}", wig)
 
         # weights
         self.weight_numel = sum(_prod(ins.weight_shape) for ins in self.instructions if ins.has_weight)
@@ -582,11 +593,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.internal_weights = internal_weights
         if internal_weights:
             assert self.shared_weights, "Having internal weights impose shared weights"
-            # self.weight = torch.nn.ParameterDict()
-            # for ins in self.instructions:
-            #     if ins.has_weight:
-            #         name = f'[{ins.i_in1}:{self.irreps_in1[ins.i_in1]}] x [{ins.i_in2}:{self.irreps_in2[ins.i_in2]}] -> [{ins.i_out}:{self.irreps_out[ins.i_out]}]'
-            #         self.weight[name] = torch.nn.Parameter(torch.randn(ins.weight_shape))
             self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
 
         if self.irreps_out.dim > 0:
@@ -727,7 +733,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         """
         with torch.autograd.profiler.record_function(repr(self)):
             weight = self.prepare_weight_list(weight)
-            wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
+            #wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
+            wigners = self._wigner_buf
 
             return self._compiled_main_right(features_2, weight, wigners)
 
@@ -756,7 +763,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         """
         with torch.autograd.profiler.record_function(repr(self)):
             weight = self.prepare_weight_list(weight)
-            wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
+            #wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
+            wigners = self._wigner_buf
 
             return self._compiled_main_out(features_1, features_2, weight, wigners)
 
