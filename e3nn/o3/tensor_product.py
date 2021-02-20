@@ -588,7 +588,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.weight_numel = sum(_prod(ins.weight_shape) for ins in self.instructions if ins.has_weight)
 
         self.internal_weights = internal_weights
-        if internal_weights:
+        if internal_weights and self.weight_numel > 0:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
         else:
