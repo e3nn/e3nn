@@ -119,11 +119,11 @@ def test_input_weights_jit():
     x1 = irreps_in1.randn(2, -1)
     x2 = irreps_in2.randn(2, -1)
     w = torch.randn(2, m.weight_numel)
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         m(x1, x2)  # it should require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2)  # it should also require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2, w[0])  # it should reject insufficient weights
     # Does the trace give right results?
     assert torch.allclose(
@@ -140,11 +140,11 @@ def test_input_weights_jit():
     )
     traced = assert_auto_jitable(m)
     w = torch.randn(m.weight_numel)
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         m(x1, x2)  # it should require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2)  # it should also require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2, torch.randn(2, m.weight_numel))  # it should reject too many weights
     # Does the trace give right results?
     assert torch.allclose(

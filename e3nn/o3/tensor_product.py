@@ -1,3 +1,4 @@
+from typing import Optional, Final, List, Union
 from math import sqrt
 from collections import namedtuple
 import textwrap
@@ -15,8 +16,7 @@ def _prod(x):
     return out
 
 
-# This decorator applies to all the subclasses as well.
-@compile_mode('trace')
+@compile_mode('script')
 class TensorProduct(CodeGenMixin, torch.nn.Module):
     r"""Tensor Product with parametrizable paths
 
@@ -148,17 +148,23 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
+
+    _profiling_str: Final[str]
+    shared_weights: Final[bool]
+    internal_weights: Final[bool]
+    weight_numel: Final[int]
+
     def __init__(
-            self,
-            in1,
-            in2,
-            out,
-            instructions,
-            normalization='component',
-            internal_weights=None,
-            shared_weights=None,
-            _specialized_code=True,
-                ):
+        self,
+        in1,
+        in2,
+        out,
+        instructions,
+        normalization='component',
+        internal_weights=None,
+        shared_weights=None,
+        _specialized_code=True,
+    ):
         super().__init__()
 
         assert normalization in ['component', 'norm'], normalization
@@ -535,22 +541,19 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
 
             code_wigners.append(f"{s}w3j_{i} = w3j[{flat_wigner_index}:{flat_wigner_index + _prod(wig.shape)}].reshape({', '.join(str(d) for d in wig.shape)})")
+            flat_wigner_index += _prod(wig.shape)
             wigner_mats.append(wig)
         code_wigners = '\n'.join(code_wigners)
+
         if len(wigner_mats) > 0:
-            self.register_buffer('_wigner_buf', torch.cat([torch.flatten(w) for w in wigner_mats]))
+            self.register_buffer('_wigner_buf', torch.cat([w.reshape(-1) for w in wigner_mats]))
         else:
+            # We register an empty buffer so that call signatures don't have to change
             self.register_buffer('_wigner_buf', torch.Tensor())
 
         # Finalize the code
         if self.irreps_in1.dim == 0 or self.irreps_in2.dim == 0 or self.irreps_out.dim == 0:
-            full_code_out = textwrap.dedent(f"""
-            from typing import List
-
-            import torch
-
-            from e3nn.util import broadcast_tensors
-
+            full_code_out = code_header + textwrap.dedent(f"""
             @torch.jit.script
             def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
                 x1, x2 = broadcast_tensors(x1, x2)
@@ -562,13 +565,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 return x1.new_zeros(outsize)
             """)
 
-            full_code_right = textwrap.dedent(f"""
-            from typing import List
-
-            import torch
-
-            from e3nn.util import broadcast_tensors
-
+            full_code_right = code_header + textwrap.dedent(f"""
             @torch.jit.script
             def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
                 size = x2.shape[:-1]
@@ -594,6 +591,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if internal_weights:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
+        else:
+            # For TorchScript, there always has to be some kind of defined .weight
+            self.register_buffer('weight', torch.Tensor())
 
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
@@ -605,6 +605,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         else:
             output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
+
+        # For TorchScript, this needs to be done in advance:
+        self._profiling_str = str(type(self))
 
     def __repr__(self):
         npath = sum(
@@ -625,91 +628,31 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         )
 
     @torch.jit.unused
-    def prepare_weight_list(self, weight):
-        if self.weight_numel:
-            if weight is None:
-                # Use internal weights
-                if not self.internal_weights:
-                    raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
-                weight = self.weight
-            elif torch.is_tensor(weight):
-                # It should already be a flat weight tensor
-                assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
-            elif isinstance(weight, list):
-                weight_shapes = [ins.weight_shape for ins in self.instructions if ins.has_weight]
-                if not self.shared_weights:
-                    weight = [w.reshape(-1, _prod(shape)) for w, shape in zip(weight, weight_shapes)]
-                else:
-                    weight = [w.reshape(_prod(shape)) for w, shape in zip(weight, weight_shapes)]
-                weight = torch.cat(weight, dim=-1)
-        else:
-            weight = torch.Tensor()
-        return weight
-
-    def _make_tracing_inputs(self, n: int):
-        import inspect
-        import random
-        MAX_N_BATCH = 3
-        # - Inspect forward() -
-        # Check if forward has weights:
-        forward_params = list(inspect.signature(self.forward).parameters)
-        arg_generators = []
-        forward_has_weight = forward_params[-1] == 'weight'
-        if forward_has_weight:
-            forward_params = forward_params[:-1]
-
-        if len(forward_params) == 1:
-            # Something like Norm or Linear with irreps_in
-            arg_generators.append(
-                lambda bdim: self.irreps_in.randn(bdim, -1)
-            )
-        elif len(forward_params) == 2:
-            # A normal TensorProduct with two inputs
-            arg_generators.append(
-                lambda bdim: self.irreps_in1.randn(bdim, -1)
-            )
-            arg_generators.append(
-                lambda bdim: self.irreps_in2.randn(bdim, -1)
-            )
-        else:
-            raise NotImplementedError("Tried to trace compile an atypical TensorProduct subclass; please override make_tracing_input() for your class.")
-
-        # - Deal with weights -
-        # We only trace a weight input if the TP has no internal weights:
-        # in TorchScript, a TP either always uses internal weights or always
-        # uses input weights
-        trace_weights = bool(self.weight_numel) and not self.internal_weights
-        # No reason to trace weights when there aren't any, even if they aren't internal:
-        trace_weights = trace_weights and self.weight_numel > 0
-        make_weights = None
-        if trace_weights:
-            if self.shared_weights:
-                def make_weights(bdim):
-                    return torch.randn(self.weight_numel)
+    def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
+        if isinstance(weight, list):
+            weight_shapes = [ins.weight_shape for ins in self.instructions if ins.has_weight]
+            if not self.shared_weights:
+                weight = [w.reshape(-1, _prod(shape)) for w, shape in zip(weight, weight_shapes)]
             else:
-                # By tracing it this way, we do enforce that non-shared weights are always passed in (..., self.weight_numel)
-                # form, which is fine, since lists don't play nice with compilation anyway
-                def make_weights(bdim):
-                    return torch.randn(bdim, self.weight_numel)
-            arg_generators.append(make_weights)
+                weight = [w.reshape(_prod(shape)) for w, shape in zip(weight, weight_shapes)]
+            return torch.cat(weight, dim=-1)
+        else:
+            return weight
 
-        # - Make outputs -
-        out = []
-        for _ in range(n):
-            # Choose a random batch dimension
-            bdim = random.randint(1, MAX_N_BATCH)
-            # right() always takes irreps_in2 so we build it here:
-            right_args = (self.irreps_in2.randn(bdim, -1),)
-            if trace_weights:
-                right_args = right_args + (make_weights(bdim),)
-            # put it in
-            out.append({
-                'forward': tuple(g(bdim) for g in arg_generators),
-                'right': right_args
-            })
-        return out
+    def _get_weights(self, weight: Optional[torch.Tensor]) -> torch.Tensor:
+        if not torch.jit.is_scripting():
+            # If we're not scripting, then we're in Python and `weight` could be a List[Tensor]
+            # deal with that:
+            weight = self._prep_weights_python(weight)
+        if weight is None:
+            if self.weight_numel > 0 and not self.internal_weights:
+                raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
+            return self.weight
+        else:
+            assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
+            return weight
 
-    def right(self, features_2, weight=None):
+    def right(self, features_2, weight: Optional[torch.Tensor] = None):
         r"""evaluate partially :math:`w x \cdot \otimes y`
 
         It returns an operator in the form of a matrix.
@@ -731,14 +674,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
-        with torch.autograd.profiler.record_function(repr(self)):
-            weight = self.prepare_weight_list(weight)
-            #wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
-            wigners = self._wigner_buf
+        with torch.autograd.profiler.record_function(self._profiling_str):
+            real_weight = self._get_weights(weight)
+            return self._compiled_main_right(features_2, real_weight, self._wigner_buf)
 
-            return self._compiled_main_right(features_2, weight, wigners)
-
-    def forward(self, features_1, features_2, weight=None):
+    def forward(self, features_1, features_2, weight: Optional[torch.Tensor] = None):
         r"""evaluate :math:`w x \otimes y`
 
         Parameters
@@ -761,12 +701,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        with torch.autograd.profiler.record_function(repr(self)):
-            weight = self.prepare_weight_list(weight)
-            #wigners = [getattr(self, f"C{i}") for i in range(len(self.wigners))]
-            wigners = self._wigner_buf
-
-            return self._compiled_main_out(features_1, features_2, weight, wigners)
+        with torch.autograd.profiler.record_function(self._profiling_str):
+            real_weight = self._get_weights(weight)
+            return self._compiled_main_out(features_1, features_2, real_weight, self._wigner_buf)
 
     def visualize(self):  # pragma: no cover
         import numpy as np
@@ -1053,6 +990,7 @@ class FullTensorProduct(TensorProduct):
         super().__init__(irreps_in1, irreps_in2, out, instr, normalization, internal_weights=False)
 
 
+@compile_mode('trace')
 class Linear(TensorProduct):
     r"""Linear operation equivariant to :math:`O(3)`
 
@@ -1123,6 +1061,7 @@ class Linear(TensorProduct):
         return super().forward(features, ones, weight)
 
 
+@compile_mode('trace')
 class Norm(TensorProduct):
     r"""Norm operation
 
