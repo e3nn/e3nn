@@ -103,6 +103,38 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     )
 
 
+def test_input_weights_python():
+    irreps_in1 = Irreps("1e + 2e + 3x3o")
+    irreps_in2 = Irreps("1e + 2e + 3x3o")
+    irreps_out = Irreps("1e + 2e + 3x3o")
+    # - shared_weights = False -
+    m = FullyConnectedTensorProduct(
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        internal_weights=False,
+        shared_weights=False
+    )
+    bdim = random.randint(1, 3)
+    x1 = irreps_in1.randn(bdim, -1)
+    x2 = irreps_in2.randn(bdim, -1)
+    w = [torch.randn((bdim,) + ins.weight_shape) for ins in m.instructions if ins.has_weight]
+    m(x1, x2, w)
+    # - shared_weights = True -
+    m = FullyConnectedTensorProduct(
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        internal_weights=False,
+        shared_weights=True
+    )
+    bdim = random.randint(1, 3)
+    x1 = irreps_in1.randn(bdim, -1)
+    x2 = irreps_in2.randn(bdim, -1)
+    w = [torch.randn(ins.weight_shape) for ins in m.instructions if ins.has_weight]
+    m(x1, x2, w)
+
+
 def test_input_weights_jit():
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
