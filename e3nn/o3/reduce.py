@@ -122,13 +122,17 @@ class ReducedTensorProducts:
     >>> b = tp(x, y)
     >>> assert torch.allclose(a, b)
     """
-    def __init__(self, formula, irreps_out=None, set_ir_mid=None, eps=1e-9, **irreps):
-        if irreps_out is not None:
-            irreps_out = [o3.Irrep(ir) for ir in irreps_out]
+    def __init__(self, formula, set_ir_out=None, set_ir_mid=None, eps=1e-9, **irreps):
+        if set_ir_out is not None:
+            set_ir_out = [o3.Irrep(ir) for ir in set_ir_out]
 
         f0, formulas = group.germinate_formulas(formula)
 
         irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
+
+        for i in irreps:
+            if len(i) != 1:
+                raise TypeError(f"got an unexpected keyword argument '{i}'")
 
         for _s, p in formulas:
             f = "".join(f0[i] for i in p)
@@ -156,7 +160,7 @@ class ReducedTensorProducts:
         Ps = collections.defaultdict(list)
 
         for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], set_ir_mid=set_ir_mid, dtype=torch.float64):
-            if irreps_out is None or ir in irreps_out:
+            if set_ir_out is None or ir in set_ir_out:
                 P = C.flatten(1) @ Q.flatten(1).T
                 Ps[ir].append((P.flatten(), path, C))
 
