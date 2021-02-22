@@ -36,6 +36,8 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
     This function match with this table of standard real spherical harmonics from Wikipedia_
     when ``normalize=True`` and ``normalization='integral'`` and called in the order ``y,z,x`` instead of ``x,y,z``.
 
+    .. _Wikipedia: https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
+
     Parameters
     ----------
     l : int or list of int
@@ -70,8 +72,6 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
     --------
     wigner_D
     wigner_3j
-
-    .. _Wikipedia: https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
 
     """
     if isinstance(l, o3.Irreps):
