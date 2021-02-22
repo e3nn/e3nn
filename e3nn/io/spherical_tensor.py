@@ -63,29 +63,39 @@ class SphericalTensor(o3.Irreps):
     def __new__(cls, lmax, p_val, p_arg):
         return super().__new__(cls, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
 
-    def from_geometry_adjusted(self, vectors):
-        r"""Convert a set of relative positions into a spherical tensor
+    def with_peaks_at(self, vectors):
+        r"""Create a spherical tensor with peaks
 
-        TODO rename this function?
+        The peaks are located in :math:`\vec r_i` and have amplitude :math:`\|\vec r_i \|`
+
+        Parameters
+        ----------
+        vectors : `torch.Tensor`
+            :math:`\vec r_i` tensor of shape ``(N, 3)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(self.dim,)``
 
         Examples
         --------
         >>> x = SphericalTensor(4, 1, -1)
         >>> p = torch.tensor([
-        ...     [1.0, 0, 0],
-        ...     [3.0, 4.0, 0],
+        ...     [1.0, 0.0, 0.0],
+        ...     [3.0, 4.0, 0.0],
         ... ])
-        >>> d = x.from_geometry_adjusted(p)
+        >>> d = x.with_peaks_at(p)
         >>> x.signal_xyz(d, p)
         tensor([1.0000, 5.0000])
         """
         # empty set of vectors returns a 0 spherical tensor
-        if len(vectors) == 0:
-            return vectors.new_zeros(o3.Irreps.spherical_harmonics(self.lmax).dim)
+        if vectors.numel() == 0:
+            return torch.zeros(vectors.shape[:-2] + (self.dim,))
 
         assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
 
-        vectors = vectors.reshape(-1, 3)
+        assert vectors.dim() == 2 and vectors.shape[1] == 3
         radii = vectors.norm(dim=1)  # [batch]
         vectors = vectors[radii > 0]  # [batch, 3]
 
@@ -100,6 +110,60 @@ class SphericalTensor(o3.Irreps):
         assert (radii - A @ solution).abs().max() < 1e-5 * radii.abs().max()
 
         return solution @ coeff
+
+    def sum_of_diracs(self, positions, values):
+        r"""Sum (almost-) dirac deltas
+
+        .. math::
+
+            f(x) = \sum_i v_i \delta^L(\vec r_i)
+
+        where :math:`\delta^L` is the apporximation of a dirac delta.
+
+        Parameters
+        ----------
+        positions : `torch.Tensor`
+            :math:`\vec r_i` tensor of shape ``(..., N, 3)``
+
+        values : `torch.Tensor`
+            :math:`v_i` tensor of shape ``(..., N)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(..., self.dim)``
+
+        Examples
+        --------
+        >>> s = SphericalTensor(7, 1, -1)
+        >>> pos = torch.tensor([
+        ...     [1.0, 0.0, 0.0],
+        ...     [0.0, 1.0, 0.0],
+        ... ])
+        >>> val = torch.tensor([
+        ...     -1.0,
+        ...     1.0,
+        ... ])
+        >>> x = s.sum_of_diracs(pos, val)
+        >>> s.signal_xyz(x, torch.eye(3)).mul(10.0).round()
+        tensor([-10.,  10.,  -0.])
+
+        >>> s.sum_of_diracs(torch.empty(1, 0, 2, 3), torch.empty(2, 0, 1)).shape
+        torch.Size([2, 0, 64])
+
+        >>> s.sum_of_diracs(torch.randn(1, 3, 2, 3), torch.randn(2, 1, 1)).shape
+        torch.Size([2, 3, 64])
+        """
+        positions, values = torch.broadcast_tensors(positions, values[..., None])
+        values = values[..., 0]
+
+        if positions.numel() == 0:
+            return torch.zeros(values.shape[:-1] + (self.dim,))
+
+        y = o3.spherical_harmonics(self, positions, True)  # [..., N, dim]
+        v = values[..., None]
+
+        return 4 * pi / (self.lmax + 1)**2 * (y * v).sum(-2)
 
     def from_geometry_global_rescale(self, vectors):
         r"""Convert a set of relative positions into a spherical tensor
@@ -125,21 +189,73 @@ class SphericalTensor(o3.Irreps):
     def from_samples_on_s2(self, positions, values, res=100):
         r"""Convert a set of position on the sphere and values into a spherical tensor
 
-        TODO rename this function?
+        Parameters
+        ----------
+        positions : `torch.Tensor`
+            tensor of shape ``(..., N, 3)``
+
+        values : `torch.Tensor`
+            tensor of shape ``(..., N)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(..., self.dim)``
+
+        Examples
+        --------
+        >>> s = SphericalTensor(2, 1, 1)
+        >>> pos = torch.tensor([
+        ...     [
+        ...         [0.0, 0.0, 1.0],
+        ...         [0.0, 0.0, -1.0],
+        ...     ],
+        ...     [
+        ...         [0.0, 1.0, 0.0],
+        ...         [0.0, -1.0, 0.0],
+        ...     ],
+        ... ], dtype=torch.float64)
+        >>> val = torch.tensor([
+        ...     [
+        ...         1.0,
+        ...         -1.0,
+        ...     ],
+        ...     [
+        ...         1.0,
+        ...         -1.0,
+        ...     ],
+        ... ], dtype=torch.float64)
+        >>> s.from_samples_on_s2(pos, val, res=200).long()
+        tensor([[0, 0, 0, 3, 0, 0, 0, 0, 0],
+                [0, 0, 3, 0, 0, 0, 0, 0, 0]])
+
+        >>> pos = torch.empty(2, 0, 10, 3)
+        >>> val = torch.empty(2, 0, 10)
+        >>> s.from_samples_on_s2(pos, val)
+        tensor([], size=(2, 0, 9))
+
         """
-        if len(positions) == 0:
-            return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
+        positions, values = torch.broadcast_tensors(positions, values[..., None])
+        values = values[..., 0]
 
-        positions = positions.reshape(-1, 3)
-        values = values.reshape(-1)
-        positions /= positions.norm(dim=1, keepdim=True)
-        assert positions.shape[0] == values.shape[0], "positions and values must have the same number of points"
+        if positions.numel() == 0:
+            return torch.zeros(values.shape[:-1] + (self.dim,))
 
-        s2 = FromS2Grid(res=res, lmax=self.lmax, normalization='integral')
-        pos = s2.grid
+        positions = torch.nn.functional.normalize(positions, dim=-1)  # forward 0's instead of nan for zero-radius
 
-        cd = torch.cdist(pos, positions)
-        val = values[cd.argmin(2)]
+        size = positions.shape[:-2]
+        n = positions.shape[-2]
+        positions = positions.reshape(-1, n, 3)
+        values = values.reshape(-1, n)
+
+        s2 = FromS2Grid(res=res, lmax=self.lmax, normalization='integral', dtype=values.dtype, device=values.device)
+        pos = s2.grid.reshape(1, -1, 3)
+
+        cd = torch.cdist(pos, positions)  # [batch, b*a, N]
+        i = torch.arange(len(values)).view(-1, 1)  # [batch, 1]
+        j = cd.argmin(2)  # [batch, b*a]
+        val = values[i, j]  # [batch, b*a]
+        val = val.reshape(*size, s2.res_beta, s2.res_alpha)
 
         return s2(val)
 
@@ -155,10 +271,33 @@ class SphericalTensor(o3.Irreps):
 
     def signal_xyz(self, signal, r):
         r"""Evaluate the signal on given points on the sphere
+
+        .. math::
+
+            f(\vec x / \|\vec x\|)
+
+        Parameters
+        ----------
+        signal : `torch.Tensor`
+            tensor of shape ``(*A, self.dim)``
+
+        r : `torch.Tensor`
+            tensor of shape ``(*B, 3)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(*A, *B)``
+
+        Examples
+        --------
+        >>> s = SphericalTensor(3, 1, -1)
+        >>> s.signal_xyz(s.randn(2, 1, 3, -1), torch.randn(2, 4, 3)).shape
+        torch.Size([2, 1, 3, 2, 4])
         """
         sh = o3.spherical_harmonics(self, r, normalize=True)
         dim = (self.lmax + 1)**2
-        output = torch.einsum('ai,zi->za', sh.reshape(-1, dim), signal.reshape(-1, dim))
+        output = torch.einsum('bi,ai->ab', sh.reshape(-1, dim), signal.reshape(-1, dim))
         return output.reshape(signal.shape[:-1] + r.shape[:-1])
 
     def signal_on_grid(self, signal, res=100, normalization='integral'):
