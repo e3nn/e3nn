@@ -183,27 +183,6 @@ class SphericalTensor(o3.Irreps):
 
         return 4 * pi / (self.lmax + 1)**2 * (y * v).sum(-2)
 
-    def from_geometry_global_rescale(self, vectors):
-        r"""Convert a set of relative positions into a spherical tensor
-
-        TODO rename this function?
-        """
-        # empty set of vectors returns a 0 spherical tensor
-        if len(vectors) == 0:
-            return torch.zeros(size=(o3.Irreps.spherical_harmonics(self.lmax).dim,))
-
-        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
-
-        vectors = vectors.reshape(-1, 3)
-        radii = vectors.norm(dim=1)
-        sh = o3.spherical_harmonics(self, vectors, normalize=True)
-        # 0.5 * sum_a ( Y(v_a) . sum_b r_b Y(v_b) s - r_a )^2
-        A = torch.einsum('ai,b,bi->a', sh, radii, sh)
-        # 0.5 * sum_a ( A_a s - r_a )^2
-        # sum_a A_a^2 s = sum_a A_a r_a
-        s = torch.dot(A, radii) / A.norm().pow(2)
-        return s * torch.einsum('a,ai->i', radii, sh)
-
     def from_samples_on_s2(self, positions, values, res=100):
         r"""Convert a set of position on the sphere and values into a spherical tensor
 

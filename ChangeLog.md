@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - in `ReducedTensorProducts`, `ElementwiseTensorProduct` and `FullTensorProduct`: rename `irreps_out` argument into `set_ir_out` to not confuse it with `o3.Irreps`
 
 ### Removed
+- `io.SphericalTensor.from_geometry_global_rescale`
 - `e3nn.math.reduce.reduce_tensor` in favor of `e3nn.o3.ReducedTensorProducts`
 - swish, use `torch.nn.functional.silu` instead
 - `"cartesian_vectors"` for equivariance testing — since the 0.2.2 Euler angle convention change, L=1 irreps are equivalent
