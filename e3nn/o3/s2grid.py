@@ -304,10 +304,10 @@ class ToS2Grid(torch.nn.Module):
     Attributes
     ----------
     grid : `torch.Tensor`
-        positions on the sphere, tensor of shape ``(..., res, 3)``
+        positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
     """
 
-    def __init__(self, lmax=None, res=None, normalization='component'):
+    def __init__(self, lmax=None, res=None, normalization='component', dtype=None, device=None):
         super().__init__()
 
         assert normalization in ['norm', 'component', 'integral'] or torch.is_tensor(normalization), "normalization needs to be 'norm', 'component' or 'integral'"
@@ -317,25 +317,25 @@ class ToS2Grid(torch.nn.Module):
         else:
             lmax, res_beta, res_alpha = _complete_lmax_res(lmax, *res)
 
-        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
+        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=dtype, device=device)
 
         n = None
         if normalization == 'component':
             # normalize such that all l has the same variance on the sphere
             # given that all componant has mean 0 and variance 1
-            n = math.sqrt(4 * math.pi) * torch.tensor([
+            n = math.sqrt(4 * math.pi) * betas.new_tensor([
                 1 / math.sqrt(2 * l + 1)
                 for l in range(lmax + 1)
             ]) / math.sqrt(lmax + 1)
         if normalization == 'norm':
             # normalize such that all l has the same variance on the sphere
             # given that all componant has mean 0 and variance 1/(2L+1)
-            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
+            n = math.sqrt(4 * math.pi) * betas.new_ones(lmax + 1) / math.sqrt(lmax + 1)
         if normalization == 'integral':
-            n = torch.ones(lmax + 1)
+            n = betas.new_ones(lmax + 1)
         if torch.is_tensor(normalization):
             n = normalization
-        m = _expand_matrix(range(lmax + 1))  # [l, m, i]
+        m = _expand_matrix(range(lmax + 1), dtype=dtype, device=device)  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
         self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
@@ -415,11 +415,11 @@ class FromS2Grid(torch.nn.Module):
     Attributes
     ----------
     grid : `torch.Tensor`
-        tensor of shape ``(res_beta, res_alpha)``
+        positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
 
     """
 
-    def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None):
+    def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None, dtype=None, device=None):
         super().__init__()
 
         assert normalization in ['norm', 'component', 'integral'] or torch.is_tensor(normalization), "normalization needs to be 'norm', 'component' or 'integral'"
@@ -432,24 +432,24 @@ class FromS2Grid(torch.nn.Module):
         if lmax_in is None:
             lmax_in = lmax
 
-        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
+        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=dtype, device=device)
 
         # normalize such that it is the inverse of ToS2Grid
         n = None
         if normalization == 'component':
-            n = math.sqrt(4 * math.pi) * torch.tensor([
+            n = math.sqrt(4 * math.pi) * betas.new_tensor([
                 math.sqrt(2 * l + 1)
                 for l in range(lmax + 1)
             ]) * math.sqrt(lmax_in + 1)
         if normalization == 'norm':
-            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
+            n = math.sqrt(4 * math.pi) * betas.new_ones(lmax + 1) * math.sqrt(lmax_in + 1)
         if normalization == 'integral':
-            n = 4 * math.pi * torch.ones(lmax + 1)
+            n = 4 * math.pi * betas.new_ones(lmax + 1)
         if torch.is_tensor(normalization):
             n = normalization
-        m = _expand_matrix(range(lmax + 1))  # [l, m, i]
+        m = _expand_matrix(range(lmax + 1), dtype=dtype, device=device)  # [l, m, i]
         assert res_beta % 2 == 0
-        qw = _quadrature_weights(res_beta // 2) * res_beta**2 / res_alpha  # [b]
+        qw = _quadrature_weights(res_beta // 2, dtype=dtype, device=device) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
 
         self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha

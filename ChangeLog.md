@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Add argument `basis` into `math.soft_one_hot_linspace` that can take values `gaussian` and `cosine`
+- `io.SphericalTensor.sum_of_diracs`
 - Optional arguments `function(..., device=None, dtype=None)` for many functions
 - `e3nn.nn.models.gate_points_2102` using node attributes along the length embedding to feed the radial network
 - `Irreps.slices()`
@@ -14,13 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TorchScript support for `TensorProduct` and subclasses, `NormActivation`, `Gate`, `FullyConnectedNet`, and `gate_points_2101.Network`
 
 ### Changed
+- rename `io.SphericalTensor.from_geometry_adjusted` into `io.SphericalTensor.with_peaks_at`
 - in `ReducedTensorProducts`, `ElementwiseTensorProduct` and `FullTensorProduct`: rename `irreps_out` argument into `set_ir_out` to not confuse it with `o3.Irreps`
 
 ### Removed
+- `io.SphericalTensor.from_geometry_global_rescale`
 - `e3nn.math.reduce.reduce_tensor` in favor of `e3nn.o3.ReducedTensorProducts`
 - swish, use `torch.nn.functional.silu` instead
 - `"cartesian_vectors"` for equivariance testing — since the 0.2.2 Euler angle convention change, L=1 irreps are equivalent
 ### Fixed
+- `io.SphericalTensor.from_samples_on_s2` manage batch dimension
 - Modules that generate code now clean up their temporary files
 - `NormActivation` now works on GPU
 
