@@ -63,7 +63,7 @@ class SphericalTensor(o3.Irreps):
     def __new__(cls, lmax, p_val, p_arg):
         return super().__new__(cls, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
 
-    def with_peaks_at(self, vectors):
+    def with_peaks_at(self, vectors, values=None):
         r"""Create a spherical tensor with peaks
 
         The peaks are located in :math:`\vec r_i` and have amplitude :math:`\|\vec r_i \|`
@@ -73,6 +73,9 @@ class SphericalTensor(o3.Irreps):
         vectors : `torch.Tensor`
             :math:`\vec r_i` tensor of shape ``(N, 3)``
 
+        values : `torch.Tensor`, optional
+            value on the peak, tensor of shape ``(N)``
+
         Returns
         -------
         `torch.Tensor`
@@ -80,15 +83,27 @@ class SphericalTensor(o3.Irreps):
 
         Examples
         --------
-        >>> x = SphericalTensor(4, 1, -1)
-        >>> p = torch.tensor([
+        >>> s = SphericalTensor(4, 1, -1)
+        >>> pos = torch.tensor([
         ...     [1.0, 0.0, 0.0],
         ...     [3.0, 4.0, 0.0],
         ... ])
-        >>> d = x.with_peaks_at(p)
-        >>> x.signal_xyz(d, p)
+        >>> x = s.with_peaks_at(pos)
+        >>> s.signal_xyz(x, pos)
         tensor([1.0000, 5.0000])
+
+        >>> val = torch.tensor([
+        ...     -1.5,
+        ...     2.0,
+        ... ])
+        >>> x = s.with_peaks_at(pos, val)
+        >>> s.signal_xyz(x, pos)
+        tensor([-1.5000,  2.0000])
         """
+        if values is not None:
+            vectors, values = torch.broadcast_tensors(vectors, values[..., None])
+            values = values[..., 0]
+
         # empty set of vectors returns a 0 spherical tensor
         if vectors.numel() == 0:
             return torch.zeros(vectors.shape[:-2] + (self.dim,))
@@ -96,8 +111,11 @@ class SphericalTensor(o3.Irreps):
         assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
 
         assert vectors.dim() == 2 and vectors.shape[1] == 3
-        radii = vectors.norm(dim=1)  # [batch]
-        vectors = vectors[radii > 0]  # [batch, 3]
+
+        if values is None:
+            values = vectors.norm(dim=1)  # [batch]
+        vectors = vectors[values != 0]  # [batch, 3]
+        values = values[values != 0]
 
         coeff = o3.spherical_harmonics(self, vectors, normalize=True)  # [batch, l * m]
         A = torch.einsum(
@@ -106,8 +124,8 @@ class SphericalTensor(o3.Irreps):
             coeff
         )
         # Y(v_a) . Y(v_b) solution_b = radii_a
-        solution = torch.lstsq(radii, A).solution.reshape(-1)  # [b]
-        assert (radii - A @ solution).abs().max() < 1e-5 * radii.abs().max()
+        solution = torch.lstsq(values, A).solution.reshape(-1)  # [b]
+        assert (values - A @ solution).abs().max() < 1e-5 * values.abs().max()
 
         return solution @ coeff
 
