@@ -349,8 +349,6 @@ class ToS2Grid(torch.nn.Module):
 
     @property
     def grid(self):
-        r"""shape ``(self.res_beta, self.res_alpha, 3)``
-        """
         beta, alpha = torch.meshgrid(self.betas, self.alphas)
         return o3.angles_to_xyz(alpha, beta)
 
@@ -465,8 +463,6 @@ class FromS2Grid(torch.nn.Module):
 
     @property
     def grid(self):
-        r"""shape ``(self.res_beta, self.res_alpha, 3)``
-        """
         beta, alpha = torch.meshgrid(self.betas, self.alphas)
         return o3.angles_to_xyz(alpha, beta)
 

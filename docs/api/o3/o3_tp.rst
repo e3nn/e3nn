@@ -40,7 +40,7 @@ Here the irreps are multiplied one by one. Note how the inputs has been split an
 
 .. jupyter-execute::
 
-    o3.Linear('5x0e + 4x1e', '6x0e + 7x1e').visualize()
+    o3.Linear('5x0e + 4x1e', '6x0e + 7x1e').tp.visualize()
 
 The linear operation is a special case of a tensor product with a constant scalar ``1.0``.
 
