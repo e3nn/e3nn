@@ -1,4 +1,4 @@
-from typing import Optional, Final, List, Union
+from typing import Optional, List, Union
 from math import sqrt
 from collections import namedtuple
 import textwrap
@@ -149,10 +149,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.max() < 3
     """
 
-    _profiling_str: Final[str]
-    shared_weights: Final[bool]
-    internal_weights: Final[bool]
-    weight_numel: Final[int]
+    _profiling_str: str
+    shared_weights: bool
+    internal_weights: bool
+    weight_numel: int
 
     def __init__(
         self,
