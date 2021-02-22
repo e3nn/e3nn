@@ -33,6 +33,9 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
 
     Where :math:`C` are the `wigner_3j`.
 
+    This function match with this table of standard real spherical harmonics from Wikipedia_
+    when ``normalize=True`` and ``normalization='integral'`` and called in the order ``y,z,x`` instead of ``x,y,z``.
+
     Parameters
     ----------
     l : int or list of int
@@ -67,6 +70,9 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
     --------
     wigner_D
     wigner_3j
+
+    .. _Wikipedia: https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
+
     """
     if isinstance(l, o3.Irreps):
         ls = [l for mul, (l, p) in l for _ in range(mul)]
@@ -119,11 +125,14 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
             sh_1_0, sh_1_1, sh_1_2
         ], dim=-1)
 
-    sh_2_0 = 1.732050807568877*x*z
-    sh_2_1 = 1.732050807568877*x*y
-    sh_2_2 = y*y - 0.5*x*x - 0.5*z*z
-    sh_2_3 = 1.732050807568877*y*z
-    sh_2_4 = -0.866025403784439*x*x + 0.866025403784439*z*z
+    sh_2_0 = math.sqrt(3.0) * x * z
+    sh_2_1 = math.sqrt(3.0) * x * y
+    y2 = y.pow(2)
+    x2z2 = x.pow(2) + z.pow(2)
+    sh_2_2 = y2 - 0.5 * x2z2
+    sh_2_3 = math.sqrt(3.0) * y * z
+    sh_2_4 = math.sqrt(3.0) / 2.0 * (z.pow(2) - x.pow(2))
+
     if lmax == 2:
         return torch.stack([
             sh_0_0,
@@ -131,13 +140,14 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
             sh_2_0, sh_2_1, sh_2_2, sh_2_3, sh_2_4
         ], dim=-1)
 
-    sh_3_0 = 0.912870929175278*sh_2_0*z + 0.912870929175277*sh_2_4*x
-    sh_3_1 = 0.74535599249993*sh_2_0*y + 0.74535599249993*sh_2_1*z + 0.74535599249993*sh_2_3*x
-    sh_3_2 = -0.235702260395516*sh_2_0*z + 0.942809041582063*sh_2_1*y + 0.816496580927726*sh_2_2*x + 0.235702260395515*sh_2_4*x
-    sh_3_3 = -0.577350269189625*sh_2_1*x + sh_2_2*y - 0.577350269189626*sh_2_3*z
-    sh_3_4 = -0.235702260395516*sh_2_0*x + 0.816496580927726*sh_2_2*z + 0.942809041582063*sh_2_3*y - 0.235702260395516*sh_2_4*z
-    sh_3_5 = -0.74535599249993*sh_2_1*x + 0.745355992499931*sh_2_3*z + 0.74535599249993*sh_2_4*y
-    sh_3_6 = -0.912870929175278*sh_2_0*x + 0.912870929175278*sh_2_4*z
+    sh_3_0 = math.sqrt(5.0 / 6.0) * (sh_2_0 * z + sh_2_4 * x)
+    sh_3_1 = math.sqrt(5.0) * sh_2_0 * y
+    sh_3_2 = math.sqrt(3.0 / 8.0) * (4.0 * y2 - x2z2) * x
+    sh_3_3 = 0.5 * y * (2.0 * y2 - 3.0 * x2z2)
+    sh_3_4 = math.sqrt(3.0 / 8.0) * z * (4.0 * y2 - x2z2)
+    sh_3_5 = math.sqrt(5.0) * sh_2_4 * y
+    sh_3_6 = math.sqrt(5.0 / 6.0) * (sh_2_4 * z - sh_2_0 * x)
+
     if lmax == 3:
         return torch.stack([
             sh_0_0,
