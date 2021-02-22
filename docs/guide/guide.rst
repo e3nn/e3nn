@@ -9,3 +9,4 @@ User Guide
     normalization
     equivar_testing
     jit
+    change_of_basis
