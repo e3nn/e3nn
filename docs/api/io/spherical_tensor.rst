@@ -1,13 +1,18 @@
 io - Spherical Tensor
 =====================
 
+There exists 4 types of function on the sphere depending on how the parity affects it.
+The representation of the coefficients are affected by this choice:
+
 .. jupyter-execute::
 
     import torch
     from e3nn.io import SphericalTensor
 
-    st = SphericalTensor(lmax=2, p_val=1, p_arg=-1)
-    st.randn(-1)
+    print(SphericalTensor(lmax=2, p_val=1, p_arg=1))
+    print(SphericalTensor(lmax=2, p_val=1, p_arg=-1))
+    print(SphericalTensor(lmax=2, p_val=-1, p_arg=1))
+    print(SphericalTensor(lmax=2, p_val=-1, p_arg=-1))
 
 
 .. jupyter-execute::
