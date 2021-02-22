@@ -137,12 +137,16 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     ...         if ir_out in ir_1 * ir_2
     ...     ]
     ... )
-    >>> with torch.no_grad():
-    ...     for weight in module.parameters():
-    ...         # formula from torch.nn.init.xavier_uniform_
+    >>> ws = []
+    >>> for ins in module.instructions:
+    ...     if ins.has_weight:
+    ...         weight = torch.empty(ins.weight_shape)
     ...         mul_1, mul_2, mul_out = weight.shape
+    ...         # formula from torch.nn.init.xavier_uniform_
     ...         a = (6 / (mul_1 * mul_2 + mul_out))**0.5
-    ...         _ = weight.uniform_(-a, a)  # `_ = ` is only here because of pytest
+    ...         ws += [weight.uniform_(-a, a).view(-1)]
+    >>> with torch.no_grad():
+    ...     module.weight[:] = torch.cat(ws)
     >>> n = 1_000
     >>> vars = module(irreps_1.randn(n, -1), irreps_2.randn(n, -1)).var(0)
     >>> assert vars.min() > 1 / 3
