@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Add argument `basis` into `math.soft_one_hot_linspace` that can take values `gaussian` and `cosine`
+- Add argument `basis` into `math.soft_one_hot_linspace` that can take values `gaussian`, `cosine` and `fourier`
 - `io.SphericalTensor.sum_of_diracs`
 - Optional arguments `function(..., device=None, dtype=None)` for many functions
 - `e3nn.nn.models.gate_points_2102` using node attributes along the length embedding to feed the radial network
