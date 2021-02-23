@@ -211,6 +211,10 @@ class ReducedTensorProducts:
     out: {self.irreps_out}
 )"""
 
+    def to(self, dtype=None, device=None):
+        for _, tp in self.tps.items():
+            tp.to(dtype=dtype, device=device)
+
     def __call__(self, *xs):
         values = dict()
 
