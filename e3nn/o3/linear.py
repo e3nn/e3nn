@@ -1,8 +1,12 @@
+from typing import Optional
+
 import torch
 
 from e3nn import o3
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('script')
 class Linear(torch.nn.Module):
     r"""Linear operation equivariant to :math:`O(3)`
 
@@ -34,7 +38,7 @@ class Linear(torch.nn.Module):
             irreps_out,
             internal_weights=None,
             shared_weights=None,
-                ):
+        ):
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in).simplify()
@@ -56,7 +60,7 @@ class Linear(torch.nn.Module):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.tp.weight_numel} weights)"
 
-    def forward(self, features, weight=None):
+    def forward(self, features, weight: Optional[torch.Tensor] = None):
         """evaluate
 
         Parameters

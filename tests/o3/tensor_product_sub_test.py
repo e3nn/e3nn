@@ -37,7 +37,7 @@ def test_linear():
     m(torch.randn(irreps_in.dim))
 
     assert_equivariant(m)
-    # assert_auto_jitable(m)
+    assert_auto_jitable(m)
 
 
 def test_full():
@@ -66,4 +66,4 @@ def test_norm():
     assert torch.allclose(out_norms[0, 3:], true_vec_norms)
 
     assert_equivariant(norm)
-    # assert_auto_jitable(norm)
+    assert_auto_jitable(norm)

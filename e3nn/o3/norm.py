@@ -1,8 +1,10 @@
 import torch
 
 from e3nn import o3
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('script')
 class Norm(torch.nn.Module):
     r"""Norm operation
 
@@ -25,7 +27,7 @@ class Norm(torch.nn.Module):
     def __init__(
             self,
             irreps_in,
-                ):
+        ):
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in).simplify()
