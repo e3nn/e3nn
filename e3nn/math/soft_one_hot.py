@@ -104,7 +104,7 @@ def soft_one_hot_linspace(x, start, end, number, base='gaussian', endpoint=True)
         x = (x[..., None] - start) / (end - start)
         if endpoint:
             i = torch.arange(0, number, dtype=x.dtype, device=x.device)
-            return torch.cos(math.pi * i * x) / math.sqrt(number / 2)
+            return torch.cos(math.pi * i * x) / math.sqrt(0.25 + number / 2)
         else:
             i = torch.arange(1, number + 1, dtype=x.dtype, device=x.device)
-            return torch.sin(math.pi * i * x) / math.sqrt(number / 2) * (0 < x) * (x < 1)
+            return torch.sin(math.pi * i * x) / math.sqrt(0.25 + number / 2) * (0 < x) * (x < 1)
