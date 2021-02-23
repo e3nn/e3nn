@@ -118,7 +118,7 @@ def test_input_weights_python():
     bdim = random.randint(1, 3)
     x1 = irreps_in1.randn(bdim, -1)
     x2 = irreps_in2.randn(bdim, -1)
-    w = [torch.randn((bdim,) + ins.weight_shape) for ins in m.instructions if ins.has_weight]
+    w = [torch.randn((bdim,) + ins.path_shape) for ins in m.instructions if ins.has_weight]
     m(x1, x2, w)
     # - shared_weights = True -
     m = FullyConnectedTensorProduct(
@@ -131,7 +131,7 @@ def test_input_weights_python():
     bdim = random.randint(1, 3)
     x1 = irreps_in1.randn(bdim, -1)
     x2 = irreps_in2.randn(bdim, -1)
-    w = [torch.randn(ins.weight_shape) for ins in m.instructions if ins.has_weight]
+    w = [torch.randn(ins.path_shape) for ins in m.instructions if ins.has_weight]
     m(x1, x2, w)
 
 

@@ -140,7 +140,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> ws = []
     >>> for ins in module.instructions:
     ...     if ins.has_weight:
-    ...         weight = torch.empty(ins.weight_shape)
+    ...         weight = torch.empty(ins.path_shape)
     ...         mul_1, mul_2, mul_out = weight.shape
     ...         # formula from torch.nn.init.xavier_uniform_
     ...         a = (6 / (mul_1 * mul_2 + mul_out))**0.5
@@ -281,7 +281,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         last_ss = None
 
-        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, weight_shape")
+        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, path_shape")
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
         self.instructions = [
             Instruction(
@@ -293,7 +293,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
                     'uuu': (self.irreps_in1[i_in1].mul,),
                     'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                }[connection_mode] if has_weight else None
+                }[connection_mode],
             )
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
         ]
@@ -353,10 +353,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             if ins.has_weight:
                 index_w += 1
                 # Extract the weight from the flattened weight tensor
-                line = f"{s}ws_{index_w} = ws[..., {flat_weight_i}:{flat_weight_i + _prod(ins.weight_shape)}].reshape({'' if self.shared_weights else '-1, '}{', '.join(str(d) for d in ins.weight_shape)})\n"
+                line = f"{s}ws_{index_w} = ws[..., {flat_weight_i}:{flat_weight_i + _prod(ins.path_shape)}].reshape({(() if self.shared_weights else (-1,)) + tuple(ins.path_shape)})\n"
                 code_out += line
                 code_right += line
-                flat_weight_i += _prod(ins.weight_shape)
+                flat_weight_i += _prod(ins.path_shape)
 
             line_out = f"{s}out[:, {index_out}:{index_out+dim_out}] += {alpha} * {{}}.reshape(batch, {dim_out})\n\n"
             line_right = f"{s}out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += {alpha} * {{}}.reshape(batch, {dim_1}, {dim_out})\n\n"
@@ -531,12 +531,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         code_right += f"{s}return out.reshape(outsize)"
 
         # w3j
-        self.wigners = wigners
         wigner_mats = []
         flat_wigner_index = 0
         code_wigners = []
         s = indent_for_level(0)
-        for i, (l_1, l_2, l_out) in enumerate(self.wigners):
+        for i, (l_1, l_2, l_out) in enumerate(wigners):
             wig = o3.wigner_3j(l_1, l_2, l_out)
 
             if normalization == 'component':
@@ -544,7 +543,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             if normalization == 'norm':
                 wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
 
-            code_wigners.append(f"{s}w3j_{i} = w3j[{flat_wigner_index}:{flat_wigner_index + _prod(wig.shape)}].reshape({', '.join(str(d) for d in wig.shape)})")
+            code_wigners.append(f"{s}w3j_{i} = w3j[{flat_wigner_index}:{flat_wigner_index + _prod(wig.shape)}].reshape({tuple(wig.shape)})")
             flat_wigner_index += _prod(wig.shape)
             wigner_mats.append(wig)
         code_wigners = '\n'.join(code_wigners)
@@ -589,7 +588,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         })
 
         # weights
-        self.weight_numel = sum(_prod(ins.weight_shape) for ins in self.instructions if ins.has_weight)
+        self.weight_numel = sum(_prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
 
         self.internal_weights = internal_weights
         if internal_weights and self.weight_numel > 0:
@@ -611,20 +610,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.register_buffer('output_mask', output_mask)
 
         # For TorchScript, this needs to be done in advance:
-        self._profiling_str = str(type(self))
+        self._profiling_str = str(self)
 
     def __repr__(self):
-        npath = sum(
-            {
-                'uvw': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul * self.irreps_out[i.i_out].mul,
-                'uvu': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul,
-                'uvv': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul,
-                'uuw': self.irreps_in1[i.i_in1].mul * self.irreps_out[i.i_out].mul,
-                'uuu': self.irreps_in1[i.i_in1].mul,
-                'uvuv': self.irreps_in1[i.i_in1].mul * self.irreps_in2[i.i_in2].mul,
-            }[i.connection_mode]
-            for i in self.instructions
-        )
+        npath = sum(_prod(i.path_shape) for i in self.instructions)
         return (
             f"{self.__class__.__name__}"
             f"({self.irreps_in1.simplify()} x {self.irreps_in2.simplify()} "
@@ -634,7 +623,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     @torch.jit.unused
     def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
         if isinstance(weight, list):
-            weight_shapes = [ins.weight_shape for ins in self.instructions if ins.has_weight]
+            weight_shapes = [ins.path_shape for ins in self.instructions if ins.has_weight]
             if not self.shared_weights:
                 weight = [w.reshape(-1, _prod(shape)) for w, shape in zip(weight, weight_shapes)]
             else:
