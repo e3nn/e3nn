@@ -85,7 +85,7 @@ def test_compilation():
     class ChildMod(Supermod):
         def forward(self, x):
             return super().forward(x) * 3.
-        
+
         def _make_tracing_inputs(self, n: int):
             return [{'forward': (torch.randn(2, 3),)} for _ in range(n)]
 
