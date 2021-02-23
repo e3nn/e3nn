@@ -30,7 +30,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
 
 ## Citing
 ```
-@software{e3nn_2021_4522091,
+@software{mario_geiger_2021_4557591,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Benjamin K. Miller and
@@ -41,15 +41,17 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Alby M. and
                   Bradley Dice and
                   Jes Frellsen and
+                  Nuri Jung and
                   Sophia Sanborn and
-                  Nuri Jung},
-  title        = {\texttt{e3nn}: a modular framework for Euclidean Neural Networks, github.com/e3nn/e3nn}},
+                  Josh Rackers and
+                  Simon Batzner},
+  title        = {e3nn/e3nn 0.2.3},
   month        = feb,
   year         = 2021,
   publisher    = {Zenodo},
-  version      = {0.2.2},
-  doi          = {10.5281/zenodo.4522091},
-  url          = {https://doi.org/10.5281/zenodo.4522091}
+  version      = {0.2.3},
+  doi          = {10.5281/zenodo.4557591},
+  url          = {https://doi.org/10.5281/zenodo.4557591}
 }
 ```
 
