@@ -834,18 +834,14 @@ class FullyConnectedTensorProduct(TensorProduct):
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         irreps_out = o3.Irreps(irreps_out).simplify()
 
-        in1 = [(mul, ir, 1.0) for mul, ir in irreps_in1]
-        in2 = [(mul, ir, 1.0) for mul, ir in irreps_in2]
-        out = [(mul, ir, 1.0) for mul, ir in irreps_out]
-
         instr = [
             (i_1, i_2, i_out, 'uvw', True, 1.0)
-            for i_1, (_, (l_1, p_1)) in enumerate(irreps_in1)
-            for i_2, (_, (l_2, p_2)) in enumerate(irreps_in2)
-            for i_out, (_, (l_out, p_out)) in enumerate(irreps_out)
-            if abs(l_1 - l_2) <= l_out <= l_1 + l_2 and p_1 * p_2 == p_out
+            for i_1, (_, ir_1) in enumerate(irreps_in1)
+            for i_2, (_, ir_2) in enumerate(irreps_in2)
+            for i_out, (_, ir_out) in enumerate(irreps_out)
+            if ir_out in ir_1 * ir_2
         ]
-        super().__init__(in1, in2, out, instr, normalization, internal_weights, shared_weights)
+        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, normalization, internal_weights, shared_weights)
 
 
 class ElementwiseTensorProduct(TensorProduct):
