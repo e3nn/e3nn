@@ -103,7 +103,7 @@ class Network(torch.nn.Module):
         edge_src, edge_dst = radius_graph(data.pos, 2.1, data.batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component', normalize=True)
-        edge_length_embedded = soft_one_hot_linspace(edge_vec.norm(dim=1), 1.0, 2.0, 3) * 3**0.5
+        edge_length_embedded = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.5, 2.5, 3, 'cosine') * 3**0.5
 
         x = scatter(edge_sh, edge_dst, dim=0).div(num_neighbors**0.5)
 
