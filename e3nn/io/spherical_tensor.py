@@ -258,6 +258,24 @@ class SphericalTensor(o3.Irreps):
 
     def norms(self, signal):
         r"""The norms of each l component
+
+        Parameters
+        ----------
+        signal : `torch.Tensor`
+            tensor of shape ``(..., dim)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(..., lmax+1)``
+
+        Examples
+        --------
+        Examples
+        --------
+        >>> s = SphericalTensor(1, 1, -1)
+        >>> s.norms(torch.tensor([1.5, 0.0, 3.0, 4.0]))
+        tensor([1.5000, 5.0000])
         """
         i = 0
         norms = []
@@ -361,11 +379,26 @@ class SphericalTensor(o3.Irreps):
 
     def find_peaks(self, signal, res=100):
         r"""Locate peaks on the sphere
+
+        Examples
+        --------
+        >>> s = SphericalTensor(4, 1, -1)
+        >>> pos = torch.tensor([
+        ...     [4.0, 0.0, 4.0],
+        ...     [0.0, 5.0, 0.0],
+        ... ])
+        >>> x = s.with_peaks_at(pos)
+        >>> pos, val = s.find_peaks(x)
+        >>> pos[val > 4.0].mul(10).round().abs()
+        tensor([[ 7.,  0.,  7.],
+                [ 0., 10.,  0.]])
+        >>> val[val > 4.0].mul(10).round().abs()
+        tensor([57., 50.])
         """
         x1, f1 = self.signal_on_grid(signal, res)
 
-        abc = pi / 2, pi / 2, pi / 2
-        R = o3.rot(*abc)
+        abc = torch.tensor([pi / 2, pi / 2, pi / 2])
+        R = o3.angles_to_matrix(*abc)
         D = self.D_from_matrix(R)
 
         r_signal = D @ signal
