@@ -80,6 +80,21 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
 
 
+def test_empty_irreps():
+    tp = FullyConnectedTensorProduct('0e + 1e', Irreps([]), '0e + 1e')
+    out = tp(torch.randn(1, 2, 4), torch.randn(2, 1, 0))
+    assert out.shape == (2, 2, 4)
+
+
+def test_empty_inputs():
+    tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
+    out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
+    assert out.shape == (2, 2, 0, 3, 4)
+
+    out = tp.right(torch.randn(1, 2, 0, 3, 4))
+    assert out.shape == (1, 2, 0, 3, 4, 4)
+
+
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
 def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
