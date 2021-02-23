@@ -25,9 +25,9 @@ class Norm(torch.nn.Module):
     torch.Size([17])
     """
     def __init__(
-            self,
-            irreps_in,
-        ):
+        self,
+        irreps_in,
+    ):
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in).simplify()

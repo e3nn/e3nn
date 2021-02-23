@@ -33,12 +33,12 @@ class Linear(torch.nn.Module):
     160
     """
     def __init__(
-            self,
-            irreps_in,
-            irreps_out,
-            internal_weights=None,
-            shared_weights=None,
-        ):
+        self,
+        irreps_in,
+        irreps_out,
+        internal_weights=None,
+        shared_weights=None,
+    ):
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in).simplify()
