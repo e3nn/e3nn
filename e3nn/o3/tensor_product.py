@@ -656,6 +656,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
             return weight
 
+    @torch.jit.export
     def right(self, features_2, weight: Optional[torch.Tensor] = None):
         r"""evaluate partially :math:`w x \cdot \otimes y`
 
