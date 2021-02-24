@@ -177,6 +177,17 @@ def test_input_weights_jit():
         m(x1, x2, w),
         traced(x1, x2, w)
     )
+
+    # Confirm that weird batch dimensions give the same results
+    for f in (m, traced):
+        x1 = irreps_in1.randn(2, 3, 4, -1)
+        x2 = irreps_in2.randn(2, 3, 4, -1)
+        w = torch.randn(2, 3, 4, f.weight_numel)
+        assert torch.allclose(
+            f(x1, x2, w).reshape(24, -1),
+            f(x1.reshape(24, -1), x2.reshape(24, -1), w.reshape(24, -1))
+        )
+
     # - shared_weights = True -
     m = FullyConnectedTensorProduct(
         irreps_in1,

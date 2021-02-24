@@ -169,6 +169,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         shared_weights=None,
         _specialized_code=True,
     ):
+        # === Setup ===
         super().__init__()
 
         assert normalization in ['component', 'norm'], normalization
@@ -209,9 +210,37 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         in2_var = [var for _, _, var in in2]
         out_var = [var for _, _, var in out]
 
-        self.shared_weights = shared_weights
-        z = '' if self.shared_weights else 'z'
+        # === Build instructions ===
+        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, path_shape")
+        instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
+        self.instructions = [
+            Instruction(
+                i_in1, i_in2, i_out, connection_mode, has_weight, path_weight,
+                {
+                    'uvw': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
+                    'uvu': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uvv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
+                    'uuu': (self.irreps_in1[i_in1].mul,),
+                    'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                }[connection_mode],
+            )
+            for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
+        ]
 
+        # === Determine weights ===
+        self.shared_weights = shared_weights
+        self.weight_numel = sum(_prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
+
+        self.internal_weights = internal_weights
+        if internal_weights and self.weight_numel > 0:
+            assert self.shared_weights, "Having internal weights impose shared weights"
+            self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
+        else:
+            # For TorchScript, there always has to be some kind of defined .weight
+            self.register_buffer('weight', torch.Tensor())
+
+        # === Init everything for codegen ===
         # == TorchScript main operation templates ==
         code_header = textwrap.dedent("""
         from typing import List
@@ -229,6 +258,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
             x1 = x1.reshape(-1, {self.irreps_in1.dim})
             x2 = x2.reshape(-1, {self.irreps_in2.dim})
+            ws = ws.reshape(-1, {self.weight_numel})
 
             if x1.shape[0] == 0:
                 return x1.new_zeros(outsize)
@@ -245,6 +275,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
             assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
             x2 = x2.reshape(-1, {self.irreps_in2.dim})
+            ws = ws.reshape(-1, {self.weight_numel})
 
             if x2.shape[0] == 0:
                 return x2.new_zeros(outsize)
@@ -279,24 +310,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         code_out += "\n"
         code_right += "\n"
 
+        z = '' if self.shared_weights else 'z'
         last_ss = None
-
-        Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, path_shape")
-        instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
-        self.instructions = [
-            Instruction(
-                i_in1, i_in2, i_out, connection_mode, has_weight, path_weight,
-                {
-                    'uvw': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
-                    'uvu': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                    'uvv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                    'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
-                    'uuu': (self.irreps_in1[i_in1].mul,),
-                    'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                }[connection_mode],
-            )
-            for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
-        ]
 
         index_w = -1
         flat_weight_i = 0
@@ -587,17 +602,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             '_compiled_main_right': full_code_right,
         })
 
-        # weights
-        self.weight_numel = sum(_prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
-
-        self.internal_weights = internal_weights
-        if internal_weights and self.weight_numel > 0:
-            assert self.shared_weights, "Having internal weights impose shared weights"
-            self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
-        else:
-            # For TorchScript, there always has to be some kind of defined .weight
-            self.register_buffer('weight', torch.Tensor())
-
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
                 torch.ones(mul * ir.dim)
@@ -642,7 +646,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
             return self.weight
         else:
-            assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
+            if self.shared_weights:
+                assert weight.shape == (self.weight_numel,), "Invalid weight shape"
+            else:
+                assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
+                assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
             return weight
 
     def right(self, features_2, weight: Optional[torch.Tensor] = None):
