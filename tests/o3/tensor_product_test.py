@@ -180,12 +180,16 @@ def test_input_weights_jit():
 
     # Confirm that weird batch dimensions give the same results
     for f in (m, traced):
-        x1 = irreps_in1.randn(2, 3, 4, -1)
-        x2 = irreps_in2.randn(2, 3, 4, -1)
-        w = torch.randn(2, 3, 4, f.weight_numel)
+        x1 = irreps_in1.randn(2, 1, 4, -1)
+        x2 = irreps_in2.randn(2, 3, 1, -1)
+        w = torch.randn(3, 4, f.weight_numel)
         assert torch.allclose(
             f(x1, x2, w).reshape(24, -1),
-            f(x1.reshape(24, -1), x2.reshape(24, -1), w.reshape(24, -1))
+            f(x1.expand(2, 3, 4, -1).reshape(24, -1), x2.expand(2, 3, 4, -1).reshape(24, -1), w[None].expand(2, 3, 4, -1).reshape(24, -1))
+        )
+        assert torch.allclose(
+            f.right(x2, w).reshape(24, -1),
+            f.right(x2.expand(2, 3, 4, -1).reshape(24, -1), w[None].expand(2, 3, 4, -1).reshape(24, -1)).reshape(24, -1)
         )
 
     # - shared_weights = True -

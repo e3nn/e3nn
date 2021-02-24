@@ -251,7 +251,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         funcdef_out = textwrap.dedent(f"""
         @torch.jit.script
         def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-            x1, x2 = broadcast_tensors(x1, x2)
+            {'x1, x2 = broadcast_tensors(x1, x2)' if shared_weights else ''}
+            {'x1, x2, ws = torch.broadcast_tensors(x1[..., :, None, None], x2[..., None, :, None], ws[..., None, None, :])' if not shared_weights else ''}
+            {'x1, x2, ws = x1[..., :, 0, 0], x2[..., 0, :, 0], ws[..., 0, 0, :]' if not shared_weights else ''}
             size = x1.shape[:-1]
             outsize = size + ({self.irreps_out.dim},)
             assert x1.shape[-1] == {self.irreps_in1.dim}, "Incorrect feature dimension for x1"
@@ -271,6 +273,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         funcdef_right = textwrap.dedent(f"""
         @torch.jit.script
         def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
+            {'x2, ws = broadcast_tensors(x2, ws)' if not shared_weights else ''}
             size = x2.shape[:-1]
             outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
             assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
@@ -368,7 +371,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             if ins.has_weight:
                 index_w += 1
                 # Extract the weight from the flattened weight tensor
-                line = f"{s}ws_{index_w} = ws[..., {flat_weight_i}:{flat_weight_i + _prod(ins.path_shape)}].reshape({(() if self.shared_weights else (-1,)) + tuple(ins.path_shape)})\n"
+                line = f"{s}ws_{index_w} = ws[:, {flat_weight_i}:{flat_weight_i + _prod(ins.path_shape)}].reshape({(() if self.shared_weights else (-1,)) + tuple(ins.path_shape)})\n"
                 code_out += line
                 code_right += line
                 flat_weight_i += _prod(ins.path_shape)
