@@ -80,6 +80,21 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
 
 
+def test_empty_irreps():
+    tp = FullyConnectedTensorProduct('0e + 1e', Irreps([]), '0e + 1e')
+    out = tp(torch.randn(1, 2, 4), torch.randn(2, 1, 0))
+    assert out.shape == (2, 2, 4)
+
+
+def test_empty_inputs():
+    tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
+    out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
+    assert out.shape == (2, 2, 0, 3, 4)
+
+    out = tp.right(torch.randn(1, 2, 0, 3, 4))
+    assert out.shape == (1, 2, 0, 3, 4, 4)
+
+
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
 def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
@@ -103,6 +118,38 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     )
 
 
+def test_input_weights_python():
+    irreps_in1 = Irreps("1e + 2e + 3x3o")
+    irreps_in2 = Irreps("1e + 2e + 3x3o")
+    irreps_out = Irreps("1e + 2e + 3x3o")
+    # - shared_weights = False -
+    m = FullyConnectedTensorProduct(
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        internal_weights=False,
+        shared_weights=False
+    )
+    bdim = random.randint(1, 3)
+    x1 = irreps_in1.randn(bdim, -1)
+    x2 = irreps_in2.randn(bdim, -1)
+    w = [torch.randn((bdim,) + ins.path_shape) for ins in m.instructions if ins.has_weight]
+    m(x1, x2, w)
+    # - shared_weights = True -
+    m = FullyConnectedTensorProduct(
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        internal_weights=False,
+        shared_weights=True
+    )
+    bdim = random.randint(1, 3)
+    x1 = irreps_in1.randn(bdim, -1)
+    x2 = irreps_in2.randn(bdim, -1)
+    w = [torch.randn(ins.path_shape) for ins in m.instructions if ins.has_weight]
+    m(x1, x2, w)
+
+
 def test_input_weights_jit():
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
@@ -119,17 +166,32 @@ def test_input_weights_jit():
     x1 = irreps_in1.randn(2, -1)
     x2 = irreps_in2.randn(2, -1)
     w = torch.randn(2, m.weight_numel)
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         m(x1, x2)  # it should require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2)  # it should also require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2, w[0])  # it should reject insufficient weights
     # Does the trace give right results?
     assert torch.allclose(
         m(x1, x2, w),
         traced(x1, x2, w)
     )
+
+    # Confirm that weird batch dimensions give the same results
+    for f in (m, traced):
+        x1 = irreps_in1.randn(2, 1, 4, -1)
+        x2 = irreps_in2.randn(2, 3, 1, -1)
+        w = torch.randn(3, 4, f.weight_numel)
+        assert torch.allclose(
+            f(x1, x2, w).reshape(24, -1),
+            f(x1.expand(2, 3, 4, -1).reshape(24, -1), x2.expand(2, 3, 4, -1).reshape(24, -1), w[None].expand(2, 3, 4, -1).reshape(24, -1))
+        )
+        assert torch.allclose(
+            f.right(x2, w).reshape(24, -1),
+            f.right(x2.expand(2, 3, 4, -1).reshape(24, -1), w[None].expand(2, 3, 4, -1).reshape(24, -1)).reshape(24, -1)
+        )
+
     # - shared_weights = True -
     m = FullyConnectedTensorProduct(
         irreps_in1,
@@ -140,11 +202,11 @@ def test_input_weights_jit():
     )
     traced = assert_auto_jitable(m)
     w = torch.randn(m.weight_numel)
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         m(x1, x2)  # it should require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2)  # it should also require weights
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         traced(x1, x2, torch.randn(2, m.weight_numel))  # it should reject too many weights
     # Does the trace give right results?
     assert torch.allclose(

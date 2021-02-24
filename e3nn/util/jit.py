@@ -21,9 +21,6 @@ def compile_mode(mode: str):
     def decorator(obj):
         if not (inspect.isclass(obj) and issubclass(obj, torch.nn.Module)):
             raise TypeError("@e3nn.util.jit.compile_mode can only decorate classes derived from torch.nn.Module")
-        if hasattr(obj, _E3NN_COMPILE_MODE):
-            # TODO: is this right for subclasses?
-            warnings.warn("Something is strange — did this class get marked twice with @e3nn.util.jit.compile_mode?")
         setattr(obj, _E3NN_COMPILE_MODE, mode)
         return obj
     return decorator

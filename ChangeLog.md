@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `o3.TensorProduct`: is jit scriptable
+- `o3.TensorProduct`: also broadcast the `weight` argument
 
 ## [0.2.3] - 2021-02-23
 ### Added
@@ -18,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TorchScript support for `TensorProduct` and subclasses, `NormActivation`, `Gate`, `FullyConnectedNet`, and `gate_points_2101.Network`
 
 ### Changed
+- in `o3.TensorProduct.instructions`: renamed `weight_shape` in `path_shape` and is now set even if `has_weight` is `False`
+- `o3.TensorProduct` weights are now flattened tensors
 - rename `io.SphericalTensor.from_geometry_adjusted` into `io.SphericalTensor.with_peaks_at`
 - in `ReducedTensorProducts`, `ElementwiseTensorProduct` and `FullTensorProduct`: rename `irreps_out` argument into `set_ir_out` to not confuse it with `o3.Irreps`
 

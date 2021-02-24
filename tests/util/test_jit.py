@@ -3,8 +3,8 @@ import warnings
 
 import torch
 
-from e3nn.o3 import FullyConnectedTensorProduct, Irreps
-from e3nn.util.jit import script, trace_module, compile_mode
+from e3nn.o3 import Linear, Irreps
+from e3nn.util.jit import script, trace_module, compile_mode, compile
 from e3nn.util.test import assert_equivariant
 
 
@@ -76,32 +76,44 @@ def test_submod_scripting():
 
 
 def test_compilation():
-    irreps_in1 = Irreps("1e + 2e + 3x3o")
-    irreps_in2 = Irreps("1e + 2e + 3x3o")
-    irreps_out = Irreps("1e + 2e + 3x3o")
 
-    # This module can't be compiled directly by TorchScript, since FullyConnectedTensorProduct is a subclass and calls super() in forward()
-    class ParentModule(torch.nn.Module):
-        def __init__(self, irreps_in1, irreps_in2, irreps_out):
+    class Supermod(torch.nn.Module):
+        def forward(self, x):
+            return x* 2.
+
+    @compile_mode('trace')
+    class ChildMod(Supermod):
+        def forward(self, x):
+            return super().forward(x) * 3.
+
+        def _make_tracing_inputs(self, n: int):
+            return [{'forward': (torch.randn(2, 3),)} for _ in range(n)]
+
+    # This module can't be compiled directly by TorchScript, since ChildMod is a subclass and calls super() in forward()
+    class ContainerMod(torch.nn.Module):
+        def __init__(self):
             super().__init__()
-            self.tp = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
+            self.submod = ChildMod()
             self.alpha = torch.randn(1).squeeze()
 
-        def forward(self, x1, x2):
-            return self.tp(x1, x2) + self.alpha*self.tp(x1, x2)
+        def forward(self, x):
+            return self.submod(x) + self.alpha*self.submod(x)
 
-    mod = ParentModule(irreps_in1, irreps_in2, irreps_out)
+    mod = ContainerMod()
     # Try and xfail with torch.jit.script
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, torch.jit.Error)):
         mod_script = torch.jit.script(mod)
     # Compile with our compiler
     mod_script = script(mod)
 
-    x1, x2 = irreps_in1.randn(3, -1), irreps_in2.randn(3, -1)
-    assert torch.allclose(mod(x1, x2), mod_script(x1, x2))
+    x = torch.randn(3, 2)
+    assert torch.allclose(mod(x), mod_script(x))
 
-    assert_equivariant(
-        mod_script,
-        irreps_in=[irreps_in1, irreps_in2],
-        irreps_out=[irreps_out]
-    )
+
+def test_equivariant():
+    # Confirm that a compiled tensorproduct is still equivariant
+    irreps_in = Irreps("1e + 2e + 3x3o")
+    irreps_out = Irreps("1e + 2e + 3x3o")
+    mod = Linear(irreps_in, irreps_out)
+    mod_script = compile(mod)
+    assert_equivariant(mod_script)
