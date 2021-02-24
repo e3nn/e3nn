@@ -558,7 +558,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if self.irreps_in1.dim == 0 or self.irreps_in2.dim == 0 or self.irreps_out.dim == 0:
             full_code_out = code_header + textwrap.dedent(f"""
             @torch.jit.script
-            def main(x1: torch.Tensor, x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+            def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
                 x1, x2 = broadcast_tensors(x1, x2)
                 size = x1.shape[:-1]
                 outsize = size + ({self.irreps_out.dim},)
@@ -570,7 +570,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
             full_code_right = code_header + textwrap.dedent(f"""
             @torch.jit.script
-            def main(x2: torch.Tensor, ws: List[torch.Tensor], w3j: List[torch.Tensor]) -> torch.Tensor:
+            def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
                 size = x2.shape[:-1]
                 outsize = size + ({self.irreps_in1.dim}, {self.irreps_out.dim},)
                 assert x2.shape[-1] == {self.irreps_in2.dim}, "Incorrect feature dimension for x2"
