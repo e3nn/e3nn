@@ -66,48 +66,61 @@ def codegen_tensor_product(in1, in2, out, instructions, normalization='component
     code_header = textwrap.dedent("""
     from typing import List
     import torch
-    from e3nn.util import broadcast_tensors
     """)
     # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
     funcdef_out = textwrap.dedent(f"""
     @torch.jit.script
     def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-        {'x1, x2 = broadcast_tensors(x1, x2)' if shared_weights else ''}
+        {'x1, x2 = torch.broadcast_tensors(x1[..., :, None], x2[..., None, :])' if shared_weights else ''}
         {'x1, x2, ws = torch.broadcast_tensors(x1[..., :, None, None], x2[..., None, :, None], ws[..., None, None, :])' if not shared_weights else ''}
-        {'x1, x2, ws = x1[..., :, 0, 0], x2[..., 0, :, 0], ws[..., 0, 0, :]' if not shared_weights else ''}
-        size = x1.shape[:-1]
-        outsize = size + ({irreps_out.dim},)
-        assert x1.shape[-1] == {irreps_in1.dim}, "Incorrect feature dimension for x1"
-        assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
-        x1 = x1.reshape(-1, {irreps_in1.dim})
-        x2 = x2.reshape(-1, {irreps_in2.dim})
-        ws = ws.reshape(-1, {weight_numel})
-
-        if x1.shape[0] == 0:
-            return x1.new_zeros(outsize)
-        else:
-            batch = x1.shape[0]
-            out = x1.new_zeros((batch, {irreps_out.dim}))
-            ein = torch.einsum
     """)
 
     funcdef_right = textwrap.dedent(f"""
     @torch.jit.script
     def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-        {'x2, ws = broadcast_tensors(x2, ws)' if not shared_weights else ''}
-        size = x2.shape[:-1]
-        outsize = size + ({irreps_in1.dim}, {irreps_out.dim},)
-        assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
-        x2 = x2.reshape(-1, {irreps_in2.dim})
-        ws = ws.reshape(-1, {weight_numel})
-
-        if x2.shape[0] == 0:
-            return x2.new_zeros(outsize)
-        else:
-            batch = x2.shape[0]
-            out = x2.new_zeros((batch, {irreps_in1.dim}, {irreps_out.dim}))
-            ein = torch.einsum
+        {'x2, ws = torch.broadcast_tensors(x2[..., :, None], ws[..., None, :])' if not shared_weights else ''}
     """)
+
+    if irreps_in1.dim == 0 or irreps_in2.dim == 0 or irreps_out.dim == 0:
+        funcdef_out += f"    return x1.new_zeros(x1.shape[{':-2' if shared_weights else ':-3'}] + ({irreps_out.dim},))"
+        funcdef_right += f"    return x2.new_zeros(x2.shape[{':-1' if shared_weights else ':-2'}] + ({irreps_in1.dim}, {irreps_out.dim},))"
+    else:
+        funcdef_out += f"""
+    {'x1, x2 = x1[..., :, 0], x2[..., 0, :]' if shared_weights else ''}
+    {'x1, x2, ws = x1[..., :, 0, 0], x2[..., 0, :, 0], ws[..., 0, 0, :]' if not shared_weights else ''}
+    size = x1.shape[:-1]
+    outsize = size + ({irreps_out.dim},)
+    assert x1.shape[-1] == {irreps_in1.dim}, "Incorrect feature dimension for x1"
+    assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
+
+    x1 = x1.reshape(-1, {irreps_in1.dim})
+    x2 = x2.reshape(-1, {irreps_in2.dim})
+    ws = ws.reshape(-1, {weight_numel})
+
+    if x1.shape[0] == 0:
+        return x1.new_zeros(outsize)
+    else:
+        batch = x1.shape[0]
+        out = x1.new_zeros((batch, {irreps_out.dim}))
+        ein = torch.einsum
+"""
+        funcdef_right += f"""
+    {'x2, ws = x2[..., :, 0], ws[..., 0, :]' if not shared_weights else ''}
+    size = x2.shape[:-1]
+    outsize = size + ({irreps_in1.dim}, {irreps_out.dim},)
+    assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
+
+    x2 = x2.reshape(-1, {irreps_in2.dim})
+    ws = ws.reshape(-1, {weight_numel})
+
+    if x2.shape[0] == 0:
+        return x2.new_zeros(outsize)
+    else:
+        batch = x2.shape[0]
+        out = x2.new_zeros((batch, {irreps_in1.dim}, {irreps_out.dim}))
+        ein = torch.einsum
+"""
+
     # == end TorchScript templates ==
     # Put everything in the else block
     code_out = ""
@@ -380,29 +393,9 @@ def codegen_tensor_product(in1, in2, out, instructions, normalization='component
 
     # Finalize the code
     if irreps_in1.dim == 0 or irreps_in2.dim == 0 or irreps_out.dim == 0:
-        full_code_out = code_header + textwrap.dedent(f"""
-        @torch.jit.script
-        def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-            x1, x2 = broadcast_tensors(x1, x2)
-            size = x1.shape[:-1]
-            outsize = size + ({irreps_out.dim},)
-            assert x1.shape[-1] == {irreps_in1.dim}, "Incorrect feature dimension for x1"
-            assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
-
-            return x1.new_zeros(outsize)
-        """)
-
-        full_code_right = code_header + textwrap.dedent(f"""
-        @torch.jit.script
-        def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-            size = x2.shape[:-1]
-            outsize = size + ({irreps_in1.dim}, {irreps_out.dim},)
-            assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
-
-            return x2.new_zeros(outsize)
-        """)
+        full_code_out = "\n\n".join([code_header, funcdef_out])
+        full_code_right = "\n\n".join([code_header, funcdef_right])
     else:
-        # paste together the pieces
         full_code_out = "\n\n".join([code_header, funcdef_out, code_wigners, code_out])
         full_code_right = "\n\n".join([code_header, funcdef_right, code_wigners, code_right])
 
