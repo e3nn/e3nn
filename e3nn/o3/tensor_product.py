@@ -16,6 +16,45 @@ def _prod(x):
     return out
 
 
+def _l1l2l3_order(lmax):
+    out = []
+    for lm in range(lmax + 1):
+        for l1 in range(lm + 1):
+            for l2 in range(l1 + 1):
+                for l3 in range(l2 + 1):
+                    if abs(l2 - l3) <= l1 <= l2 + l3:
+                        out += [(l1, l2, l3)]
+    return out
+
+
+def _codegen_w3j(name, l_in1, l_in2, l_out, normalization):
+    a = _l1l2l3_order(max(l_in1, l_in2, l_out))
+    k = a.index(tuple(sorted([l_in1, l_in2, l_out])))
+
+    i = sum((2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1) for l1, l2, l3 in a[:k])
+    j = i + (2 * l_in1 + 1) * (2 * l_in2 + 1) * (2 * l_out + 1)
+
+    name = f"{name}[{i}:{j}].reshape({2 * l_in1 + 1}, {2 * l_in2 + 1}, {2 * l_out + 1})"
+
+    if normalization == 'component':
+        v = (2 * l_out + 1) ** 0.5
+    if normalization == 'norm':
+        v = (2 * l_in1 + 1) ** 0.5 * (2 * l_in2 + 1) ** 0.5
+
+    if l_in1 <= l_in2 <= l_out:
+        return f"{name}.mul({v})"
+    if l_in1 <= l_out <= l_in2:
+        return f"{name}.transpose(1, 2).mul({v * (-1) ** (l_in1 + l_in2 + l_out)})"
+    if l_in2 <= l_in1 <= l_out:
+        return f"{name}.transpose(0, 1).mul({v * (-1) ** (l_in1 + l_in2 + l_out)})"
+    if l_out <= l_in2 <= l_in1:
+        return f"{name}.transpose(0, 2).mul({v * (-1) ** (l_in1 + l_in2 + l_out)})"
+    if l_in2 <= l_out <= l_in1:
+        return f"{name}.transpose(0, 2).transpose(1, 2).mul({v})"
+    if l_out <= l_in1 <= l_in2:
+        return f"{name}.transpose(0, 2).transpose(0, 1).mul({v})"
+
+
 def codegen_tensor_product(in1, in2, out, instructions, normalization='component', shared_weights=None, specialized_code=True):
     try:
         in1 = o3.Irreps(in1)
