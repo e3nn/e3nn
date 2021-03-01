@@ -1,0 +1,50 @@
+Models of March 21
+==================
+
+Lets create a simple network and evaluate it on random data.
+
+.. jupyter-execute::
+
+    import torch
+    from e3nn.nn.models.v2103 import SimpleNetwork
+
+    net = SimpleNetwork(
+        irreps_in="3x0e + 2x1o",
+        irreps_out="1x1o",
+        max_radius=2.0,
+        num_neighbors=3.0,
+        num_nodes=5.0
+    )
+
+    pos = torch.randn(5, 3)
+    x = net.irreps_in.randn(5, -1)
+
+    net({
+        'pos': pos,
+        'x': x
+    })
+
+If we rotate the inputs,
+
+.. jupyter-execute::
+
+    from e3nn import o3
+
+    rot = o3.matrix_x(torch.tensor(3.14 / 3.0))
+    rot
+
+.. jupyter-execute::
+
+    net({
+        'pos': pos @ rot.T,
+        'x': x @ net.irreps_in.D_from_matrix(rot).T
+    })
+
+it gives the same result as rotating the outputs.
+
+.. jupyter-execute::
+
+    net({
+        'pos': pos,
+        'x': x
+    }) @ net.irreps_out.D_from_matrix(rot).T

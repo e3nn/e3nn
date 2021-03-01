@@ -13,8 +13,8 @@ from .gate_points_message_passing import MessagePassing
 class SimpleNetwork(torch.nn.Module):
     def __init__(
             self,
-            irreps_node_input,
-            irreps_node_output,
+            irreps_in,
+            irreps_out,
             max_radius,
             num_neighbors,
             num_nodes,
@@ -36,9 +36,9 @@ class SimpleNetwork(torch.nn.Module):
         ])
 
         self.mp = MessagePassing(
-            irreps_node_input=irreps_node_input,
+            irreps_node_input=irreps_in,
             irreps_node_hidden=irreps_node_hidden,
-            irreps_node_output=irreps_node_output,
+            irreps_node_output=irreps_out,
             irreps_node_attr="0e",
             irreps_edge_attr=o3.Irreps.spherical_harmonics(lmax),
             layers=layers,
