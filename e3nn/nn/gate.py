@@ -94,7 +94,7 @@ class Activation(torch.nn.Module):
                 return torch.zeros_like(features)
 
 
-@compile_mode('trace')
+@compile_mode('script')
 class _Sortcut(torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
@@ -154,10 +154,9 @@ class Gate(torch.nn.Module):
         irreps_gates = o3.Irreps(irreps_gates)
         irreps_nonscalars = o3.Irreps(irreps_nonscalars)
 
-        self.sc = _Sortcut(irreps_scalars, irreps_gates)
-        self.irreps_scalars, self.irreps_gates = self.sc.irreps_outs
-        self.irreps_nonscalars = irreps_nonscalars.simplify()
-        self.irreps_in = self.sc.irreps_in + self.irreps_nonscalars
+        self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_nonscalars)
+        self.irreps_scalars, self.irreps_gates, self.irreps_nonscalars = self.sc.irreps_outs
+        self.irreps_in = self.sc.irreps_in
 
         self.act_scalars = Activation(irreps_scalars, act_scalars)
         irreps_scalars = self.act_scalars.irreps_out
@@ -187,8 +186,7 @@ class Gate(torch.nn.Module):
             tensor of shape ``(..., irreps_out.dim)``
         '''
         with torch.autograd.profiler.record_function('Gate'):
-            scalars, gates = self.sc(features)
-            nonscalars = features[..., scalars.shape[-1] + gates.shape[-1]:]
+            scalars, gates, nonscalars = self.sc(features)
 
             scalars = self.act_scalars(scalars)
             if gates.shape[-1]:

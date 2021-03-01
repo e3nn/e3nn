@@ -41,7 +41,8 @@ class Extract(CodeGenMixin, torch.nn.Module):
             "import torch",
             "@torch.jit.script",
             "def main(x: torch.Tensor):",
-            "    out = ("
+            f"    assert x.shape[-1] == {self.irreps_in.dim}",
+            "    out = (",
         ]
         s = " "*4
         for irreps in self.irreps_outs:
