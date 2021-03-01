@@ -6,7 +6,7 @@ from e3nn.util import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
 from ._instruction import Instruction
-from ._tensor_product_codegen import codegen_tensor_product, _prod
+from ._codegen import codegen_tensor_product, _prod
 
 
 @compile_mode('script')
