@@ -12,7 +12,7 @@ It makes the atoms interact with their neighbors but does not mix the channels.
 To mix the channels it is sandwich with ``lin1`` and ``lin2``.
 
 .. literalinclude:: ../../../../e3nn/nn/models/gate_points_2101.py
-    :lines: 20-116
+    :lines: 22-120
 
 .. rubric:: Network
 
@@ -26,7 +26,7 @@ one can use specific ``l`` of the spherical harmonics with the correct parity ``
 or consider that ``p=1`` in order to **not** be equivariant to Parity.
 
 .. literalinclude:: ../../../../e3nn/nn/models/gate_points_2101.py
-    :lines: 152-326
+    :lines: 156-329
 
 .. automodule:: e3nn.nn.models.gate_points_2101
     :members:
