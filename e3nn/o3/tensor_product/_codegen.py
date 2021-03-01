@@ -4,7 +4,6 @@ import textwrap
 import threading
 import inspect
 
-import torch
 from e3nn import o3
 
 from ._instruction import Instruction
@@ -333,15 +332,15 @@ def codegen_tensor_product(
 
             elif l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uuu' and normalization == 'component' and not ins.has_weight:
                 # Cl_l_0 = eye / sqrt(2L+1)
-                cg_out.einsum(f"zui,zui->zu", "s1", "s2", div_const=sqrt(2 * l_1 + 1))
-                cg_right.einsum(f"uw,zui->zuiw", "e1", "s2", div_const=sqrt(2 * l_1 + 1))
+                cg_out.einsum("zui,zui->zu", "s1", "s2", div_const=sqrt(2 * l_1 + 1))
+                cg_right.einsum("uw,zui->zuiw", "e1", "s2", div_const=sqrt(2 * l_1 + 1))
 
             elif (l_1, l_2, l_out) == (1, 1, 1) and ins.connection_mode == 'uvw' and normalization == 'component' and ins.has_weight:
                 # C1_1_1 = levi-civita / sqrt(2)
                 cg_out(f"s1 = s1.reshape(batch, {mul_1}, 1, {2 * l_1 + 1})")
                 cg_out(f"s2 = s2.reshape(batch, 1, {mul_2}, {2 * l_2 + 1})")
-                cg_out(f"s1, s2 = torch.broadcast_tensors(s1, s2)")
-                cg_out(f"s1xs2 = torch.cross(s1, s2, dim=3)")
+                cg_out("s1, s2 = torch.broadcast_tensors(s1, s2)")
+                cg_out("s1xs2 = torch.cross(s1, s2, dim=3)")
                 cg_out.einsum(f"{z}uvw,zuvi->zwi", f"ws_{index_w}", "s1xs2", div_const=sqrt(2))
 
                 if (l_1, l_2, l_out) in wigners:
@@ -367,7 +366,7 @@ def codegen_tensor_product(
                     wigners += [(l_1, l_2, l_out)]
 
                 cg_right.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
-            
+
             else:
                 # We didn't make a specialized version
                 done = False
@@ -397,17 +396,17 @@ def codegen_tensor_product(
                     cg_out.einsum(f"{z}uv,ijk,zuvij->zuk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
                     cg_right.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
                 else:
-                    cg_out.einsum(f"ijk,zuvij->zuk", f"w3j_{index_w3j}", "ss")
-                    cg_right.einsum(f"ijk,uw,zvj->zuiwk", f"w3j_{index_w3j}", "e1", "s2")
+                    cg_out.einsum("ijk,zuvij->zuk", f"w3j_{index_w3j}", "ss")
+                    cg_right.einsum("ijk,uw,zvj->zuiwk", f"w3j_{index_w3j}", "e1", "s2")
             if ins.connection_mode == 'uvv':
                 assert mul_2 == mul_out
                 if ins.has_weight:
                     cg_out.einsum(f"{z}uv,ijk,zuvij->zvk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
                     cg_right.einsum(f"{z}uv,ijk,zvj->zuivk", f"ws_{index_w}", f"w3j_{index_w3j}", "s2")
                 else:
-                    cg_out.einsum(f"ijk,zuvij->zvk", f"w3j_{index_w3j}", "ss")
+                    cg_out.einsum("ijk,zuvij->zvk", f"w3j_{index_w3j}", "ss")
                     cg_right(f"s2zeros = s2.new_zeros({mul_1}).fill_(1.0)")
-                    cg_right.einsum(f"u,ijk,zvj->zuivk", "s2zeros", f"w3j_{index_w3j}", "s2")
+                    cg_right.einsum("u,ijk,zvj->zuivk", "s2zeros", f"w3j_{index_w3j}", "s2")
             if ins.connection_mode == 'uuw':
                 assert mul_1 == mul_2
                 if ins.has_weight:
@@ -415,24 +414,24 @@ def codegen_tensor_product(
                     cg_right.einsum(f"{z}uw,ijk,zuj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "s2")
                 else:
                     assert mul_out == 1
-                    cg_out.einsum(f"ijk,zuij->zk", f"w3j_{index_w3j}", "ss")
-                    cg_right.einsum(f"ijk,zuj->zuik", f"w3j_{index_w3j}", "s2")
+                    cg_out.einsum("ijk,zuij->zk", f"w3j_{index_w3j}", "ss")
+                    cg_right.einsum("ijk,zuj->zuik", f"w3j_{index_w3j}", "s2")
             if ins.connection_mode == 'uuu':
                 assert mul_1 == mul_2 == mul_out
                 if ins.has_weight:
-                    cg_out.einsum(f"{z}u,ijk,zuij->zuk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
-                    cg_right.einsum(f"{z}u,ijk,uw,zuj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
+                    cg_out.einsum("{z}u,ijk,zuij->zuk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
+                    cg_right.einsum("{z}u,ijk,uw,zuj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
                 else:
-                    cg_out.einsum(f"ijk,zuij->zuk", f"w3j_{index_w3j}", "ss")
-                    cg_right.einsum(f"ijk,uw,zuj->zuiwk", f"w3j_{index_w3j}", "e1", "s2")
+                    cg_out.einsum("ijk,zuij->zuk", f"w3j_{index_w3j}", "ss")
+                    cg_right.einsum("ijk,uw,zuj->zuiwk", f"w3j_{index_w3j}", "e1", "s2")
             if ins.connection_mode == 'uvuv':
                 assert mul_1 * mul_2 == mul_out
                 if ins.has_weight:
                     cg_out.einsum(f"{z}uv,ijk,zuvij->zuvk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
                     cg_right.einsum(f"{z}uv,ijk,uw,zvj->zuiwvk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
                 else:
-                    cg_out.einsum(f"ijk,zuvij->zuvk", f"w3j_{index_w3j}", "ss")
-                    cg_right.einsum(f"ijk,uw,zvj->zuiwvk", f"w3j_{index_w3j}", "e1", "s2")
+                    cg_out.einsum("ijk,zuvij->zuvk", f"w3j_{index_w3j}", "ss")
+                    cg_right.einsum("ijk,uw,zvj->zuiwvk", f"w3j_{index_w3j}", "e1", "s2")
 
         # Add to output
         cg_out(f"out[:, {index_out}:{index_out+dim_out}] += {alpha} * _ein_out.reshape(batch, {dim_out})")
