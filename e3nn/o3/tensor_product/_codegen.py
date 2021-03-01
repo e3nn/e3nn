@@ -4,15 +4,9 @@ import textwrap
 
 from e3nn import o3
 from e3nn.util.codegen import LazyCodeGenerator
+from e3nn.util import prod
 
 from ._instruction import Instruction
-
-
-def _prod(x):
-    out = 1
-    for a in x:
-        out *= a
-    return out
 
 
 def codegen_tensor_product(
@@ -31,7 +25,7 @@ def codegen_tensor_product(
     cg_out = LazyCodeGenerator(**codegen_kwargs)
     cg_right = LazyCodeGenerator(**codegen_kwargs)
 
-    weight_numel = sum(_prod(ins.path_shape) for ins in instructions if ins.has_weight)
+    weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.has_weight)
 
     # = Function definitions =
     code_header = textwrap.dedent("""
@@ -113,8 +107,8 @@ def codegen_tensor_product(
         code_wigners = []
         for i, (l_1, l_2, l_out) in enumerate(wigners):
             shape = (2 * l_1 + 1, 2 * l_2 + 1, 2 * l_out + 1)
-            code_wigners.append(f"w3j_{i} = w3j[{flat_wigner_index}:{flat_wigner_index + _prod(shape)}].reshape({tuple(shape)})")
-            flat_wigner_index += _prod(shape)
+            code_wigners.append(f"w3j_{i} = w3j[{flat_wigner_index}:{flat_wigner_index + prod(shape)}].reshape({tuple(shape)})")
+            flat_wigner_index += prod(shape)
         return '\n'.join(code_wigners)
 
     cg_out(code_wigners)
@@ -192,10 +186,10 @@ def codegen_tensor_product(
         if ins.has_weight:
             index_w += 1
             # Extract the weight from the flattened weight tensor
-            line = f"ws_{index_w} = ws[:, {flat_weight_i}:{flat_weight_i + _prod(ins.path_shape)}].reshape({(() if shared_weights else (-1,)) + tuple(ins.path_shape)})"
+            line = f"ws_{index_w} = ws[:, {flat_weight_i}:{flat_weight_i + prod(ins.path_shape)}].reshape({(() if shared_weights else (-1,)) + tuple(ins.path_shape)})"
             cg_out(line)
             cg_right(line)
-            flat_weight_i += _prod(ins.path_shape)
+            flat_weight_i += prod(ins.path_shape)
 
         done: bool = True
         if specialized_code:

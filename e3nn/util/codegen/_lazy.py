@@ -2,12 +2,7 @@ import threading
 import inspect
 import textwrap
 
-
-def _prod(x):
-    out = 1
-    for a in x:
-        out *= a
-    return out
+from e3nn.util import prod
 
 
 INDENT = "    "
@@ -42,9 +37,9 @@ class LazyCodeGenerator:
 
     def einsum(self, einstr, *args, out_var="_ein_out", mul_const=None, div_const=None):
         if mul_const is not None and not isinstance(mul_const, float):
-            mul_const = _prod(mul_const)
+            mul_const = prod(mul_const)
         if div_const is not None and not isinstance(div_const, float):
-            div_const = _prod(mul_const)
+            div_const = prod(mul_const)
         if mul_const is not None and div_const is not None:
             mul_const = mul_const / div_const
             div_const = None

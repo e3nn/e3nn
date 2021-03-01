@@ -4,9 +4,10 @@ import torch
 from e3nn import o3
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
+from e3nn.util import prod
 
 from ._instruction import Instruction
-from ._codegen import codegen_tensor_product, _prod
+from ._codegen import codegen_tensor_product
 
 
 @compile_mode('script')
@@ -237,7 +238,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # === Determine weights ===
         self.shared_weights = shared_weights
-        self.weight_numel = sum(_prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
+        self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
 
         self.internal_weights = internal_weights
         if internal_weights and self.weight_numel > 0:
@@ -285,7 +286,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self._profiling_str = str(self)
 
     def __repr__(self):
-        npath = sum(_prod(i.path_shape) for i in self.instructions)
+        npath = sum(prod(i.path_shape) for i in self.instructions)
         return (
             f"{self.__class__.__name__}"
             f"({self.irreps_in1.simplify()} x {self.irreps_in2.simplify()} "
@@ -297,9 +298,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if isinstance(weight, list):
             weight_shapes = [ins.path_shape for ins in self.instructions if ins.has_weight]
             if not self.shared_weights:
-                weight = [w.reshape(-1, _prod(shape)) for w, shape in zip(weight, weight_shapes)]
+                weight = [w.reshape(-1, prod(shape)) for w, shape in zip(weight, weight_shapes)]
             else:
-                weight = [w.reshape(_prod(shape)) for w, shape in zip(weight, weight_shapes)]
+                weight = [w.reshape(prod(shape)) for w, shape in zip(weight, weight_shapes)]
             return torch.cat(weight, dim=-1)
         else:
             return weight
