@@ -34,17 +34,17 @@ def codegen_tensor_product(
     """)
     cg_out(code_header)
     cg_right(code_header)
-    # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
+    
+    cg_out.script_decorator()  # this is @torch.jit.script
     cg_out(textwrap.dedent(f"""
-    @torch.jit.script
     def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
         {'x1, x2 = torch.broadcast_tensors(x1[..., :, None], x2[..., None, :])' if shared_weights else ''}
         {'x1, x2, ws = torch.broadcast_tensors(x1[..., :, None, None], x2[..., None, :, None], ws[..., None, None, :])' if not shared_weights else ''}
     """))
     cg_out.indent()
 
+    cg_out.script_decorator()  # this is @torch.jit.script
     cg_right(textwrap.dedent(f"""
-    @torch.jit.script
     def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
         {'x2, ws = torch.broadcast_tensors(x2[..., :, None], ws[..., None, :])' if not shared_weights else ''}
     """))
@@ -59,6 +59,7 @@ def codegen_tensor_product(
         return cg_out.generate(), cg_right.generate(), []
 
     # = Broadcast inputs =
+    # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
     cg_out(textwrap.dedent(f"""
         {'x1, x2 = x1[..., :, 0], x2[..., 0, :]' if shared_weights else ''}
         {'x1, x2, ws = x1[..., :, 0, 0], x2[..., 0, :, 0], ws[..., 0, 0, :]' if not shared_weights else ''}
