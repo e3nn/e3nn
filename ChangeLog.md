@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- `nn.model.gate_points_2103` is a model that ask the user to create the graph.
+- `nn.model.v2103` generic message passing model + examples of networks using it.
 - `o3.TensorProduct`: is jit scriptable
 - `o3.TensorProduct`: also broadcast the `weight` argument
 
