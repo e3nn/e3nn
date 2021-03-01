@@ -2,7 +2,7 @@ from typing import Optional, List, Union
 
 import torch
 from e3nn import o3
-from e3nn.util import CodeGenMixin
+from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
 from ._instruction import Instruction

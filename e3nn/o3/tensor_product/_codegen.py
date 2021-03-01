@@ -1,81 +1,11 @@
 from typing import List, Tuple
 from math import sqrt
 import textwrap
-import threading
-import inspect
 
 from e3nn import o3
+from e3nn.util.codegen import LazyCodeGenerator
 
 from ._instruction import Instruction
-
-INDENT = "    "
-
-
-class TensorProductCodegen:
-    def __init__(
-        self,
-        optimize_einsums: bool = False
-    ):
-        #params
-        self.optimize_einsums = optimize_einsums
-        # state vars
-        self.indent_level = 0
-        self.blocks = []
-        self._thread_local = threading.local()
-        self._thread_local.profile = {}
-
-    def indent(self):
-        def f():
-            self.indent_level += 1
-        self(f)
-
-    def dedent(self):
-        def f():
-            self.indent_level -= 1
-            assert self.indent_level >= 0
-        self(f)
-
-    def __call__(self, b):
-        self.blocks.append(b)
-
-    def einsum(self, einstr, *args, out_var="_ein_out", mul_const=None, div_const=None):
-        if mul_const is not None and not isinstance(mul_const, float):
-            mul_const = _prod(mul_const)
-        if div_const is not None and not isinstance(div_const, float):
-            div_const = _prod(mul_const)
-        if mul_const is not None and div_const is not None:
-            mul_const = mul_const / div_const
-            div_const = None
-
-        if not self.optimize_einsums:
-            def func(profile: bool):
-                out = f"{out_var} = torch.einsum('{einstr}', {', '.join(args)})"
-                if mul_const is not None:
-                    out += f".mul({mul_const})"
-                if div_const is not None:
-                    out += f".div({div_const})"
-                return out
-        else:
-            def func(profile: bool):
-                pass
-        self(func)
-
-    def generate(self, profile: bool = False):
-        processed_lines = []
-        for b in self.blocks:
-            if callable(b):
-                sig = inspect.signature(b)
-                if 'profile' in sig.parameters:
-                    b = b(profile=profile)
-                else:
-                    b = b()
-            if b is None:
-                continue
-            # Indent to curent indent
-            b = textwrap.indent(b, INDENT*self.indent_level)
-            processed_lines.append(b)
-        out = "\n".join(processed_lines)
-        return out
 
 
 def _prod(x):
@@ -95,10 +25,11 @@ def codegen_tensor_product(
     instructions: List[Instruction],
     normalization: str = 'component',
     shared_weights: bool = False,
-    specialized_code: bool = True
+    specialized_code: bool = True,
+    codegen_kwargs: dict = {}
 ) -> Tuple[str, str, list]:
-    cg_out = TensorProductCodegen()
-    cg_right = TensorProductCodegen()
+    cg_out = LazyCodeGenerator(**codegen_kwargs)
+    cg_right = LazyCodeGenerator(**codegen_kwargs)
 
     weight_numel = sum(_prod(ins.path_shape) for ins in instructions if ins.has_weight)
 
@@ -414,8 +345,8 @@ def codegen_tensor_product(
             if ins.connection_mode == 'uuu':
                 assert mul_1 == mul_2 == mul_out
                 if ins.has_weight:
-                    cg_out.einsum("{z}u,ijk,zuij->zuk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
-                    cg_right.einsum("{z}u,ijk,uw,zuj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
+                    cg_out.einsum(f"{z}u,ijk,zuij->zuk", f"ws_{index_w}", f"w3j_{index_w3j}", "ss")
+                    cg_right.einsum(f"{z}u,ijk,uw,zuj->zuiwk", f"ws_{index_w}", f"w3j_{index_w3j}", "e1", "s2")
                 else:
                     cg_out.einsum("ijk,zuij->zuk", f"w3j_{index_w3j}", "ss")
                     cg_right.einsum("ijk,uw,zuj->zuiwk", f"w3j_{index_w3j}", "e1", "s2")
