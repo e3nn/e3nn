@@ -33,7 +33,6 @@ class TensorProductCodegen:
         def f():
             self.indent_level -= 1
             assert self.indent_level >= 0
-            print("dedent")
         self(f)
 
     def __call__(self, b):
@@ -47,9 +46,6 @@ class TensorProductCodegen:
         if mul_const is not None and div_const is not None:
             mul_const = mul_const / div_const
             div_const = None
-
-        print("mul const", mul_const)
-        print('div const', div_const)
 
         if not self.optimize_einsums:
             def func(profile: bool):
@@ -79,7 +75,6 @@ class TensorProductCodegen:
             b = textwrap.indent(b, INDENT*self.indent_level)
             processed_lines.append(b)
         out = "\n".join(processed_lines)
-        print(out)
         return out
 
 
