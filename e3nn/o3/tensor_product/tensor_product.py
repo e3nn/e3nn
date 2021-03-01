@@ -1,12 +1,11 @@
 from typing import Optional, List, Union
-from math import sqrt
-from collections import namedtuple
 
 import torch
 from e3nn import o3
 from e3nn.util import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
+from ._instruction import Instruction
 from ._tensor_product_codegen import codegen_tensor_product, _prod
 
 
@@ -179,7 +178,62 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         assert shared_weights or not internal_weights
 
-        self.irreps_in1, self.irreps_in2, self.irreps_out, full_code_out, full_code_right, self.instructions, wigners = codegen_tensor_product(in1, in2, out, instructions, normalization, shared_weights, _specialized_code)
+        # Determine irreps
+        try:
+            in1 = o3.Irreps(in1)
+        except AssertionError:
+            pass
+        try:
+            in2 = o3.Irreps(in2)
+        except AssertionError:
+            pass
+        try:
+            out = o3.Irreps(out)
+        except AssertionError:
+            pass
+
+        in1 = [x if len(x) == 3 else x + (1.0,) for x in in1]
+        in2 = [x if len(x) == 3 else x + (1.0,) for x in in2]
+        out = [x if len(x) == 3 else x + (1.0,) for x in out]
+
+        self.irreps_in1 = o3.Irreps([(mul, ir) for mul, ir, _var in in1])
+        self.irreps_in2 = o3.Irreps([(mul, ir) for mul, ir, _var in in2])
+        self.irreps_out = o3.Irreps([(mul, ir) for mul, ir, _var in out])
+
+        in1_var = [var for _, _, var in in1]
+        in2_var = [var for _, _, var in in2]
+        out_var = [var for _, _, var in out]
+
+        # Preprocess instructions into objects
+        instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
+        instructions = [
+            Instruction(
+                i_in1, i_in2, i_out, connection_mode, has_weight, path_weight,
+                {
+                    'uvw': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
+                    'uvu': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uvv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
+                    'uuu': (self.irreps_in1[i_in1].mul,),
+                    'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                }[connection_mode],
+            )
+            for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
+        ]
+        self.instructions = instructions
+
+        full_code_out, full_code_right, wigners = codegen_tensor_product(
+            self.irreps_in1,
+            in1_var,
+            self.irreps_in2,
+            in2_var,
+            self.irreps_out,
+            out_var,
+            self.instructions,
+            normalization,
+            shared_weights,
+            _specialized_code
+        )
 
         # === Determine weights ===
         self.shared_weights = shared_weights

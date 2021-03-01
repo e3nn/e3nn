@@ -1,9 +1,11 @@
+from typing import List, Tuple
 from math import sqrt
-from collections import namedtuple
 import textwrap
 
 import torch
 from e3nn import o3
+
+from ._instruction import Instruction
 
 
 def _prod(x):
@@ -13,49 +15,18 @@ def _prod(x):
     return out
 
 
-def codegen_tensor_product(in1, in2, out, instructions, normalization='component', shared_weights=None, specialized_code=True):
-    try:
-        in1 = o3.Irreps(in1)
-    except AssertionError:
-        pass
-    try:
-        in2 = o3.Irreps(in2)
-    except AssertionError:
-        pass
-    try:
-        out = o3.Irreps(out)
-    except AssertionError:
-        pass
-
-    in1 = [x if len(x) == 3 else x + (1.0,) for x in in1]
-    in2 = [x if len(x) == 3 else x + (1.0,) for x in in2]
-    out = [x if len(x) == 3 else x + (1.0,) for x in out]
-
-    irreps_in1 = o3.Irreps([(mul, ir) for mul, ir, _var in in1])
-    irreps_in2 = o3.Irreps([(mul, ir) for mul, ir, _var in in2])
-    irreps_out = o3.Irreps([(mul, ir) for mul, ir, _var in out])
-
-    in1_var = [var for _, _, var in in1]
-    in2_var = [var for _, _, var in in2]
-    out_var = [var for _, _, var in out]
-
-    # === Build instructions ===
-    Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, path_shape")
-    instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
-    instructions = [
-        Instruction(
-            i_in1, i_in2, i_out, connection_mode, has_weight, path_weight,
-            {
-                'uvw': (irreps_in1[i_in1].mul, irreps_in2[i_in2].mul, irreps_out[i_out].mul),
-                'uvu': (irreps_in1[i_in1].mul, irreps_in2[i_in2].mul),
-                'uvv': (irreps_in1[i_in1].mul, irreps_in2[i_in2].mul),
-                'uuw': (irreps_in1[i_in1].mul, irreps_out[i_out].mul),
-                'uuu': (irreps_in1[i_in1].mul,),
-                'uvuv': (irreps_in1[i_in1].mul, irreps_in2[i_in2].mul),
-            }[connection_mode],
-        )
-        for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
-    ]
+def codegen_tensor_product(
+    irreps_in1: o3.Irreps,
+    in1_var: List[float],
+    irreps_in2: o3.Irreps,
+    in2_var: List[float],
+    irreps_out: o3.Irreps,
+    out_var: List[float],
+    instructions: List[Instruction],
+    normalization: str = 'component',
+    shared_weights: bool = False,
+    specialized_code: bool = True
+) -> Tuple[str, str, list]:
     weight_numel = sum(_prod(ins.path_shape) for ins in instructions if ins.has_weight)
 
     # === Init everything for codegen ===
@@ -396,4 +367,4 @@ def codegen_tensor_product(in1, in2, out, instructions, normalization='component
         full_code_out = "\n\n".join([code_header, funcdef_out, code_wigners, code_out])
         full_code_right = "\n\n".join([code_header, funcdef_right, code_wigners, code_right])
 
-    return irreps_in1, irreps_in2, irreps_out, full_code_out, full_code_right, instructions, wigners
+    return full_code_out, full_code_right, wigners
