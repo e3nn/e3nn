@@ -6,8 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `nn.model.gate_points_2103` is a model that ask the user to create the graph.
 - `o3.TensorProduct`: is jit scriptable
 - `o3.TensorProduct`: also broadcast the `weight` argument
+
+### Changed
+- `math.soft_one_hot_linspace` very small change in the normalization of `fourier` basis
+
+### Fixed
+- `nn.Gate` was crashing when the number of scalars or gates was zero
 
 ## [0.2.3] - 2021-02-23
 ### Added
@@ -31,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `e3nn.math.reduce.reduce_tensor` in favor of `e3nn.o3.ReducedTensorProducts`
 - swish, use `torch.nn.functional.silu` instead
 - `"cartesian_vectors"` for equivariance testing — since the 0.2.2 Euler angle convention change, L=1 irreps are equivalent
+
 ### Fixed
 - `io.SphericalTensor.from_samples_on_s2` manage batch dimension
 - Modules that generate code now clean up their temporary files
