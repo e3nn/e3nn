@@ -162,6 +162,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         internal_weights=None,
         shared_weights=None,
         _specialized_code=True,
+        _codegen_kwargs={}
     ):
         # === Setup ===
         super().__init__()
@@ -233,7 +234,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self.instructions,
             normalization,
             shared_weights,
-            _specialized_code
+            _specialized_code,
+            codegen_kwargs=_codegen_kwargs
         )
 
         self._codegen_register({

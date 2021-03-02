@@ -2,9 +2,9 @@ import inspect
 import textwrap
 import contextvars
 import contextlib
-import warnings
 
 from e3nn.util import prod
+from ._einsum import opt_einsum_code
 
 
 # dict mapping id(lazy_codegen_obj) to dict of ids -> info
@@ -27,7 +27,7 @@ _INDENT = "    "
 class LazyCodeGenerator:
     def __init__(
         self,
-        optimize_einsums: bool = False
+        optimize_einsums: bool = True
     ):
         #params
         self.optimize_einsums = optimize_einsums
@@ -61,6 +61,8 @@ class LazyCodeGenerator:
         # If we're profiling, we have to import this module in the code gen
         if profile:
             processed_lines.append("from e3nn.util.codegen._lazy import _ProfileData")
+            # initialize the profile data for this object
+            processed_lines.append(f"_ProfileData.get()[{id(self)}] = dict()")
         for b in self.blocks:
             if callable(b):
                 sig = inspect.signature(b)
@@ -117,13 +119,17 @@ class LazyCodeGenerator:
                     return prof_line + "\n" + func_no_opt()
                 else:
                     # Check if there is profile data to use for optimization
-                    profile_dat = _ProfileData.get(default={})
+                    profile_dat = _ProfileData.get({})
                     if id(self) in profile_dat and my_einsum_id in profile_dat[id(self)]:
                         arg_shapes = profile_dat[id(self)][my_einsum_id]
                         assert len(arg_shapes) == len(args)
                         # there actually is a profile, use it to optimize
-                        warnings.warn(f"Optimization not implimented yet. For args {args}, had profile {arg_shapes}")
-                        return func_no_opt()
+                        return opt_einsum_code(
+                            einstr,
+                            args,
+                            arg_shapes,
+                            out_var=out_var
+                        )
                     else:
                         # There's no profile data for this einsum, use unoptimized
                         return func_no_opt()
