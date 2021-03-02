@@ -2,7 +2,7 @@ from typing import Optional, List, Union
 
 import torch
 from e3nn import o3
-from e3nn.util.codegen import CodeGenMixin
+from e3nn.util.codegen import CodeGenMixin, profile
 from e3nn.util.jit import compile_mode
 from e3nn.util import prod
 
@@ -223,7 +223,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         ]
         self.instructions = instructions
 
-        full_code_out, full_code_right, wigners = codegen_tensor_product(
+        self._lazygen_out, self._lazygen_right, wigners = codegen_tensor_product(
             self.irreps_in1,
             in1_var,
             self.irreps_in2,
@@ -235,6 +235,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             shared_weights,
             _specialized_code
         )
+
+        self._codegen_register({
+            '_compiled_main_out': self._lazygen_out.generate(),
+            '_compiled_main_right': self._lazygen_right.generate(),
+        })
+
+        self._is_optimized = False
 
         # === Determine weights ===
         self.shared_weights = shared_weights
@@ -266,11 +273,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             # We register an empty buffer so that call signatures don't have to change
             self.register_buffer('_wigner_buf', torch.Tensor())
 
-        self._codegen_register({
-            '_compiled_main_out': full_code_out,
-            '_compiled_main_right': full_code_right,
-        })
-
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
                 torch.ones(mul * ir.dim)
@@ -292,6 +294,35 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             f"({self.irreps_in1.simplify()} x {self.irreps_in2.simplify()} "
             f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
+
+    @torch.jit.ignore
+    def optimize_for_batch_size(self, batch_size: int):
+        print(f"Optimizing for batch size {batch_size}")
+        with torch.no_grad(), profile():
+            self._codegen_register({
+                '_compiled_main_out': self._lazygen_out.generate(profile=True),
+                '_compiled_main_right': self._lazygen_right.generate(profile=True),
+            })
+
+            # profiling run
+            # make fake inputs
+            x1 = torch.zeros(size=(batch_size, self.irreps_in1.dim))
+            x2 = torch.zeros(size=(batch_size, self.irreps_in2.dim))
+            if self.internal_weights:
+                w = self.weight
+            elif self.shared_weights:
+                w = torch.zeros(size=(self.weight_numel,))
+            else:
+                w = torch.zeros(size=(batch_size, self.weight_numel))
+            _ = self._compiled_main_out(x1, x2, w, self._wigner_buf)
+            _ = self._compiled_main_right(x2, w, self._wigner_buf)
+
+            # generate with profile
+            self._codegen_register({
+                '_compiled_main_out': self._lazygen_out.generate(),
+                '_compiled_main_right': self._lazygen_right.generate(),
+            })
+        self._is_optimized = True
 
     @torch.jit.unused
     def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
@@ -372,6 +403,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
+        if not torch.jit.is_scripting():
+            if not self._is_optimized:
+                self.optimize_for_batch_size(features_1.shape[0])
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
             return self._compiled_main_out(features_1, features_2, real_weight, self._wigner_buf)

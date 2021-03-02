@@ -21,7 +21,7 @@ def codegen_tensor_product(
     shared_weights: bool = False,
     specialized_code: bool = True,
     codegen_kwargs: dict = {}
-) -> Tuple[str, str, list]:
+) -> Tuple[LazyCodeGenerator, LazyCodeGenerator, list]:
     cg_out = LazyCodeGenerator(**codegen_kwargs)
     cg_right = LazyCodeGenerator(**codegen_kwargs)
 
@@ -34,7 +34,7 @@ def codegen_tensor_product(
     """)
     cg_out(code_header)
     cg_right(code_header)
-    
+
     cg_out.script_decorator()  # this is @torch.jit.script
     cg_out(textwrap.dedent(f"""
     def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
@@ -43,7 +43,7 @@ def codegen_tensor_product(
     """))
     cg_out.indent()
 
-    cg_out.script_decorator()  # this is @torch.jit.script
+    cg_right.script_decorator()  # this is @torch.jit.script
     cg_right(textwrap.dedent(f"""
     def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
         {'x2, ws = torch.broadcast_tensors(x2[..., :, None], ws[..., None, :])' if not shared_weights else ''}
@@ -56,7 +56,7 @@ def codegen_tensor_product(
         cg_right(f"return x2.new_zeros(x2.shape[{':-1' if shared_weights else ':-2'}] + ({irreps_in1.dim}, {irreps_out.dim},))")
         # Short circut
         # the empty list is wigners
-        return cg_out.generate(), cg_right.generate(), []
+        return cg_out, cg_right, []
 
     # = Broadcast inputs =
     # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
@@ -70,7 +70,7 @@ def codegen_tensor_product(
 
         x1 = x1.reshape(-1, {irreps_in1.dim})
         x2 = x2.reshape(-1, {irreps_in2.dim})
-        ws = ws.reshape(-1, {weight_numel})
+        {f"ws = ws.reshape(-1, {weight_numel})" if weight_numel > 0 else ""}
 
         if x1.shape[0] == 0:
             return x1.new_zeros(outsize)
@@ -86,7 +86,7 @@ def codegen_tensor_product(
         assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
 
         x2 = x2.reshape(-1, {irreps_in2.dim})
-        ws = ws.reshape(-1, {weight_numel})
+        {f"ws = ws.reshape(-1, {weight_numel})" if weight_numel > 0 else ""}
 
         if x2.shape[0] == 0:
             return x2.new_zeros(outsize)
@@ -326,8 +326,8 @@ def codegen_tensor_product(
                     cg_right.einsum(f"{z}uv,ijk,zvj->zuivk", f"ws_{index_w}", f"w3j_{index_w3j}", "s2")
                 else:
                     cg_out.einsum("ijk,zuvij->zvk", f"w3j_{index_w3j}", "ss")
-                    cg_right(f"s2zeros = s2.new_zeros({mul_1}).fill_(1.0)")
-                    cg_right.einsum("u,ijk,zvj->zuivk", "s2zeros", f"w3j_{index_w3j}", "s2")
+                    cg_right(f"s2ones = torch.ones({mul_1}, device=s2.device, dtype=s2.dtype)")
+                    cg_right.einsum("u,ijk,zvj->zuivk", "s2ones", f"w3j_{index_w3j}", "s2")
             if ins.connection_mode == 'uuw':
                 assert mul_1 == mul_2
                 if ins.has_weight:
@@ -367,4 +367,4 @@ def codegen_tensor_product(
     cg_out("return out.reshape(outsize)")
     cg_right("return out.reshape(outsize)")
 
-    return cg_out.generate(), cg_right.generate(), wigners
+    return cg_out, cg_right, wigners
