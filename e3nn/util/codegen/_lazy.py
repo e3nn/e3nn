@@ -2,6 +2,7 @@ import inspect
 import textwrap
 import contextvars
 import contextlib
+import warnings
 
 from e3nn.util import prod
 
@@ -31,17 +32,21 @@ class LazyCodeGenerator:
         #params
         self.optimize_einsums = optimize_einsums
         # state vars
-        self.indent_level = 0
         self.blocks = []
         self._einsum_id = 0
+        self._reset_state()
+
+    def _reset_state(self):
+        # some state needs to be reset each time we generate
+        self.indent_level = 0
 
     def indent(self):
-        def f():
+        def f(self):
             self.indent_level += 1
         self(f)
 
     def dedent(self):
-        def f():
+        def f(self):
             self.indent_level -= 1
             assert self.indent_level >= 0
         self(f)
@@ -50,6 +55,8 @@ class LazyCodeGenerator:
         self.blocks.append(b)
 
     def generate(self, profile: bool = False):
+        self._reset_state()
+        # the final lines
         processed_lines = []
         # If we're profiling, we have to import this module in the code gen
         if profile:
@@ -57,16 +64,19 @@ class LazyCodeGenerator:
         for b in self.blocks:
             if callable(b):
                 sig = inspect.signature(b)
-                if 'profile' in sig.parameters:
-                    b = b(profile=profile)
-                else:
-                    b = b()
+                b_kwargs = {
+                    'self': self,
+                    'profile': profile
+                }
+                b_kwargs = {k: v for k, v in b_kwargs.items() if k in sig.parameters}
+                b = b(**b_kwargs)
             if b is None:
                 continue
             # Indent to curent indent
             b = textwrap.indent(b, _INDENT*self.indent_level)
             processed_lines.append(b)
         out = "\n".join(processed_lines)
+        print(out)
         return out
 
     def einsum(self, einstr, *args, out_var="_ein_out", mul_const=None, div_const=None):
@@ -100,7 +110,7 @@ class LazyCodeGenerator:
             # Just output a normal einsum
             func = func_no_opt
         else:
-            def func(profile: bool):
+            def func(self, profile: bool):
                 if profile:
                     # record shapes
                     prof_line = f"_ProfileData.get()[{id(self)}][{my_einsum_id}] = ({', '.join(f'({arg}).shape' for arg in args)})"
@@ -110,8 +120,11 @@ class LazyCodeGenerator:
                     # Check if there is profile data to use for optimization
                     profile_dat = _ProfileData.get(default={})
                     if id(self) in profile_dat and my_einsum_id in profile_dat[id(self)]:
+                        arg_shapes = profile_dat[id(self)][my_einsum_id]
+                        assert len(arg_shapes) == len(args)
                         # there actually is a profile, use it to optimize
-                        raise NotImplementedError
+                        warnings.warn(f"Optimization not implimented yet. For args {args}, had profile {arg_shapes}")
+                        return func_no_opt()
                     else:
                         # There's no profile data for this einsum, use unoptimized
                         return func_no_opt()
