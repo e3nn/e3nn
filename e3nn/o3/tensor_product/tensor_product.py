@@ -162,7 +162,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         internal_weights=None,
         shared_weights=None,
         _specialized_code=True,
-        _codegen_kwargs={}
+        _optimize_einsums=True
     ):
         # === Setup ===
         super().__init__()
@@ -235,7 +235,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             normalization,
             shared_weights,
             _specialized_code,
-            codegen_kwargs=_codegen_kwargs
+            codegen_kwargs={'optimize_einsums': _optimize_einsums}
         )
 
         self._codegen_register({
@@ -243,6 +243,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             '_compiled_main_right': self._lazygen_right.generate(),
         })
 
+        self._optimize_einsums = _optimize_einsums
         self._is_optimized = False
 
         # === Determine weights ===
@@ -299,6 +300,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     @torch.jit.ignore
     def optimize_for_batch_size(self, batch_size: int):
+        if not self._optimize_einsums:
+            return
         print(f"Optimizing for batch size {batch_size}")
         with torch.no_grad(), profile():
             self._codegen_register({
@@ -316,6 +319,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 w = torch.zeros(size=(self.weight_numel,))
             else:
                 w = torch.zeros(size=(batch_size, self.weight_numel))
+            w = self._get_weights(w)
             _ = self._compiled_main_out(x1, x2, w, self._wigner_buf)
             _ = self._compiled_main_right(x2, w, self._wigner_buf)
 

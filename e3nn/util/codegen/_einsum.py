@@ -1,8 +1,10 @@
 """Optimize einsums based on shapes for code generation."""
 
-from typing import List
+from typing import List, Optional
 
 from opt_einsum.contract import contract_path
+
+from e3nn.util import prod
 
 
 # based on opt_einsum/backends/torch.py
@@ -11,50 +13,72 @@ class _CodeGenBackend:
         self._tmp_idx = 0
         self.code = []
 
-    def _get_tmp(self):
+    def get_tmp(self):
         out = f"_ein_tmp{self._tmp_idx}"
         self._tmp_idx += 1
         return out
 
     def transpose(self, v, axes, out=None):
         axes = list(axes)
-        print(axes)
         if axes == list(range(len(axes))):
             # In this case, we're asking for the identity permutation, so just no-op
             if out is None:
                 return v
             else:
                 self.code.append(f"{out} = {v}  # identity permutation no-op")
-        out = out if out is not None else self._get_tmp()
+        out = out if out is not None else self.get_tmp()
         self.code.append(f"{out} = {v}.permute({', '.join(str(a) for a in axes)})")
         return out
 
     def einsum(self, einstr, *args, out=None):
-        out = out if out is not None else self._get_tmp()
+        out = out if out is not None else self.get_tmp()
         self.code.append(f"{out} = torch.einsum('{einstr}', {', '.join(args)})")
         return out
 
     def tensordot(self, x, y, axes=2):
-        out = self._get_tmp()
+        out = self.get_tmp()
         self.code.append(f"{out} = torch.tensordot({x}, {y}, dims_self=[{', '.join(str(a) for a in axes[0])}], dims_other=[{', '.join(str(a) for a in axes[1])},])")
+        return out
+
+    def scalar_mul(self, x, mul: float):
+        out = self.get_tmp()
+        self.code.append(f"{out} = {x}.mul({mul})")
         return out
 
     def make_code(self):
         return "\n".join(self.code)
 
 
-def opt_einsum_code(einstr: str, operands: List[str], arg_shapes: list, out_var: str):
+def opt_einsum_code(
+    einstr: str,
+    operands: List[str],
+    arg_shapes: list,
+    out_var: str,
+    mul_const: Optional[float] = None
+):
+    operands = list(operands)
+
     _, opt_path = contract_path(
         einstr,
         *arg_shapes,
         shapes=True
     )
-    print(opt_path)
 
     cgb = _CodeGenBackend()
 
+    # == deal with constants ==
+    # TODO: check this
+    # einsum is a linear operation in all operands, and as a result we
+    # can multiply a scalar constant for the ouptu onto any of the inputs.
+    # In terms of FLOPs, it's fastest then to do this multiplication with
+    # the smallest of the operands
+    if mul_const is not None:
+        # which is smallest
+        smallest = min((i for i in range(len(operands))), key=lambda i: prod(arg_shapes[i]))
+        with_mul = cgb.scalar_mul(operands[smallest], mul_const)
+        operands[smallest] = with_mul
+
     # setup for following
-    operands = list(operands)
     contraction_list = opt_path.contraction_list
     # ===== Code based on opt_einsum's _core_contract ========
     for num, contraction in enumerate(contraction_list):

@@ -98,6 +98,8 @@ class LazyCodeGenerator:
             # If we have only divisor, still take reciprocal and make it a multiplier
             mul_const = 1. / div_const
             div_const = None
+        # Be sure that it got incorporated into the multiplicitive constant
+        assert div_const is None
 
         def func_no_opt():
             out = f"{out_var} = torch.einsum('{einstr}', {', '.join(args)})"
@@ -128,7 +130,8 @@ class LazyCodeGenerator:
                             einstr,
                             args,
                             arg_shapes,
-                            out_var=out_var
+                            out_var=out_var,
+                            mul_const=mul_const
                         )
                     else:
                         # There's no profile data for this einsum, use unoptimized
