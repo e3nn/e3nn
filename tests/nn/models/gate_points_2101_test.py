@@ -115,3 +115,12 @@ def test_copy(network):
     fcopy = copy.deepcopy(f)
     g = random_graph()
     assert torch.allclose(f(g), fcopy(g))
+
+
+def test_save(network):
+    f, random_graph = network
+    with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+        torch.save(f, tmp.name)
+        f2 = torch.load(tmp.name)
+    x = random_graph()
+    assert torch.all(f(x) == f2(x))
