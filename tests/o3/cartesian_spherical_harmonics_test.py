@@ -113,4 +113,4 @@ def test_recurrence_relation(float_tolerance, l):
         o3.spherical_harmonics(l, x, False)
     )
 
-    assert (a - b).abs().max() < 10*float_tolerance
+    assert (a - b).abs().max() < 100*float_tolerance
