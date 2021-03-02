@@ -83,7 +83,7 @@ class SimpleNetwork(torch.nn.Module):
         return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
 
 
-class MoreAdvancedNetwork(torch.nn.Module):
+class NetworkForAGraphWithAttributes(torch.nn.Module):
     def __init__(
             self,
             irreps_node_input,
@@ -132,10 +132,9 @@ class MoreAdvancedNetwork(torch.nn.Module):
         else:
             batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
 
-        # Create graph
-        edge_index = radius_graph(data['pos'], self.max_radius, batch)
-        edge_src = edge_index[0]
-        edge_dst = edge_index[1]
+        # The graph
+        edge_src = data['edge_index'][0]
+        edge_dst = data['edge_index'][1]
 
         # Edge attributes
         edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
