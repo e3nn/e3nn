@@ -2,7 +2,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/e3nn/e3nn/badge.svg?branch=main)](https://coveralls.io/github/e3nn/e3nn?branch=main)
 [![DOI](https://zenodo.org/badge/237431920.svg)](https://zenodo.org/badge/latestdoi/237431920)
 
-**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)**
+**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)** | **[Colab](https://colab.research.google.com/drive/1Gps7mMOmzLe3Rt_b012xsz4UyuexTKAf?usp=sharing)**
 
 The aim of this library it to help the developement of E3 equivariant neural networks.
 It contains fundamental mathematical operations such as tensor products and spherical harmonics.
