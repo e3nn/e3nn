@@ -38,6 +38,7 @@ setup(
         'scipy',   # only for SphericalTensor.find_peaks
         'torch>=1.4.0',
         'torch_geometric',
+        'contextvars;python_version<"3.7"'  # a backport for python 3.6
     ],
     include_package_data=True,
     classifiers=[
