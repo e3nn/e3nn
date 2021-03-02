@@ -21,7 +21,7 @@ copyright = '2020, e3nn Developers'
 author = 'e3nn Developers'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2.0'
+release = '0.2.3'
 
 
 # -- General configuration ---------------------------------------------------
@@ -37,6 +37,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
+    "nbsphinx",
+    "jupyter_sphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -74,3 +76,5 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
+
+myst_update_mathjax = False

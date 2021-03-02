@@ -5,6 +5,7 @@ import os
 import torch
 
 from e3nn import o3
+from e3nn.util import explicit_default_types
 
 _Jd, _W3j = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
 
@@ -19,11 +20,11 @@ def _z_rot_mat(angle, l):
     on the diagonal and anti-diagonal are non-zero, so explicitly constructing
     this matrix is unnecessary.
     """
-    shape = angle.shape
-    M = torch.zeros(*shape, 2 * l + 1, 2 * l + 1, dtype=torch.get_default_dtype())
-    inds = torch.arange(0, 2 * l + 1, 1)
-    reversed_inds = torch.arange(2 * l, -1, -1)
-    frequencies = torch.arange(l, -l - 1, -1, dtype=torch.get_default_dtype())
+    shape, device, dtype = angle.shape, angle.device, angle.dtype
+    M = angle.new_zeros((*shape, 2 * l + 1, 2 * l + 1))
+    inds = torch.arange(0, 2 * l + 1, 1, device=device)
+    reversed_inds = torch.arange(2 * l, -1, -1, device=device)
+    frequencies = torch.arange(l, -l - 1, -1, dtype=dtype, device=device)
     M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
     M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
     return M
@@ -37,7 +38,7 @@ def wigner_D(l, alpha, beta, gamma):
     * :math:`D(\text{identity rotation}) = \text{identity matrix}`
     * :math:`D(R_1 \circ R_2) = D(R_1) \circ D(R_2)`
     * :math:`D(R^{-1}) = D(R)^{-1} = D(R)^T`
-    * :math:`D(\text{rotation around Z axis})` has some property that allows us to use FFT in `s2grid`
+    * :math:`D(\text{rotation around Y axis})` has some property that allows us to use FFT in `s2grid`
 
     Code of this function has beed copied from `lie_learn <https://github.com/AMLab-Amsterdam/lie_learn>`_ made by Taco Cohen.
 
@@ -48,15 +49,15 @@ def wigner_D(l, alpha, beta, gamma):
 
     alpha : `torch.Tensor`
         tensor of shape :math:`(...)`
-        Rotation :math:`\alpha` around Z axis, applied third.
+        Rotation :math:`\alpha` around Y axis, applied third.
 
     beta : `torch.Tensor`
         tensor of shape :math:`(...)`
-        Rotation :math:`\beta` around Y axis, applied second.
+        Rotation :math:`\beta` around X axis, applied second.
 
     gamma : `torch.Tensor`
         tensor of shape :math:`(...)`
-        Rotation :math:`\gamma` around Z axis, applied first.
+        Rotation :math:`\gamma` around Y axis, applied first.
 
     Returns
     -------
@@ -67,14 +68,14 @@ def wigner_D(l, alpha, beta, gamma):
         raise NotImplementedError(f'wigner D maximum l implemented is {len(_Jd) - 1}, send us an email to ask for more')
 
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    J = _Jd[l].to(dtype=torch.get_default_dtype())
+    J = _Jd[l].to(dtype=alpha.dtype, device=alpha.device)
     Xa = _z_rot_mat(alpha, l)
     Xb = _z_rot_mat(beta, l)
     Xc = _z_rot_mat(gamma, l)
     return Xa @ J @ Xb @ J @ Xc
 
 
-def wigner_3j(l1, l2, l3):
+def wigner_3j(l1, l2, l3, dtype=None, device=None):
     r"""Wigner 3j symbols
 
     It satifies the following two properties:
@@ -100,6 +101,12 @@ def wigner_3j(l1, l2, l3):
     l3 : int
         :math:`l_3`
 
+    dtype : torch.dtype or None
+        ``dtype`` of the returned tensor. If ``None`` then set to ``torch.get_default_dtype()``.
+
+    device : torch.device or None
+        ``device`` of the returned tensor. If ``None`` then set to the default device of the current context.
+
     Returns
     -------
     `torch.Tensor`
@@ -109,22 +116,25 @@ def wigner_3j(l1, l2, l3):
 
     try:
         if l1 <= l2 <= l3:
-            return _W3j[(l1, l2, l3)].clone()
+            out = _W3j[(l1, l2, l3)].clone()
         if l1 <= l3 <= l2:
-            return _W3j[(l1, l3, l2)].transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = _W3j[(l1, l3, l2)].transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
         if l2 <= l1 <= l3:
-            return _W3j[(l2, l1, l3)].transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = _W3j[(l2, l1, l3)].transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
         if l3 <= l2 <= l1:
-            return _W3j[(l3, l2, l1)].transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = _W3j[(l3, l2, l1)].transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
         if l2 <= l3 <= l1:
-            return _W3j[(l2, l3, l1)].transpose(0, 2).transpose(1, 2).clone()
+            out = _W3j[(l2, l3, l1)].transpose(0, 2).transpose(1, 2).clone()
         if l3 <= l1 <= l2:
-            return _W3j[(l3, l1, l2)].transpose(0, 2).transpose(0, 1).clone()
+            out = _W3j[(l3, l1, l2)].transpose(0, 2).transpose(0, 1).clone()
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
 
+    dtype, device = explicit_default_types(dtype, device)
+    return out.to(dtype=dtype, device=device)
 
-def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
+
+def _generate_wigner_3j(l1, l2, l3, dtype=None, device=None):  # pragma: no cover
     r"""Computes the 3-j symbol
     """
     # these three propositions are equivalent
@@ -146,11 +156,11 @@ def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
         [0.53878964, 4.09050444, 5.36539036],
         [2.16017393, 3.48835314, 5.55174441],
         [2.52385107, 0.29089583, 3.90040975],
-    ])
+    ], dtype=dtype, device=device)
 
-    B = torch.zeros(n, n)
+    B = random_angles.new_zeros((n, n))
     for abc in random_angles:
-        D = _DxDxD(*abc) - torch.eye(n)
+        D = _DxDxD(*abc) - torch.eye(n, dtype=dtype, device=device)
         B += D.T @ D
 
     eigenvalues, eigenvectors = torch.symeig(B, eigenvectors=True)
@@ -168,7 +178,7 @@ def _generate_wigner_3j(l1, l2, l3):  # pragma: no cover
         if next(x for x in Q.flatten() if x != 0) < 0:
             Q.neg_()
 
-    abc = o3.rand_angles(100)
+    abc = o3.rand_angles(100, dtype=dtype, device=device)
     Q2 = torch.einsum("zil,zjm,zkn,lmn->zijk", wigner_D(l1, *abc), wigner_D(l2, *abc), wigner_D(l3, *abc), Q)
     assert (Q - Q2).norm() < 1e-10
     assert abs(Q.norm() - 1) < 1e-10

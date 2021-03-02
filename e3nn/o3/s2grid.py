@@ -14,7 +14,7 @@ Another representation is the discretization around the sphere. For this represe
 
 .. math::
 
-    x_{ij} &= (\sin(\beta_i) \cos(\alpha_j), \sin(\beta_i) \sin(\alpha_j), \cos(\beta_i))
+    x_{ij} &= (\sin(\beta_i) \sin(\alpha_j), \cos(\beta_i), \sin(\beta_i) \cos(\alpha_j))
 
     \beta_i &= \pi (i + 0.5) / N
 
@@ -31,29 +31,30 @@ import math
 import torch
 import torch.fft
 from e3nn import o3
+from e3nn.util import explicit_default_types
 
 
-def _quadrature_weights(b):
+def _quadrature_weights(b, dtype=None, device=None):
     """
     function copied from ``lie_learn.spaces.S3``
 
     Compute quadrature weights for the grid used by Kostelec & Rockmore [1, 2].
     """
-    k = torch.arange(b)
+    k = torch.arange(b, device=device)
     w = torch.tensor([
         (
             (2. / b) * torch.sin(math.pi * (2. * j + 1.) / (4. * b)) * (
                 (1. / (2 * k + 1)) * torch.sin((2 * j + 1) * (2 * k + 1) * math.pi / (4. * b))
             ).sum()
         )
-        for j in torch.arange(2 * b)
-    ])
+        for j in torch.arange(2 * b, device=device)
+    ], dtype=dtype, device=device)
 
     w /= 2. * ((2 * b) ** 2)
     return w
 
 
-def s2_grid(res_beta, res_alpha):
+def s2_grid(res_beta, res_alpha, dtype=None, device=None):
     r"""grid on the sphere
 
     Parameters
@@ -64,6 +65,12 @@ def s2_grid(res_beta, res_alpha):
     res_alpha : int
         :math:`M`
 
+    dtype : torch.dtype or None
+        ``dtype`` of the returned tensors. If ``None`` then set to ``torch.get_default_dtype()``.
+
+    device : torch.device or None
+        ``device`` of the returned tensors. If ``None`` then set to the default device of the current context.
+
     Returns
     -------
     betas : `torch.Tensor`
@@ -72,15 +79,17 @@ def s2_grid(res_beta, res_alpha):
     alphas : `torch.Tensor`
         tensor of shape ``(res_alpha)``
     """
-    i = torch.arange(res_beta).to(dtype=torch.get_default_dtype())
+    dtype, device = explicit_default_types(dtype, device)
+
+    i = torch.arange(res_beta, dtype=dtype, device=device)
     betas = (i + 0.5) / res_beta * math.pi
 
-    i = torch.arange(res_alpha).to(dtype=torch.get_default_dtype())
+    i = torch.arange(res_alpha, dtype=dtype, device=device)
     alphas = i / res_alpha * 2 * math.pi
     return betas, alphas
 
 
-def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha):
+def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=None, device=None):
     r"""spherical harmonics evaluated on the grid on the sphere
 
     .. math::
@@ -114,7 +123,7 @@ def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha):
     sha : `torch.Tensor`
         tensor of shape ``(res_alpha, 2 lmax + 1)``
     """
-    betas, alphas = s2_grid(res_beta, res_alpha)
+    betas, alphas = s2_grid(res_beta, res_alpha, dtype=dtype, device=device)
     shb = o3.legendre(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
     sha = o3.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
     return betas, alphas, shb, sha
@@ -146,7 +155,7 @@ def _complete_lmax_res(lmax, res_beta, res_alpha):
     return lmax, res_beta, res_alpha
 
 
-def _expand_matrix(ls, like=None):
+def _expand_matrix(ls, like=None, dtype=None, device=None):
     """
     convertion matrix between a flatten vector (L, m) like that
     (0, 0) (1, -1) (1, 0) (1, 1) (2, -2) (2, -1) (2, 0) (2, 1) (2, 2)
@@ -159,11 +168,19 @@ def _expand_matrix(ls, like=None):
     :return: tensor [l, m, l * m]
     """
     lmax = max(ls)
-    zeros = torch.zeros if like is None else like.new_zeros
-    m = zeros(len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls))
+    if like is None:
+        m = torch.zeros(len(ls),
+                        2 * lmax + 1,
+                        sum(2 * l + 1 for l in ls),
+                        dtype=dtype,
+                        device=device)
+    else:
+        m = like.new_zeros((len(ls), 2 * lmax + 1, sum(2 * l + 1 for l in ls)),
+                           dtype=dtype,
+                           device=device)
     i = 0
     for j, l in enumerate(ls):
-        m[j, lmax - l: lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1)
+        m[j, lmax - l:lmax + l + 1, i:i + 2 * l + 1] = torch.eye(2 * l + 1, dtype=dtype, device=device)
         i += 2 * l + 1
     return m
 
@@ -235,9 +252,9 @@ def irfft(x, res):
     *size, sm = x.shape
     x = x.reshape(-1, sm)
     x = torch.cat([
-        x.new_zeros(x.shape[0], (res - sm) // 2),
+        x.new_zeros((x.shape[0], (res - sm) // 2)),
         x,
-        x.new_zeros(x.shape[0], (res - sm) // 2),
+        x.new_zeros((x.shape[0], (res - sm) // 2)),
     ], dim=-1)
     assert x.shape[1] == res
     l = res // 2
@@ -287,10 +304,10 @@ class ToS2Grid(torch.nn.Module):
     Attributes
     ----------
     grid : `torch.Tensor`
-        positions on the sphere, tensor of shape ``(..., res, 3)``
+        positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
     """
 
-    def __init__(self, lmax=None, res=None, normalization='component'):
+    def __init__(self, lmax=None, res=None, normalization='component', dtype=None, device=None):
         super().__init__()
 
         assert normalization in ['norm', 'component', 'integral'] or torch.is_tensor(normalization), "normalization needs to be 'norm', 'component' or 'integral'"
@@ -300,32 +317,35 @@ class ToS2Grid(torch.nn.Module):
         else:
             lmax, res_beta, res_alpha = _complete_lmax_res(lmax, *res)
 
-        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
+        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=dtype, device=device)
 
         n = None
         if normalization == 'component':
             # normalize such that all l has the same variance on the sphere
             # given that all componant has mean 0 and variance 1
-            n = math.sqrt(4 * math.pi) * torch.tensor([
+            n = math.sqrt(4 * math.pi) * betas.new_tensor([
                 1 / math.sqrt(2 * l + 1)
                 for l in range(lmax + 1)
             ]) / math.sqrt(lmax + 1)
         if normalization == 'norm':
             # normalize such that all l has the same variance on the sphere
             # given that all componant has mean 0 and variance 1/(2L+1)
-            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) / math.sqrt(lmax + 1)
+            n = math.sqrt(4 * math.pi) * betas.new_ones(lmax + 1) / math.sqrt(lmax + 1)
         if normalization == 'integral':
-            n = torch.ones(lmax + 1)
+            n = betas.new_ones(lmax + 1)
         if torch.is_tensor(normalization):
             n = normalization
-        m = _expand_matrix(range(lmax + 1))  # [l, m, i]
+        m = _expand_matrix(range(lmax + 1), dtype=dtype, device=device)  # [l, m, i]
         shb = torch.einsum('lmj,bj,lmi,l->mbi', m, shb, m, n)  # [m, b, i]
 
+        self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
         self.register_buffer('alphas', alphas)
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
-        self.to(torch.get_default_dtype())
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
 
     @property
     def grid(self):
@@ -370,6 +390,8 @@ class FromS2Grid(torch.nn.Module):
     lmax : int
     normalization : {'norm', 'component', 'integral'}
     lmax_in : int, optional
+    dtype : torch.dtype or None, optional
+    device : torch.device or None, optional
 
     Examples
     --------
@@ -393,11 +415,11 @@ class FromS2Grid(torch.nn.Module):
     Attributes
     ----------
     grid : `torch.Tensor`
-        tensor of shape ``(res_beta, res_alpha)``
+        positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
 
     """
 
-    def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None):
+    def __init__(self, res=None, lmax=None, normalization='component', lmax_in=None, dtype=None, device=None):
         super().__init__()
 
         assert normalization in ['norm', 'component', 'integral'] or torch.is_tensor(normalization), "normalization needs to be 'norm', 'component' or 'integral'"
@@ -410,31 +432,34 @@ class FromS2Grid(torch.nn.Module):
         if lmax_in is None:
             lmax_in = lmax
 
-        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha)
+        betas, alphas, shb, sha = spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=dtype, device=device)
 
         # normalize such that it is the inverse of ToS2Grid
         n = None
         if normalization == 'component':
-            n = math.sqrt(4 * math.pi) * torch.tensor([
+            n = math.sqrt(4 * math.pi) * betas.new_tensor([
                 math.sqrt(2 * l + 1)
                 for l in range(lmax + 1)
             ]) * math.sqrt(lmax_in + 1)
         if normalization == 'norm':
-            n = math.sqrt(4 * math.pi) * torch.ones(lmax + 1) * math.sqrt(lmax_in + 1)
+            n = math.sqrt(4 * math.pi) * betas.new_ones(lmax + 1) * math.sqrt(lmax_in + 1)
         if normalization == 'integral':
-            n = 4 * math.pi * torch.ones(lmax + 1)
+            n = 4 * math.pi * betas.new_ones(lmax + 1)
         if torch.is_tensor(normalization):
             n = normalization
-        m = _expand_matrix(range(lmax + 1))  # [l, m, i]
+        m = _expand_matrix(range(lmax + 1), dtype=dtype, device=device)  # [l, m, i]
         assert res_beta % 2 == 0
-        qw = _quadrature_weights(res_beta // 2) * res_beta**2 / res_alpha  # [b]
+        qw = _quadrature_weights(res_beta // 2, dtype=dtype, device=device) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum('lmj,bj,lmi,l,b->mbi', m, shb, m, n, qw)  # [m, b, i]
 
+        self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
         self.register_buffer('alphas', alphas)
         self.register_buffer('betas', betas)
         self.register_buffer('sha', sha)
         self.register_buffer('shb', shb)
-        self.to(torch.get_default_dtype())
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
 
     @property
     def grid(self):

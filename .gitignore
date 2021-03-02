@@ -1,5 +1,7 @@
 notebook
 .vscode
+.coverage
+.pytest_cache
 *.egg-info
 __pycache__
 QM9
@@ -9,3 +11,4 @@ wandb
 _build
 build
 dist
+.ipynb_checkpoints

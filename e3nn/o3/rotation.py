@@ -2,11 +2,10 @@ import math
 
 import torch
 
-
 # matrix
 
 
-def rand_matrix(*shape, requires_grad=False):
+def rand_matrix(*shape, requires_grad=False, dtype=None, device=None):
     r"""random rotation matrix
 
     Parameters
@@ -18,14 +17,14 @@ def rand_matrix(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 3, 3)`
     """
-    R = angles_to_matrix(*rand_angles(*shape))
+    R = angles_to_matrix(*rand_angles(*shape, dtype=dtype, device=device))
     return R.detach().requires_grad_(requires_grad)
 
 
 # angles
 
 
-def identity_angles(*shape, requires_grad=False):
+def identity_angles(*shape, requires_grad=False, dtype=None, device=None):
     r"""angles of the identity rotation
 
     Parameters
@@ -43,10 +42,12 @@ def identity_angles(*shape, requires_grad=False):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    return torch.zeros(*shape, requires_grad=requires_grad), torch.zeros(*shape, requires_grad=requires_grad), torch.zeros(*shape, requires_grad=requires_grad)
+    return (torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device),
+            torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device),
+            torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device))
 
 
-def rand_angles(*shape, requires_grad=False):
+def rand_angles(*shape, requires_grad=False, dtype=None, device=None):
     r"""random rotation angles
 
     Parameters
@@ -64,8 +65,8 @@ def rand_angles(*shape, requires_grad=False):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    alpha, gamma = 2 * math.pi * torch.rand(2, *shape)
-    beta = torch.rand(shape).mul(2).sub(1).acos()
+    alpha, gamma = 2 * math.pi * torch.rand(2, *shape, dtype=dtype, device=device)
+    beta = torch.rand(shape, dtype=dtype, device=device).mul(2).sub(1).acos()
     alpha = alpha.detach().requires_grad_(requires_grad)
     beta = beta.detach().requires_grad_(requires_grad)
     gamma = gamma.detach().requires_grad_(requires_grad)
@@ -143,7 +144,7 @@ def inverse_angles(a, b, c):
 # quaternions
 
 
-def identity_quaternion(*shape, requires_grad=False):
+def identity_quaternion(*shape, requires_grad=False, dtype=None, device=None):
     r"""quaternion of identity rotation
 
     Parameters
@@ -155,13 +156,13 @@ def identity_quaternion(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 4)`
     """
-    q = torch.zeros(*shape, 4)
+    q = torch.zeros(*shape, 4, dtype=dtype, device=device)
     q[..., 0] = 1  # or -1...
     q = q.detach().requires_grad_(requires_grad)
     return q
 
 
-def rand_quaternion(*shape, requires_grad=False):
+def rand_quaternion(*shape, requires_grad=False, dtype=None, device=None):
     r"""generate random quaternion
 
     Parameters
@@ -173,7 +174,7 @@ def rand_quaternion(*shape, requires_grad=False):
     `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape}, 4)`
     """
-    q = angles_to_quaternion(*rand_angles(*shape))
+    q = angles_to_quaternion(*rand_angles(*shape, dtype=dtype, device=device))
     q = q.detach().requires_grad_(requires_grad)
     return q
 
@@ -226,7 +227,7 @@ def inverse_quaternion(q):
 # axis-angle
 
 
-def rand_axis_angle(*shape, requires_grad=False):
+def rand_axis_angle(*shape, requires_grad=False, dtype=None, device=None):
     r"""generate random rotation as axis-angle
 
     Parameters
@@ -241,7 +242,7 @@ def rand_axis_angle(*shape, requires_grad=False):
     angle : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    axis, angle = angles_to_axis_angle(*rand_angles(*shape))
+    axis, angle = angles_to_axis_angle(*rand_angles(*shape, dtype=dtype, device=device))
     axis = axis.detach().requires_grad_(requires_grad)
     angle = angle.detach().requires_grad_(requires_grad)
     return axis, angle
@@ -278,12 +279,12 @@ def compose_axis_angle(axis1, angle1, axis2, angle2):
 # conversions
 
 
-def matrix_z(gamma):
-    r"""matrix of rotation around Z axis
+def matrix_x(angle: torch.Tensor) -> torch.Tensor:
+    r"""matrix of rotation around X axis
 
     Parameters
     ----------
-    gamma : `torch.Tensor`
+    angle : `torch.Tensor`
         tensor of any shape :math:`(...)`
 
     Returns
@@ -291,23 +292,23 @@ def matrix_z(gamma):
     `torch.Tensor`
         matrices of shape :math:`(..., 3, 3)`
     """
-    c = gamma.cos()
-    s = gamma.sin()
-    o = torch.ones_like(gamma)
-    z = torch.zeros_like(gamma)
+    c = angle.cos()
+    s = angle.sin()
+    o = torch.ones_like(angle)
+    z = torch.zeros_like(angle)
     return torch.stack([
-        torch.stack([c, -s, z], dim=-1),
-        torch.stack([s, c, z], dim=-1),
-        torch.stack([z, z, o], dim=-1)
+        torch.stack([o, z, z], dim=-1),
+        torch.stack([z, c, -s], dim=-1),
+        torch.stack([z, s, c], dim=-1),
     ], dim=-2)
 
 
-def matrix_y(beta):
+def matrix_y(angle: torch.Tensor) -> torch.Tensor:
     r"""matrix of rotation around Y axis
 
     Parameters
     ----------
-    beta : `torch.Tensor`
+    angle : `torch.Tensor`
         tensor of any shape :math:`(...)`
 
     Returns
@@ -315,14 +316,38 @@ def matrix_y(beta):
     `torch.Tensor`
         matrices of shape :math:`(..., 3, 3)`
     """
-    c = beta.cos()
-    s = beta.sin()
-    o = torch.ones_like(beta)
-    z = torch.zeros_like(beta)
+    c = angle.cos()
+    s = angle.sin()
+    o = torch.ones_like(angle)
+    z = torch.zeros_like(angle)
     return torch.stack([
         torch.stack([c, z, s], dim=-1),
         torch.stack([z, o, z], dim=-1),
         torch.stack([-s, z, c], dim=-1),
+    ], dim=-2)
+
+
+def matrix_z(angle: torch.Tensor) -> torch.Tensor:
+    r"""matrix of rotation around Z axis
+
+    Parameters
+    ----------
+    angle : `torch.Tensor`
+        tensor of any shape :math:`(...)`
+
+    Returns
+    -------
+    `torch.Tensor`
+        matrices of shape :math:`(..., 3, 3)`
+    """
+    c = angle.cos()
+    s = angle.sin()
+    o = torch.ones_like(angle)
+    z = torch.zeros_like(angle)
+    return torch.stack([
+        torch.stack([c, -s, z], dim=-1),
+        torch.stack([s, c, z], dim=-1),
+        torch.stack([z, z, o], dim=-1)
     ], dim=-2)
 
 
@@ -346,7 +371,7 @@ def angles_to_matrix(alpha, beta, gamma):
         matrices of shape :math:`(..., 3, 3)`
     """
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    return matrix_z(alpha) @ matrix_y(beta) @ matrix_z(gamma)
+    return matrix_y(alpha) @ matrix_x(beta) @ matrix_y(gamma)
 
 
 def matrix_to_angles(R):
@@ -368,10 +393,11 @@ def matrix_to_angles(R):
     gamma : `torch.Tensor`
         tensor of shape :math:`(...)`
     """
-    x = R @ R.new_tensor([0, 0, 1])
+    assert torch.allclose(torch.det(R), R.new_tensor(1))
+    x = R @ R.new_tensor([0.0, 1.0, 0.0])
     a, b = xyz_to_angles(x)
-    R = angles_to_matrix(a, b, a.new_zeros(a.shape)).transpose(-1, -2) @ R
-    c = torch.atan2(R[..., 1, 0], R[..., 0, 0])
+    R = angles_to_matrix(a, b, torch.zeros_like(a)).transpose(-1, -2) @ R
+    c = torch.atan2(R[..., 0, 2], R[..., 0, 0])
     return a, b, c
 
 
@@ -395,9 +421,9 @@ def angles_to_quaternion(alpha, beta, gamma):
         matrices of shape :math:`(..., 4)`
     """
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    qa = axis_angle_to_quaternion(torch.tensor([0, 0, 1.0]), alpha)
-    qb = axis_angle_to_quaternion(torch.tensor([0, 1, 0.0]), beta)
-    qc = axis_angle_to_quaternion(torch.tensor([0, 0, 1.0]), gamma)
+    qa = axis_angle_to_quaternion(alpha.new_tensor([0.0, 1.0, 0.0]), alpha)
+    qb = axis_angle_to_quaternion(beta.new_tensor([1.0, 0.0, 0.0]), beta)
+    qc = axis_angle_to_quaternion(gamma.new_tensor([0.0, 1.0, 0.0]), gamma)
     return compose_quaternion(qa, compose_quaternion(qb, qc))
 
 
@@ -476,6 +502,7 @@ def matrix_to_axis_angle(R):
     angle : `torch.Tensor`
         tonsor of shape :math:`(...)`
     """
+    assert torch.allclose(torch.det(R), R.new_tensor(1))
     tr = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
     angle = torch.acos(tr.sub(1).div(2).clamp(-1, 1))
     axis = torch.stack([
@@ -531,8 +558,8 @@ def axis_angle_to_matrix(axis, angle):
     axis, angle = torch.broadcast_tensors(axis, angle[..., None])
     alpha, beta = xyz_to_angles(axis)
     R = angles_to_matrix(alpha, beta, torch.zeros_like(beta))
-    Rz = matrix_z(angle[..., 0])
-    return R @ Rz @ R.transpose(-2, -1)
+    Ry = matrix_y(angle[..., 0])
+    return R @ Ry @ R.transpose(-2, -1)
 
 
 def quaternion_to_matrix(q):
@@ -571,7 +598,6 @@ def quaternion_to_angles(q):
         tensor of shape :math:`(...)`
     """
     return matrix_to_angles(quaternion_to_matrix(q))
-
 
 
 def axis_angle_to_angles(axis, angle):
@@ -622,12 +648,12 @@ def angles_to_xyz(alpha, beta):
     --------
 
     >>> angles_to_xyz(torch.tensor(1.7), torch.tensor(0.0)).abs()
-    tensor([0., 0., 1.])
+    tensor([0., 1., 0.])
     """
     alpha, beta = torch.broadcast_tensors(alpha, beta)
-    x = torch.sin(beta) * torch.cos(alpha)
-    y = torch.sin(beta) * torch.sin(alpha)
-    z = torch.cos(beta)
+    x = torch.sin(beta) * torch.sin(alpha)
+    y = torch.cos(beta)
+    z = torch.sin(beta) * torch.cos(alpha)
     return torch.stack([x, y, z], dim=-1)
 
 
@@ -655,6 +681,6 @@ def xyz_to_angles(xyz):
     xyz = torch.nn.functional.normalize(xyz, p=2, dim=-1)  # forward 0's instead of nan for zero-radius
     xyz = xyz.clamp(-1, 1)
 
-    beta = torch.acos(xyz[..., 2])
-    alpha = torch.atan2(xyz[..., 1], xyz[..., 0])
+    beta = torch.acos(xyz[..., 1])
+    alpha = torch.atan2(xyz[..., 0], xyz[..., 2])
     return alpha, beta

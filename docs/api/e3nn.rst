@@ -4,5 +4,6 @@ e3nn
 .. toctree::
     o3/o3
     nn/nn
-    io
-    math
+    io/io
+    math/math
+    util/util

@@ -1,9 +1,12 @@
 import torch
 
 from e3nn import o3
+from e3nn.nn import Extract
 from e3nn.math import normalize2mom
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('trace')
 class Activation(torch.nn.Module):
     r"""Scalar activation function
 
@@ -91,30 +94,31 @@ class Activation(torch.nn.Module):
                 return torch.zeros_like(features)
 
 
+@compile_mode('script')
 class _Sortcut(torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
-        self.irreps_outs = tuple(irreps.simplify() for irreps in irreps_outs)
-        def key(mul_ir):
-            _mul, (l, p) = mul_ir
-            return (l, p)
-        self.irreps_in = o3.Irreps(sorted((x for irreps in self.irreps_outs for x in irreps), key=key)).simplify()
+        self.irreps_outs = tuple(o3.Irreps(irreps).simplify() for irreps in irreps_outs)
+        irreps_in = sum(self.irreps_outs, o3.Irreps([]))
+
+        i = 0
+        instructions = []
+        for irreps_out in self.irreps_outs:
+            instructions += [tuple(range(i, i + len(irreps_out)))]
+            i += len(irreps_out)
+        assert len(irreps_in) == i, (len(irreps_in), i)
+
+        irreps_in, p, _ = irreps_in.sort()
+        instructions = [tuple(p[i] for i in x) for x in instructions]
+
+        self.cut = Extract(irreps_in, self.irreps_outs, instructions)
+        self.irreps_in = irreps_in.simplify()
 
     def forward(self, x):
-        outs = tuple(x.new_zeros(x.shape[:-1] + (irreps.dim,)) for irreps in self.irreps_outs)
-        i_in = 0
-        for _, (l_in, p_in) in self.irreps_in:
-            for irreps_out, out in zip(self.irreps_outs, outs):
-                i_out = 0
-                for mul_out, (l_out, p_out) in irreps_out:
-                    d = mul_out * (2 * l_out + 1)
-                    if (l_in, p_in) == (l_out, p_out):
-                        out[..., i_out:i_out + d] = x[..., i_in:i_in + d]
-                        i_in += d
-                    i_out += d
-        return outs
+        return self.cut(x)
 
 
+@compile_mode('script')
 class Gate(torch.nn.Module):
     r"""Gate activation function
 
@@ -150,10 +154,9 @@ class Gate(torch.nn.Module):
         irreps_gates = o3.Irreps(irreps_gates)
         irreps_nonscalars = o3.Irreps(irreps_nonscalars)
 
-        self.sc = _Sortcut(irreps_scalars, irreps_gates)
-        self.irreps_scalars, self.irreps_gates = self.sc.irreps_outs
-        self.irreps_nonscalars = irreps_nonscalars.simplify()
-        self.irreps_in = self.sc.irreps_in + self.irreps_nonscalars
+        self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_nonscalars)
+        self.irreps_scalars, self.irreps_gates, self.irreps_nonscalars = self.sc.irreps_outs
+        self.irreps_in = self.sc.irreps_in
 
         self.act_scalars = Activation(irreps_scalars, act_scalars)
         irreps_scalars = self.act_scalars.irreps_out
@@ -182,9 +185,8 @@ class Gate(torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         '''
-        with torch.autograd.profiler.record_function(repr(self)):
-            scalars, gates = self.sc(features)
-            nonscalars = features[..., scalars.shape[-1] + gates.shape[-1]:]
+        with torch.autograd.profiler.record_function('Gate'):
+            scalars, gates, nonscalars = self.sc(features)
 
             scalars = self.act_scalars(scalars)
             if gates.shape[-1]:

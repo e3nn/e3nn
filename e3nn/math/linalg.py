@@ -3,14 +3,14 @@ from typing import Tuple
 import torch
 
 
-def kron(*matrices):
+def kron(*matrices, dtype=None, device=None):
     r"""Kroneker product between matrices
     """
     for m in matrices:
         assert m.dim() == 2
 
     if len(matrices) == 0:
-        return torch.ones(1, 1)
+        return torch.ones(1, 1, dtype=dtype, device=device)
     if len(matrices) == 1:
         return matrices[0]
 
@@ -18,8 +18,8 @@ def kron(*matrices):
     z = torch.einsum("ij,kl->ikjl", x, y).reshape(x.size(0) * y.size(0), x.size(1) * y.size(1))
 
     if matrices:
-        return kron(z, *matrices)
-    return z
+        return kron(z, *matrices, dtype=dtype, device=device)
+    return z.to(dtype=dtype, device=device)
 
 
 def direct_sum(*matrices):
@@ -29,7 +29,7 @@ def direct_sum(*matrices):
     m = sum(x.size(-2) for x in matrices)
     n = sum(x.size(-1) for x in matrices)
     total_shape = list(front_indices) + [m, n]
-    out = matrices[0].new_zeros(*total_shape)
+    out = matrices[0].new_zeros(total_shape)
     i, j = 0, 0
     for x in matrices:
         m, n = x.shape[-2:]
@@ -87,8 +87,8 @@ def orthonormalize(
             final += [x]
             matrix += [cx]
 
-    final = torch.stack(final) if len(final) > 0 else original.new_zeros(0, dim)
-    matrix = torch.stack(matrix) if len(matrix) > 0 else original.new_zeros(0, len(original))
+    final = torch.stack(final) if len(final) > 0 else original.new_zeros((0, dim))
+    matrix = torch.stack(matrix) if len(matrix) > 0 else original.new_zeros((0, len(original)))
 
     return final, matrix
 

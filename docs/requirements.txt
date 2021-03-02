@@ -3,5 +3,20 @@ myst-parser
 sphinx
 sphinx-rtd-theme
 sympy
-torch_geometric
-torch>=1.4.0
+
+ipykernel
+nbsphinx
+plotly
+jupyter-sphinx
+
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch>=1.7.1+cpu
+
+--find-links https://pytorch-geometric.com/whl/torch-1.7.0+cpu.html
+torch-scatter
+torch-sparse
+torch-cluster
+torch-spline-conv
+torch-geometric
+
+.

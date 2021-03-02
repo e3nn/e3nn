@@ -80,6 +80,9 @@ class BatchNorm(nn.Module):
         if self.training:
             new_means = []
             new_vars = []
+        else:
+            new_means = None
+            new_vars = None
 
         fields = []
         ix = 0
