@@ -110,6 +110,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
         irreps_out=tp.irreps_out
     )
 
+    # TODO: this fails with optimization for float32 because of different numerics after optimization happens. What is correct behavior?
     # Confirm that it gives same results
     x1 = tp.irreps_in1.randn(2, -1)
     x2 = tp.irreps_in2.randn(2, -1)

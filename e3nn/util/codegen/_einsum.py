@@ -54,14 +54,16 @@ def opt_einsum_code(
     operands: List[str],
     arg_shapes: list,
     out_var: str,
-    mul_const: Optional[float] = None
+    mul_const: Optional[float] = None,
+    **opt_kwargs
 ):
     operands = list(operands)
 
     _, opt_path = contract_path(
         einstr,
         *arg_shapes,
-        shapes=True
+        shapes=True,
+        **opt_kwargs
     )
 
     cgb = _CodeGenBackend()
@@ -138,4 +140,4 @@ def opt_einsum_code(
     # ==== end opt_einsum code =====
 
     outcode = cgb.make_code()
-    return outcode
+    return outcode, opt_path

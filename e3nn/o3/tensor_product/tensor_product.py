@@ -303,7 +303,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     def optimize_for_batch_size(self, batch_size: int):
         if not self._optimize_einsums:
             return
-        # We use torch.no_grad() and all-zero probe tensors instead of 
+        # We use torch.no_grad() and all-zero probe tensors instead of
         # actual inputs in order to avoid confusing the autograd engine.
         # Even if we did use the real inputs, because of no_grad(),
         # we wouldn't be able to use the results.
