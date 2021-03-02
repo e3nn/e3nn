@@ -76,7 +76,6 @@ class LazyCodeGenerator:
             b = textwrap.indent(b, _INDENT*self.indent_level)
             processed_lines.append(b)
         out = "\n".join(processed_lines)
-        print(out)
         return out
 
     def einsum(self, einstr, *args, out_var="_ein_out", mul_const=None, div_const=None):
@@ -141,3 +140,4 @@ class LazyCodeGenerator:
                 return None
             else:
                 return "@torch.jit.script"
+        self(func)
