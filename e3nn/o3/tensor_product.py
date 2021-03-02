@@ -1,6 +1,5 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Union, NamedTuple
 from math import sqrt
-from collections import namedtuple
 import textwrap
 
 import torch
@@ -14,6 +13,16 @@ def _prod(x):
     for a in x:
         out *= a
     return out
+
+
+class Instruction(NamedTuple):
+    i_in1: int
+    i_in2: int
+    i_out: int
+    connection_mode: str
+    has_weight: bool
+    path_weight: float
+    path_shape: tuple
 
 
 def codegen_tensor_product(in1, in2, out, instructions, normalization='component', shared_weights=None, specialized_code=True):
@@ -43,7 +52,6 @@ def codegen_tensor_product(in1, in2, out, instructions, normalization='component
     out_var = [var for _, _, var in out]
 
     # === Build instructions ===
-    Instruction = namedtuple("Instruction", "i_in1, i_in2, i_out, connection_mode, has_weight, path_weight, path_shape")
     instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
     instructions = [
         Instruction(

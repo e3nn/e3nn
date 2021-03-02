@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nn.model.v2103` generic message passing model + examples of networks using it.
 - `o3.TensorProduct`: is jit scriptable
 - `o3.TensorProduct`: also broadcast the `weight` argument
+- simple e3nn models can be saved/loaded with `torch.save()`/`torch.load()`
 
 ### Changed
 - `math.soft_one_hot_linspace` very small change in the normalization of `fourier` basis
+- `normalize2mom` is now a `torch.nn.Module`
 
 ### Fixed
 - `nn.Gate` was crashing when the number of scalars or gates was zero
