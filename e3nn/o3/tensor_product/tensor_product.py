@@ -146,12 +146,20 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
-
+    _specialized_code: bool
+    _optimize_einsums: bool
     _profiling_str: str
+    normalization: str
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
     optimal_batch_size: Optional[int]
+    irreps_in1: o3.Irreps
+    irreps_in2: o3.Irreps
+    irreps_out: o3.Irreps
+    in1_var: List[float]
+    in2_var: List[float]
+    out_var: List[float]
 
     def __init__(
         self,
@@ -169,6 +177,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         super().__init__()
 
         assert normalization in ['component', 'norm'], normalization
+        self.normalization = normalization
 
         if shared_weights is False and internal_weights is None:
             internal_weights = False
@@ -180,6 +189,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             internal_weights = True
 
         assert shared_weights or not internal_weights
+        self.internal_weights = internal_weights
+        self.shared_weights = shared_weights
 
         # Determine irreps
         try:
@@ -203,9 +214,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.irreps_in2 = o3.Irreps([(mul, ir) for mul, ir, _var in in2])
         self.irreps_out = o3.Irreps([(mul, ir) for mul, ir, _var in out])
 
-        in1_var = [var for _, _, var in in1]
-        in2_var = [var for _, _, var in in2]
-        out_var = [var for _, _, var in out]
+        self.in1_var = [var for _, _, var in in1]
+        self.in2_var = [var for _, _, var in in2]
+        self.out_var = [var for _, _, var in out]
 
         # Preprocess instructions into objects
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
@@ -225,33 +236,22 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         ]
         self.instructions = instructions
 
-        self._lazygen_out, self._lazygen_right, wigners = codegen_tensor_product(
-            self.irreps_in1,
-            in1_var,
-            self.irreps_in2,
-            in2_var,
-            self.irreps_out,
-            out_var,
-            self.instructions,
-            normalization,
-            shared_weights,
-            _specialized_code,
-            codegen_kwargs={'optimize_einsums': _optimize_einsums}
-        )
+        self._specialized_code = _specialized_code
+        self._optimize_einsums = _optimize_einsums
+        self.optimal_batch_size = None
+
+        # Generate the actual tensor product code
+        wigners = self._make_lazy_codegen()
+        self._wigners = wigners
 
         self._codegen_register({
             '_compiled_main_out': self._lazygen_out.generate(),
             '_compiled_main_right': self._lazygen_right.generate(),
         })
 
-        self._optimize_einsums = _optimize_einsums
-        self.optimal_batch_size = None
-
         # === Determine weights ===
-        self.shared_weights = shared_weights
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
 
-        self.internal_weights = internal_weights
         if internal_weights and self.weight_numel > 0:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
@@ -298,6 +298,40 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             f"({self.irreps_in1.simplify()} x {self.irreps_in2.simplify()} "
             f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
+
+    @torch.jit.ignore
+    def _make_lazy_codegen(self):
+        self._lazygen_out, self._lazygen_right, wigners = codegen_tensor_product(
+            self.irreps_in1,
+            self.in1_var,
+            self.irreps_in2,
+            self.in2_var,
+            self.irreps_out,
+            self.out_var,
+            self.instructions,
+            self.normalization,
+            self.shared_weights,
+            self._specialized_code,
+            codegen_kwargs={'optimize_einsums': self._optimize_einsums}
+        )
+
+        return wigners
+
+    def __getstate__(self):
+        # This calls CodeGenMixin
+        d = super().__getstate__()
+        # lazy code generators can't be pickled, since they're full of closures
+        del d['_lazygen_out']
+        del d['_lazygen_right']
+        return d
+
+    def __setstate__(self, d):
+        # Set the dict with CodeGenMixin
+        super().__setstate__(d)
+        # Rebuild the lazy code generators
+        # We don't compile with the new code generators — CodeGenMixin has already restored whatever exact code was compiled when the object was saved, and we want to preserve that.
+        wigners = self._make_lazy_codegen()
+        assert wigners == self._wigners, "The provided state is inconsistant or from an incompatible version fo e3nn"
 
     @torch.jit.ignore
     def optimize_for_batch_size(self, batch_size: int):
