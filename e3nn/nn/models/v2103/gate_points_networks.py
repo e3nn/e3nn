@@ -83,23 +83,75 @@ class SimpleNetwork(torch.nn.Module):
         return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
 
 
-class MoreAdvancedNetwork(torch.nn.Module):
+class NetworkForAGraphWithAttributes(torch.nn.Module):
     def __init__(
             self,
             irreps_node_input,
-            irreps_node_output,
-            irreps_node_hidden,
             irreps_node_attr,
             irreps_edge_attr,
+            irreps_node_output,
             max_radius,
             num_neighbors,
             num_nodes,
-            layers,
-            lmax_sh,
+            mul=50,
+            layers=3,
+            lmax=2,
                 ) -> None:
         super().__init__()
-        # TODO
+
+        self.lmax = lmax
+        self.max_radius = max_radius
+        self.number_of_basis = 10
+        self.num_nodes = num_nodes
+        self.irreps_edge_attr = o3.Irreps(irreps_edge_attr)
+
+        irreps_node_hidden = o3.Irreps([
+            (mul, (l, p))
+            for l in range(lmax + 1)
+            for p in [-1, 1]
+        ])
+
+        self.mp = MessagePassing(
+            irreps_node_input=irreps_node_input,
+            irreps_node_hidden=irreps_node_hidden,
+            irreps_node_output=irreps_node_output,
+            irreps_node_attr=irreps_node_attr,
+            irreps_edge_attr=self.irreps_edge_attr + o3.Irreps.spherical_harmonics(lmax),
+            layers=layers,
+            fc_neurons=[self.number_of_basis, 100],
+            num_neighbors=num_neighbors,
+        )
+
+        self.irreps_node_input = self.mp.irreps_node_input
+        self.irreps_node_attr = self.mp.irreps_node_attr
+        self.irreps_node_output = self.mp.irreps_node_output
 
     def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
-        # TODO
-        pass
+        if 'batch' in data:
+            batch = data['batch']
+        else:
+            batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
+
+        # The graph
+        edge_src = data['edge_index'][0]
+        edge_dst = data['edge_index'][1]
+
+        # Edge attributes
+        edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
+        edge_sh = o3.spherical_harmonics(range(self.lmax + 1), edge_vec, True, normalization='component')
+        edge_attr = torch.cat([data['edge_attr'], edge_sh], dim=1)
+
+        # Edge length embedding
+        edge_length = edge_vec.norm(dim=1)
+        edge_length_embedding = soft_one_hot_linspace(
+            edge_length,
+            0.0,
+            self.max_radius,
+            self.number_of_basis,
+            base='cosine',  # the cosine basis with endpoint = True goes to zero at max_radius
+            endpoint=False,  # no need for an additional smooth cutoff
+        ).mul(self.number_of_basis**0.5)
+
+        node_outputs = self.mp(data['node_input'], data['node_attr'], edge_src, edge_dst, edge_attr, edge_length_embedding)
+
+        return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)

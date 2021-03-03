@@ -39,6 +39,9 @@ class Irrep(tuple):
     >>> Irrep("1y")
     1o
 
+    >>> Irrep("2o").dim
+    5
+
     >>> Irrep("2e") in Irrep("1o") * Irrep("1o")
     True
 
@@ -274,8 +277,12 @@ class Irreps(tuple):
     --------
     Create a representation of 100 :math:`l=0` of even parity and 50 pseudo-vectors.
 
-    >>> Irreps([(100, (0, 1)), (50, (1, 1))])
+    >>> x = Irreps([(100, (0, 1)), (50, (1, 1))])
+    >>> x
     100x0e+50x1e
+
+    >>> x.dim
+    250
 
     Create a representation of 100 :math:`l=0` of even parity and 50 pseudo-vectors.
 
