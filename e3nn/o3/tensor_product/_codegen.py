@@ -355,8 +355,10 @@ def codegen_tensor_product(
                     cg_right.einsum("ijk,uw,zvj->zuiwvk", f"w3j_{index_w3j}", "e1", "s2")
 
         # Add to output
-        cg_out(f"out[:, {index_out}:{index_out+dim_out}] += {alpha} * _ein_out.reshape(batch, {dim_out})")
-        cg_right(f"out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += {alpha} * _ein_out.reshape(batch, {dim_1}, {dim_out})")
+        cg_out.scalar_multiply("_ein_out", alpha, out_var="_ein_out")
+        cg_right.scalar_multiply("_ein_out", alpha, out_var="_ein_out")
+        cg_out(f"out[:, {index_out}:{index_out+dim_out}] += _ein_out.reshape(batch, {dim_out})")
+        cg_right(f"out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += _ein_out.reshape(batch, {dim_1}, {dim_out})")
         # Dedent out of the profiler block
         cg_out.dedent()
         cg_right.dedent()

@@ -70,6 +70,7 @@ def opt_einsum_code(
 
     # == deal with constants ==
     # TODO: check this
+    # TODO: output too!
     # einsum is a linear operation in all operands, and as a result we
     # can multiply a scalar constant for the ouptu onto any of the inputs.
     # In terms of FLOPs, it's fastest then to do this multiplication with

@@ -103,6 +103,16 @@ class LazyCodeGenerator:
         func = LazyEinsum(my_einsum_id, *args, **kwargs)
         self(func)
 
+    def scalar_multiply(self, x: str, mul: float, out_var: str):
+        if isinstance(self.blocks[-1], LazyEinsum):
+            lazyein: LazyEinsum = self.blocks[-1]
+            if lazyein.out_var == x:
+                # We're multiplying the output of an einsum that just happened, so we can incorporate into that einsum:
+                lazyein.add_multiplicative_const(mul)
+                self(f"{out_var} = {x}")
+                return
+        self(f"{out_var} = {x}.mul({mul})")
+
     def script_decorator(self):
         """Insert an ``@torch.jit.script`` decorator.
 
@@ -179,6 +189,12 @@ class LazyEinsum:
         if mul_const is not None:
             out += f".mul({mul_const})"
         return out
+
+    def add_multiplicative_const(self, mul: float):
+        if self.mul_consts is None:
+            self.mul_consts = [mul]
+        else:
+            self.mul_consts.append(mul)
 
     def __call__(self, lazy_codegen: LazyCodeGenerator, profile: bool):
         if not self.optimize_einsums:
