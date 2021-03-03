@@ -154,9 +154,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     internal_weights: bool
     weight_numel: int
     optimal_batch_size: Optional[int]
-    irreps_in1: o3.Irreps
-    irreps_in2: o3.Irreps
-    irreps_out: o3.Irreps
     in1_var: List[float]
     in2_var: List[float]
     out_var: List[float]
