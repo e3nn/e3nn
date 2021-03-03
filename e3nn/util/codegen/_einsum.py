@@ -35,8 +35,8 @@ class _CodeGenBackend:
         self.code.append(f"{out} = torch.einsum('{einstr}', {', '.join(args)})")
         return out
 
-    def tensordot(self, x, y, axes=2):
-        out = self.get_tmp()
+    def tensordot(self, x, y, axes=2, out=None):
+        out = out if out is not None else self.get_tmp()
         self.code.append(f"{out} = torch.tensordot({x}, {y}, dims_self=[{', '.join(str(a) for a in axes[0])}], dims_other=[{', '.join(str(a) for a in axes[1])},])")
         return out
 
