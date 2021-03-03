@@ -77,10 +77,9 @@ def codegen_tensor_product(
         else:
             batch = x1.shape[0]
     """))
-    # For forward(), we will accululate the various outputs independently
+    # ^ For forward(), we will accululate the various outputs independently
     # and then concatinate them: this improves performance by avoiding in-place operations,
     # which are bad for autograd.
-    has_outs = [False] * len(irreps_out)
 
     cg_right(textwrap.dedent(f"""
         {'x2, ws = x2[..., :, 0], ws[..., 0, :]' if not shared_weights else ''}
@@ -99,6 +98,7 @@ def codegen_tensor_product(
     """))
     # ^ for right, it is not simple to collect different inputs independently,
     #   so we retain the in-place operations at a small performance cost.
+    #   So, we allocate output space.
 
     # = Put everything in the else block =
     cg_out.indent()
@@ -363,8 +363,7 @@ def codegen_tensor_product(
         cg_out.scalar_multiply("_ein_out", alpha, out_var="_ein_out")
         cg_right.scalar_multiply("_ein_out", alpha, out_var="_ein_out")
         # sum this instruction into outputs
-        cg_out(f"out_{ins.i_out} = {f'out_{ins.i_out} + ' if has_outs[ins.i_out] else ''} _ein_out.reshape(batch, {dim_out})")
-        has_outs[ins.i_out] = True
+        cg_out(f"out_ins_{ins_number} = _ein_out.reshape(batch, {dim_out})")
         cg_right(f"out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += _ein_out.reshape(batch, {dim_1}, {dim_out})")
         # Dedent out of the profiler block
         cg_out.dedent()
@@ -373,8 +372,17 @@ def codegen_tensor_product(
         cg_right("\n")
 
     # = Return the result =
-    # cg_out("return out.reshape(outsize)")
-    cg_out(f"return torch.cat(({', '.join(f'out_{i}' for i in range(len(has_outs)))},), dim=-1).reshape(outsize)")
+    # for forward(), we now sum the individual paths at the end:
+    out_ir_strs = [
+        " + ".join(
+            f"out_ins_{ins_number}"
+            for ins_number in range(len(instructions))
+            if instructions[ins_number].i_out == ir_out_num
+        )
+        for ir_out_num in range(len(irreps_out))
+    ]
+    cg_out(f"return torch.cat(({', '.join(out_ir_strs)},), dim=-1).reshape(outsize)")
+    # for right(), we just reshape and return
     cg_right("return out.reshape(outsize)")
 
     return cg_out, cg_right, wigners
