@@ -1,3 +1,4 @@
+from typing import List, Optional
 import inspect
 import textwrap
 import contextvars
@@ -95,11 +96,66 @@ class LazyCodeGenerator:
 
         return out
 
-    def einsum(self, einstr, *args, out_var="_ein_out", mul_const=None, div_const=None):
+    def einsum(self, *args, **kwargs):
         """Generate an einsum."""
         my_einsum_id = self._einsum_id
         self._einsum_id += 1
+        func = LazyEinsum(my_einsum_id, *args, **kwargs)
+        self(func)
 
+    def script_decorator(self):
+        """Insert an ``@torch.jit.script`` decorator.
+
+        In profiling mode, this does nothing.
+        """
+        def func(profile: bool):
+            if profile:
+                return None
+            else:
+                return "@torch.jit.script"
+        self(func)
+
+
+class LazyEinsum:
+    einsum_id: int
+    einstr: str
+    operands: List[str]
+    out_var: str
+    mul_consts: Optional[List[float]]
+    div_consts: Optional[List[float]]
+    optimize_einsums: bool
+
+    def __init__(
+        self,
+        einsum_id: int,
+        einstr,
+        *args,
+        out_var="_ein_out",
+        mul_consts=None,
+        div_consts=None,
+        optimize_einsums=True
+    ):
+        self.einsum_id = einsum_id
+        self.einstr = einstr
+        self.operands = args
+        self.out_var = out_var
+        self.optimize_einsums = optimize_einsums
+        if isinstance(mul_consts, list):
+            self.mul_consts = mul_consts
+        elif mul_consts is None:
+            self.mul_consts = None
+        else:
+            self.mul_consts = [mul_consts]
+        if isinstance(div_consts, list):
+            self.div_consts = div_consts
+        elif div_consts is None:
+            self.div_consts = None
+        else:
+            self.div_consts = [div_consts]
+
+    def _get_multiplicitive_const(self):
+        mul_const = self.mul_consts
+        div_const = self.div_consts
         # Combine multiple scalar multiples/divisors
         if mul_const is not None and not isinstance(mul_const, float):
             mul_const = prod(mul_const)
@@ -115,57 +171,43 @@ class LazyCodeGenerator:
             div_const = None
         # Be sure that it got incorporated into the multiplicitive constant
         assert div_const is None
+        return mul_const
 
-        def func_no_opt():
-            out = f"{out_var} = torch.einsum('{einstr}', {', '.join(args)})"
-            if mul_const is not None:
-                out += f".mul({mul_const})"
-            if div_const is not None:
-                out += f".div({div_const})"
-            return out
+    def _ein_no_opt(self):
+        out = f"{self.out_var} = torch.einsum('{self.einstr}', {', '.join(self.operands)})"
+        mul_const = self._get_multiplicitive_const()
+        if mul_const is not None:
+            out += f".mul({mul_const})"
+        return out
 
+    def __call__(self, lazy_codegen: LazyCodeGenerator, profile: bool):
         if not self.optimize_einsums:
-            # Just output a normal einsum
-            func = func_no_opt
+            return self._ein_no_opt()
+        codegen_id = id(lazy_codegen)
+        if profile:
+            # record shapes
+            prof_line = f"_ProfileData.get()[{codegen_id}][{self.einsum_id}] = ({', '.join(f'({arg}).shape' for arg in self.operands)})"
+            # normal einsum
+            return prof_line + "\n" + self._ein_no_opt()
         else:
-            def func(self, profile: bool):
-                if profile:
-                    # record shapes
-                    prof_line = f"_ProfileData.get()[{id(self)}][{my_einsum_id}] = ({', '.join(f'({arg}).shape' for arg in args)})"
-                    # normal einsum
-                    return prof_line + "\n" + func_no_opt()
-                else:
-                    # Check if there is profile data to use for optimization
-                    profile_dat = _ProfileData.get({})
-                    if id(self) in profile_dat and my_einsum_id in profile_dat[id(self)]:
-                        arg_shapes = profile_dat[id(self)][my_einsum_id]
-                        assert len(arg_shapes) == len(args)
-                        # there actually is a profile, use it to optimize
-                        code, opt_path = opt_einsum_code(
-                            einstr,
-                            args,
-                            arg_shapes,
-                            out_var=out_var,
-                            mul_const=mul_const,
-                            optimize='optimal'
-                        )
-                        self._ein_naive_cost += opt_path.naive_cost
-                        self._ein_opt_cost += opt_path.opt_cost
-                        return code
-                    else:
-                        # There's no profile data for this einsum, use unoptimized
-                        return func_no_opt()
-
-        self(func)
-
-    def script_decorator(self):
-        """Insert an ``@torch.jit.script`` decorator.
-
-        In profiling mode, this does nothing.
-        """
-        def func(profile: bool):
-            if profile:
-                return None
+            # Check if there is profile data to use for optimization
+            profile_dat = _ProfileData.get({})
+            if codegen_id in profile_dat and self.einsum_id in profile_dat[codegen_id]:
+                arg_shapes = profile_dat[codegen_id][self.einsum_id]
+                assert len(arg_shapes) == len(self.operands)
+                # there actually is a profile, use it to optimize
+                mul_const = self._get_multiplicitive_const()
+                code, opt_path = opt_einsum_code(
+                    self.einstr,
+                    self.operands,
+                    arg_shapes,
+                    out_var=self.out_var,
+                    mul_const=mul_const,
+                    optimize='optimal'
+                )
+                lazy_codegen._ein_naive_cost += opt_path.naive_cost
+                lazy_codegen._ein_opt_cost += opt_path.opt_cost
+                return code
             else:
-                return "@torch.jit.script"
-        self(func)
+                # There's no profile data for this einsum, use unoptimized
+                return self._ein_no_opt()
