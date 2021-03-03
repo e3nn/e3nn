@@ -381,6 +381,12 @@ def codegen_tensor_product(
         )
         for ir_out_num in range(len(irreps_out))
     ]
+    # sometimes an out irrep has no paths leading to it.
+    # in this case, we just allocate zeros
+    out_ir_strs = [
+        s if s else f"x2.new_zeros((batch, {out_ir.dim}))"
+        for s, out_ir in zip(out_ir_strs, irreps_out)
+    ]
     cg_out(f"return torch.cat(({', '.join(out_ir_strs)},), dim=-1).reshape(outsize)")
     # for right(), we just reshape and return
     cg_right("return out.reshape(outsize)")
