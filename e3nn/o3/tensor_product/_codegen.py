@@ -76,8 +76,11 @@ def codegen_tensor_product(
             return x1.new_zeros(outsize)
         else:
             batch = x1.shape[0]
-            out = x1.new_zeros((batch, {irreps_out.dim}))
     """))
+    # For forward(), we will accululate the various outputs independently
+    # and then concatinate them: this improves performance by avoiding in-place operations,
+    # which are bad for autograd.
+    has_outs = [False] * len(irreps_out)
 
     cg_right(textwrap.dedent(f"""
         {'x2, ws = x2[..., :, 0], ws[..., 0, :]' if not shared_weights else ''}
@@ -94,6 +97,8 @@ def codegen_tensor_product(
             batch = x2.shape[0]
             out = x2.new_zeros((batch, {irreps_in1.dim}, {irreps_out.dim}))
     """))
+    # ^ for right, it is not simple to collect different inputs independently,
+    #   so we retain the in-place operations at a small performance cost.
 
     # = Put everything in the else block =
     cg_out.indent()
@@ -137,7 +142,7 @@ def codegen_tensor_product(
     index_w = -1
     flat_weight_i = 0
 
-    for ins in instructions:
+    for ins_number, ins in enumerate(instructions):
         mul_1, (l_1, p_1) = irreps_in1[ins.i_in1]
         mul_2, (l_2, p_2) = irreps_in2[ins.i_in2]
         mul_out, (l_out, p_out) = irreps_out[ins.i_out]
@@ -354,10 +359,12 @@ def codegen_tensor_product(
                     cg_out.einsum("ijk,zuvij->zuvk", f"w3j_{index_w3j}", "ss")
                     cg_right.einsum("ijk,uw,zvj->zuiwvk", f"w3j_{index_w3j}", "e1", "s2")
 
-        # Add to output
+        # multiply with alpha
         cg_out.scalar_multiply("_ein_out", alpha, out_var="_ein_out")
         cg_right.scalar_multiply("_ein_out", alpha, out_var="_ein_out")
-        cg_out(f"out[:, {index_out}:{index_out+dim_out}] += _ein_out.reshape(batch, {dim_out})")
+        # sum this instruction into outputs
+        cg_out(f"out_{ins.i_out} = {f'out_{ins.i_out} + ' if has_outs[ins.i_out] else ''} _ein_out.reshape(batch, {dim_out})")
+        has_outs[ins.i_out] = True
         cg_right(f"out[:, {index_1}:{index_1+dim_1}, {index_out}:{index_out+dim_out}] += _ein_out.reshape(batch, {dim_1}, {dim_out})")
         # Dedent out of the profiler block
         cg_out.dedent()
@@ -366,7 +373,8 @@ def codegen_tensor_product(
         cg_right("\n")
 
     # = Return the result =
-    cg_out("return out.reshape(outsize)")
+    # cg_out("return out.reshape(outsize)")
+    cg_out(f"return torch.cat(({', '.join(f'out_{i}' for i in range(len(has_outs)))},), dim=-1).reshape(outsize)")
     cg_right("return out.reshape(outsize)")
 
     return cg_out, cg_right, wigners
