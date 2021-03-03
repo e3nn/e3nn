@@ -104,7 +104,7 @@ class LazyCodeGenerator:
         if mul_const is not None and not isinstance(mul_const, float):
             mul_const = prod(mul_const)
         if div_const is not None and not isinstance(div_const, float):
-            div_const = prod(mul_const)
+            div_const = prod(div_const)
         # If we have both multiplicitive and divisor, incorporate
         if mul_const is not None and div_const is not None:
             mul_const = mul_const / div_const
