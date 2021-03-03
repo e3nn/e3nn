@@ -238,23 +238,23 @@ def codegen_tensor_product(
 
             elif l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uvw' and normalization == 'component' and ins.has_weight:
                 # Cl_l_0 = eye / sqrt(2L+1)
-                cg_out.einsum(f"{z}uvw,zui,zvi->zw", f"ws_{index_w}", "s1", "s2", div_const=sqrt(2 * l_1 + 1))
-                cg_right.einsum(f"{z}uvw,zvi->zuiw", f"ws_{index_w}", "s2", div_const=sqrt(2 * l_1 + 1))
+                cg_out.einsum(f"{z}uvw,zui,zvi->zw", f"ws_{index_w}", "s1", "s2", div_consts=sqrt(2 * l_1 + 1))
+                cg_right.einsum(f"{z}uvw,zvi->zuiw", f"ws_{index_w}", "s2", div_consts=sqrt(2 * l_1 + 1))
 
             elif l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uvu' and normalization == 'component' and ins.has_weight:
                 # Cl_l_0 = eye / sqrt(2L+1)
-                cg_out.einsum(f"{z}uv,zui,zvi->zu", f"ws_{index_w}", "s1", "s2", div_const=sqrt(2 * l_1 + 1))
-                cg_right.einsum(f"{z}uv,uw,zvi->zuiw", f"ws_{index_w}", "e1", "s2", div_const=sqrt(2 * l_1 + 1))
+                cg_out.einsum(f"{z}uv,zui,zvi->zu", f"ws_{index_w}", "s1", "s2", div_consts=sqrt(2 * l_1 + 1))
+                cg_right.einsum(f"{z}uv,uw,zvi->zuiw", f"ws_{index_w}", "e1", "s2", div_consts=sqrt(2 * l_1 + 1))
 
             elif l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uuu' and normalization == 'component' and ins.has_weight:
                 # Cl_l_0 = eye / sqrt(2L+1)
-                cg_out.einsum(f"{z}u,zui,zui->zu", f"ws_{index_w}", "s1", "s2", div_const=sqrt(2 * l_1 + 1))
-                cg_right.einsum(f"{z}u,uw,zui->zuiw", f"ws_{index_w}", "e1", "s2", div_const=sqrt(2 * l_1 + 1))
+                cg_out.einsum(f"{z}u,zui,zui->zu", f"ws_{index_w}", "s1", "s2", div_consts=sqrt(2 * l_1 + 1))
+                cg_right.einsum(f"{z}u,uw,zui->zuiw", f"ws_{index_w}", "e1", "s2", div_consts=sqrt(2 * l_1 + 1))
 
             elif l_1 == l_2 and l_out == 0 and ins.connection_mode == 'uuu' and normalization == 'component' and not ins.has_weight:
                 # Cl_l_0 = eye / sqrt(2L+1)
-                cg_out.einsum("zui,zui->zu", "s1", "s2", div_const=sqrt(2 * l_1 + 1))
-                cg_right.einsum("uw,zui->zuiw", "e1", "s2", div_const=sqrt(2 * l_1 + 1))
+                cg_out.einsum("zui,zui->zu", "s1", "s2", div_consts=sqrt(2 * l_1 + 1))
+                cg_right.einsum("uw,zui->zuiw", "e1", "s2", div_consts=sqrt(2 * l_1 + 1))
 
             elif (l_1, l_2, l_out) == (1, 1, 1) and ins.connection_mode == 'uvw' and normalization == 'component' and ins.has_weight:
                 # C1_1_1 = levi-civita / sqrt(2)
@@ -262,7 +262,7 @@ def codegen_tensor_product(
                 cg_out(f"s2 = s2.reshape(batch, 1, {mul_2}, {2 * l_2 + 1})")
                 cg_out("s1, s2 = torch.broadcast_tensors(s1, s2)")
                 cg_out("s1xs2 = torch.cross(s1, s2, dim=3)")
-                cg_out.einsum(f"{z}uvw,zuvi->zwi", f"ws_{index_w}", "s1xs2", div_const=sqrt(2))
+                cg_out.einsum(f"{z}uvw,zuvi->zwi", f"ws_{index_w}", "s1xs2", div_consts=sqrt(2))
 
                 if (l_1, l_2, l_out) in wigners:
                     index_w3j = wigners.index((l_1, l_2, l_out))
@@ -278,7 +278,7 @@ def codegen_tensor_product(
                 cg_out(f"s2 = s2.reshape(batch, 1, {mul_2}, {2 * l_2 + 1})")
                 cg_out("s1, s2 = torch.broadcast_tensors(s1, s2)")
                 cg_out("s1xs2 = torch.cross(s1, s2, dim=3)")
-                cg_out.einsum(f"{z}uv,zuvi->zui", f"ws_{index_w}", "s1xs2", div_const=sqrt(2))
+                cg_out.einsum(f"{z}uv,zuvi->zui", f"ws_{index_w}", "s1xs2", div_consts=sqrt(2))
 
                 if (l_1, l_2, l_out) in wigners:
                     index_w3j = wigners.index((l_1, l_2, l_out))

@@ -46,13 +46,13 @@ class LazyCodeGenerator:
         self._ein_opt_cost = 0
 
     def indent(self):
-        def f(self):
-            self.indent_level += 1
+        def f(lazy_codegen):
+            lazy_codegen.indent_level += 1
         self(f)
 
     def dedent(self):
-        def f(self):
-            self.indent_level -= 1
+        def f(lazy_codegen):
+            lazy_codegen.indent_level -= 1
             assert self.indent_level >= 0
         self(f)
 
@@ -72,7 +72,7 @@ class LazyCodeGenerator:
             if callable(b):
                 sig = inspect.signature(b)
                 b_kwargs = {
-                    'self': self,
+                    'lazy_codegen': self,
                     'profile': profile
                 }
                 b_kwargs = {k: v for k, v in b_kwargs.items() if k in sig.parameters}
