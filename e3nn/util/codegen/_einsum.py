@@ -26,6 +26,7 @@ class _CodeGenBackend:
                 return v
             else:
                 self.code.append(f"{out} = {v}  # identity permutation no-op")
+                return out
         out = out if out is not None else self.get_tmp()
         self.code.append(f"{out} = {v}.permute({', '.join(str(a) for a in axes)})")
         return out
