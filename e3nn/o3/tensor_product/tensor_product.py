@@ -2,7 +2,7 @@ from typing import Optional, List, Union
 
 import torch
 from e3nn import o3
-from e3nn.util.codegen import CodeGenMixin, profile
+from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from e3nn.util import prod
 
@@ -153,7 +153,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
-    optimal_batch_size: Optional[int]
     in1_var: List[float]
     in2_var: List[float]
     out_var: List[float]
@@ -168,7 +167,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         internal_weights=None,
         shared_weights=None,
         _specialized_code=True,
-        _optimize_einsums=True
     ):
         # === Setup ===
         super().__init__()
@@ -234,7 +232,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.instructions = instructions
 
         self._specialized_code = _specialized_code
-        self._optimize_einsums = _optimize_einsums
         self.optimal_batch_size = None
 
         # Generate the actual tensor product code
@@ -309,7 +306,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self.normalization,
             self.shared_weights,
             self._specialized_code,
-            codegen_kwargs={'optimize_einsums': self._optimize_einsums}
         )
 
         return wigners
@@ -329,45 +325,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         # We don't compile with the new code generators — CodeGenMixin has already restored whatever exact code was compiled when the object was saved, and we want to preserve that.
         wigners = self._make_lazy_codegen()
         assert wigners == self._wigners, "The provided state is inconsistant or from an incompatible version fo e3nn"
-
-    @torch.jit.ignore
-    def optimize_for_batch_size(self, batch_size: int):
-        if not self._optimize_einsums:
-            return
-        # We use torch.no_grad() and all-zero probe tensors instead of
-        # actual inputs in order to avoid confusing the autograd engine.
-        # Even if we did use the real inputs, because of no_grad(),
-        # we wouldn't be able to use the results.
-        # And without no_grad(), the profiling run would needlessly add many
-        # tensors to the compute graph.
-        #
-        # profile() here is our e3nn.util.codegen.profile
-        with torch.no_grad(), profile():
-            self._codegen_register({
-                '_compiled_main_out': self._lazygen_out.generate(profile=True),
-                '_compiled_main_right': self._lazygen_right.generate(profile=True),
-            })
-
-            # profiling run
-            # make fake inputs
-            x1 = torch.zeros(size=(batch_size, self.irreps_in1.dim))
-            x2 = torch.zeros(size=(batch_size, self.irreps_in2.dim))
-            if self.internal_weights:
-                w = self.weight
-            elif self.shared_weights:
-                w = torch.zeros(size=(self.weight_numel,))
-            else:
-                w = torch.zeros(size=(batch_size, self.weight_numel))
-            w = self._get_weights(w)
-            _ = self._compiled_main_out(x1, x2, w, self._wigner_buf)
-            _ = self._compiled_main_right(x2, w, self._wigner_buf)
-
-            # generate with profile
-            self._codegen_register({
-                '_compiled_main_out': self._lazygen_out.generate(),
-                '_compiled_main_right': self._lazygen_right.generate(),
-            })
-        self.optimal_batch_size = batch_size
 
     @torch.jit.unused
     def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
@@ -421,9 +378,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
-        if not torch.jit.is_scripting():
-            if self.optimal_batch_size is None:
-                self.optimize_for_batch_size(features_2.shape[0])
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
             return self._compiled_main_right(features_2, real_weight, self._wigner_buf)
@@ -451,9 +405,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        if not torch.jit.is_scripting():
-            if self.optimal_batch_size is None:
-                self.optimize_for_batch_size(features_1.shape[0])
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
             return self._compiled_main_out(features_1, features_2, real_weight, self._wigner_buf)
