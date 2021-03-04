@@ -319,7 +319,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         # Rebuild the lazy code generators
         # We don't compile with the new code generators — CodeGenMixin has already restored whatever exact code was compiled when the object was saved, and we want to preserve that.
         wigners = self._make_lazy_codegen(compile=False)
-        assert wigners == self._wigners, "The provided state is inconsistant or from an incompatible version fo e3nn"
+        assert wigners == self._wigners, "The provided saved state is inconsistant or from an incompatible version of e3nn"
 
     @torch.jit.unused
     def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
