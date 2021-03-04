@@ -3,6 +3,7 @@ import inspect
 import textwrap
 import contextvars
 import contextlib
+import collections
 import logging
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,8 @@ _ProfileData = contextvars.ContextVar("LazyCodeProfileData")
 
 @contextlib.contextmanager
 def profile():
-    token = _ProfileData.set({})
+    # defaultdict so that accesses for previously unset codegen object ids just give an empty dict to start filling
+    token = _ProfileData.set(collections.defaultdict(dict))
     try:
         yield
     finally:
@@ -66,8 +68,6 @@ class LazyCodeGenerator:
         # If we're profiling, we have to import this module in the code gen
         if profile:
             processed_lines.append("from e3nn.util.codegen._lazy import _ProfileData")
-            # initialize the profile data for this object
-            processed_lines.append(f"_ProfileData.get()[{id(self)}] = dict()")
         for b in self.blocks:
             if callable(b):
                 sig = inspect.signature(b)
