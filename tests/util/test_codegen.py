@@ -34,17 +34,19 @@ def test_einsums():
     einstr = "ij,ij->i"
     mul_const = 4.7
     div_const = 1.1
+    last_scalar_mul = 3.66666
     cg = LazyCodeGenerator()
     cg("import torch")
     cg("def f(x1, x2):")
     cg.indent()
     cg.einsum(einstr, "x1", "x2", out_var="thing", mul_consts=mul_const, div_consts=div_const)
-    cg("return thing")
+    cg.scalar_multiply("thing", last_scalar_mul, out_var="thing2")
+    cg("return thing2")
     cg_func = eval_code(cg.generate()).f
 
     x1 = torch.randn(3, 4)
     x2 = torch.randn(3, 4)
     assert torch.allclose(
-        cg_func(x1, x2), 
-        torch.einsum(einstr, x1, x2).mul(mul_const).div(div_const)
+        cg_func(x1, x2),
+        torch.einsum(einstr, x1, x2).mul(mul_const).div(div_const).mul(last_scalar_mul)
     )
