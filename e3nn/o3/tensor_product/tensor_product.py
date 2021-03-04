@@ -290,7 +290,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     @torch.jit.ignore
     def _make_lazy_codegen(self, compile: bool = True):
-        self._lazygen_out, self._lazygen_right, wigners = codegen_tensor_product(
+        lazygen_out, lazygen_right, wigners = codegen_tensor_product(
             self.irreps_in1,
             self.in1_var,
             self.irreps_in2,
@@ -305,8 +305,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         self._codegen_register(
             {
-                '_compiled_main_out': self._lazygen_out,
-                '_compiled_main_right': self._lazygen_right,
+                '_compiled_main_out': lazygen_out,
+                '_compiled_main_right': lazygen_right,
             },
             compile=compile
         )
