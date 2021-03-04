@@ -7,7 +7,8 @@ import tempfile
 import functools
 
 
-@functools.lru_cache(None)
+# Set a large but finite maximum size to prevent long-running or unusual client codes from growing memory use without bound.
+@functools.lru_cache(maxsize=512)
 def eval_code(code):
     r"""
     save code in a temporary file and import it as a module
