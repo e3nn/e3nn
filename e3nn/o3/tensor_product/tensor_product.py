@@ -238,11 +238,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         wigners = self._make_lazy_codegen()
         self._wigners = wigners
 
-        self._codegen_register({
-            '_compiled_main_out': self._lazygen_out.generate(),
-            '_compiled_main_right': self._lazygen_right.generate(),
-        })
-
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
 
@@ -294,7 +289,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         )
 
     @torch.jit.ignore
-    def _make_lazy_codegen(self):
+    def _make_lazy_codegen(self, compile: bool = True):
         self._lazygen_out, self._lazygen_right, wigners = codegen_tensor_product(
             self.irreps_in1,
             self.in1_var,
@@ -308,22 +303,22 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self._specialized_code,
         )
 
-        return wigners
+        self._codegen_register(
+            {
+                '_compiled_main_out': self._lazygen_out,
+                '_compiled_main_right': self._lazygen_right,
+            },
+            compile=compile
+        )
 
-    def __getstate__(self):
-        # This calls CodeGenMixin
-        d = super().__getstate__()
-        # lazy code generators can't be pickled, since they're full of closures
-        del d['_lazygen_out']
-        del d['_lazygen_right']
-        return d
+        return wigners
 
     def __setstate__(self, d):
         # Set the dict with CodeGenMixin
         super().__setstate__(d)
         # Rebuild the lazy code generators
         # We don't compile with the new code generators — CodeGenMixin has already restored whatever exact code was compiled when the object was saved, and we want to preserve that.
-        wigners = self._make_lazy_codegen()
+        wigners = self._make_lazy_codegen(compile=False)
         assert wigners == self._wigners, "The provided state is inconsistant or from an incompatible version fo e3nn"
 
     @torch.jit.unused
