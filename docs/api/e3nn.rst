@@ -1,5 +1,5 @@
-e3nn
-====
+e3nn API
+========
 
 .. toctree::
     o3/o3

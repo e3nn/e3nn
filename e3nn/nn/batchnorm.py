@@ -7,7 +7,7 @@ class BatchNorm(nn.Module):
     '''Batch normalization for orthonormal representations
 
     It normalizes by the norm of the representations.
-    Not that the norm is invariant only for orthonormal representations.
+    Note that the norm is invariant only for orthonormal representations.
     Irreducible representations `wigner_D` are orthonormal.
 
     Parameters

@@ -4,7 +4,7 @@ Models of March 21
 Simple Network
 --------------
 
-Lets create a simple network and evaluate it on random data.
+Let's create a simple network and evaluate it on random data.
 
 .. jupyter-execute::
 
@@ -69,10 +69,10 @@ Usually their only attributes are the positions of the nodes :math:`\vec r_i` an
 We typically don't use the node positions because they change with the global translation of the graph.
 The nodes and edges can have other attributes like for instance atom type or bond type and so on.
 
-The attributes defines the graph properties. They dont change layer after layer (in this example).
+The attributes defines the graph properties. They don't change layer after layer (in this example).
 The data (``node_input``) flow through this graph layer after layer.
 
-In the following network, the edges attributes are the spherical harmonics :math:`Y^L(\vec r_i - \vec r_j)` plus the extra attributes provided by the user.
+In the following network, the edges attributes are the spherical harmonics :math:`Y^l(\vec r_i - \vec r_j)` plus the extra attributes provided by the user.
 
 .. jupyter-execute::
 

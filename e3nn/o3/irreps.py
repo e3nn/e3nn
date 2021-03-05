@@ -24,17 +24,17 @@ class Irrep(tuple):
 
     Examples
     --------
-    Create a representation :math:`l=0` of even parity.
+    Create a scalar representation (:math:`l=0`) of even parity.
 
     >>> Irrep(0, 1)
     0e
 
-    Create a representation :math:`l=2` of odd parity.
+    Create a pseudotensor representation (:math:`l=2`) of odd parity.
 
     >>> Irrep(2, -1)
     2o
 
-    Create a representation :math:`l=1` of the parity of the spherical harmonics.
+    Create a vector representation (:math:`l=1`) of the parity of the spherical harmonics (:math:`-1^l` gives odd parity).
 
     >>> Irrep("1y")
     1o
@@ -476,7 +476,7 @@ class Irreps(tuple):
         >>> Irreps("1e + 1e + 0e").simplify()
         2x1e+1x0e
 
-        Same representations which are seperated from each other are not combined
+        Equivalent representations which are separated from each other are not combined.
 
         >>> Irreps("1e + 1e + 0e + 1e").simplify()
         2x1e+1x0e+1x1e

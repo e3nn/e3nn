@@ -28,7 +28,7 @@ The representation of the coefficients are affected by this choice:
 In the following graph we show the four possible behavior under parity for a function on the sphere.
 
 #. This first ball shows :math:`f(x)` unaffected by the parity
-#. Then ``p_val=1`` but ``p_arg=-1`` so we see the signal fliped over the sphere but the colors are unchanged
+#. Then ``p_val=1`` but ``p_arg=-1`` so we see the signal flipped over the sphere but the colors are unchanged
 #. For ``p_val=-1`` and ``p_arg=1`` only the value of the signal flips its sign
 #. For ``p_val=-1`` and ``p_arg=-1`` both in the same time, the signal flips over the sphere and the value flip its sign
 

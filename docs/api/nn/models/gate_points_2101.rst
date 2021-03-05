@@ -23,7 +23,7 @@ To relax this constraint and make it equivariant to ``SO(3)`` only, one can simp
 pass all the ``irreps`` parameters to be even (``p=1`` in `Irrep`).
 This is why ``irreps_sh`` is a parameter of the class ``Network``,
 one can use specific ``l`` of the spherical harmonics with the correct parity ``p=(-1)^l`` (one can use `Irreps.spherical_harmonics` for that)
-or consider that ``p=1`` in order to **not** be equivariant to Parity.
+or consider that ``p=1`` in order to **not** be equivariant to parity.
 
 .. literalinclude:: ../../../../e3nn/nn/models/gate_points_2101.py
     :lines: 156-329

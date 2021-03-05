@@ -19,7 +19,7 @@ class FullyConnectedNet(torch.nn.Module):
         input, internal and output dimensions
 
     act : function
-        activation funtion :math:`\phi`, it will be automatically normalized by a scaling factor such that
+        activation function :math:`\phi`, it will be automatically normalized by a scaling factor such that
 
         .. math::
 
