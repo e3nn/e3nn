@@ -1,7 +1,7 @@
 Change of Basis
 ===============
 
-In the release ``0.2.2``, the euler angle convention changed from the standard ZYZ to YXY. This amounts to a change of basis for e3nn.
+In the release ``0.2.2``, the Euler angle convention changed from the standard ZYZ to YXY. This amounts to a change of basis for e3nn.
 
 This change of basis means that the real spherical harmonics have been rotated from the "standard" real spherical harmonics (see this table of standard real spherical harmonics from Wikipedia_). If your network has outputs of L=0 only, this has no effect. If your network has outputs of L=1, the components are now ordered x,y,z as opposed to the "standard" y,z,x.
 
