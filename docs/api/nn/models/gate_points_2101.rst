@@ -27,7 +27,3 @@ or consider that ``p=1`` in order to **not** be equivariant to parity.
 
 .. literalinclude:: ../../../../e3nn/nn/models/gate_points_2101.py
     :lines: 156-329
-
-.. automodule:: e3nn.nn.models.gate_points_2101
-    :members:
-    :show-inheritance:
