@@ -1,26 +1,7 @@
-"""
-Evaluate a python string as code
-"""
-import importlib.machinery
-import importlib.util
-import tempfile
-import functools
-from typing import Dict
+from typing import Dict, Union
 
-
-@functools.lru_cache(None)
-def eval_code(code):
-    r"""
-    save code in a temporary file and import it as a module
-    """
-    with tempfile.NamedTemporaryFile() as new_file:
-        new_file.write(bytes(code, 'ascii'))
-        new_file.flush()
-        loader = importlib.machinery.SourceFileLoader('main', new_file.name)
-        spec = importlib.util.spec_from_loader(loader.name, loader)
-        mod = importlib.util.module_from_spec(spec)
-        loader.exec_module(mod)
-    return mod
+from ._eval import eval_code
+from ._lazy import LazyCodeGenerator
 
 
 class CodeGenMixin:
@@ -28,23 +9,42 @@ class CodeGenMixin:
 
     This class manages evaluating generated code for subclasses while remaining pickle/deepcopy compatible. If subclasses need to override ``__getstate__``/``__setstate__``, they should be sure to call CodeGenMixin's first and use its output.
     """
-    def _codegen_register(self, funcs: Dict[str, str]) -> None:
+    def _codegen_register(
+        self,
+        funcs: Dict[str, Union[str, LazyCodeGenerator]],
+        compile: bool = True
+    ) -> None:
         """Register dynamically generated methods.
 
         Parameters
         ----------
-            funcs : Dict[str, str]
+            funcs : Dict[str, Union[str, LazyCodeGenerator]]
                 Dictionary mapping method names to their code.
         """
         if not hasattr(self, "__codegen__"):
-            self.__codegen__ = {}
-        self.__codegen__.update(funcs)
-        self._codegen_compile()
+            # (code_dict, generator_dict)
+            self.__codegen__ = ({}, {})
+        self.__codegen__[0].update({
+            k: v for k, v in funcs.items() if isinstance(v, str)
+        })
+        self.__codegen__[1].update({
+            k: v for k, v in funcs.items() if isinstance(v, LazyCodeGenerator)
+        })
+        if compile:
+            self._codegen_compile()
 
     def _codegen_compile(self):
-        """Compile and set all registered dynamically generated methods."""
+        """Compile and set all registered dynamically generated methods.
+
+        Reruns any ``LazyCodeGenerator``s.
+        """
         if hasattr(self, "__codegen__"):
-            for fname, code in self.__codegen__.items():
+            # Run generators and update code
+            self.__codegen__[0].update({
+                f: g.generate() for f, g in self.__codegen__[1].items()
+            })
+            # Compile the generated or static code
+            for fname, code in self.__codegen__[0].items():
                 setattr(self, fname, eval_code(code).main)
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
@@ -59,20 +59,21 @@ class CodeGenMixin:
             out = self.__dict__.copy()
         # - Remove compiled methods -
         if hasattr(self, "__codegen__"):
-            out["__codegen__"] = self.__codegen__
-            for fname in self.__codegen__:
+            # Save only code strings, we can't save LazyCodeGenerator
+            out["__codegen__"] = self.__codegen__[0]
+            # Functions that have code and not just generators are those that are currently compiled, so we remove them
+            for fname in self.__codegen__[0]:
                 out.pop(fname, None)
         return out
 
     def __setstate__(self, d):
         d = d.copy()
         if "__codegen__" in d:
+            codegen_state = d.pop("__codegen__")
             # Remove any compiled methods that somehow entered the state
-            for k in d['__codegen__']:
+            for k in codegen_state:
                 d.pop(k, None)
-            # Set for self
-            self.__dict__['__codegen__'] = d.pop("__codegen__")
-            # And compile
+            self.__codegen__ = (codegen_state, {})  # no generators
             self._codegen_compile()
 
         # We need to check if other parent classes of self define __getstate__

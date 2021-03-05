@@ -7,7 +7,7 @@ from typing import List, Tuple
 import torch
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
-from e3nn.util import eval_code
+from e3nn.util.codegen import eval_code
 from e3nn import o3
 
 

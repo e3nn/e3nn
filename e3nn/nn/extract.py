@@ -1,5 +1,5 @@
 import torch
-from e3nn.util import CodeGenMixin
+from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from e3nn import o3
 

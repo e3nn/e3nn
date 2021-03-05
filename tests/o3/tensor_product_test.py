@@ -7,7 +7,7 @@ from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
-def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
+def make_tp(l1, p1, l2, p2, lo, po, mode, weight, **kwargs):
     def mul_out(mul):
         if mode == "uvuv":
             return mul**2
@@ -23,7 +23,8 @@ def make_tp(l1, p1, l2, p2, lo, po, mode, weight):
                 (1, 1, 1, mode, weight),
                 (0, 0, 1, 'uvw', True, 0.5),
                 (0, 1, 1, 'uvw', True, 0.2),
-            ]
+            ],
+            **kwargs
         )
     except AssertionError:
         return None
@@ -112,10 +113,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
     # Confirm that it gives same results
     x1 = tp.irreps_in1.randn(2, -1)
     x2 = tp.irreps_in2.randn(2, -1)
-    assert torch.allclose(
-        tp(x1, x2),
-        tp_trace(x1, x2)
-    )
+    assert torch.allclose(tp(x1, x2), tp_trace(x1, x2))
 
 
 def test_input_weights_python():
