@@ -118,7 +118,7 @@ def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=None, device=No
         tensor of shape ``(res_alpha)``
 
     shb : `torch.Tensor`
-        tensor of shape ``(res_bera, (lmax + 1)^2)``
+        tensor of shape ``(res_beta, (lmax + 1)**2)``
 
     sha : `torch.Tensor`
         tensor of shape ``(res_alpha, 2 lmax + 1)``

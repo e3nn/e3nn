@@ -15,7 +15,7 @@ component
 """""""""
 
 ``component`` normalization refers to tensors with each component of value around 1.
-More presicely, the second moment of each component is 1.
+More precisely, the second moment of each component is 1.
 
 .. math::
 
