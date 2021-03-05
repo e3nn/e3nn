@@ -1,5 +1,4 @@
 import argparse
-import time
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -75,8 +74,7 @@ print("starting...")
 t = Timer(
     stmt=(
         "tp.zero_grad()\n"
-        "out = tp(*next(inputs))\n" +
-        ("out.sum().backward()\n" if args.backward else '')
+        "out = tp(*next(inputs))\n" + ("out.sum().backward()\n" if args.backward else '')
     ),
     globals={'tp': tp, 'inputs': inputs}
 )
