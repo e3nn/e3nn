@@ -207,7 +207,7 @@ def compose_quaternion(q1, q2):
 def inverse_quaternion(q):
     r"""inverse of a quaternion
 
-    Works only for uniary quaternion
+    Works only for unit quaternions.
 
     Parameters
     ----------
@@ -492,15 +492,15 @@ def matrix_to_axis_angle(R):
     Parameters
     ----------
     R : `torch.Tensor`
-        tonsor of shape :math:`(..., 3, 3)`
+        tensor of shape :math:`(..., 3, 3)`
 
     Returns
     -------
     axis : `torch.Tensor`
-        tonsor of shape :math:`(..., 3)`
+        tensor of shape :math:`(..., 3)`
 
     angle : `torch.Tensor`
-        tonsor of shape :math:`(...)`
+        tensor of shape :math:`(...)`
     """
     assert torch.allclose(torch.det(R), R.new_tensor(1))
     tr = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
@@ -520,21 +520,21 @@ def angles_to_axis_angle(alpha, beta, gamma):
     Parameters
     ----------
     alpha : `torch.Tensor`
-        tonsor of shape :math:`(...)`
+        tensor of shape :math:`(...)`
 
     beta : `torch.Tensor`
-        tonsor of shape :math:`(...)`
+        tensor of shape :math:`(...)`
 
     gamma : `torch.Tensor`
-        tonsor of shape :math:`(...)`
+        tensor of shape :math:`(...)`
 
     Returns
     -------
     axis : `torch.Tensor`
-        tonsor of shape :math:`(..., 3)`
+        tensor of shape :math:`(..., 3)`
 
     angle : `torch.Tensor`
-        tonsor of shape :math:`(...)`
+        tensor of shape :math:`(...)`
     """
     return matrix_to_axis_angle(angles_to_matrix(alpha, beta, gamma))
 
@@ -545,15 +545,15 @@ def axis_angle_to_matrix(axis, angle):
     Parameters
     ----------
     axis : `torch.Tensor`
-        tonsor of shape :math:`(..., 3)`
+        tensor of shape :math:`(..., 3)`
 
     angle : `torch.Tensor`
-        tonsor of shape :math:`(...)`
+        tensor of shape :math:`(...)`
 
     Returns
     -------
     `torch.Tensor`
-        tonsor of shape :math:`(..., 3, 3)`
+        tensor of shape :math:`(..., 3, 3)`
     """
     axis, angle = torch.broadcast_tensors(axis, angle[..., None])
     alpha, beta = xyz_to_angles(axis)
@@ -662,7 +662,7 @@ def xyz_to_angles(xyz):
 
     .. math::
 
-    \vec r = R(\alpha, \beta, 0) \vec e_z
+        \vec r = R(\alpha, \beta, 0) \vec e_z
 
 
     Parameters

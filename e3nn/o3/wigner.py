@@ -31,9 +31,9 @@ def _z_rot_mat(angle, l):
 
 
 def wigner_D(l, alpha, beta, gamma):
-    r"""Wigner D matrix
+    r"""Wigner D matrix representation of :math:`SO(3)`.
 
-    representation of :math:`SO(3)`. It satifies the following properties:
+    It satisfies the following properties:
 
     * :math:`D(\text{identity rotation}) = \text{identity matrix}`
     * :math:`D(R_1 \circ R_2) = D(R_1) \circ D(R_2)`
@@ -76,9 +76,9 @@ def wigner_D(l, alpha, beta, gamma):
 
 
 def wigner_3j(l1, l2, l3, dtype=None, device=None):
-    r"""Wigner 3j symbols
+    r"""Wigner 3j symbols :math:`C_{lmn}`.
 
-    It satifies the following two properties:
+    It satisfies the following two properties:
 
         .. math::
 

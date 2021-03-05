@@ -130,13 +130,13 @@ The spherical harmonics :math:`Y^l(x)` are functions defined on the sphere :math
     )
     fig.show()
 
-Each point on the sphere has 3 component. If we plot the value of each of the 3 component separately we obtain the following figure:
+Each point on the sphere has 3 components. If we plot the value of each of the 3 component separately we obtain the following figure:
 
 .. jupyter-execute::
 
     plot(r)
 
-:math:`Y^1` is the identity function. Now lets compute :math:`Y^2`, for this we take the tensor product of ``r`` with ``r`` and extract the :math:`L=2` part of it.
+:math:`Y^1` is the identity function. Now let's compute :math:`Y^2`, for this we take the tensor product :math:`r \otimes r` and extract the :math:`L=2` part of it.
 
 .. jupyter-execute::
 
@@ -144,7 +144,7 @@ Each point on the sphere has 3 component. If we plot the value of each of the 3 
     y2 = tp(r, r)
     plot(y2)
 
-:math:`Y^3` is nothing else than the :math:`L=3` part of :math:`r \otimes r \otimes r`:
+Similarly, the next spherical harmonic function :math:`Y^3` is the :math:`L=3` part of :math:`r \otimes r \otimes r`:
 
 .. jupyter-execute::
 
