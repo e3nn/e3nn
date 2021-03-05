@@ -4,17 +4,32 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 import torch
+from torch.utils.benchmark import Timer
+
 from e3nn.o3 import Irreps, FullyConnectedTensorProduct
 from e3nn.util.jit import compile
+
+
+# https://stackoverflow.com/a/15008806/1008938
+def t_or_f(arg):
+    ua = str(arg).upper()
+    if 'TRUE'.startswith(ua):
+       return True
+    elif 'FALSE'.startswith(ua):
+       return False
+    else:
+       raise ValueError(str(arg))
+
 
 parser = argparse.ArgumentParser(
     prog="tensor_product_benchmark"
 )
-parser.add_argument("--jit", type=bool, default=True)
+parser.add_argument("--jit", type=t_or_f, default=True)
 parser.add_argument("--irreps-in1", type=str, default="8x1e + 8x2e + 8x3o")
 parser.add_argument("--irreps-in2", type=str, default="8x1e + 8x2e + 8x3o")
 parser.add_argument("--irreps-out", type=str, default="8x1e + 8x2e + 8x3o")
-parser.add_argument("--cuda", type=bool, default=True)
+parser.add_argument("--cuda", type=t_or_f, default=True)
+parser.add_argument("--backward", type=t_or_f, default=True)
 parser.add_argument("-n", type=int, default=1000)
 parser.add_argument("--warmup", type=int, default=10)
 parser.add_argument("--batch", type=int, default=10)
@@ -37,11 +52,15 @@ tp = FullyConnectedTensorProduct(
     irreps_in2,
     irreps_out,
 )
+tp = tp.to(device=device)
 
-inputs = iter([(irreps_in1.randn(args.batch, -1), irreps_in2.randn(args.batch, -1)) for _ in range(1 + args.warmup + args.n)])
-
-# optimize (if that happens)
-_ = tp(*next(inputs))
+inputs = iter([
+    (
+        irreps_in1.randn(args.batch, -1).to(device=device),
+        irreps_in2.randn(args.batch, -1).to(device=device)
+    )
+    for _ in range(args.warmup + args.n + 1)]
+)
 
 # compile
 if args.jit:
@@ -53,16 +72,16 @@ for i in range(args.warmup):
 
 print("starting...")
 
-start = time.time()
+t = Timer(
+    stmt=(
+        "tp.zero_grad()\n"
+        "out = tp(*next(inputs))\n" +
+        ("out.sum().backward()\n" if args.backward else '')
+    ),
+    globals={'tp': tp, 'inputs': inputs}
+)
 
-accumulate = torch.as_tensor(0.)
+perloop = t.timeit(args.n)
 
-for input in inputs:
-    tp.zero_grad()
-    out = tp(*input)
-    out.sum().backward()
-    accumulate = accumulate + tp.weight[0]
-
-end = time.time()
-
-print(f"per-loop {(end - start) / args.n:0.5f} sec")
+print()
+print(perloop)
