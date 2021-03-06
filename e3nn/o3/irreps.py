@@ -53,14 +53,17 @@ class Irrep(tuple):
             return l
 
         if isinstance(l, str) and p is None:
-            name = l.strip()
-            l = int(name[:-1])
-            assert l >= 0
-            p = {
-                'e': 1,
-                'o': -1,
-                'y': (-1)**l,
-            }[name[-1]]
+            try:
+                name = l.strip()
+                l = int(name[:-1])
+                assert l >= 0
+                p = {
+                    'e': 1,
+                    'o': -1,
+                    'y': (-1)**l,
+                }[name[-1]]
+            except:
+                raise ValueError(f"unable to convert string \"{name}\" into an Irrep")
 
         if isinstance(l, tuple) and p is None:
             l, p = l
@@ -306,17 +309,20 @@ class Irreps(tuple):
         if isinstance(irreps, Irrep):
             out.append(_MulIr(1, Irrep(irreps)))
         elif isinstance(irreps, str):
-            for mul_ir in irreps.split('+'):
-                if 'x' in mul_ir:
-                    mul, ir = mul_ir.split('x')
-                    mul = int(mul)
-                    ir = Irrep(ir)
-                else:
-                    mul = 1
-                    ir = Irrep(mul_ir)
+            try:
+                for mul_ir in irreps.split('+'):
+                    if 'x' in mul_ir:
+                        mul, ir = mul_ir.split('x')
+                        mul = int(mul)
+                        ir = Irrep(ir)
+                    else:
+                        mul = 1
+                        ir = Irrep(mul_ir)
 
-                assert isinstance(mul, int) and mul >= 0
-                out.append(_MulIr(mul, ir))
+                    assert isinstance(mul, int) and mul >= 0
+                    out.append(_MulIr(mul, ir))
+            except:
+                raise ValueError(f"unable to convert string \"{irreps}\" into an Irreps")
         else:
             for mul_ir in irreps:
                 if isinstance(mul_ir, str):
