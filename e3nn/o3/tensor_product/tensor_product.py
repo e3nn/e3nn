@@ -567,7 +567,7 @@ class ElementwiseTensorProduct(TensorProduct):
     irreps_in2 : `Irreps`
         representation of the second input
 
-    set_ir_out : iterator of `Irrep`, optional
+    filter_ir_out : iterator of `Irrep`, optional
         representations of the output
 
     normalization : {'component', 'norm'}
@@ -577,14 +577,14 @@ class ElementwiseTensorProduct(TensorProduct):
             self,
             irreps_in1,
             irreps_in2,
-            set_ir_out=None,
+            filter_ir_out=None,
             normalization='component',
                 ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
-        if set_ir_out is not None:
-            set_ir_out = [o3.Irrep(ir) for ir in set_ir_out]
+        if filter_ir_out is not None:
+            filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
 
         assert irreps_in1.num_irreps == irreps_in2.num_irreps
 
@@ -611,7 +611,7 @@ class ElementwiseTensorProduct(TensorProduct):
             assert mul == mul_2
             for ir in ir_1 * ir_2:
 
-                if set_ir_out is not None and ir not in set_ir_out:
+                if filter_ir_out is not None and ir not in filter_ir_out:
                     continue
 
                 i_out = len(out)
@@ -640,7 +640,7 @@ class FullTensorProduct(TensorProduct):
     irreps_in2 : `Irreps`
         representation of the second input
 
-    set_ir_out : iterator of `Irrep`, optional
+    filter_ir_out : iterator of `Irrep`, optional
         representations of the output
 
     normalization : {'component', 'norm'}
@@ -650,14 +650,14 @@ class FullTensorProduct(TensorProduct):
             self,
             irreps_in1,
             irreps_in2,
-            set_ir_out=None,
+            filter_ir_out=None,
             normalization='component',
                 ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
-        if set_ir_out is not None:
-            set_ir_out = [o3.Irrep(ir) for ir in set_ir_out]
+        if filter_ir_out is not None:
+            filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
 
         out = []
         instr = []
@@ -665,7 +665,7 @@ class FullTensorProduct(TensorProduct):
             for i_2, (mul_2, ir_2) in enumerate(irreps_in2):
                 for ir_out in ir_1 * ir_2:
 
-                    if set_ir_out is not None and ir_out not in set_ir_out:
+                    if filter_ir_out is not None and ir_out not in filter_ir_out:
                         continue
 
                     i_out = len(out)

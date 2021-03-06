@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `math.soft_one_hot_linspace` very small change in the normalization of `fourier` basis
 - `normalize2mom` is now a `torch.nn.Module`
+- rename arguments `set_ir_...` into `filter_ir_...`
 
 ### Fixed
 - `nn.Gate` was crashing when the number of scalars or gates was zero
