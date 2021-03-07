@@ -45,6 +45,6 @@ In the elementwise tensor product, the irreps are multiplied one by one. Note ho
 The linear operation is a special case of a tensor product with a constant scalar ``1.0``.
 
 
-.. automodule:: e3nn.o3.tensor_product
+.. automodule:: e3nn.o3.tensor_product.tensor_product
     :members:
     :show-inheritance:
