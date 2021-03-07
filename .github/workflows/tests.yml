@@ -34,8 +34,8 @@ jobs:
         flake8 e3nn --count --exit-zero --statistics --ignore=E741,E743,E501,C901
     - name: Install dependencies
       env:
-        TORCH: "1.7.1"
-        TORCHG: "1.7.0"
+        TORCH: "1.8.0"
+        TORCHG: "1.8.0"
         CUDA: "cpu"
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |

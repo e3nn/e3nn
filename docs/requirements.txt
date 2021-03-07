@@ -10,9 +10,9 @@ plotly
 jupyter-sphinx
 
 --find-links https://download.pytorch.org/whl/torch_stable.html
-torch==1.7.1+cpu
+torch==1.8.0+cpu
 
---find-links https://pytorch-geometric.com/whl/torch-1.7.0+cpu.html
+--find-links https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
 torch-scatter
 torch-sparse
 torch-cluster

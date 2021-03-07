@@ -25,7 +25,8 @@ def test_norm_activation(float_tolerance, do_bias, nonlin):
 
     if do_bias:
         assert len(list(norm_act.parameters())) == 1
-        norm_act.biases[:] = torch.randn(norm_act.biases.shape)
+        with torch.no_grad():
+            norm_act.biases[:] = torch.randn(norm_act.biases.shape)
     else:
         # Assert that there are no biases
         assert len(list(norm_act.parameters())) == 0
@@ -92,7 +93,8 @@ def test_norm_activation_equivariant(do_bias, nonlin):
     if do_bias:
         # Set up some nonzero biases
         assert len(list(norm_act.parameters())) == 1
-        norm_act.biases[:] = torch.randn(norm_act.biases.shape)
+        with torch.no_grad():
+            norm_act.biases[:] = torch.randn(norm_act.biases.shape)
 
     assert_equivariant(norm_act)
     assert_auto_jitable(norm_act)
