@@ -1,5 +1,7 @@
-from typing import List, Tuple
+import re
 from math import sqrt
+from typing import List, Tuple
+
 import torch
 from torch import fx
 
@@ -10,7 +12,15 @@ from ._instruction import Instruction
 
 
 def _get_code(graph):
-    return graph.python_code('').replace('def forward(self, ', '@torch.jit.script\ndef main(')
+    x = graph.python_code('')
+    x = x.replace('def forward(self, ', '@torch.jit.script\ndef main(')
+    x = x.replace('Ellipsis', '...')
+    x = x.replace('slice(None, None, None)', ':')
+    x = re.sub(r'slice\(None, (-?\d+), None\)', r':\1', x)
+    x = re.sub(r'slice\((\d+), (-?\d+), None\)', r'\1:\2', x)
+    x = x.replace('[(', '[')
+    x = x.replace(')]', ']')
+    return x
 
 
 def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
