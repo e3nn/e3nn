@@ -9,6 +9,19 @@ from e3nn.util import prod
 from ._instruction import Instruction
 
 
+def _get_code(graph):
+    return graph.python_code('').replace('def forward(self, ', '@torch.jit.script\ndef main(')
+
+
+def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
+    if len(xs) > 0:
+        out = xs[0]
+        for x in xs[1:]:
+            out = out + x
+        return out
+    return like.new_zeros(shape)
+
+
 def codegen_tensor_product(
     irreps_in1: o3.Irreps,
     in1_var: List[float],
@@ -21,7 +34,7 @@ def codegen_tensor_product(
     shared_weights: bool = False,
     specialized_code: bool = True,
     codegen_kwargs: dict = {}
-) -> Tuple[fx.Graph, fx.Graph, list]:
+) -> Tuple[str, str, list]:
     graph_out = fx.Graph()
     graph_right = fx.Graph()
 
@@ -43,14 +56,16 @@ def codegen_tensor_product(
 
     # = Short-circut for zero dimensional =
     if irreps_in1.dim == 0 or irreps_in2.dim == 0 or irreps_out.dim == 0:
-        graph_out.output(x1s_out.new_zeros(x1s_out.shape[:-2 if shared_weights else -3] + (irreps_out.dim,)), torch.Tensor)
-        graph_right.output(x2s_right.new_zeros(x2s_right.shape[:-1 if shared_weights else -2] + (irreps_in1.dim, irreps_out.dim,)), torch.Tensor)
+        out_out = x1s_out.new_zeros(x1s_out.shape[:-2 if shared_weights else -3] + (irreps_out.dim,))
+        out_right = x2s_right.new_zeros(x2s_right.shape[:-1 if shared_weights else -2] + (irreps_in1.dim, irreps_out.dim,))
+
+        graph_out.output(out_out.node, torch.Tensor)
+        graph_right.output(out_right.node, torch.Tensor)
         # Short circut
         # the empty list is wigners
-        return graph_out, graph_right, []
+        return _get_code(graph_out), _get_code(graph_right), []
 
     # = Broadcast inputs =
-    # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
     if shared_weights:
         x1s_out, x2s_out = x1s_out[..., :, 0], x2s_out[..., 0, :]
     else:
@@ -60,30 +75,22 @@ def codegen_tensor_product(
     outsize_out = x1s_out.shape[:-1] + (irreps_out.dim,)
     outsize_right = x2s_right.shape[:-1] + (irreps_in1.dim, irreps_out.dim,)
 
-    # assert x1_out.shape[-1] == irreps_in1.dim, "Incorrect feature dimension for x1"
-    # assert x2_out.shape[-1] == irreps_in2.dim, "Incorrect feature dimension for x2"
-    # assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
+    # assert x1s_out.shape[-1] == irreps_in1.dim, "Incorrect feature dimension for x1"
+    # assert x2s_out.shape[-1] == irreps_in2.dim, "Incorrect feature dimension for x2"
+    # assert x2s_right.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
 
     x1s_out = x1s_out.reshape(-1, irreps_in1.dim)
     x2s_out = x2s_out.reshape(-1, irreps_in2.dim)
     x2s_right = x2s_right.reshape(-1, irreps_in2.dim)
+
+    batch_out = x1s_out.shape[0]
+    batch_right = x2s_right.shape[0]
 
     weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.has_weight)
     if weight_numel > 0:
         ws_out = ws_out.reshape(-1, weight_numel)
         ws_right = ws_right.reshape(-1, weight_numel)
     del weight_numel
-
-    batch_out = x1s_out.shape[0]
-    # ^ For forward(), we will accululate the various outputs independently
-    # and then concatinate them: this improves performance by avoiding in-place operations,
-    # which are bad for autograd.
-
-    batch_right = x2s_right.shape[0]
-    out_right = x2s_right.new_zeros((batch_right, irreps_in1.dim, irreps_out.dim))
-    # ^ for right, it is not simple to collect different inputs independently,
-    #   so we retain the in-place operations at a small performance cost.
-    #   So, we allocate output space.
 
     # = extract wigners =
     w3j = []
@@ -112,6 +119,7 @@ def codegen_tensor_product(
     flat_weight_index = 0
 
     out_list_out = []
+    out_list_right = []
 
     for ins in instructions:
         mul_ir_in1 = irreps_in1[ins.i_in1]
@@ -126,6 +134,7 @@ def codegen_tensor_product(
 
         alpha = ins.path_weight * out_var[ins.i_out] / sum(in1_var[i.i_in1] * in2_var[i.i_in2] for i in instructions if i.i_out == ins.i_out)
 
+        # Open the profiler block
         name = f"{mul_ir_in1} x {mul_ir_in2} = {mul_ir_out} {ins.connection_mode} {ins.has_weight}"
         handle_out = graph_out.call_function(torch.ops.profiler._record_function_enter, (name,))
         handle_right = graph_right.call_function(torch.ops.profiler._record_function_enter, (name,))
@@ -221,35 +230,39 @@ def codegen_tensor_product(
         ein_out = alpha * ein_out
         ein_right = alpha * ein_right
 
-        ein_out = ein_out.reshape(batch_out, mul_ir_out.dim)
+        out_list_out += [ein_out.reshape(batch_out, mul_ir_out.dim)]
+        out_list_right += [ein_right.reshape(batch_right, mul_ir_in1.dim, mul_ir_out.dim)]
 
-        out_list_out.append(ein_out)
-
-        index_1 = irreps_in1[:ins.i_in1].dim
-        index_out = irreps_out[:ins.i_out].dim
-        #! TODO
-        # out_right[:, index_1:index_1+mul_ir_in1.dim, index_out:index_out+mul_ir_out.dim] += ein_right.reshape(batch_right, mul_ir_in1.dim, mul_ir_out.dim)
-        del index_1, index_out
-
-        # Dedent out of the profiler block
+        # Close the profiler block
         graph_out.call_function(torch.ops.profiler._record_function_exit, (handle_out,))
         graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
 
     # = Return the result =
-    # for forward(), we now sum the individual paths at the end:
-    out = torch.cat([
-        sum(
-            out
-            for ins, out in zip(instructions, out_list_out)
-            if ins.i_out == i_out
+    out_out = torch.cat([
+        _sum_tensors(
+            [out for ins, out in zip(instructions, out_list_out) if ins.i_out == i_out],
+            shape=(batch_out, mul_ir_out.dim),
+            like=x1s_out
         )
-        for i_out in range(len(irreps_out))
-    ], dim=1).reshape(outsize_out)
-    graph_out.output(out.node, torch.Tensor)
+        for i_out, mul_ir_out in enumerate(irreps_out)
+    ], dim=1)
 
-    graph_right.output(out_right.reshape(outsize_right).node, torch.Tensor)
+    out_right = torch.cat([
+        torch.cat([
+            _sum_tensors(
+                [out for ins, out in zip(instructions, out_list_right) if (ins.i_in1, ins.i_out) == (i_in1, i_out)],
+                shape=(batch_right, mul_ir_in1.dim, mul_ir_out.dim),
+                like=x2s_right
+            )
+            for i_out, mul_ir_out in enumerate(irreps_out)
+        ], dim=2)
+        for i_in1, mul_ir_in1 in enumerate(irreps_in1)
+    ], dim=1)
 
-    graph_out.lint()
-    graph_right.lint()
+    out_out = out_out.reshape(outsize_out)
+    out_right = out_right.reshape(outsize_right)
 
-    return graph_out, graph_right, w3j
+    graph_out.output(out_out.node, torch.Tensor)
+    graph_right.output(out_right.node, torch.Tensor)
+
+    return _get_code(graph_out), _get_code(graph_right), w3j
