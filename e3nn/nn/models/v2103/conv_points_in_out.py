@@ -1,3 +1,5 @@
+r"""example of a graph convolution when the input and output nodes are different
+"""
 import torch
 from torch_scatter import scatter
 
