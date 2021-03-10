@@ -221,7 +221,7 @@ def assert_auto_jitable(
         The traced TorchScript function.
     """
     # Prevent pytest from showing this function in the traceback
-    #__tracebackhide__ = True
+    __tracebackhide__ = True
 
     if get_compile_mode(func) is None:
         raise ValueError("assert_auto_jitable is only for modules marked with @compile_mode")
