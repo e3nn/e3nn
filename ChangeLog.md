@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - simple e3nn models can be saved/loaded with `torch.save()`/`torch.load()`
 
 ### Changed
+- `Irreps.slices()`, do `zip(irreps.slices(), irreps)` to retrieve the old behavior
 - `math.soft_one_hot_linspace` very small change in the normalization of `fourier` basis
 - `normalize2mom` is now a `torch.nn.Module`
 - rename arguments `set_ir_...` into `filter_ir_...`
