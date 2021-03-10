@@ -1,5 +1,7 @@
 r"""Spherical Harmonics as polynomials of x, y, z
 """
+from typing import Union, List
+
 import math
 
 import sympy
@@ -7,9 +9,47 @@ from sympy.printing.pycode import pycode
 import torch
 
 from e3nn import o3
+from .irreps import Irreps
+from e3nn.util.jit import compile_mode
 
 
-def spherical_harmonics(l, xyz, normalize, normalization='integral'):
+@compile_mode('trace')
+class SphericalHarmonics(torch.nn.Module):
+    """JITable module version of ``e3nn.o3.spherical_harmonics``.
+
+    Parameters are idential to ``e3nn.o3.spherical_harmonics``.
+    """
+    def __init__(
+        self,
+        l: Union[int, List[int], Irreps],
+        normalize: bool,
+        normalization='integral'
+    ):
+        super().__init__()
+        self.l = l
+        self.normalize = normalize
+        self.normalization = normalization
+
+    def forward(self, xyz: torch.Tensor) -> torch.Tensor:
+        return spherical_harmonics(
+            self.l,
+            xyz,
+            self.normalize,
+            self.normalization
+        )
+
+    def _make_tracing_inputs(self, n: int):
+        return [{
+            'forward': (torch.ones(2, 3),)
+        }]
+
+
+def spherical_harmonics(
+    l: Union[int, List[int], Irreps],
+    xyz: torch.Tensor,
+    normalize: bool,
+    normalization='integral'
+):
     r"""Spherical harmonics
 
     .. image:: https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif
@@ -76,7 +116,7 @@ def spherical_harmonics(l, xyz, normalize, normalization='integral'):
     wigner_3j
 
     """
-    if isinstance(l, o3.Irreps):
+    if isinstance(l, Irreps):
         ls = [l for mul, (l, p) in l for _ in range(mul)]
     elif isinstance(l, int):
         ls = [l]
