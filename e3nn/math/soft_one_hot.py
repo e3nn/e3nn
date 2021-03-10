@@ -2,7 +2,7 @@ import math
 import torch
 
 
-def soft_one_hot_linspace(x, start, end, number, base='gaussian', endpoint=True):
+def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True):
     r"""Projection on a basis of functions
 
     Returns a set of :math:`\{y_i\}_{i=1}^N`,
@@ -11,7 +11,7 @@ def soft_one_hot_linspace(x, start, end, number, base='gaussian', endpoint=True)
 
         y_i = \frac{1}{Z} f_i(x)
 
-    where :math:`x` is the input and :math:`f_i` is the ith base function.
+    where :math:`x` is the input and :math:`f_i` is the ith basis function.
     :math:`Z` is set such that,
 
     .. math::
@@ -34,7 +34,7 @@ def soft_one_hot_linspace(x, start, end, number, base='gaussian', endpoint=True)
     number : int
         number of basis functions :math:`N`
 
-    base : {'gaussian', 'cosine', 'fourier'}
+    basis : {'gaussian', 'cosine', 'fourier'}
         choice of basis family
 
     endpoint : bool
@@ -78,10 +78,10 @@ def soft_one_hot_linspace(x, start, end, number, base='gaussian', endpoint=True)
 
     .. jupyter-execute::
 
-        for base in ['gaussian', 'cosine', 'fourier']:
+        for basis in ['gaussian', 'cosine', 'fourier']:
             for endpoint in [False, True]:
-                y = soft_one_hot_linspace(x, -0.5, 1.5, 4, base, endpoint)
-                plt.plot(x, y.pow(2).sum(1), label=f"{base} {'endpoint' if endpoint else ''}")
+                y = soft_one_hot_linspace(x, -0.5, 1.5, 4, basis, endpoint)
+                plt.plot(x, y.pow(2).sum(1), label=f"{basis} {'endpoint' if endpoint else ''}")
         plt.legend();
     """
     if endpoint:
@@ -94,13 +94,13 @@ def soft_one_hot_linspace(x, start, end, number, base='gaussian', endpoint=True)
 
     diff = x[..., None] - values
 
-    if base == 'gaussian':
+    if basis == 'gaussian':
         return diff.div(step).pow(2).neg().exp().div(1.12)
 
-    if base == 'cosine':
+    if basis == 'cosine':
         return torch.cos(math.pi/2 * diff / step) * (diff < step) * (-step < diff)
 
-    if base == 'fourier':
+    if basis == 'fourier':
         x = (x[..., None] - start) / (end - start)
         if endpoint:
             i = torch.arange(0, number, dtype=x.dtype, device=x.device)
