@@ -269,4 +269,24 @@ def codegen_tensor_product(
     graph_out.output(out_out.node, torch.Tensor)
     graph_right.output(out_right.node, torch.Tensor)
 
+    try:
+        from opt_einsum_fx import optimize_einsums, jitable
+
+        example_inputs = (
+            irreps_in1.randn(4, -1, dtype=torch.float32),
+            irreps_in2.randn(4, -1, dtype=torch.float32),
+            torch.randn(1 if shared_weights else 4, flat_weight_index, dtype=torch.float32),
+            torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
+        )
+
+        m = fx.GraphModule(torch.nn.Module(), graph_out)
+        m = jitable(optimize_einsums(m, example_inputs))
+        graph_out = m.graph
+
+        m = fx.GraphModule(torch.nn.Module(), graph_right)
+        m = jitable(optimize_einsums(m, example_inputs[1:]))
+        graph_right = m.graph
+    except:
+        pass
+
     return _get_code(graph_out), _get_code(graph_right), w3j
