@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `o3.TensorProduct`: also broadcast the `weight` argument
 - simple e3nn models can be saved/loaded with `torch.save()`/`torch.load()`
 - JITable `o3.SphericalHarmonics` module version of `o3.spherical_harmonics`
+- `in_place` option for `e3nn.util.jit` compilation functions
 
 ### Changed
 - in `soft_one_hot_linspace` the argument `base` is renamed into `basis`
