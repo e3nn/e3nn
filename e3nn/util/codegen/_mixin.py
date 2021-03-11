@@ -1,7 +1,6 @@
 from typing import Dict, Union
 
 from ._eval import eval_code
-from ._lazy import LazyCodeGenerator
 
 
 class CodeGenMixin:
@@ -11,40 +10,28 @@ class CodeGenMixin:
     """
     def _codegen_register(
         self,
-        funcs: Dict[str, Union[str, LazyCodeGenerator]],
+        funcs: Dict[str, str],
         compile: bool = True
     ) -> None:
         """Register dynamically generated methods.
 
         Parameters
         ----------
-            funcs : Dict[str, Union[str, LazyCodeGenerator]]
+            funcs : Dict[str, str]
                 Dictionary mapping method names to their code.
         """
         if not hasattr(self, "__codegen__"):
-            # (code_dict, generator_dict)
-            self.__codegen__ = ({}, {})
-        self.__codegen__[0].update({
-            k: v for k, v in funcs.items() if isinstance(v, str)
-        })
-        self.__codegen__[1].update({
-            k: v for k, v in funcs.items() if isinstance(v, LazyCodeGenerator)
-        })
+            # func_name -> code
+            self.__codegen__ = {}
+        self.__codegen__.update(funcs)
         if compile:
             self._codegen_compile()
 
     def _codegen_compile(self):
-        """Compile and set all registered dynamically generated methods.
-
-        Reruns any ``LazyCodeGenerator``s.
-        """
+        """Compile and set all registered dynamically generated methods."""
         if hasattr(self, "__codegen__"):
-            # Run generators and update code
-            self.__codegen__[0].update({
-                f: g.generate() for f, g in self.__codegen__[1].items()
-            })
             # Compile the generated or static code
-            for fname, code in self.__codegen__[0].items():
+            for fname, code in self.__codegen__.items():
                 setattr(self, fname, eval_code(code).main)
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
@@ -59,10 +46,8 @@ class CodeGenMixin:
             out = self.__dict__.copy()
         # - Remove compiled methods -
         if hasattr(self, "__codegen__"):
-            # Save only code strings, we can't save LazyCodeGenerator
-            out["__codegen__"] = self.__codegen__[0]
-            # Functions that have code and not just generators are those that are currently compiled, so we remove them
-            for fname in self.__codegen__[0]:
+            # We cant save compiled functions
+            for fname in self.__codegen__:
                 out.pop(fname, None)
         return out
 
@@ -73,7 +58,7 @@ class CodeGenMixin:
             # Remove any compiled methods that somehow entered the state
             for k in codegen_state:
                 d.pop(k, None)
-            self.__codegen__ = (codegen_state, {})  # no generators
+            self.__codegen__ = codegen_state
             self._codegen_compile()
 
         # We need to check if other parent classes of self define __getstate__
