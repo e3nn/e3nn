@@ -6,6 +6,7 @@ import sys
 import tempfile
 import subprocess
 import copy
+import textwrap
 
 import torch
 from torch_geometric.data import Data
@@ -91,16 +92,16 @@ def test_gate_points_2101_jit(network):
         torch.save(dat, tmpdir + '/dat.pt')
         # Load in new process
         with open(tmpdir + '/code.py', 'x') as code:
-            code.write(f"""
-import torch
-# Needed for the TorchScript kernels for scatter and radius_graph
-import torch_scatter
-import torch_cluster
-f = torch.jit.load('{tmpdir}/model.pt')
-d = torch.load('{tmpdir}/dat.pt')
-out = f(d)
-torch.save(out, '{tmpdir}/out.pt')
-""")
+            code.write(textwrap.dedent(f"""
+            import torch
+            # Needed for the TorchScript kernels for scatter and radius_graph
+            import torch_scatter
+            import torch_cluster
+            f = torch.jit.load('{tmpdir}/model.pt')
+            d = torch.load('{tmpdir}/dat.pt')
+            out = f(d)
+            torch.save(out, '{tmpdir}/out.pt')
+            """))
         # Run
         # sys.executable gives the path to the current python interpreter
         proc_res = subprocess.run([sys.executable, tmpdir + '/code.py'])
