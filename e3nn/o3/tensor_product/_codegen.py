@@ -197,8 +197,9 @@ def codegen_tensor_product(
             cg_right(line)
             flat_weight_i += prod(ins.path_shape)
 
-        done: bool = True
+        done: bool = False
         if specialized_code:
+            done = True
             # optimized code for special cases:
             # 0 x 0 = 0
             # 0 x L = L
