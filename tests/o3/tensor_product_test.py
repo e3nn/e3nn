@@ -3,7 +3,7 @@ import copy
 
 import pytest
 import torch
-from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
+from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps, Instruction
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
@@ -79,6 +79,37 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
     # equivariance
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+
+@pytest.mark.parametrize('normalization', ['component', 'norm'])
+@pytest.mark.parametrize('mode', ['uvw', 'uvu'])
+def test_specialized_code(float_tolerance, normalization, mode):
+    irreps = Irreps('4x0e + 4x1e + 4x2e')
+
+    tps = []
+    for sc in [False, True]:
+        torch.manual_seed(0)
+        ins = [
+            (0, 0, 0, mode, True, 1.0),
+
+            (0, 1, 1, mode, True, 1.0),
+            (1, 0, 1, mode, True, 1.0),
+            (1, 1, 0, mode, True, 1.0),
+
+            (1, 1, 1, mode, True, 1.0),
+
+            (0, 2, 2, mode, True, 1.0),
+            (2, 0, 2, mode, True, 1.0),
+            (2, 2, 0, mode, True, 1.0),
+
+            (2, 1, 1, mode, True, 1.0),
+        ]
+        tps += [TensorProduct(irreps, irreps, irreps, ins, normalization=normalization, _specialized_code=sc)]
+
+    tp1, tp2 = tps
+    x = irreps.randn(3, -1)
+    y = irreps.randn(3, -1)
+    assert (tp1(x, y) - tp2(x, y)).abs().max() < float_tolerance
 
 
 def test_empty_irreps():

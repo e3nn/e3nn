@@ -105,17 +105,16 @@ def codegen_tensor_product(
         return (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
 
     # = extract individual input irreps =
-    x1_list_out = []
-    for i, mul_ir in enumerate(irreps_in1):
-        index = irreps_in1[:i].dim
-        x1_list_out.append(x1s_out[:, index:index + mul_ir.dim].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim))
+    x1_list_out = [
+        x1s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
+        for i, mul_ir in zip(irreps_in1.slices(), irreps_in1)
+    ]
 
     x2_list_out = []
     x2_list_right = []
-    for i, mul_ir in enumerate(irreps_in2):
-        index = irreps_in2[:i].dim
-        x2_list_out.append(x2s_out[:, index:index + mul_ir.dim].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim))
-        x2_list_right.append(x2s_right[:, index:index + mul_ir.dim].reshape(batch_right, mul_ir.mul, mul_ir.ir.dim))
+    for i, mul_ir in zip(irreps_in2.slices(), irreps_in2):
+        x2_list_out.append(x2s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim))
+        x2_list_right.append(x2s_right[:, i].reshape(batch_right, mul_ir.mul, mul_ir.ir.dim))
 
     z = '' if shared_weights else 'z'
     xx_dict = dict()
@@ -148,6 +147,7 @@ def codegen_tensor_product(
         x2_right = x2_list_right[ins.i_in2]
 
         e1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
+        i1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
 
         assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
@@ -186,48 +186,72 @@ def codegen_tensor_product(
 
         if ins.connection_mode == 'uvw':
             assert ins.has_weight
-            ein_out = torch.einsum(f"{z}uvw,ijk,zuvij->zwk", w_out, w3j_out, xx)
-            ein_right = torch.einsum(f"{z}uvw,ijk,zvj->zuiwk", w_right, w3j_right, x2_right)
+            if specialized_code and key == (0, 0, 0):
+                ein_out = torch.einsum(f"{z}uvw,zu,zv->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                ein_right = torch.einsum(f"{z}uvw,zv->zuw", w_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+            elif specialized_code and mul_ir_in1.ir.l == 0:
+                ein_out = torch.einsum(f"{z}uvw,zu,zvj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
+                ein_right = torch.einsum(f"{z}uvw,zvi->zuwi", w_right, x2_right)
+            elif specialized_code and mul_ir_in2.ir.l == 0:
+                ein_out = torch.einsum(f"{z}uvw,zui,zv->zwi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
+                ein_right = torch.einsum(f"{z}uvw,ij,zv->zuiwj", w_right, i1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+            elif specialized_code and mul_ir_out.ir.l == 0:
+                exp = {'component': 1, 'norm': -1}[normalization]
+                ein_out = torch.einsum(f"{z}uvw,zui,zvi->zw", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
+                ein_right = torch.einsum(f"{z}uvw,zvi->zuiw", w_right, x2_right) / sqrt(mul_ir_in1.ir.dim)**exp
+            else:
+                ein_out = torch.einsum(f"{z}uvw,ijk,zuvij->zwk", w_out, w3j_out, xx)
+                ein_right = torch.einsum(f"{z}uvw,ijk,zvj->zuiwk", w_right, w3j_right, x2_right)
         if ins.connection_mode == 'uvu':
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
+                # TODO implement specialized code
                 ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zuk", w_out, w3j_out, xx)
                 ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", w_right, w3j_right, e1_right, x2_right)
             else:
+                # TODO implement specialized code
                 ein_out = torch.einsum("ijk,zuvij->zuk", w3j_out, xx)
                 ein_right = torch.einsum("ijk,uw,zvj->zuiwk", w3j_right, e1_right, x2_right)
         if ins.connection_mode == 'uvv':
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
+                # TODO implement specialized code
                 ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w_out, w3j_out, xx)
                 ein_right = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w_right, w3j_right, x2_right)
             else:
+                # TODO implement specialized code
                 ein_out = torch.einsum("ijk,zuvij->zvk", w3j_out, xx)
                 s2ones = fx.Proxy(graph_right.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2_right.device.node, dtype=x2_right.dtype.node)))
                 ein_right = torch.einsum("u,ijk,zvj->zuivk", s2ones, w3j_right, x2_right)
         if ins.connection_mode == 'uuw':
             assert mul_ir_in1.mul == mul_ir_in2.mul
             if ins.has_weight:
+                # TODO implement specialized code
                 ein_out = torch.einsum(f"{z}uw,ijk,zuij->zwk", w_out, w3j_out, xx)
                 ein_right = torch.einsum(f"{z}uw,ijk,zuj->zuiwk", w_right, w3j_right, x2_right)
             else:
+                # TODO implement specialized code
                 assert mul_ir_out.mul == 1
                 ein_out = torch.einsum("ijk,zuij->zk", w3j_out, xx)
                 ein_right = torch.einsum("ijk,zuj->zuik", w3j_right, x2_right)
         if ins.connection_mode == 'uuu':
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
+                # TODO implement specialized code
                 ein_out = torch.einsum(f"{z}u,ijk,zuij->zuk", w_out, w3j_out, xx)
                 ein_right = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w_right, w3j_right, e1_right, x2_right)
             else:
+                # TODO implement specialized code
                 ein_out = torch.einsum("ijk,zuij->zuk", w3j_out, xx)
                 ein_right = torch.einsum("ijk,uw,zuj->zuiwk", w3j_right, e1_right, x2_right)
         if ins.connection_mode == 'uvuv':
             assert mul_ir_in1.mul * mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
+                # TODO implement specialized code
                 ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zuvk", w_out, w3j_out, xx)
                 ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwvk", w_right, w3j_right, e1_right, x2_right)
             else:
+                # TODO implement specialized code
                 ein_out = torch.einsum("ijk,zuvij->zuvk", w3j_out, xx)
                 ein_right = torch.einsum("ijk,uw,zvj->zuiwvk", w3j_right, e1_right, x2_right)
 
