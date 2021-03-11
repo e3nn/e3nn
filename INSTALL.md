@@ -11,10 +11,10 @@ pip install torch==$TORCH+$CUDA -f https://download.pytorch.org/whl/torch_stable
 
 pip install scipy
 
-pip install --no-index torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
-pip install --no-index torch-sparse -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
-pip install --no-index torch-cluster -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
-pip install --no-index torch-spline-conv -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --upgrade --force-reinstall torch-scatter -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --upgrade --force-reinstall torch-sparse -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --upgrade --force-reinstall torch-cluster -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
+pip install --upgrade --force-reinstall torch-spline-conv -f https://pytorch-geometric.com/whl/torch-$TORCH+$CUDA.html
 pip install torch-geometric
 ```
 

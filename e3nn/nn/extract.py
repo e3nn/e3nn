@@ -57,7 +57,7 @@ class Extract(CodeGenMixin, torch.nn.Module):
                     f"{s}out[{i}][:] = x"
                 )
             else:
-                for (s_out, _), i_in in zip(irreps_out.slices(), ins):
+                for s_out, i_in in zip(irreps_out.slices(), ins):
                     i_in1 = self.irreps_in[:i_in].dim
                     i_in2 = self.irreps_in[:i_in + 1].dim
                     code_out.append(

@@ -71,7 +71,7 @@ class SimpleNetwork(torch.nn.Module):
             0.0,
             self.max_radius,
             self.number_of_basis,
-            base='cosine',  # the cosine basis with endpoint = True goes to zero at max_radius
+            basis='cosine',  # the cosine basis with endpoint = True goes to zero at max_radius
             endpoint=False,  # no need for an additional smooth cutoff
         ).mul(self.number_of_basis**0.5)
 
@@ -148,7 +148,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             0.0,
             self.max_radius,
             self.number_of_basis,
-            base='cosine',  # the cosine basis with endpoint = True goes to zero at max_radius
+            basis='cosine',  # the cosine basis with endpoint = True goes to zero at max_radius
             endpoint=False,  # no need for an additional smooth cutoff
         ).mul(self.number_of_basis**0.5)
 

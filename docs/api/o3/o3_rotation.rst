@@ -1,3 +1,5 @@
+.. _Rotation functions:
+
 o3 - Parametrization of Rotations
 =================================
 

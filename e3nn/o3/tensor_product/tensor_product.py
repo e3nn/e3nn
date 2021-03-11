@@ -534,7 +534,8 @@ class FullyConnectedTensorProduct(TensorProduct):
             irreps_out,
             normalization='component',
             internal_weights=None,
-            shared_weights=None
+            shared_weights=None,
+            _specialized_code=True,
                 ):
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -547,7 +548,7 @@ class FullyConnectedTensorProduct(TensorProduct):
             for i_out, (_, ir_out) in enumerate(irreps_out)
             if ir_out in ir_1 * ir_2
         ]
-        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, normalization, internal_weights, shared_weights)
+        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, normalization, internal_weights, shared_weights, _specialized_code)
 
 
 class ElementwiseTensorProduct(TensorProduct):

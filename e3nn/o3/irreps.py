@@ -11,6 +11,9 @@ from e3nn.math import direct_sum, perm
 class Irrep(tuple):
     r"""Irreducible representation of :math:`O(3)`
 
+    This class does not contain any data, it is a structure that describe the representation.
+    It is typically used as argument of other classes of the library to define the input and output representations of functions.
+
     Attributes
     ----------
     l : int
@@ -262,6 +265,9 @@ class _MulIr(tuple):
 class Irreps(tuple):
     r"""Direct sum of irreducible representations of :math:`O(3)`
 
+    This class does not contain any data, it is a structure that describe the representation.
+    It is typically used as argument of other classes of the library to define the input and output representations of functions.
+
     Attributes
     ----------
     dim : int
@@ -373,18 +379,18 @@ class Irreps(tuple):
         return Irreps([(1, (l, (-1)**l)) for l in range(lmax + 1)])
 
     def slices(self):
-        r"""list of slice and ``mul_ir``
+        r"""list of slices
 
         Examples
         --------
 
         >>> Irreps('2x0e + 1e').slices()
-        [(slice(0, 2, None), 2x0e), (slice(2, 5, None), 1x1e)]
+        [slice(0, 2, None), slice(2, 5, None)]
         """
         s = []
         i = 0
         for mul_ir in self:
-            s += [(slice(i, i + mul_ir.dim), mul_ir)]
+            s += [slice(i, i + mul_ir.dim)]
             i += mul_ir.dim
         return s
 
@@ -422,7 +428,7 @@ class Irreps(tuple):
         if normalization == 'norm':
             x = torch.zeros(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
             with torch.no_grad():
-                for s, (mul, ir) in self.slices():
+                for s, (mul, ir) in zip(self.slices(), self):
                     r = torch.randn(*lsize, mul, ir.dim, *rsize, dtype=dtype, device=device)
                     r.div_(r.norm(2, dim=di + 1, keepdim=True))
                     x.narrow(di, s.start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))

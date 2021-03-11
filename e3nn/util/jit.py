@@ -1,5 +1,6 @@
 import warnings
 import inspect
+import copy
 
 import torch
 
@@ -50,6 +51,7 @@ def compile(
     n_trace_checks: int = 1,
     script_options: dict = {},
     trace_options: dict = {},
+    in_place: bool = True
 ):
     """Recursively compile a module and all submodules according to their decorators.
 
@@ -70,6 +72,8 @@ def compile(
     -------
     Returns the compiled module.
     """
+    if not in_place:
+        mod = copy.deepcopy(mod)
     # TODO: debug logging
     assert n_trace_checks >= 1
     # == recurse to children ==
@@ -82,7 +86,8 @@ def compile(
                 submod,
                 n_trace_checks=n_trace_checks,
                 script_options=script_options,
-                trace_options=trace_options
+                trace_options=trace_options,
+                in_place=True  # since we deepcopied the module above, we can do inplace
             )
         )
     # == Compile this module now ==
@@ -156,6 +161,7 @@ def trace_module(
     mod: torch.nn.Module,
     inputs: dict = None,
     check_inputs: list = [],
+    in_place: bool = True
 ):
     """Trace a module.
 
@@ -187,7 +193,7 @@ def trace_module(
         )
 
     # Compile
-    out = compile(mod)
+    out = compile(mod, in_place=in_place)
 
     # Restore old values, if we had them
     if old_mode is not None:
@@ -201,6 +207,7 @@ def trace(
     mod: torch.nn.Module,
     example_inputs: tuple = None,
     check_inputs: list = [],
+    in_place: bool = True
 ):
     """Trace a module.
 
@@ -219,10 +226,11 @@ def trace(
         mod=mod,
         inputs=({'forward': example_inputs} if example_inputs is not None else None),
         check_inputs=[{'forward': c} for c in check_inputs],
+        in_place=in_place
     )
 
 
-def script(mod: torch.nn.Module):
+def script(mod: torch.nn.Module, in_place: bool = True):
     """Script a module.
 
     Like ``torch.jit.script``, but first recursively compiles ``mod`` using :func:``compile``.
@@ -241,7 +249,7 @@ def script(mod: torch.nn.Module):
     setattr(mod, _E3NN_COMPILE_MODE, 'script')
 
     # Compile
-    out = compile(mod)
+    out = compile(mod, in_place=in_place)
 
     # Restore old values, if we had them
     if old_mode is not None:
