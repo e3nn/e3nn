@@ -37,7 +37,7 @@ def codegen_tensor_product(
     normalization: str = 'component',
     shared_weights: bool = False,
     specialized_code: bool = True,
-    codegen_kwargs: dict = {}
+    optimize_einsums: bool = True,
 ) -> Tuple[str, str, list]:
     graph_out = fx.Graph()
     graph_right = fx.Graph()
@@ -315,24 +315,42 @@ def codegen_tensor_product(
     graph_out.output(out_out.node, torch.Tensor)
     graph_right.output(out_right.node, torch.Tensor)
 
-    try:
-        from opt_einsum_fx import optimize_einsums, jitable
+    if optimize_einsums:
+        try:
+            from opt_einsum_fx import optimize_einsums, jitable
 
-        example_inputs = (
-            irreps_in1.randn(4, -1, dtype=torch.float32),
-            irreps_in2.randn(4, -1, dtype=torch.float32),
-            torch.randn(1 if shared_weights else 4, flat_weight_index, dtype=torch.float32),
-            torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
-        )
+            # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
+            # and still get the right path for _all_ batch dimensions.
+            # This is because our einsums are essentially of the form:
+            #    zuvw,ijk,zuvij->zwk    OR     uvw,ijk,zuvij->zwk
+            # In the first case, all but one operands have the batch dimension
+            #    => The first contraction gains the batch dimension
+            #    => All following contractions have batch dimension
+            #    => All possible contraction paths have cost that scales linearly in batch size
+            #    => The optimal path is the same for all batch sizes
+            # For the second case, this logic follows as long as the first contraction is not between the first two operands. Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
+            # https://github.com/dgasmith/opt_einsum/issues/158
+            # for more details.
+            #
+            # TODO: consider the impact maximum intermediate result size on this logic
+            #         \- this is the `memory_limit` option in opt_einsum
+            # TODO: allow user to choose opt_einsum parameters?
+            batchdim = 4
+            example_inputs = (
+                irreps_in1.randn(batchdim, -1, dtype=torch.float32),
+                irreps_in2.randn(batchdim, -1, dtype=torch.float32),
+                torch.randn(1 if shared_weights else batchdim, flat_weight_index, dtype=torch.float32),
+                torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
+            )
 
-        m = fx.GraphModule(torch.nn.Module(), graph_out)
-        m = jitable(optimize_einsums(m, example_inputs))
-        graph_out = m.graph
+            m = fx.GraphModule(torch.nn.Module(), graph_out)
+            m = jitable(optimize_einsums(m, example_inputs))
+            graph_out = m.graph
 
-        m = fx.GraphModule(torch.nn.Module(), graph_right)
-        m = jitable(optimize_einsums(m, example_inputs[1:]))
-        graph_right = m.graph
-    except:
-        pass
+            m = fx.GraphModule(torch.nn.Module(), graph_right)
+            m = jitable(optimize_einsums(m, example_inputs[1:]))
+            graph_right = m.graph
+        except:
+            pass
 
     return _get_code(graph_out), _get_code(graph_right), w3j

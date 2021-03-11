@@ -30,8 +30,9 @@ def main():
     parser.add_argument("--irreps-out", type=str, default="8x1e + 8x2e + 8x3o")
     parser.add_argument("--cuda", type=t_or_f, default=True)
     parser.add_argument("--backward", type=t_or_f, default=True)
+    parser.add_argument("--opt-ein", type=t_or_f, default=True)
+    parser.add_argument("--specialized-code", type=t_or_f, default=True)
     parser.add_argument("-n", type=int, default=1000)
-    parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--batch", type=int, default=10)
 
     args = parser.parse_args()
@@ -39,10 +40,10 @@ def main():
     device = 'cuda' if (torch.cuda.is_available() and args.cuda) else 'cpu'
     args.cuda = device == 'cuda'
 
-    print(" ===== Benchmark with settings: ===== ")
+    print("======= Benchmark with settings: ======")
     for key, val in vars(args).items():
-        print(f"{key:>15} : {val}")
-    print("="*37)
+        print(f"{key:>18} : {val}")
+    print("="*40)
 
     irreps_in1 = Irreps(args.irreps_in1)
     irreps_in2 = Irreps(args.irreps_in2)
@@ -51,24 +52,25 @@ def main():
         irreps_in1,
         irreps_in2,
         irreps_out,
+        _specialized_code=args.specialized_code,
+        _optimize_einsums=args.opt_ein
     )
     tp = tp.to(device=device)
+
+    # from https://pytorch.org/docs/master/_modules/torch/utils/benchmark/utils/timer.html#Timer.timeit
+    warmup = max(int(args.n // 100), 1)
 
     inputs = iter([
         (
             irreps_in1.randn(args.batch, -1).to(device=device),
             irreps_in2.randn(args.batch, -1).to(device=device)
         )
-        for _ in range(args.warmup + args.n + 1)]
-    )
+        for _ in range(args.n + warmup)
+    ])
 
     # compile
     if args.jit:
         tp = compile(tp)
-
-    # warmup
-    for i in range(args.warmup):
-        _ = tp(*next(inputs))
 
     print("starting...")
 
