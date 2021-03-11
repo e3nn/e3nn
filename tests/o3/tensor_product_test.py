@@ -82,9 +82,16 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
 
 @pytest.mark.parametrize('normalization', ['component', 'norm'])
-@pytest.mark.parametrize('mode', ['uvw', 'uvu'])
+@pytest.mark.parametrize('mode', ['uvw', 'uvu', 'uvv'])
 def test_specialized_code(float_tolerance, normalization, mode):
-    irreps = Irreps('4x0e + 4x1e + 4x2e')
+    irreps_in1 = Irreps('4x0e + 4x1e + 4x2e')
+    irreps_in2 = Irreps('5x0e + 5x1e + 5x2e')
+    irreps_out = Irreps('6x0e + 6x1e + 6x2e')
+
+    if mode == 'uvu':
+        irreps_out = irreps_in1
+    if mode == 'uvv':
+        irreps_out = irreps_in2
 
     tps = []
     for sc in [False, True]:
@@ -104,11 +111,11 @@ def test_specialized_code(float_tolerance, normalization, mode):
 
             (2, 1, 1, mode, True, 1.0),
         ]
-        tps += [TensorProduct(irreps, irreps, irreps, ins, normalization=normalization, _specialized_code=sc)]
+        tps += [TensorProduct(irreps_in1, irreps_in2, irreps_out, ins, normalization=normalization, _specialized_code=sc)]
 
     tp1, tp2 = tps
-    x = irreps.randn(3, -1)
-    y = irreps.randn(3, -1)
+    x = irreps_in1.randn(3, -1)
+    y = irreps_in2.randn(3, -1)
     assert (tp1(x, y) - tp2(x, y)).abs().max() < float_tolerance
 
 

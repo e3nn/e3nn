@@ -79,10 +79,6 @@ def codegen_tensor_product(
     outsize_out = x1s_out.shape[:-1] + (irreps_out.dim,)
     outsize_right = x2s_right.shape[:-1] + (irreps_in1.dim, irreps_out.dim,)
 
-    # assert x1s_out.shape[-1] == irreps_in1.dim, "Incorrect feature dimension for x1"
-    # assert x2s_out.shape[-1] == irreps_in2.dim, "Incorrect feature dimension for x2"
-    # assert x2s_right.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
-
     x1s_out = x1s_out.reshape(-1, irreps_in1.dim)
     x2s_out = x2s_out.reshape(-1, irreps_in2.dim)
     x2s_right = x2s_right.reshape(-1, irreps_in2.dim)
@@ -184,6 +180,8 @@ def codegen_tensor_product(
         w3j_out = w3j_dict_out[key]
         w3j_right = w3j_dict_right[key]
 
+        exp = {'component': 1, 'norm': -1}[normalization]
+
         if ins.connection_mode == 'uvw':
             assert ins.has_weight
             if specialized_code and key == (0, 0, 0):
@@ -196,7 +194,6 @@ def codegen_tensor_product(
                 ein_out = torch.einsum(f"{z}uvw,zui,zv->zwi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
                 ein_right = torch.einsum(f"{z}uvw,ij,zv->zuiwj", w_right, i1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
             elif specialized_code and mul_ir_out.ir.l == 0:
-                exp = {'component': 1, 'norm': -1}[normalization]
                 ein_out = torch.einsum(f"{z}uvw,zui,zvi->zw", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
                 ein_right = torch.einsum(f"{z}uvw,zvi->zuiw", w_right, x2_right) / sqrt(mul_ir_in1.ir.dim)**exp
             else:
@@ -205,21 +202,46 @@ def codegen_tensor_product(
         if ins.connection_mode == 'uvu':
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
-                # TODO implement specialized code
-                ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zuk", w_out, w3j_out, xx)
-                ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", w_right, w3j_right, e1_right, x2_right)
+                if specialized_code and key == (0, 0, 0):
+                    ein_out = torch.einsum(f"{z}uv,zu,zv->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    ein_right = torch.einsum(f"{z}uv,uw,zv->zuw", w_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_in1.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uv,zu,zvj->zuj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
+                    ein_right = torch.einsum(f"{z}uv,uw,zvi->zuwi", w_right, e1_right, x2_right)
+                elif specialized_code and mul_ir_in2.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uv,zui,zv->zui", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    ein_right = torch.einsum(f"{z}uv,ij,uw,zv->zuiwj", w_right, i1_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_out.ir.l == 0:
+                    exp = {'component': 1, 'norm': -1}[normalization]
+                    ein_out = torch.einsum(f"{z}uv,zui,zvi->zu", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
+                    ein_right = torch.einsum(f"{z}uv,uw,zvi->zuiw", w_right, e1_right, x2_right) / sqrt(mul_ir_in1.ir.dim)**exp
+                else:
+                    ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zuk", w_out, w3j_out, xx)
+                    ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", w_right, w3j_right, e1_right, x2_right)
             else:
-                # TODO implement specialized code
+                # not so useful operation because v is summed
                 ein_out = torch.einsum("ijk,zuvij->zuk", w3j_out, xx)
                 ein_right = torch.einsum("ijk,uw,zvj->zuiwk", w3j_right, e1_right, x2_right)
         if ins.connection_mode == 'uvv':
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
-                # TODO implement specialized code
-                ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w_out, w3j_out, xx)
-                ein_right = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w_right, w3j_right, x2_right)
+                if specialized_code and key == (0, 0, 0):
+                    ein_out = torch.einsum(f"{z}uv,zu,zv->zv", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    ein_right = torch.einsum(f"{z}uv,vw,zv->zuw", w_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_in1.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uv,zu,zvj->zvj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
+                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuwi", w_right, e1_right, x2_right)
+                elif specialized_code and mul_ir_in2.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uv,zui,zv->zvi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    ein_right = torch.einsum(f"{z}uv,ij,vw,zv->zuiwj", w_right, i1_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_out.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uv,zui,zvi->zv", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
+                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuiw", w_right, e1_right, x2_right) / sqrt(mul_ir_in1.ir.dim)**exp
+                else:
+                    ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w_out, w3j_out, xx)
+                    ein_right = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w_right, w3j_right, x2_right)
             else:
-                # TODO implement specialized code
+                # not so useful operation because u is summed
                 ein_out = torch.einsum("ijk,zuvij->zvk", w3j_out, xx)
                 s2ones = fx.Proxy(graph_right.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2_right.device.node, dtype=x2_right.dtype.node)))
                 ein_right = torch.einsum("u,ijk,zvj->zuivk", s2ones, w3j_right, x2_right)
@@ -230,7 +252,7 @@ def codegen_tensor_product(
                 ein_out = torch.einsum(f"{z}uw,ijk,zuij->zwk", w_out, w3j_out, xx)
                 ein_right = torch.einsum(f"{z}uw,ijk,zuj->zuiwk", w_right, w3j_right, x2_right)
             else:
-                # TODO implement specialized code
+                # equivalent to tp(x, y, 'uuu').sum('u')
                 assert mul_ir_out.mul == 1
                 ein_out = torch.einsum("ijk,zuij->zk", w3j_out, xx)
                 ein_right = torch.einsum("ijk,zuj->zuik", w3j_right, x2_right)
