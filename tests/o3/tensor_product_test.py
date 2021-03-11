@@ -135,23 +135,74 @@ def test_empty_inputs():
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
-def test_jit(l1, p1, l2, p2, lo, po, mode, weight):
-    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+@pytest.mark.parametrize('special_code', [True, False])
+@pytest.mark.parametrize('opt_ein', [True, False])
+def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
+    """Test the JIT.
 
-    # Check the tensor product
-    tp_trace = assert_auto_jitable(tp)
+    This test is seperate from test_optimizations to ensure that just jitting a model has minimal error if any.
+    """
+    orig_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        _specialized_code=special_code,
+        _optimize_einsums=opt_ein
+    )
+    opt_tp = assert_auto_jitable(orig_tp)
 
-    # Confirm equivariance of traced model
+    # Confirm equivariance of optimized model
     assert_equivariant(
-        tp_trace,
-        irreps_in=[tp.irreps_in1, tp.irreps_in2],
-        irreps_out=tp.irreps_out
+        opt_tp,
+        irreps_in=[orig_tp.irreps_in1, orig_tp.irreps_in2],
+        irreps_out=orig_tp.irreps_out
     )
 
     # Confirm that it gives same results
-    x1 = tp.irreps_in1.randn(2, -1)
-    x2 = tp.irreps_in2.randn(2, -1)
-    assert torch.allclose(tp(x1, x2), tp_trace(x1, x2))
+    x1 = orig_tp.irreps_in1.randn(2, -1)
+    x2 = orig_tp.irreps_in2.randn(2, -1)
+    # TorchScript should casue very little if any numerical error
+    assert torch.allclose(
+        orig_tp(x1, x2),
+        opt_tp(x1, x2),
+    )
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
+@pytest.mark.parametrize('special_code', [True, False])
+@pytest.mark.parametrize('opt_ein', [True, False])
+@pytest.mark.parametrize('jit', [True, False])
+def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
+    orig_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        _specialized_code=False,
+        _optimize_einsums=False
+    )
+    opt_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        _specialized_code=special_code,
+        _optimize_einsums=opt_ein
+    )
+    opt_tp.load_state_dict(orig_tp.state_dict())
+    assert opt_tp._specialized_code == special_code
+    assert opt_tp._optimize_einsums == opt_ein
+
+    if jit:
+        opt_tp = assert_auto_jitable(opt_tp)
+
+    # Confirm equivariance of optimized model
+    assert_equivariant(
+        opt_tp,
+        irreps_in=[orig_tp.irreps_in1, orig_tp.irreps_in2],
+        irreps_out=orig_tp.irreps_out
+    )
+
+    # Confirm that it gives same results
+    x1 = orig_tp.irreps_in1.randn(2, -1)
+    x2 = orig_tp.irreps_in2.randn(2, -1)
+    assert torch.allclose(
+        orig_tp(x1, x2),
+        opt_tp(x1, x2),
+        atol=float_tolerance  # numerical optimizations can cause meaningful numerical error by changing operations
+    )
 
 
 def test_input_weights_python():
