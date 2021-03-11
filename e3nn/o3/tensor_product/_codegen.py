@@ -319,10 +319,27 @@ def codegen_tensor_product(
         try:
             from opt_einsum_fx import optimize_einsums, jitable
 
+            # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
+            # and still get the right path for _all_ batch dimensions.
+            # This is because our einsums are essentially of the form:
+            #    zuvw,ijk,zuvij->zwk    OR     uvw,ijk,zuvij->zwk
+            # In the first case, all but one operands have the batch dimension
+            #    => The first contraction gains the batch dimension
+            #    => All following contractions have batch dimension
+            #    => All possible contraction paths have cost that scales linearly in batch size
+            #    => The optimal path is the same for all batch sizes
+            # For the second case, this logic follows as long as the first contraction is not between the first two operands. Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
+            # https://github.com/dgasmith/opt_einsum/issues/158
+            # for more details.
+            #
+            # TODO: consider the impact maximum intermediate result size on this logic
+            #         \- this is the `memory_limit` option in opt_einsum
+            # TODO: allow user to choose opt_einsum parameters?
+            batchdim = 4
             example_inputs = (
-                irreps_in1.randn(4, -1, dtype=torch.float32),
-                irreps_in2.randn(4, -1, dtype=torch.float32),
-                torch.randn(1 if shared_weights else 4, flat_weight_index, dtype=torch.float32),
+                irreps_in1.randn(batchdim, -1, dtype=torch.float32),
+                irreps_in2.randn(batchdim, -1, dtype=torch.float32),
+                torch.randn(1 if shared_weights else batchdim, flat_weight_index, dtype=torch.float32),
                 torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
 
