@@ -5,7 +5,7 @@ import warnings
 import torch
 
 from e3nn import o3
-from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode
+from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode, _MAKE_TRACING_INPUTS
 from ._argtools import _get_args_in, _get_io_irreps, _transform
 
 
@@ -236,7 +236,8 @@ def assert_auto_jitable(
         )
 
     # Confirm that it rejects incorrect shapes
-    if strict_shapes:
+    # This check only makes sense if all inputs are Tensors with irreps; otherwise we can't know how to modify the arguments or that our modifications make them wrong.
+    if strict_shapes and not hasattr(func, _MAKE_TRACING_INPUTS):
         try:
             all_bad_args = get_tracing_inputs(func, n=1)[0]
         except ValueError:
