@@ -3,7 +3,7 @@ import copy
 
 import pytest
 import torch
-from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps, Instruction
+from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
