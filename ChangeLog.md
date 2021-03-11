@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `in_place` option for `e3nn.util.jit` compilation functions
 
 ### Changed
+- e3nn now requires the latest stable PyTorch, >=1.8.0
 - in `soft_one_hot_linspace` the argument `base` is renamed into `basis`
 - `Irreps.slices()`, do `zip(irreps.slices(), irreps)` to retrieve the old behavior
 - `math.soft_one_hot_linspace` very small change in the normalization of `fourier` basis
