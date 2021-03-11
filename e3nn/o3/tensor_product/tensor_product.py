@@ -241,7 +241,24 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self._optimize_einsums = _optimize_einsums
 
         # Generate the actual tensor product code
-        wigners = self._make_lazy_codegen()
+        code_out, code_right, wigners = codegen_tensor_product(
+            self.irreps_in1,
+            self.in1_var,
+            self.irreps_in2,
+            self.in2_var,
+            self.irreps_out,
+            self.out_var,
+            self.instructions,
+            self.normalization,
+            self.shared_weights,
+            self._specialized_code,
+            self._optimize_einsums
+        )
+
+        self._codegen_register({
+            '_compiled_main_out': code_out,
+            '_compiled_main_right': code_right,
+        })
         self._wigners = wigners
 
         # === Determine weights ===
@@ -293,40 +310,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             f"({self.irreps_in1.simplify()} x {self.irreps_in2.simplify()} "
             f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
-
-    @torch.jit.ignore
-    def _make_lazy_codegen(self, compile: bool = True):
-        code_out, code_right, wigners = codegen_tensor_product(
-            self.irreps_in1,
-            self.in1_var,
-            self.irreps_in2,
-            self.in2_var,
-            self.irreps_out,
-            self.out_var,
-            self.instructions,
-            self.normalization,
-            self.shared_weights,
-            self._specialized_code,
-            self._optimize_einsums
-        )
-
-        self._codegen_register(
-            {
-                '_compiled_main_out': code_out,
-                '_compiled_main_right': code_right,
-            },
-            compile=compile
-        )
-
-        return wigners
-
-    def __setstate__(self, d):
-        # Set the dict with CodeGenMixin
-        super().__setstate__(d)
-        # Rebuild the lazy code generators
-        # We don't compile with the new code generators — CodeGenMixin has already restored whatever exact code was compiled when the object was saved, and we want to preserve that.
-        wigners = self._make_lazy_codegen(compile=False)
-        assert wigners == self._wigners, "The provided saved state is inconsistant or from an incompatible version of e3nn"
 
     @torch.jit.unused
     def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
