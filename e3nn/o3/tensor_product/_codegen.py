@@ -335,6 +335,8 @@ def codegen_tensor_product(
             # TODO: consider the impact maximum intermediate result size on this logic
             #         \- this is the `memory_limit` option in opt_einsum
             # TODO: allow user to choose opt_einsum parameters?
+            #
+            # We use float32 to save memory, since optimize_einsums doesn't look at traced dtypes
             batchdim = 4
             example_inputs = (
                 irreps_in1.randn(batchdim, -1, dtype=torch.float32),
