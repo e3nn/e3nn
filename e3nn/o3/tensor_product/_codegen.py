@@ -38,22 +38,25 @@ def codegen_tensor_product(
     cg_out.script_decorator()  # this is @torch.jit.script
     cg_out(textwrap.dedent(f"""
     def main(x1: torch.Tensor, x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-        {'x1, x2 = torch.broadcast_tensors(x1[..., :, None], x2[..., None, :])' if shared_weights else ''}
-        {'x1, x2, ws = torch.broadcast_tensors(x1[..., :, None, None], x2[..., None, :, None], ws[..., None, None, :])' if not shared_weights else ''}
+        scalar = torch.zeros((), device="cpu")
+        {'size = torch.broadcast_tensors(scalar.expand(x1.shape[:-1]), scalar.expand(x2.shape[:-1]))[0].shape' if shared_weights else ''}
+        {'size = torch.broadcast_tensors(scalar.expand(x1.shape[:-1]), scalar.expand(x2.shape[:-1]), scalar.expand(ws.shape[:-1]))[0].shape' if not shared_weights else ''}
     """))
     cg_out.indent()
 
     cg_right.script_decorator()  # this is @torch.jit.script
     cg_right(textwrap.dedent(f"""
     def main(x2: torch.Tensor, ws: torch.Tensor, w3j: torch.Tensor) -> torch.Tensor:
-        {'x2, ws = torch.broadcast_tensors(x2[..., :, None], ws[..., None, :])' if not shared_weights else ''}
+        scalar = torch.zeros((), device="cpu")
+        {'size = x2.shape[:-1]' if shared_weights else ''}
+        {'size = torch.broadcast_tensors(scalar.expand(x2.shape[:-1]), scalar.expand(ws.shape[:-1]))[0].shape' if not shared_weights else ''}
     """))
     cg_right.indent()
 
     # = Short-circut for zero dimensional =
     if irreps_in1.dim == 0 or irreps_in2.dim == 0 or irreps_out.dim == 0:
-        cg_out(f"return x1.new_zeros(x1.shape[{':-2' if shared_weights else ':-3'}] + ({irreps_out.dim},))")
-        cg_right(f"return x2.new_zeros(x2.shape[{':-1' if shared_weights else ':-2'}] + ({irreps_in1.dim}, {irreps_out.dim},))")
+        cg_out(f"return x1.new_zeros(size + ({irreps_out.dim},))")
+        cg_right(f"return x2.new_zeros(size + ({irreps_in1.dim}, {irreps_out.dim},))")
         # Short circut
         # the empty list is wigners
         return cg_out, cg_right, []
@@ -61,8 +64,8 @@ def codegen_tensor_product(
     # = Broadcast inputs =
     # The if-else block is needed to avoid an internal TorchScript compiler bug related to the early return.
     cg_out(textwrap.dedent(f"""
-        {'x1, x2 = x1[..., :, 0], x2[..., 0, :]' if shared_weights else ''}
-        {'x1, x2, ws = x1[..., :, 0, 0], x2[..., 0, :, 0], ws[..., 0, 0, :]' if not shared_weights else ''}
+        {'x1, x2 = x1.broadcast_to(size + (-1,)), x2.broadcast_to(size + (-1,))' if shared_weights else ''}
+        {'x1, x2, ws = x1.broadcast_to(size + (-1,)), x2.broadcast_to(size + (-1,)), ws.broadcast_to(size + (-1,))' if not shared_weights else ''}
         size = x1.shape[:-1]
         outsize = size + ({irreps_out.dim},)
         assert x1.shape[-1] == {irreps_in1.dim}, "Incorrect feature dimension for x1"
@@ -82,7 +85,7 @@ def codegen_tensor_product(
     # which are bad for autograd.
 
     cg_right(textwrap.dedent(f"""
-        {'x2, ws = x2[..., :, 0], ws[..., 0, :]' if not shared_weights else ''}
+        {'x2, ws = x2.broadcast_to(size + (-1,)), ws.broadcast_to(size + (-1,))' if not shared_weights else ''}
         size = x2.shape[:-1]
         outsize = size + ({irreps_in1.dim}, {irreps_out.dim},)
         assert x2.shape[-1] == {irreps_in2.dim}, "Incorrect feature dimension for x2"
