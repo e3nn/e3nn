@@ -7,7 +7,11 @@ import torch
 from e3nn import o3
 from e3nn.util import explicit_default_types
 
-_Jd, _W3j = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+_Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+# _Jd is a list of tensors of shape (2l+1, 2l+1)
+# _W3j_flat is a flatten version of W3j symbols
+# _W3j_indices is a dict from (l1, l2, l3) -> slice(i, j) to index the flat tensor
+# only l1 <= l2 <= l3 are stored
 
 
 def _z_rot_mat(angle, l):
@@ -75,7 +79,7 @@ def wigner_D(l, alpha, beta, gamma):
     return Xa @ J @ Xb @ J @ Xc
 
 
-def wigner_3j(l1, l2, l3, dtype=None, device=None):
+def wigner_3j(l1, l2, l3, flat_src=_W3j_flat, dtype=None, device=None):
     r"""Wigner 3j symbols :math:`C_{lmn}`.
 
     It satisfies the following two properties:
@@ -116,19 +120,19 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
 
     try:
         if l1 <= l2 <= l3:
-            out = _W3j[(l1, l2, l3)].clone()
+            out = flat_src[_W3j_indices[(l1, l2, l3)]].reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1).clone()
         if l1 <= l3 <= l2:
-            out = _W3j[(l1, l3, l2)].transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = flat_src[_W3j_indices[(l1, l3, l2)]].reshape(2 * l1 + 1, 2 * l3 + 1, 2 * l2 + 1).transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
         if l2 <= l1 <= l3:
-            out = _W3j[(l2, l1, l3)].transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = flat_src[_W3j_indices[(l2, l1, l3)]].reshape(2 * l2 + 1, 2 * l1 + 1, 2 * l3 + 1).transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
         if l3 <= l2 <= l1:
-            out = _W3j[(l3, l2, l1)].transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = flat_src[_W3j_indices[(l3, l2, l1)]].reshape(2 * l3 + 1, 2 * l2 + 1, 2 * l1 + 1).transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
         if l2 <= l3 <= l1:
-            out = _W3j[(l2, l3, l1)].transpose(0, 2).transpose(1, 2).clone()
+            out = flat_src[_W3j_indices[(l2, l3, l1)]].reshape(2 * l2 + 1, 2 * l3 + 1, 2 * l1 + 1).transpose(0, 2).transpose(1, 2).clone()
         if l3 <= l1 <= l2:
-            out = _W3j[(l3, l1, l2)].transpose(0, 2).transpose(0, 1).clone()
+            out = flat_src[_W3j_indices[(l3, l1, l2)]].reshape(2 * l3 + 1, 2 * l1 + 1, 2 * l2 + 1).transpose(0, 2).transpose(0, 1).clone()
     except KeyError:
-        raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j.keys())[0]}, send us an email to ask for more')
+        raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j_indices.keys())[0]}, send us an email to ask for more')
 
     dtype, device = explicit_default_types(dtype, device)
     return out.to(dtype=dtype, device=device)
