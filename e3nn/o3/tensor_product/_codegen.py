@@ -146,6 +146,7 @@ def codegen_tensor_product(
         x2_right = x2_list_right[ins.i_in2]
 
         e1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
+        e2_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
         i1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
 
         assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
@@ -230,16 +231,16 @@ def codegen_tensor_product(
             if ins.has_weight:
                 if specialized_code and key == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}uv,zu,zv->zv", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
-                    ein_right = torch.einsum(f"{z}uv,vw,zv->zuw", w_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                    ein_right = torch.einsum(f"{z}uv,vw,zv->zuw", w_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uv,zu,zvj->zvj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
-                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuwi", w_right, e1_right, x2_right)
+                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuwi", w_right, e2_right, x2_right)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uv,zui,zv->zvi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
-                    ein_right = torch.einsum(f"{z}uv,ij,vw,zv->zuiwj", w_right, i1_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                    ein_right = torch.einsum(f"{z}uv,ij,vw,zv->zuiwj", w_right, i1_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uv,zui,zvi->zv", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
-                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuiw", w_right, e1_right, x2_right) / sqrt(mul_ir_in1.ir.dim)**exp
+                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuiw", w_right, e2_right, x2_right) / sqrt(mul_ir_in1.ir.dim)**exp
                 else:
                     ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w_out, w3j_out, xx)
                     ein_right = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w_right, w3j_right, x2_right)
@@ -321,7 +322,10 @@ def codegen_tensor_product(
     if optimize_einsums:
         try:
             from opt_einsum_fx import optimize_einsums_full, jitable
-
+        except ImportError:
+            # opt_einsum_fx is not installed
+            pass
+        else:
             # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
             # and still get the right path for _all_ batch dimensions.
             # This is because our einsums are essentially of the form:
@@ -350,9 +354,5 @@ def codegen_tensor_product(
 
             graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
             graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
-
-        except ImportError:
-            # opt_einsum_fx is not installed
-            pass
 
     return _get_code(graph_out), _get_code(graph_right), w3j
