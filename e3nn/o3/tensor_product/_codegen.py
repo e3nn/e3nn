@@ -346,9 +346,10 @@ def codegen_tensor_product(
             )
 
             graph_out = jitable(optimize_einsums(graph_out, example_inputs))
-
             graph_right = jitable(optimize_einsums(graph_right, example_inputs[1:]))
-        except:
+
+        except ImportError:
+            # opt_einsum_fx is not installed
             pass
 
     return _get_code(graph_out), _get_code(graph_right), w3j
