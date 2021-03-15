@@ -4,7 +4,7 @@ Euclidean neural networks
 ``e3nn`` is a python library based on pytorch_ to create equivariant neural networks for the group of :math:`O(3)`.
 
 All the functions to manipulate rotations (rotation matrices, Euler angles, quaternions, convertions, ...) can be found here :ref:`Rotation functions`.
-The irreducible representations of :math:`O(3)` are represented by the class `Irrep`.
+The irreducible representations of :math:`O(3)` (more info at :ref:`Irreducible representations`) are represented by the class `Irrep`.
 The direct sum of multiple irrep is described by an object `Irreps`.
 
 If two tensors :math:`x` and :math:`y` transforms as :math:`D_x = 2 \times 1_o` (two vectors) and :math:`D_y = 0_e + 1_e` (a scalar and a pseudovector) respectively, where the indices :math:`e` and :math:`o` stand for even and odd -- the representation of parity,

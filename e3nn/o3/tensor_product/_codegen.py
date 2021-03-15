@@ -52,16 +52,19 @@ def codegen_tensor_product(
     ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor))
     w3js_right = fx.Proxy(graph_right.placeholder('w3j', torch.Tensor))
 
+    empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')))
+    empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')))
     if shared_weights:
-        x1s_out, x2s_out = torch.broadcast_tensors(x1s_out[..., :, None], x2s_out[..., None, :])
+        size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]))[0].shape
+        size_right = x2s_right.shape[:-1]
     else:
-        x1s_out, x2s_out, ws_out = torch.broadcast_tensors(x1s_out[..., :, None, None], x2s_out[..., None, :, None], ws_out[..., None, None, :])
-        x2s_right, ws_right = torch.broadcast_tensors(x2s_right[..., :, None], ws_right[..., None, :])
+        size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]), empty_out.expand(ws_out.shape[:-1]))[0].shape
+        size_right = torch.broadcast_tensors(empty_right.expand(x2s_right.shape[:-1]), empty_right.expand(ws_right.shape[:-1]))[0].shape
 
     # = Short-circut for zero dimensional =
     if irreps_in1.dim == 0 or irreps_in2.dim == 0 or irreps_out.dim == 0:
-        out_out = x1s_out.new_zeros(x1s_out.shape[:-2 if shared_weights else -3] + (irreps_out.dim,))
-        out_right = x2s_right.new_zeros(x2s_right.shape[:-1 if shared_weights else -2] + (irreps_in1.dim, irreps_out.dim,))
+        out_out = x1s_out.new_zeros(size_out + (irreps_out.dim,))
+        out_right = x2s_right.new_zeros(size_right + (irreps_in1.dim, irreps_out.dim,))
 
         graph_out.output(out_out.node, torch.Tensor)
         graph_right.output(out_right.node, torch.Tensor)
@@ -71,13 +74,13 @@ def codegen_tensor_product(
 
     # = Broadcast inputs =
     if shared_weights:
-        x1s_out, x2s_out = x1s_out[..., :, 0], x2s_out[..., 0, :]
+        x1s_out, x2s_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,))
     else:
-        x1s_out, x2s_out, ws_out = x1s_out[..., :, 0, 0], x2s_out[..., 0, :, 0], ws_out[..., 0, 0, :]
-        x2s_right, ws_right = x2s_right[..., :, 0], ws_right[..., 0, :]
+        x1s_out, x2s_out, ws_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,)), ws_out.broadcast_to(size_out + (-1,))
+        x2s_right, ws_right = x2s_right.broadcast_to(size_right + (-1,)), ws_right.broadcast_to(size_right + (-1,))
 
-    outsize_out = x1s_out.shape[:-1] + (irreps_out.dim,)
-    outsize_right = x2s_right.shape[:-1] + (irreps_in1.dim, irreps_out.dim,)
+    outsize_out = size_out + (irreps_out.dim,)
+    outsize_right = size_right + (irreps_in1.dim, irreps_out.dim,)
 
     x1s_out = x1s_out.reshape(-1, irreps_in1.dim)
     x2s_out = x2s_out.reshape(-1, irreps_in2.dim)

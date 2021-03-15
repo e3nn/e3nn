@@ -1,5 +1,37 @@
+.. _Spherical Harmonics:
+
 o3 - Spherical Harmonics
 ========================
+
+The spherical harmonics :math:`Y^l(x)` are functions defined on the sphere :math:`S^2`.
+They form a basis of the space on function on the sphere:
+
+.. math::
+
+    \mathcal{F} = \{ S^2 \longrightarrow \mathbb{R} \}
+
+
+On this space it is nautal how the group :math:`O(3)` acts,
+Given :math:`p_a, p_v` two scalar representations:
+
+.. math::
+
+    [L(g) f](x) = p_v(g) f(p_a(g) R(g)^{-1} x), \quad \forall f \in \mathcal{F}, x \in S^2
+
+:math:`L` is representation of :math:`O(3)`. But :math:`L` is not irreducible.
+It can be decomposed via a change of basis into a sum of irreps,
+
+.. math::
+
+    Y^T L(g) Y = 0 \oplus 1 \oplus 2 \oplus 3 \oplus \dots
+
+where the change of basis are the spherical harmonics!
+
+As a consequence, the spherical harmonics are equivariant,
+
+.. math::
+
+    Y^l(R(g) x) = D^l(g) Y^l(x)
 
 .. jupyter-execute::
     :hide-code:
@@ -74,8 +106,6 @@ o3 - Spherical Harmonics
         traces = [go.Surface(**d, colorscale=cmap_bwr, cmin=-cmax, cmax=cmax) for d in traces]
         fig = go.Figure(data=traces, layout=layout)
         fig.show()
-
-The spherical harmonics :math:`Y^l(x)` are functions defined on the sphere :math:`S^2`.
 
 .. jupyter-execute::
 
