@@ -345,13 +345,9 @@ def codegen_tensor_product(
                 torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
 
-            m = fx.GraphModule(torch.nn.Module(), graph_out)
-            m = jitable(optimize_einsums(m, example_inputs))
-            graph_out = m.graph
+            graph_out = jitable(optimize_einsums(graph_out, example_inputs))
 
-            m = fx.GraphModule(torch.nn.Module(), graph_right)
-            m = jitable(optimize_einsums(m, example_inputs[1:]))
-            graph_right = m.graph
+            graph_right = jitable(optimize_einsums(graph_right, example_inputs[1:]))
         except:
             pass
 
