@@ -320,7 +320,7 @@ def codegen_tensor_product(
 
     if optimize_einsums:
         try:
-            from opt_einsum_fx import optimize_einsums, jitable
+            from opt_einsum_fx import optimize_einsums_full, jitable
 
             # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
             # and still get the right path for _all_ batch dimensions.
@@ -338,6 +338,8 @@ def codegen_tensor_product(
             # TODO: consider the impact maximum intermediate result size on this logic
             #         \- this is the `memory_limit` option in opt_einsum
             # TODO: allow user to choose opt_einsum parameters?
+            #
+            # We use float32 to save memory, since optimize_einsums doesn't look at traced dtypes
             batchdim = 4
             example_inputs = (
                 irreps_in1.randn(batchdim, -1, dtype=torch.float32),
@@ -346,14 +348,11 @@ def codegen_tensor_product(
                 torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
 
-            m = fx.GraphModule(torch.nn.Module(), graph_out)
-            m = jitable(optimize_einsums(m, example_inputs))
-            graph_out = m.graph
+            graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+            graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
 
-            m = fx.GraphModule(torch.nn.Module(), graph_right)
-            m = jitable(optimize_einsums(m, example_inputs[1:]))
-            graph_right = m.graph
-        except:
+        except ImportError:
+            # opt_einsum_fx is not installed
             pass
 
     return _get_code(graph_out), _get_code(graph_right), w3j
