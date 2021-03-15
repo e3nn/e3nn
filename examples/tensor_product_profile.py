@@ -3,7 +3,6 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 import torch
-from torch.utils.benchmark import Timer
 
 from e3nn.o3 import Irreps, FullyConnectedTensorProduct
 from e3nn.util.jit import compile
@@ -87,7 +86,7 @@ def main():
             warmup=args.w,
             active=args.n),
         on_trace_ready=trace_handler
-        ) as p:
+    ) as p:
         for _ in range(1 + args.w + args.n):
             out = tp(*next(inputs))
             if args.backward:
