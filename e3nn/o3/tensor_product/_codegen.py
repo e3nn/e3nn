@@ -317,7 +317,7 @@ def codegen_tensor_product(
 
     if optimize_einsums:
         try:
-            from opt_einsum_fx import optimize_einsums, jitable
+            from opt_einsum_fx import optimize_einsums_full, jitable
 
             # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
             # and still get the right path for _all_ batch dimensions.
@@ -345,8 +345,8 @@ def codegen_tensor_product(
                 torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
 
-            graph_out = jitable(optimize_einsums(graph_out, example_inputs))
-            graph_right = jitable(optimize_einsums(graph_right, example_inputs[1:]))
+            graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+            graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
 
         except ImportError:
             # opt_einsum_fx is not installed
