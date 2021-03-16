@@ -28,22 +28,26 @@ class SphericalHarmonics(torch.nn.Module):
 
     def __init__(
         self,
-        l: Union[int, List[int], Irreps],
+        irreps_out: Union[int, List[int], Irreps],
         normalize: bool,
         normalization='integral'
     ):
         super().__init__()
-        self.l = l
         self.normalize = normalize
         self.normalization = normalization
         assert normalization in ['integral', 'component', 'norm']
 
-        if isinstance(l, Irreps):
-            ls = [l for mul, (l, p) in l for _ in range(mul)]
-        elif isinstance(l, int):
-            ls = [l]
+        if isinstance(irreps_out, Irreps):
+            ls = [l for mul, (l, p) in irreps_out for _ in range(mul)]
+        elif isinstance(irreps_out, int):
+            ls = [irreps_out]
+            irreps_out = Irreps([(1, (irreps_out, 1))])
         else:
-            ls = list(l)
+            ls = list(irreps_out)
+            irreps_out = Irreps([(1, (l, 1)) for l in ls])
+        self.irreps_out = irreps_out
+        self.irreps_in = Irreps("1x1o")
+
         self._ls_list = ls
         self._lmax = max(ls)
         self._is_range_lmax = ls == list(range(max(ls) + 1))
