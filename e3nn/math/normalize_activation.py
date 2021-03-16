@@ -18,6 +18,8 @@ def moment(f, n, dtype=None, device=None):
 
 @compile_mode('trace')
 class normalize2mom(torch.nn.Module):
+    _is_id: bool
+
     def __init__(self, f, dtype=None, device=None):
         super().__init__()
 
