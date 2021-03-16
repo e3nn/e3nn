@@ -3,7 +3,6 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 import torch
-from torch.utils.benchmark import Timer
 
 from e3nn.o3 import Irreps, FullyConnectedTensorProduct
 from e3nn.util.jit import compile
@@ -25,14 +24,15 @@ def main():
         prog="tensor_product_benchmark"
     )
     parser.add_argument("--jit", type=t_or_f, default=True)
-    parser.add_argument("--irreps-in1", type=str, default="8x1e + 8x2e + 8x3o")
-    parser.add_argument("--irreps-in2", type=str, default="8x1e + 8x2e + 8x3o")
-    parser.add_argument("--irreps-out", type=str, default="8x1e + 8x2e + 8x3o")
+    parser.add_argument("--irreps-in1", type=str, default="8x0e + 8x1e + 8x2e + 8x3e")
+    parser.add_argument("--irreps-in2", type=str, default="8x0e + 8x1e + 8x2e + 8x3e")
+    parser.add_argument("--irreps-out", type=str, default="8x0e + 8x1e + 8x2e + 8x3e")
     parser.add_argument("--cuda", type=t_or_f, default=True)
     parser.add_argument("--backward", type=t_or_f, default=True)
     parser.add_argument("--opt-ein", type=t_or_f, default=True)
     parser.add_argument("--specialized-code", type=t_or_f, default=True)
-    parser.add_argument("-n", type=int, default=1000)
+    parser.add_argument("-w", type=int, default=10)
+    parser.add_argument("-n", type=int, default=3)
     parser.add_argument("--batch", type=int, default=10)
 
     args = parser.parse_args()
@@ -57,15 +57,12 @@ def main():
     )
     tp = tp.to(device=device)
 
-    # from https://pytorch.org/docs/master/_modules/torch/utils/benchmark/utils/timer.html#Timer.timeit
-    warmup = max(int(args.n // 100), 1)
-
     inputs = iter([
         (
             irreps_in1.randn(args.batch, -1).to(device=device),
             irreps_in2.randn(args.batch, -1).to(device=device)
         )
-        for _ in range(args.n + warmup)
+        for _ in range(1 + args.w + args.n)
     ])
 
     # compile
@@ -74,18 +71,27 @@ def main():
 
     print("starting...")
 
-    t = Timer(
-        stmt=(
-            "tp.zero_grad()\n"
-            "out = tp(*next(inputs))\n" + ("out.sum().backward()\n" if args.backward else '')
-        ),
-        globals={'tp': tp, 'inputs': inputs}
-    )
+    called_num = [0]
+    def trace_handler(p):
+        print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
+        p.export_chrome_trace("test_trace_" + str(called_num[0]) + ".json")
+        called_num[0] += 1
 
-    perloop = t.timeit(args.n)
-
-    print()
-    print(perloop)
+    with torch.profiler.profile(
+        activities=[
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.CUDA],
+        schedule=torch.profiler.schedule(
+            wait=1,
+            warmup=args.w,
+            active=args.n),
+        on_trace_ready=trace_handler
+    ) as p:
+        for _ in range(1 + args.w + args.n):
+            out = tp(*next(inputs))
+            if args.backward:
+                out.sum().backward()
+            p.step()
 
 
 if __name__ == '__main__':

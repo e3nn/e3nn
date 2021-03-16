@@ -156,6 +156,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     in1_var: List[float]
     in2_var: List[float]
     out_var: List[float]
+    _in1_dim: int
+    _in2_dim: int
 
     def __init__(
         self,
@@ -163,10 +165,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         in2,
         out,
         instructions,
-        normalization='component',
+        normalization: str = 'component',
         internal_weights=None,
         shared_weights=None,
-        _specialized_code=True,
+        _specialized_code: bool = True,
+        _optimize_einsums: bool = True
     ):
         # === Setup ===
         super().__init__()
@@ -209,6 +212,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.irreps_in2 = o3.Irreps([(mul, ir) for mul, ir, _var in in2])
         self.irreps_out = o3.Irreps([(mul, ir) for mul, ir, _var in out])
 
+        self._in1_dim = self.irreps_in1.dim
+        self._in2_dim = self.irreps_in2.dim
+
         self.in1_var = [var for _, _, var in in1]
         self.in2_var = [var for _, _, var in in2]
         self.out_var = [var for _, _, var in out]
@@ -232,10 +238,27 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.instructions = instructions
 
         self._specialized_code = _specialized_code
-        self.optimal_batch_size = None
+        self._optimize_einsums = _optimize_einsums
 
         # Generate the actual tensor product code
-        wigners = self._make_lazy_codegen()
+        code_out, code_right, wigners = codegen_tensor_product(
+            self.irreps_in1,
+            self.in1_var,
+            self.irreps_in2,
+            self.in2_var,
+            self.irreps_out,
+            self.out_var,
+            self.instructions,
+            self.normalization,
+            self.shared_weights,
+            self._specialized_code,
+            self._optimize_einsums
+        )
+
+        self._codegen_register({
+            '_compiled_main_out': code_out,
+            '_compiled_main_right': code_right,
+        })
         self._wigners = wigners
 
         # === Determine weights ===
@@ -288,39 +311,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
 
-    @torch.jit.ignore
-    def _make_lazy_codegen(self, compile: bool = True):
-        lazygen_out, lazygen_right, wigners = codegen_tensor_product(
-            self.irreps_in1,
-            self.in1_var,
-            self.irreps_in2,
-            self.in2_var,
-            self.irreps_out,
-            self.out_var,
-            self.instructions,
-            self.normalization,
-            self.shared_weights,
-            self._specialized_code,
-        )
-
-        self._codegen_register(
-            {
-                '_compiled_main_out': lazygen_out,
-                '_compiled_main_right': lazygen_right,
-            },
-            compile=compile
-        )
-
-        return wigners
-
-    def __setstate__(self, d):
-        # Set the dict with CodeGenMixin
-        super().__setstate__(d)
-        # Rebuild the lazy code generators
-        # We don't compile with the new code generators — CodeGenMixin has already restored whatever exact code was compiled when the object was saved, and we want to preserve that.
-        wigners = self._make_lazy_codegen(compile=False)
-        assert wigners == self._wigners, "The provided saved state is inconsistant or from an incompatible version of e3nn"
-
     @torch.jit.unused
     def _prep_weights_python(self, weight: Optional[Union[torch.Tensor, List[torch.Tensor]]]) -> Optional[torch.Tensor]:
         if isinstance(weight, list):
@@ -351,14 +341,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             return weight
 
     @torch.jit.export
-    def right(self, features_2, weight: Optional[torch.Tensor] = None):
+    def right(self, x2, weight: Optional[torch.Tensor] = None):
         r"""evaluate partially :math:`w x \cdot \otimes y`
 
         It returns an operator in the form of a matrix.
 
         Parameters
         ----------
-        features_2 : `torch.Tensor`
+        x2 : `torch.Tensor`
             tensor of shape ``(..., irreps_in2.dim)``
 
         weight : `torch.Tensor` or list of `torch.Tensor`, optional
@@ -373,19 +363,21 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
+        assert x2.shape[-1] == self._in2_dim, "Incorrect last dimension for x2"
+
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_right(features_2, real_weight, self._wigner_buf)
+            return self._compiled_main_right(x2, real_weight, self._wigner_buf)
 
-    def forward(self, features_1, features_2, weight: Optional[torch.Tensor] = None):
+    def forward(self, x1, x2, weight: Optional[torch.Tensor] = None):
         r"""evaluate :math:`w x \otimes y`
 
         Parameters
         ----------
-        features_1 : `torch.Tensor`
+        x1 : `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim)``
 
-        features_2 : `torch.Tensor`
+        x2 : `torch.Tensor`
             tensor of shape ``(..., irreps_in2.dim)``
 
         weight : `torch.Tensor` or list of `torch.Tensor`, optional
@@ -400,9 +392,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
+        assert x1.shape[-1] == self._in1_dim, "Incorrect last dimension for x1"
+        assert x2.shape[-1] == self._in2_dim, "Incorrect last dimension for x2"
+
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_out(features_1, features_2, real_weight, self._wigner_buf)
+            return self._compiled_main_out(x1, x2, real_weight, self._wigner_buf)
 
     def visualize(self):  # pragma: no cover
         import numpy as np
@@ -528,15 +523,12 @@ class FullyConnectedTensorProduct(TensorProduct):
         see `TensorProduct`
     """
     def __init__(
-            self,
-            irreps_in1,
-            irreps_in2,
-            irreps_out,
-            normalization='component',
-            internal_weights=None,
-            shared_weights=None,
-            _specialized_code=True,
-                ):
+        self,
+        irreps_in1,
+        irreps_in2,
+        irreps_out,
+        **kwargs
+    ):
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         irreps_out = o3.Irreps(irreps_out).simplify()
@@ -548,7 +540,7 @@ class FullyConnectedTensorProduct(TensorProduct):
             for i_out, (_, ir_out) in enumerate(irreps_out)
             if ir_out in ir_1 * ir_2
         ]
-        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, normalization, internal_weights, shared_weights, _specialized_code)
+        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, **kwargs)
 
 
 class ElementwiseTensorProduct(TensorProduct):
@@ -575,12 +567,12 @@ class ElementwiseTensorProduct(TensorProduct):
         see `TensorProduct`
     """
     def __init__(
-            self,
-            irreps_in1,
-            irreps_in2,
-            filter_ir_out=None,
-            normalization='component',
-                ):
+        self,
+        irreps_in1,
+        irreps_in2,
+        filter_ir_out=None,
+        **kwargs
+    ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -621,7 +613,8 @@ class ElementwiseTensorProduct(TensorProduct):
                     (i, i, i_out, 'uuu', False)
                 ]
 
-        super().__init__(irreps_in1, irreps_in2, out, instr, normalization, internal_weights=False)
+        kwargs['internal_weights'] = False
+        super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)
 
 
 class FullTensorProduct(TensorProduct):
@@ -648,12 +641,12 @@ class FullTensorProduct(TensorProduct):
         see `TensorProduct`
     """
     def __init__(
-            self,
-            irreps_in1,
-            irreps_in2,
-            filter_ir_out=None,
-            normalization='component',
-                ):
+        self,
+        irreps_in1,
+        irreps_in2,
+        filter_ir_out=None,
+        **kwargs
+    ):
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -683,4 +676,5 @@ class FullTensorProduct(TensorProduct):
             for i_1, i_2, i_out, mode, train in instr
         ]
 
-        super().__init__(irreps_in1, irreps_in2, out, instr, normalization, internal_weights=False)
+        kwargs['internal_weights'] = False
+        super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)

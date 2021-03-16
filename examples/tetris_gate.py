@@ -157,3 +157,40 @@ def test():
     rotated_data, _ = tetris()
     error = f(rotated_data) - f(data)
     assert error.abs().max() < 1e-10
+
+
+def profile():
+    data, labels = tetris()
+    data = data.to(device='cuda')
+    labels = labels.to(device='cuda')
+
+    f = Network()
+    f.to(device='cuda')
+
+    optim = torch.optim.Adam(f.parameters(), lr=1e-2)
+
+    called_num = [0]
+    def trace_handler(p):
+        print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
+        p.export_chrome_trace("test_trace_" + str(called_num[0]) + ".json")
+        called_num[0] += 1
+
+    with torch.profiler.profile(
+        activities=[
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.CUDA],
+        schedule=torch.profiler.schedule(
+            wait=50,
+            warmup=1,
+            active=1),
+        on_trace_ready=trace_handler
+    ) as p:
+        for _ in range(52):
+            pred = f(data)
+            loss = (pred - labels).pow(2).sum()
+
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
+
+            p.step()
