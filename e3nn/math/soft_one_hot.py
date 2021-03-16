@@ -1,6 +1,8 @@
 import math
 import torch
 
+from .soft_heaviside import soft_unit_step
+
 
 def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True):
     r"""Projection on a basis of functions
@@ -62,6 +64,10 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
 
     .. jupyter-execute::
 
+        plt.plot(x, soft_one_hot_linspace(x, -0.5, 1.5, 3, 'smooth_finite', endpoint=False));
+
+    .. jupyter-execute::
+
         plt.plot(x, soft_one_hot_linspace(x, -0.5, 1.5, 3, 'cosine', endpoint=True));
 
     .. jupyter-execute::
@@ -78,7 +84,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
 
     .. jupyter-execute::
 
-        for basis in ['gaussian', 'cosine', 'fourier']:
+        for basis in ['gaussian', 'cosine', 'fourier', 'smooth_finite']:
             for endpoint in [False, True]:
                 y = soft_one_hot_linspace(x, -0.5, 1.5, 4, basis, endpoint)
                 plt.plot(x, y.pow(2).sum(1), label=f"{basis} {'endpoint' if endpoint else ''}")
@@ -92,13 +98,16 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         step = values[1] - values[0]
         values = values[1:-1]
 
-    diff = x[..., None] - values
+    diff = (x[..., None] - values) / step
 
     if basis == 'gaussian':
-        return diff.div(step).pow(2).neg().exp().div(1.12)
+        return diff.pow(2).neg().exp().div(1.12)
 
     if basis == 'cosine':
-        return torch.cos(math.pi/2 * diff / step) * (diff < step) * (-step < diff)
+        return torch.cos(math.pi/2 * diff) * (diff < 1) * (-1 < diff)
+
+    if basis == 'smooth_finite':
+        return 1.14136 * torch.exp(torch.tensor(2.0)) * soft_unit_step(diff + 1) * soft_unit_step(1 - diff)
 
     if basis == 'fourier':
         x = (x[..., None] - start) / (end - start)
