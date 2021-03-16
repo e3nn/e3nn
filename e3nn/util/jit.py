@@ -1,3 +1,4 @@
+from typing import Optional
 import warnings
 import inspect
 import copy
@@ -52,7 +53,7 @@ def compile(
     n_trace_checks: int = 1,
     script_options: dict = {},
     trace_options: dict = {},
-    in_place: bool = True
+    in_place: bool = True,
 ):
     """Recursively compile a module and all submodules according to their decorators.
 
@@ -92,7 +93,7 @@ def compile(
                 n_trace_checks=n_trace_checks,
                 script_options=script_options,
                 trace_options=trace_options,
-                in_place=True  # since we deepcopied the module above, we can do inplace
+                in_place=True,  # since we deepcopied the module above, we can do inplace
             )
         )
     # == Compile this module now ==
@@ -101,7 +102,10 @@ def compile(
     elif mode == 'trace':
         # These are always modules, so we're always using trace_module
         # We need tracing inputs:
-        check_inputs = get_tracing_inputs(mod, n_trace_checks)
+        check_inputs = get_tracing_inputs(
+            mod,
+            n_trace_checks,
+        )
         assert len(check_inputs) >= 1, "Must have at least one tracing input."
         # Do the actual trace
         mod = torch.jit.trace_module(
@@ -113,7 +117,11 @@ def compile(
     return mod
 
 
-def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
+def get_tracing_inputs(
+    mod: torch.nn.Module,
+    n: int = 1,
+    device: Optional[torch.device] =  None
+):
     """Get random tracing inputs for ``mod``.
 
     First checks if ``mod`` has a ``_make_tracing_inputs`` method. If so, calls it with ``n`` as the single argument and returns its results.
@@ -125,6 +133,8 @@ def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
         mod : torch.nn.Module
         n : int, default = 1
             A hint for how many inputs are wanted. Usually n will be returned, but modules don't necessarily have to.
+        device : torch.device
+            The device to do tracing on.
 
     Returns
     -------
@@ -149,7 +159,8 @@ def get_tracing_inputs(mod: torch.nn.Module, n: int = 1):
         )
         trace_inputs = [{'forward': _rand_args(irreps_in)} for _ in range(n)]
     # - Put them on the right device -
-    device = _get_device(mod)
+    if device is None:
+        device = _get_device(mod)
     # Move them
     trace_inputs = _to_device(trace_inputs, device)
     return trace_inputs
