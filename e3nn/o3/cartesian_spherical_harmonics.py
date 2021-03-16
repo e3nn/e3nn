@@ -25,7 +25,7 @@ class SphericalHarmonics(torch.nn.Module):
     _lmax: int
     _is_range_lmax: bool
     _prof_str: str
-    
+
     def __init__(
         self,
         l: Union[int, List[int], Irreps],
@@ -48,7 +48,7 @@ class SphericalHarmonics(torch.nn.Module):
         self._lmax = max(ls)
         self._is_range_lmax = ls == list(range(max(ls) + 1))
         self._prof_str = f'spherical_harmonics({ls})'
-        
+
         _lmax = 11
         if self._lmax > _lmax:
             raise NotImplementedError(f'spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more')
