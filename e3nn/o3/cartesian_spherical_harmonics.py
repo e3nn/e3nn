@@ -13,12 +13,19 @@ from .irreps import Irreps
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('trace')
+@compile_mode('script')
 class SphericalHarmonics(torch.nn.Module):
     """JITable module version of ``e3nn.o3.spherical_harmonics``.
 
     Parameters are idential to ``e3nn.o3.spherical_harmonics``.
     """
+    normalize: bool
+    normalization: str
+    _ls_list: List[int]
+    _lmax: int
+    _is_range_lmax: bool
+    _prof_str: str
+    
     def __init__(
         self,
         l: Union[int, List[int], Irreps],
@@ -29,19 +36,49 @@ class SphericalHarmonics(torch.nn.Module):
         self.l = l
         self.normalize = normalize
         self.normalization = normalization
+        assert normalization in ['integral', 'component', 'norm']
+
+        if isinstance(l, Irreps):
+            ls = [l for mul, (l, p) in l for _ in range(mul)]
+        elif isinstance(l, int):
+            ls = [l]
+        else:
+            ls = list(l)
+        self._ls_list = ls
+        self._lmax = max(ls)
+        self._is_range_lmax = ls == list(range(max(ls) + 1))
+        self._prof_str = f'spherical_harmonics({ls})'
+        
+        _lmax = 11
+        if self._lmax > _lmax:
+            raise NotImplementedError(f'spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more')
 
     def forward(self, xyz: torch.Tensor) -> torch.Tensor:
-        return spherical_harmonics(
-            self.l,
-            xyz,
-            self.normalize,
-            self.normalization
-        )
+        with torch.autograd.profiler.record_function(self._prof_str):
+            if self.normalize:
+                xyz = torch.nn.functional.normalize(xyz, dim=-1)  # forward 0's instead of nan for zero-radius
 
-    def _make_tracing_inputs(self, n: int):
-        return [{
-            'forward': (torch.ones(2, 3),)
-        }]
+            x, y, z = xyz[..., 0], xyz[..., 1], xyz[..., 2]
+            sh = _spherical_harmonics(self._lmax, x, y, z)
+
+            if not self._is_range_lmax:
+                sh = torch.cat([
+                    sh[..., l*l:(l+1)*(l+1)]
+                    for l in self._ls_list
+                ], dim=-1)
+
+            if self.normalization == 'integral':
+                sh.mul_(torch.cat([
+                    (math.sqrt(2 * l + 1) / math.sqrt(4 * math.pi)) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
+                    for l in self._ls_list
+                ]))
+            elif self.normalization == 'component':
+                sh.mul_(torch.cat([
+                    math.sqrt(2 * l + 1) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
+                    for l in self._ls_list
+                ]))
+
+            return sh
 
 
 def spherical_harmonics(
@@ -116,38 +153,8 @@ def spherical_harmonics(
     wigner_3j
 
     """
-    if isinstance(l, Irreps):
-        ls = [l for mul, (l, p) in l for _ in range(mul)]
-    elif isinstance(l, int):
-        ls = [l]
-    else:
-        ls = list(l)
-
-    _lmax = 11
-    if max(ls) > _lmax:
-        raise NotImplementedError(f'spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more')
-
-    assert normalization in ['integral', 'component', 'norm']
-
-    with torch.autograd.profiler.record_function(f'spherical_harmonics({ls})'):
-        if normalize:
-            xyz = torch.nn.functional.normalize(xyz, dim=-1)  # forward 0's instead of nan for zero-radius
-
-        x, y, z = xyz[..., 0], xyz[..., 1], xyz[..., 2]
-        sh = _spherical_harmonics(max(ls), x, y, z)
-
-        if not ls == list(range(max(ls) + 1)):
-            sh = torch.cat([
-                sh[..., l**2:(l+1)**2]
-                for l in ls
-            ], dim=-1)
-
-        if normalization == 'integral':
-            sh.mul_(torch.cat([math.sqrt(2 * l + 1) * sh.new_ones(2 * l + 1) / math.sqrt(4 * math.pi) for l in ls]))
-        if normalization == 'component':
-            sh.mul_(torch.cat([math.sqrt(2 * l + 1) * sh.new_ones(2 * l + 1) for l in ls]))
-
-        return sh
+    sh = SphericalHarmonics(l, normalize, normalization)
+    return sh(xyz)
 
 
 @torch.jit.script
