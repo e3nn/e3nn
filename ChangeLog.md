@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `math.soft_unit_step` function
 - `nn.model.v2103` generic message passing model + examples of networks using it.
 - `o3.TensorProduct`: is jit scriptable
 - `o3.TensorProduct`: also broadcast the `weight` argument
