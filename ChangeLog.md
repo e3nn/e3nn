@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `nn.Gate` was crashing when the number of scalars or gates was zero
+- `device` edge cases for `Gate` and `SphericalHarmonics`
 
 ## [0.2.3] - 2021-02-23
 ### Added
