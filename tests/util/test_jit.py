@@ -117,3 +117,18 @@ def test_equivariant():
     mod = Linear(irreps_in, irreps_out)
     mod_script = compile(mod)
     assert_equivariant(mod_script)
+
+
+def test_unsupported():
+    @compile_mode('unsupported')
+    class ChildMod(torch.nn.Module):
+        pass
+
+    class Supermod(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.child = ChildMod()
+
+    mod = Supermod()
+    with pytest.raises(NotImplementedError):
+        mod = script(mod)
