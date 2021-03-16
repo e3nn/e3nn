@@ -64,7 +64,7 @@ class Activation(torch.nn.Module):
 
         self.irreps_in = irreps_in.simplify()
         self.irreps_out = o3.Irreps(irreps_out).simplify()
-        self.acts = acts
+        self.acts = torch.nn.ModuleList(acts)
 
     def forward(self, features, dim=-1):
         '''evaluate
