@@ -37,14 +37,15 @@ class Activation(torch.nn.Module):
         # normalize the second moment
         acts = [normalize2mom(act) if act is not None else None for act in acts]
 
+        from e3nn.util._argtools import _get_device
+
         irreps_out = []
         for (mul, (l_in, p_in)), act in zip(irreps_in, acts):
             if act is not None:
                 if l_in != 0:
                     raise ValueError("Activation: cannot apply an activation function to a non-scalar input.")
 
-                # act is a normalize2mom, so it has dtype and device
-                x = torch.linspace(0, 10, 256, dtype=act.cst.dtype, device=act.cst.device)
+                x = torch.linspace(0, 10, 256, device=_get_device(act))
 
                 a1, a2 = act(x), act(-x)
                 if (a1 - a2).abs().max() < 1e-5:
