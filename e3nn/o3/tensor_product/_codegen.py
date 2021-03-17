@@ -357,6 +357,7 @@ def codegen_tensor_product(
                 torch.randn(1 if shared_weights else batchdim, flat_weight_index, dtype=torch.float32),
                 torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
+
             graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
             graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
 
