@@ -42,7 +42,7 @@ class SphericalHarmonics(torch.nn.Module):
         if irreps_in not in (Irreps("1x1o"), Irreps("1x1e")):
             raise ValueError(f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a psuedovector (`1x1e`), not `{irreps_in}`")
         self.irreps_in = irreps_in
-        input_p = irreps_in[0][1][1]
+        input_p = irreps_in[0].ir.p
 
         if isinstance(irreps_out, str):
             irreps_out = Irreps(irreps_out)
