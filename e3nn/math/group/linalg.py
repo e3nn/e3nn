@@ -1,7 +1,7 @@
 import warnings
 
 import torch
-from e3nn.math import complete_basis, direct_sum, kron
+from e3nn.math import complete_basis, direct_sum
 from e3nn.math.group import Group
 
 
@@ -11,15 +11,15 @@ def intertwiners(group: Group, D1, D2, eps=1e-9, dtype=torch.float64, device=Non
     D1(g) A = A D2(g) for all g in O(3)
     """
     e = group.identity(dtype=dtype, device=device)
-    I1 = D1(e)
-    I2 = D2(e)
+    I1 = D1(e).contiguous()
+    I2 = D2(e).contiguous()
 
     if I1.dtype in [torch.float16, torch.float32]:
         warnings.warn("Warning: intertwiners: you should use torch.float64")
 
     # picking 20 random rotations seems good enough, no idea for the finite groups
     rr = [group.random(dtype=dtype, device=device) for i in range(20)]
-    xs = [kron(D1(g), I2) - kron(I1, D2(g).T) for g in rr]
+    xs = [torch.kron(D1(g).contiguous(), I2) - torch.kron(I1, D2(g).T.contiguous()) for g in rr]
     xtx = sum(x.T @ x for x in xs)
 
     res = xtx.symeig(eigenvectors=True)

@@ -6,6 +6,7 @@ import torch
 
 
 _E3NN_COMPILE_MODE = "__e3nn_compile_mode__"
+_VALID_MODES = ('trace', 'script', 'unsupported', None)
 _MAKE_TRACING_INPUTS = '_make_tracing_inputs'
 
 
@@ -17,7 +18,7 @@ def compile_mode(mode: str):
         mode : str
             'script', 'trace', or None
     """
-    if mode not in ['trace', 'script', None]:
+    if mode not in _VALID_MODES:
         raise ValueError("Invalid compile mode")
     def decorator(obj):
         if not (inspect.isclass(obj) and issubclass(obj, torch.nn.Module)):
@@ -42,7 +43,7 @@ def get_compile_mode(mod: torch.nn.Module) -> str:
         mode = getattr(mod, _E3NN_COMPILE_MODE)
     else:
         mode = getattr(type(mod), _E3NN_COMPILE_MODE, None)
-    assert mode in ['script', 'trace', None], "Invalid compile mode `%r`" % mode
+    assert mode in _VALID_MODES, "Invalid compile mode `%r`" % mode
     return mode
 
 
@@ -72,6 +73,10 @@ def compile(
     -------
     Returns the compiled module.
     """
+    mode = get_compile_mode(mod)
+    if mode == 'unsupported':
+        raise NotImplementedError(f"{type(mod).__name__} does not support TorchScript compilation")
+
     if not in_place:
         mod = copy.deepcopy(mod)
     # TODO: debug logging
@@ -91,8 +96,6 @@ def compile(
             )
         )
     # == Compile this module now ==
-    mode = get_compile_mode(mod)
-
     if mode == 'script':
         mod = torch.jit.script(mod, **script_options)
     elif mode == 'trace':
