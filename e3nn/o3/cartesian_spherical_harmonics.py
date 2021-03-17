@@ -1,6 +1,6 @@
 r"""Spherical Harmonics as polynomials of x, y, z
 """
-from typing import Union, List
+from typing import Union, List, Any
 
 import math
 
@@ -28,26 +28,37 @@ class SphericalHarmonics(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_out: Union[int, List[int], Irreps],
+        irreps_out: Union[int, List[int], str, Irreps],
         normalize: bool,
-        normalization='integral'
+        normalization: str = 'integral',
+        irreps_in: Any = Irreps("1x1o"),
     ):
         super().__init__()
         self.normalize = normalize
         self.normalization = normalization
         assert normalization in ['integral', 'component', 'norm']
 
+        irreps_in = Irreps(irreps_in)
+        if irreps_in not in (Irreps("1x1o"), Irreps("1x1e")):
+            raise ValueError(f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a psuedovector (`1x1e`), not `{irreps_in}`")
+        self.irreps_in = irreps_in
+        input_p = irreps_in[0][1][1]
+
+        if isinstance(irreps_out, str):
+            irreps_out = Irreps(irreps_out)
         if isinstance(irreps_out, Irreps):
-            ls = [l for mul, (l, p) in irreps_out for _ in range(mul)]
+            ls = []
+            for mul, (l, p) in irreps_out:
+                if p != input_p**l:
+                    raise ValueError(f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity p = {p}, which is inconsistant with the input parity {input_p} — the output parity should have been p = {input_p**l}")
+                ls.extend([l]*mul)
         elif isinstance(irreps_out, int):
             ls = [irreps_out]
-            irreps_out = Irreps([(1, (irreps_out, 1))])
         else:
             ls = list(irreps_out)
-            irreps_out = Irreps([(1, (l, 1)) for l in ls])
-        self.irreps_out = irreps_out
-        self.irreps_in = Irreps("1x1o")
 
+        irreps_out = Irreps([(1, (l, input_p**l)) for l in ls]).simplify()
+        self.irreps_out = irreps_out
         self._ls_list = ls
         self._lmax = max(ls)
         self._is_range_lmax = ls == list(range(max(ls) + 1))
@@ -86,10 +97,10 @@ class SphericalHarmonics(torch.nn.Module):
 
 
 def spherical_harmonics(
-    l: Union[int, List[int], Irreps],
+    l: Union[int, List[int], str, Irreps],
     xyz: torch.Tensor,
     normalize: bool,
-    normalization='integral'
+    normalization: str = 'integral'
 ):
     r"""Spherical harmonics
 
