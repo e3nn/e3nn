@@ -319,6 +319,12 @@ def codegen_tensor_product(
     graph_out.output(out_out.node, torch.Tensor)
     graph_right.output(out_right.node, torch.Tensor)
 
+    # check graphs
+    graph_out.lint()
+    graph_right.lint()
+
+    # TODO: when eliminate_dead_code() is in PyTorch stable, use that
+
     if optimize_einsums:
         try:
             from opt_einsum_fx import optimize_einsums_full, jitable

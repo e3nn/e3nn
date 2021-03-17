@@ -25,9 +25,10 @@ def main():
         prog="tensor_product_benchmark"
     )
     parser.add_argument("--jit", type=t_or_f, default=True)
-    parser.add_argument("--irreps-in1", type=str, default="8x1e + 8x2e + 8x3o")
-    parser.add_argument("--irreps-in2", type=str, default="8x1e + 8x2e + 8x3o")
-    parser.add_argument("--irreps-out", type=str, default="8x1e + 8x2e + 8x3o")
+    parser.add_argument("--irreps", type=str, default="8x0e + 8x1e + 8x2e + 8x3o")
+    parser.add_argument("--irreps-in1", type=str, default=None)
+    parser.add_argument("--irreps-in2", type=str, default=None)
+    parser.add_argument("--irreps-out", type=str, default=None)
     parser.add_argument("--cuda", type=t_or_f, default=True)
     parser.add_argument("--backward", type=t_or_f, default=True)
     parser.add_argument("--opt-ein", type=t_or_f, default=True)
@@ -45,9 +46,9 @@ def main():
         print(f"{key:>18} : {val}")
     print("="*40)
 
-    irreps_in1 = Irreps(args.irreps_in1)
-    irreps_in2 = Irreps(args.irreps_in2)
-    irreps_out = Irreps(args.irreps_out)
+    irreps_in1 = Irreps(args.irreps_in1 if args.irreps_in1 else args.irreps)
+    irreps_in2 = Irreps(args.irreps_in2 if args.irreps_in2 else args.irreps)
+    irreps_out = Irreps(args.irreps_out if args.irreps_out else args.irreps)
     tp = FullyConnectedTensorProduct(
         irreps_in1,
         irreps_in2,
