@@ -3,11 +3,41 @@ import math
 import pytest
 import torch
 from e3nn import o3
-from e3nn.util.test import assert_auto_jitable
+from e3nn.util.test import assert_auto_jitable, assert_equivariant
 
 
 def test_weird_call():
     o3.spherical_harmonics([4, 1, 2, 3, 3, 1, 0], torch.randn(2, 1, 2, 3), False)
+
+
+def test_weird_irreps():
+    # string input
+    o3.spherical_harmonics("0e + 1o", torch.randn(1, 3), False)
+
+    # Weird multipliciteis
+    irreps = o3.Irreps("1x0e + 4x1o + 3x2e")
+    out = o3.spherical_harmonics(irreps, torch.randn(7, 3), True)
+    assert out.shape[-1] == irreps.dim
+
+    # Bad parity
+    with pytest.raises(ValueError):
+        # L = 1 shouldn't be even for a vector input
+        o3.spherical_harmonics("1x0e + 4x1e + 3x2e", torch.randn(2, 3), True)
+
+    # Good parity but psuedovector input
+    _ = o3.SphericalHarmonics(
+        irreps_in="1e",
+        irreps_out="1x0e + 4x1e + 3x2e",
+        normalize=True
+    )
+
+    # Invalid input
+    with pytest.raises(ValueError):
+        _ = o3.SphericalHarmonics(
+            irreps_in="1e + 3o",  # invalid
+            irreps_out="1x0e + 4x1e + 3x2e",
+            normalize=True
+        )
 
 
 def test_zeros():
@@ -128,3 +158,4 @@ def test_module():
         sp_jit(xyz),
         o3.spherical_harmonics(l, xyz, normalize, normalization)
     )
+    assert_equivariant(sp)

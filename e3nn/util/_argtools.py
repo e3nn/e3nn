@@ -73,6 +73,15 @@ def _rand_args(irreps_in):
     return args_in
 
 
+def _get_device(mod: torch.nn.Module) -> torch.device:
+    # Try to a get a parameter
+    a_buf = next(mod.parameters(), None)
+    if a_buf is None:
+        # If there isn't one, try to get a buffer
+        a_buf = next(mod.buffers(), None)
+    return a_buf.device if a_buf is not None else 'cpu'
+
+
 def _to_device(args, device):
     if isinstance(args, torch.Tensor):
         return args.to(device=device)
