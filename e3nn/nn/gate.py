@@ -139,7 +139,7 @@ class Gate(torch.nn.Module):
 
     The parameters passed in should adhere to two conditions:
 
-    1. ``irreps_scalars.num_irreps == len(act_scalars)``.
+    1. ``len(irreps_scalars) == len(act_scalars)``.
     2. ``irreps_gates.num_irreps == len(act_gates) == irreps_gated.num_irreps``.
 
     Parameters
