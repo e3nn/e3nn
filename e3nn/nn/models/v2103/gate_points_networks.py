@@ -1,3 +1,7 @@
+"""
+>>> test_simple_network()
+>>> test_network_for_a_graph_with_attributes()
+"""
 from typing import Dict, Union
 
 import torch
@@ -155,3 +159,38 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
         node_outputs = self.mp(data['node_input'], data['node_attr'], edge_src, edge_dst, edge_attr, edge_length_embedding)
 
         return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+
+
+def test_simple_network():
+    net = SimpleNetwork(
+        "3x0e + 2x1o",
+        "4x0e + 1x1o",
+        max_radius=2.0,
+        num_neighbors=3.0,
+        num_nodes=5.0
+    )
+
+    net({
+        'pos': torch.randn(5, 3),
+        'x': net.irreps_in.randn(5, -1)
+    })
+
+
+def test_network_for_a_graph_with_attributes():
+    net = NetworkForAGraphWithAttributes(
+        "3x0e + 2x1o",
+        "4x0e + 1x1o",
+        "1e",
+        "3x0o + 1e",
+        max_radius=2.0,
+        num_neighbors=3.0,
+        num_nodes=5.0
+    )
+
+    net({
+        'pos': torch.randn(3, 3),
+        'edge_index': torch.tensor([[0, 1, 2], [1, 2, 0]]),
+        'node_input': net.irreps_node_input.randn(3, -1),
+        'node_attr': net.irreps_node_attr.randn(3, -1),
+        'edge_attr': net.irreps_edge_attr.randn(3, -1),
+    })

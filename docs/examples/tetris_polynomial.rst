@@ -1,3 +1,5 @@
+.. _tetris_poly:
+
 Tetris Polynomial Example
 =========================
 

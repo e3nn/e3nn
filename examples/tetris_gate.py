@@ -56,8 +56,10 @@ def mean_std(name, x):
 
 
 class Convolution(torch.nn.Module):
-    def __init__(self, irreps_in, irreps_sh, irreps_out) -> None:
+    def __init__(self, irreps_in, irreps_sh, irreps_out, num_neighbors) -> None:
         super().__init__()
+
+        self.num_neighbors = num_neighbors
 
         tp = FullyConnectedTensorProduct(
             irreps_in1=irreps_in,
@@ -69,16 +71,17 @@ class Convolution(torch.nn.Module):
         self.fc = FullyConnectedNet([3, 256, tp.weight_numel], torch.relu)
         self.tp = tp
 
-    def forward(self, edge_src, edge_dst, node_features, edge_sh, edge_length_embedded, num_neighbors) -> torch.Tensor:
-        weight = self.fc(edge_length_embedded)
-        edge_features = self.tp(node_features[edge_src], edge_sh, weight)
-        node_features = scatter(edge_features, edge_dst, dim=0).div(num_neighbors**0.5)
+    def forward(self, node_features, edge_src, edge_dst, edge_attr, edge_scalars) -> torch.Tensor:
+        weight = self.fc(edge_scalars)
+        edge_features = self.tp(node_features[edge_src], edge_attr, weight)
+        node_features = scatter(edge_features, edge_dst, dim=0).div(self.num_neighbors**0.5)
         return node_features
 
 
 class Network(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
+        self.num_neighbors = 3.8  # typical number of neighbors
         self.irreps_sh = o3.Irreps.spherical_harmonics(3)
 
         irreps = self.irreps_sh
@@ -89,27 +92,26 @@ class Network(torch.nn.Module):
             "8x0e + 8x0o + 8x0e + 8x0o", [torch.relu, torch.tanh, torch.relu, torch.tanh],  # gates (scalars)
             "16x1o + 16x1e"  # non-scalars, num_irreps has to match with gates
         )
-        self.conv = Convolution(irreps, self.irreps_sh, gate.irreps_in)
+        self.conv = Convolution(irreps, self.irreps_sh, gate.irreps_in, self.num_neighbors)
         self.gate = gate
         irreps = self.gate.irreps_out
 
         # Final layer
-        self.final = Convolution(irreps, self.irreps_sh, "0o + 6x0e")
+        self.final = Convolution(irreps, self.irreps_sh, "0o + 6x0e", self.num_neighbors)
 
     def forward(self, data) -> torch.Tensor:
-        num_neighbors = 3.8  # typical number of neighbors
         num_nodes = 4  # typical number of nodes
 
-        edge_src, edge_dst = radius_graph(data.pos, 2.1, data.batch)
+        edge_src, edge_dst = radius_graph(data.pos, 2.5, data.batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalization='component', normalize=True)
-        edge_length_embedded = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.5, 2.5, 3, 'cosine') * 3**0.5
+        edge_attr = o3.spherical_harmonics(self.irreps_sh, edge_vec, True, normalization='component')
+        edge_length_embedded = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.5, 2.5, 3, 'smooth_finite', False) * 3**0.5
 
-        x = scatter(edge_sh, edge_dst, dim=0).div(num_neighbors**0.5)
+        x = scatter(edge_attr, edge_dst, dim=0).div(self.num_neighbors**0.5)
 
-        x = self.conv(edge_src, edge_dst, x, edge_sh, edge_length_embedded, num_neighbors)
+        x = self.conv(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
         x = self.gate(x)
-        x = self.final(edge_src, edge_dst, x, edge_sh, edge_length_embedded, num_neighbors)
+        x = self.final(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
         return scatter(x, data.batch, dim=0).div(num_nodes**0.5)
 
@@ -120,7 +122,7 @@ def main():
 
     print(f)
 
-    optim = torch.optim.Adam(f.parameters(), lr=1e-2)
+    optim = torch.optim.Adam(f.parameters(), lr=1e-3)
 
     for step in range(200):
         pred = f(data)

@@ -36,7 +36,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
     number : int
         number of basis functions :math:`N`
 
-    basis : {'gaussian', 'cosine', 'fourier'}
+    basis : {'gaussian', 'cosine', 'fourier', 'smooth_finite'}
         choice of basis family
 
     endpoint : bool

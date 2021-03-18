@@ -1,4 +1,6 @@
 r"""example of a graph convolution when the input and output nodes are different
+
+>>> test()
 """
 import torch
 from torch_scatter import scatter
@@ -41,35 +43,6 @@ class Convolution(torch.nn.Module):
 
     num_neighbors : float
         typical number of nodes convolved over
-
-
-    Examples
-    --------
-    >>> conv = Convolution(
-    ...     irreps_node_input='0e + 1e',
-    ...     irreps_node_output='0e + 1e',
-    ...     irreps_node_attr_input='2x0e',
-    ...     irreps_node_attr_output='3x0e',
-    ...     irreps_edge_attr='0e + 1e',
-    ...     num_edge_scalar_attr=4,
-    ...     radial_layers=1,
-    ...     radial_neurons=50,
-    ...     num_neighbors=3.0,
-    ... )
-    >>> pos_in = torch.randn(5, 3)
-    >>> pos_out = torch.randn(2, 3)
-    >>> node_input = torch.randn(5, 4)
-    >>> node_attr_input = torch.randn(5, 2)
-    >>> node_attr_output = torch.randn(2, 3)
-    >>> from torch_cluster import radius
-    >>> edge_src, edge_dst = radius(pos_out, pos_in, r=2.0)
-    >>> edge_vec = pos_in[edge_src] - pos_out[edge_dst]
-    >>> edge_attr = o3.spherical_harmonics([0, 1], edge_vec, True)
-    >>> from e3nn.math import soft_one_hot_linspace
-    >>> edge_scalar_attr = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, 2.0, 4)
-    >>> node_outut = conv(node_input, node_attr_input, node_attr_output, edge_src, edge_dst, edge_attr, edge_scalar_attr)
-    >>> node_outut.shape
-    torch.Size([2, 4])
     """
     def __init__(
             self,
@@ -136,3 +109,34 @@ class Convolution(torch.nn.Module):
         node_output.div_(self.num_neighbors**0.5)
 
         return self.lin2(node_output, node_attr_output)
+
+
+def test():
+    from torch_cluster import radius
+    from e3nn.math import soft_one_hot_linspace
+
+    conv = Convolution(
+        irreps_node_input='0e + 1e',
+        irreps_node_output='0e + 1e',
+        irreps_node_attr_input='2x0e',
+        irreps_node_attr_output='3x0e',
+        irreps_edge_attr='0e + 1e',
+        num_edge_scalar_attr=4,
+        radial_layers=1,
+        radial_neurons=50,
+        num_neighbors=3.0,
+    )
+
+    pos_in = torch.randn(5, 3)
+    pos_out = torch.randn(2, 3)
+
+    node_input = torch.randn(5, 4)
+    node_attr_input = torch.randn(5, 2)
+    node_attr_output = torch.randn(2, 3)
+
+    edge_src, edge_dst = radius(pos_out, pos_in, r=2.0)
+    edge_vec = pos_in[edge_src] - pos_out[edge_dst]
+    edge_attr = o3.spherical_harmonics([0, 1], edge_vec, True)
+    edge_scalar_attr = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, 2.0, 4)
+
+    conv(node_input, node_attr_input, node_attr_output, edge_src, edge_dst, edge_attr, edge_scalar_attr)
