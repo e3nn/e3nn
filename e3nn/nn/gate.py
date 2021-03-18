@@ -223,7 +223,7 @@ class Gate(torch.nn.Module):
     @property
     def irreps_in(self):
         """Input representations."""
-        return self._irreps_out
+        return self._irreps_in
 
     @property
     def irreps_out(self):
