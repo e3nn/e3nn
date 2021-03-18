@@ -97,18 +97,18 @@ class MessagePassing(torch.nn.Module):
                 for mul, ir in self.irreps_node_hidden
                 if ir.l == 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
             ])
-            irreps_nonscalars = o3.Irreps([
+            irreps_gated = o3.Irreps([
                 (mul, ir)
                 for mul, ir in self.irreps_node_hidden
                 if ir.l > 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
             ])
             ir = "0e" if tp_path_exists(irreps_node, self.irreps_edge_attr, "0e") else "0o"
-            irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_nonscalars])
+            irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated])
 
             gate = Gate(
                 irreps_scalars, [act[ir.p] for _, ir in irreps_scalars],  # scalar
                 irreps_gates, [act_gates[ir.p] for _, ir in irreps_gates],  # gates (scalars)
-                irreps_nonscalars  # non-scalars
+                irreps_gated  # gated tensors
             )
             conv = Convolution(
                 irreps_node,
