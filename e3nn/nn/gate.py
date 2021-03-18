@@ -138,6 +138,7 @@ class Gate(torch.nn.Module):
     from ``irreps_gates``, ``act_gates``, and ``irreps_gated``.
 
     The parameters passed in should adhere to two conditions:
+
     1. ``irreps_scalars.num_irreps == len(act_scalars)``.
     2. ``irreps_gates.num_irreps == len(act_gates) == irreps_gated.num_irreps``.
 
@@ -178,7 +179,7 @@ class Gate(torch.nn.Module):
 
         self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_gated)
         self.irreps_scalars, self.irreps_gates, self.irreps_gated = self.sc.irreps_outs
-        self.irreps_in = self.sc.irreps_in
+        self._irreps_in = self.sc.irreps_in
 
         self.act_scalars = Activation(irreps_scalars, act_scalars)
         irreps_scalars = self.act_scalars.irreps_out
@@ -189,7 +190,7 @@ class Gate(torch.nn.Module):
         self.mul = o3.ElementwiseTensorProduct(irreps_gated, irreps_gates)
         irreps_gated = self.mul.irreps_out
 
-        self.irreps_out = irreps_scalars + irreps_gated
+        self._irreps_out = irreps_scalars + irreps_gated
 
     def __repr__(self):
         return f"{self.__class__.__name__} ({self.irreps_in} -> {self.irreps_out})"
@@ -218,3 +219,13 @@ class Gate(torch.nn.Module):
             else:
                 features = scalars
             return features
+
+    @property
+    def irreps_in(self):
+        """Input representations."""
+        return self._irreps_out
+
+    @property
+    def irreps_out(self):
+        """Output representations (a direct sum of ``irreps_scalars`` and ``irreps_gated``)."""
+        return self._irreps_out
