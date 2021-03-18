@@ -1,5 +1,3 @@
-import math
-
 import torch
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
@@ -58,7 +56,7 @@ class Convolution(torch.nn.Module):
         for i, (mul, ir_in) in enumerate(self.irreps_node_input):
             for j, (_, ir_edge) in enumerate(self.irreps_edge_attr):
                 for ir_out in ir_in * ir_edge:
-                    if ir_out in self.irreps_node_output:
+                    if ir_out in self.irreps_node_output or ir_out == o3.Irrep(0, 1):
                         k = len(irreps_mid)
                         irreps_mid.append((mul, ir_out))
                         instructions.append((i, j, k, 'uvu', True))
@@ -85,6 +83,7 @@ class Convolution(torch.nn.Module):
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, self.irreps_node_output)
+        self.lin3 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr, "0e")
 
     def forward(self, node_input, node_attr, edge_src, edge_dst, edge_attr, edge_scalars) -> torch.Tensor:
         weight = self.fc(edge_scalars)
@@ -95,9 +94,11 @@ class Convolution(torch.nn.Module):
         edge_features = self.tp(node_features[edge_src], edge_attr, weight)
         node_features = scatter(edge_features, edge_dst, dim=0, dim_size=node_input.shape[0]).div(self.num_neighbors**0.5)
 
-        node_features = self.lin2(node_features, node_attr)
+        node_conv_out = self.lin2(node_features, node_attr)
+        node_angle = 0.1 * self.lin3(node_features, node_attr)
+        #            ^^^------ start small, favor self-connection
 
-        c_s, c_x = math.sin(math.pi / 8), math.cos(math.pi / 8)
+        cos, sin = node_angle.cos(), node_angle.sin()
         m = self.sc.output_mask
-        c_x = (1 - m) + c_x * m
-        return c_s * node_self_connection + c_x * node_features
+        sin = (1 - m) + sin * m
+        return cos * node_self_connection + sin * node_conv_out
