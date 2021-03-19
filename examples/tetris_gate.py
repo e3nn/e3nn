@@ -90,7 +90,7 @@ class Network(torch.nn.Module):
         gate = Gate(
             "16x0e + 16x0o", [torch.relu, torch.abs],  # scalar
             "8x0e + 8x0o + 8x0e + 8x0o", [torch.relu, torch.tanh, torch.relu, torch.tanh],  # gates (scalars)
-            "16x1o + 16x1e"  # non-scalars, num_irreps has to match with gates
+            "16x1o + 16x1e"  # gated tensors, num_irreps has to match with gates
         )
         self.conv = Convolution(irreps, self.irreps_sh, gate.irreps_in, self.num_neighbors)
         self.gate = gate

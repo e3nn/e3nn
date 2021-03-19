@@ -122,26 +122,48 @@ class _Sortcut(torch.nn.Module):
 
 @compile_mode('script')
 class Gate(torch.nn.Module):
-    r"""Gate activation function
+    r"""Gate activation function.
+
+    The gate activation is a direct sum of two sets of irreps. The first set
+    of irreps is ``irreps_scalars`` passed through activation functions
+    ``act_scalars``. The second set of irreps is ``irreps_gated`` multiplied
+    by the scalars ``irreps_gates`` passed through activation functions
+    ``act_gates``. Mathematically, this can be written as:
+
+    .. math::
+        \left(\bigoplus_i \phi_i(x_i) \right) \oplus \left(\bigoplus_j \phi_j(g_j) y_j \right)
+
+    where :math:`x_i` and :math:`\phi_i` are from ``irreps_scalars`` and
+    ``act_scalars``, and :math:`g_j`, :math:`\phi_j`, and :math:`y_j` are
+    from ``irreps_gates``, ``act_gates``, and ``irreps_gated``.
+
+    The parameters passed in should adhere to two conditions:
+
+    1. ``len(irreps_scalars) == len(act_scalars)``.
+    2. ``len(irreps_gates) == len(act_gates)``.
+    3. ``irreps_gates.num_irreps == irreps_gated.num_irreps``.
 
     Parameters
     ----------
     irreps_scalars : `Irreps`
-        representation of the scalars (the one not use for the gates)
+        Representation of the scalars that will be passed through the
+        activation functions ``act_scalars``.
 
     act_scalars : list of function or None
-        activations acting on the scalars
+        Activation functions acting on the scalars.
 
     irreps_gates : `Irreps`
-        representation of the scalars used to gate.
-        ``irreps_gates.num_irreps == irreps_nonscalars.num_irreps``
+        Representation of the scalars that will be passed through the
+        activation functions ``act_gates`` and multiplied by the
+        ``irreps_gated``.
 
     act_gates : list of function or None
-        activations acting on the gates
+        Activation functions acting on the gates. The number of functions in
+        the list should match the number of irrep groups in ``irreps_gates``.
 
-    irreps_nonscalars : `Irreps`
-        representation of the non-scalars.
-        ``irreps_gates.num_irreps == irreps_nonscalars.num_irreps``
+    irreps_gated : `Irreps`
+        Representation of the gated tensors.
+        ``irreps_gates.num_irreps == irreps_gated.num_irreps``
 
     Examples
     --------
@@ -150,15 +172,15 @@ class Gate(torch.nn.Module):
     >>> g.irreps_out
     16x0o+16x1o+16x1e
     """
-    def __init__(self, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_nonscalars):
+    def __init__(self, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated):
         super().__init__()
         irreps_scalars = o3.Irreps(irreps_scalars)
         irreps_gates = o3.Irreps(irreps_gates)
-        irreps_nonscalars = o3.Irreps(irreps_nonscalars)
+        irreps_gated = o3.Irreps(irreps_gated)
 
-        self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_nonscalars)
-        self.irreps_scalars, self.irreps_gates, self.irreps_nonscalars = self.sc.irreps_outs
-        self.irreps_in = self.sc.irreps_in
+        self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_gated)
+        self.irreps_scalars, self.irreps_gates, self.irreps_gated = self.sc.irreps_outs
+        self._irreps_in = self.sc.irreps_in
 
         self.act_scalars = Activation(irreps_scalars, act_scalars)
         irreps_scalars = self.act_scalars.irreps_out
@@ -166,16 +188,16 @@ class Gate(torch.nn.Module):
         self.act_gates = Activation(irreps_gates, act_gates)
         irreps_gates = self.act_gates.irreps_out
 
-        self.mul = o3.ElementwiseTensorProduct(irreps_nonscalars, irreps_gates)
-        irreps_nonscalars = self.mul.irreps_out
+        self.mul = o3.ElementwiseTensorProduct(irreps_gated, irreps_gates)
+        irreps_gated = self.mul.irreps_out
 
-        self.irreps_out = irreps_scalars + irreps_nonscalars
+        self._irreps_out = irreps_scalars + irreps_gated
 
     def __repr__(self):
         return f"{self.__class__.__name__} ({self.irreps_in} -> {self.irreps_out})"
 
     def forward(self, features):
-        '''evaluate
+        """Evaluate the gated activation function.
 
         Parameters
         ----------
@@ -186,15 +208,25 @@ class Gate(torch.nn.Module):
         -------
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
-        '''
+        """
         with torch.autograd.profiler.record_function('Gate'):
-            scalars, gates, nonscalars = self.sc(features)
+            scalars, gates, gated = self.sc(features)
 
             scalars = self.act_scalars(scalars)
             if gates.shape[-1]:
                 gates = self.act_gates(gates)
-                nonscalars = self.mul(nonscalars, gates)
-                features = torch.cat([scalars, nonscalars], dim=-1)
+                gated = self.mul(gated, gates)
+                features = torch.cat([scalars, gated], dim=-1)
             else:
                 features = scalars
             return features
+
+    @property
+    def irreps_in(self):
+        """Input representations."""
+        return self._irreps_in
+
+    @property
+    def irreps_out(self):
+        """Output representations."""
+        return self._irreps_out
