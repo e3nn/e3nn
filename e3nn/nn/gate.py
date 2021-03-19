@@ -140,7 +140,8 @@ class Gate(torch.nn.Module):
     The parameters passed in should adhere to two conditions:
 
     1. ``len(irreps_scalars) == len(act_scalars)``.
-    2. ``irreps_gates.num_irreps == len(act_gates) == irreps_gated.num_irreps``.
+    2. ``len(irreps_gates) == len(act_gates)``.
+    3. ``irreps_gates.num_irreps == irreps_gated.num_irreps``.
 
     Parameters
     ----------
@@ -227,5 +228,5 @@ class Gate(torch.nn.Module):
 
     @property
     def irreps_out(self):
-        """Output representations (a direct sum of ``irreps_scalars`` and ``irreps_gated``)."""
+        """Output representations."""
         return self._irreps_out
