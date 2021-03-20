@@ -399,7 +399,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             real_weight = self._get_weights(weight)
             return self._compiled_main_out(x1, x2, real_weight, self._wigner_buf)
 
-    def visualize(self):  # pragma: no cover
+    def visualize(self, ax=None):  # pragma: no cover
         import numpy as np
 
         def _intersection(x, u, y, v):
@@ -414,7 +414,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         from matplotlib.path import Path
         import matplotlib.patches as patches
 
-        fig, ax = plt.subplots()
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.get_figure()
 
         # hexagon
         verts = [
@@ -488,6 +491,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         ax.set_ylim(-2, 2)
         ax.axis('equal')
         ax.axis('off')
+
+        return fig, ax
 
 
 class FullyConnectedTensorProduct(TensorProduct):
