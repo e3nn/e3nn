@@ -488,11 +488,13 @@ def _generate_spherical_harmonics(lmax, device=None):  # pragma: no cover
             )
             for cij in o3.wigner_3j(l+1, 1, l, device=device)
         ]
+
         def sub(p, names, polynormz):
             p = p.subs(x, 0).subs(y, 0).subs(z, 1)
             for n, c in zip(names, polynormz):
                 p = p.subs(n, c)
             return p
+
         polynormz = [
             sub(p, names, polynormz)
             for p in polynomials

@@ -79,7 +79,7 @@ def test_compilation():
 
     class Supermod(torch.nn.Module):
         def forward(self, x):
-            return x* 2.
+            return x * 2.
 
     @compile_mode('trace')
     class ChildMod(Supermod):

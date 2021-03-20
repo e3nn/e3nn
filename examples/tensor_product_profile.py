@@ -1,6 +1,5 @@
 import argparse
 import logging
-logging.basicConfig(level=logging.DEBUG)
 
 import torch
 
@@ -8,15 +7,18 @@ from e3nn.o3 import Irreps, FullyConnectedTensorProduct
 from e3nn.util.jit import compile
 
 
+logging.basicConfig(level=logging.DEBUG)
+
+
 # https://stackoverflow.com/a/15008806/1008938
 def t_or_f(arg):
     ua = str(arg).upper()
     if 'TRUE'.startswith(ua):
-       return True
+        return True
     elif 'FALSE'.startswith(ua):
-       return False
+        return False
     else:
-       raise ValueError(str(arg))
+        raise ValueError(str(arg))
 
 
 def main():
@@ -72,6 +74,7 @@ def main():
     print("starting...")
 
     called_num = [0]
+
     def trace_handler(p):
         print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
         p.export_chrome_trace("test_trace_" + str(called_num[0]) + ".json")
