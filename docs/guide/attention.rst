@@ -1,7 +1,7 @@
 Attention mechanism
 ===================
 
-(Add some text to tell that attention mechanism is well known)
+(Add some text to tell that attention mechanism is useful and well known)
 
 .. jupyter-execute::
     :hide-code:
@@ -45,7 +45,8 @@ Note that outputs and values share the same irreps.
 
 .. jupyter-execute::
 
-    irreps_input = o3.Irreps("10x0e + 5x1o")
+    # Just define arbitrary irreps
+    irreps_input = o3.Irreps("10x0e + 5x1o + 2x2e")
     irreps_query = o3.Irreps("11x0e + 4x1o")
     irreps_key = o3.Irreps("12x0e + 3x1o")
     irreps_output = o3.Irreps("14x0e + 6x1o")  # also irreps of the values
@@ -54,16 +55,14 @@ Lets create a random graph on which we can apply the attention mechanism:
 
 .. jupyter-execute::
 
-    num_graph = 3
     num_nodes = 20
 
-    pos = torch.randn(num_graph * num_nodes, 3)
-    f = irreps_input.randn(num_graph * num_nodes, -1)
-    batch = torch.arange(num_graph * num_nodes) % num_graph
+    pos = torch.randn(num_nodes, 3)
+    f = irreps_input.randn(num_nodes, -1)
 
     # create graph
     max_radius = 1.3
-    edge_src, edge_dst = radius_graph(pos, max_radius, batch)
+    edge_src, edge_dst = radius_graph(pos, max_radius)
     edge_vec = pos[edge_src] - pos[edge_dst]
     edge_length = edge_vec.norm(dim=1)
 
@@ -89,15 +88,16 @@ To create the values and the keys we have to use the relative position of the ed
     irreps_sh = o3.Irreps.spherical_harmonics(3)
     edge_sh = o3.spherical_harmonics(irreps_sh, edge_vec, True, normalization='component')
 
-We will make a tensor prodcut between the input and the spherical harmonics of the relative positions and tensor product that with the input to create the values and keys.
+We will make a tensor prodcut between the input and the spherical harmonics to create the values and keys.
+Because we want the weights of these tensor products to depend on the edge length we will generate the weights using multi layer perceptrons.
 
 .. jupyter-execute::
 
     tp_k = o3.FullyConnectedTensorProduct(irreps_input, irreps_sh, irreps_key, shared_weights=False)
-    fc_k = nn.FullyConnectedNet([number_of_basis, tp_k.weight_numel])
+    fc_k = nn.FullyConnectedNet([number_of_basis, 16, tp_k.weight_numel], act=torch.nn.functional.silu)
 
     tp_v = o3.FullyConnectedTensorProduct(irreps_input, irreps_sh, irreps_output, shared_weights=False)
-    fc_v = nn.FullyConnectedNet([number_of_basis, tp_v.weight_numel])
+    fc_v = nn.FullyConnectedNet([number_of_basis, 16, tp_v.weight_numel], act=torch.nn.functional.silu)
 
 
 For the correpondance with the formula, ``tp_v, fc_v`` represent :math:`h_K` and ``tp_v, fc_v`` represent :math:`h_V`.
@@ -122,7 +122,7 @@ The operations ``tp_k``, ``tp_v`` and ``dot`` can be visualized as follow:
     plt.tight_layout()
 
 
-Finally we can just use all the modules to compute the attention mechanism:
+Finally we can just use all the modules we created to compute the attention mechanism:
 
 .. jupyter-execute::
 
@@ -141,12 +141,12 @@ Finally we can just use all the modules to compute the attention mechanism:
 
 Note that this implementation has small differences with the article.
 
-- In this implementation the ``dot`` operation has weights (why not?).
-- The radial neural networks are feed with embeddings that goes smoothly to zero when the edge length reach ``max_radius``. This ensure that the hole operation is smooth when we move the points (deleting/creating new edges).
+- In this implementation the ``dot`` operation has weights (just because it is simple to make it with weights).
+- The radial neural networks are fed with embeddings that goes smoothly to zero when the edge length reach ``max_radius``. This ensure that the whole operation is smooth when we move the points (deleting/creating new edges).
 - The output is weight with :math:`\sqrt(\alpha_{ij})` instead of :math:`\alpha_{ij}` to ensure a proper normalization. As checked below.
 
 .. jupyter-execute::
 
-    f_out.mean(), f_out.std()
+    f_out.mean().item(), f_out.std().item()
 
 .. _SE(3)-Transformers: https://proceedings.neurips.cc/paper/2020/file/15231a7ce4ba789d13b722cc5c955834-Paper.pdf
