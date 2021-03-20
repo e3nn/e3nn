@@ -22,6 +22,7 @@ try:
     # If pytest is available, define an e3nn pytest plugin
     # See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
     import pytest
+
     @pytest.fixture(scope='session', autouse=True, params=['float32', 'float64'])
     def float_tolerance(request):
         """Run all tests with various PyTorch default dtypes.
@@ -93,8 +94,8 @@ def assert_equivariant(
 
     if len(problems) != 0:
         errstr = (
-            "Largest componentwise equivariance error was too large for: " + \
-            '; '.join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
+            "Largest componentwise equivariance error was too large for: "
+            "; ".join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
         )
         assert len(problems) == 0, errstr
 

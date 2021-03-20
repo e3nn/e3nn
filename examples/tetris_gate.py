@@ -172,6 +172,7 @@ def profile():
     optim = torch.optim.Adam(f.parameters(), lr=1e-2)
 
     called_num = [0]
+
     def trace_handler(p):
         print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
         p.export_chrome_trace("test_trace_" + str(called_num[0]) + ".json")

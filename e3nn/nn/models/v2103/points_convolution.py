@@ -32,14 +32,14 @@ class Convolution(torch.nn.Module):
         typical number of nodes convolved over
     """
     def __init__(
-            self,
-            irreps_node_input,
-            irreps_node_attr,
-            irreps_edge_attr,
-            irreps_node_output,
-            fc_neurons,
-            num_neighbors
-                ) -> None:
+        self,
+        irreps_node_input,
+        irreps_node_attr,
+        irreps_edge_attr,
+        irreps_node_output,
+        fc_neurons,
+        num_neighbors
+    ) -> None:
         super().__init__()
         self.irreps_node_input = o3.Irreps(irreps_node_input)
         self.irreps_node_attr = o3.Irreps(irreps_node_attr)

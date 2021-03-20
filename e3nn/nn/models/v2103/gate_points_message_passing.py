@@ -59,16 +59,16 @@ class MessagePassing(torch.nn.Module):
         first layer and hidden layers but not the output layer
     """
     def __init__(
-            self,
-            irreps_node_input,
-            irreps_node_hidden,
-            irreps_node_output,
-            irreps_node_attr,
-            irreps_edge_attr,
-            layers,
-            fc_neurons,
-            num_neighbors,
-                ) -> None:
+        self,
+        irreps_node_input,
+        irreps_node_hidden,
+        irreps_node_output,
+        irreps_node_attr,
+        irreps_edge_attr,
+        layers,
+        fc_neurons,
+        num_neighbors,
+    ) -> None:
         super().__init__()
         self.num_neighbors = num_neighbors
 

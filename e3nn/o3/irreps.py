@@ -65,7 +65,7 @@ class Irrep(tuple):
                     'o': -1,
                     'y': (-1)**l,
                 }[name[-1]]
-            except:
+            except Exception:
                 raise ValueError(f"unable to convert string \"{name}\" into an Irrep")
 
         if isinstance(l, tuple) and p is None:
@@ -327,7 +327,7 @@ class Irreps(tuple):
 
                     assert isinstance(mul, int) and mul >= 0
                     out.append(_MulIr(mul, ir))
-            except:
+            except Exception:
                 raise ValueError(f"unable to convert string \"{irreps}\" into an Irreps")
         else:
             for mul_ir in irreps:

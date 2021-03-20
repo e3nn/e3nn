@@ -58,6 +58,7 @@ def test_convolution_jit(network):
 
 def test_gate_points_2101_equivariant(network):
     f, random_graph = network
+
     # -- Test equivariance: --
     def wrapper(pos, x, z):
         data = Data(pos=pos, x=x, z=z, batch=torch.zeros(pos.shape[0], dtype=torch.long))

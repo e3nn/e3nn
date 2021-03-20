@@ -21,11 +21,13 @@ def compile_mode(mode: str):
     """
     if mode not in _VALID_MODES:
         raise ValueError("Invalid compile mode")
+
     def decorator(obj):
         if not (inspect.isclass(obj) and issubclass(obj, torch.nn.Module)):
             raise TypeError("@e3nn.util.jit.compile_mode can only decorate classes derived from torch.nn.Module")
         setattr(obj, _E3NN_COMPILE_MODE, mode)
         return obj
+
     return decorator
 
 
@@ -120,7 +122,7 @@ def compile(
 def get_tracing_inputs(
     mod: torch.nn.Module,
     n: int = 1,
-    device: Optional[torch.device] =  None
+    device: Optional[torch.device] = None
 ):
     """Get random tracing inputs for ``mod``.
 

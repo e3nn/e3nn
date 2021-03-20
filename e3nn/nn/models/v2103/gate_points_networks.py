@@ -16,16 +16,16 @@ from .gate_points_message_passing import MessagePassing
 
 class SimpleNetwork(torch.nn.Module):
     def __init__(
-            self,
-            irreps_in,
-            irreps_out,
-            max_radius,
-            num_neighbors,
-            num_nodes,
-            mul=50,
-            layers=3,
-            lmax=2,
-                ) -> None:
+        self,
+        irreps_in,
+        irreps_out,
+        max_radius,
+        num_neighbors,
+        num_nodes,
+        mul=50,
+        layers=3,
+        lmax=2,
+    ) -> None:
         super().__init__()
 
         self.lmax = lmax
@@ -89,18 +89,18 @@ class SimpleNetwork(torch.nn.Module):
 
 class NetworkForAGraphWithAttributes(torch.nn.Module):
     def __init__(
-            self,
-            irreps_node_input,
-            irreps_node_attr,
-            irreps_edge_attr,
-            irreps_node_output,
-            max_radius,
-            num_neighbors,
-            num_nodes,
-            mul=50,
-            layers=3,
-            lmax=2,
-                ) -> None:
+        self,
+        irreps_node_input,
+        irreps_node_attr,
+        irreps_edge_attr,
+        irreps_node_output,
+        max_radius,
+        num_neighbors,
+        num_nodes,
+        mul=50,
+        layers=3,
+        lmax=2,
+    ) -> None:
         super().__init__()
 
         self.lmax = lmax

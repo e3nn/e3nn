@@ -50,16 +50,16 @@ class Convolution(torch.nn.Module):
         typical number of nodes convolved over
     """
     def __init__(
-            self,
-            irreps_in,
-            irreps_node_attr,
-            irreps_edge_attr,
-            irreps_out,
-            number_of_edge_features,
-            radial_layers,
-            radial_neurons,
-            num_neighbors
-                ) -> None:
+        self,
+        irreps_in,
+        irreps_node_attr,
+        irreps_edge_attr,
+        irreps_out,
+        number_of_edge_features,
+        radial_layers,
+        radial_neurons,
+        num_neighbors
+    ) -> None:
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_node_attr = o3.Irreps(irreps_node_attr)
@@ -203,21 +203,21 @@ class Network(torch.nn.Module):
         typical number of nodes in a graph
     """
     def __init__(
-            self,
-            irreps_in,
-            irreps_hidden,
-            irreps_out,
-            irreps_node_attr,
-            irreps_edge_attr,
-            layers,
-            max_radius,
-            number_of_basis,
-            radial_layers,
-            radial_neurons,
-            num_neighbors,
-            num_nodes,
-            reduce_output=True,
-                ) -> None:
+        self,
+        irreps_in,
+        irreps_hidden,
+        irreps_out,
+        irreps_node_attr,
+        irreps_edge_attr,
+        layers,
+        max_radius,
+        number_of_basis,
+        radial_layers,
+        radial_neurons,
+        num_neighbors,
+        num_nodes,
+        reduce_output=True,
+    ) -> None:
         super().__init__()
         self.max_radius = max_radius
         self.number_of_basis = number_of_basis
