@@ -10,3 +10,4 @@ User Guide
     equivar_testing
     jit
     change_of_basis
+    attention

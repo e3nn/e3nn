@@ -414,7 +414,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         from matplotlib.path import Path
         import matplotlib.patches as patches
 
-        fig, ax = plt.subplots()
+        ax = plt.gca()
 
         # hexagon
         verts = [
