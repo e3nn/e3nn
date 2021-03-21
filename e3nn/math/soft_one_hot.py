@@ -135,4 +135,4 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         if endpoint:
             return out
         else:
-            return out * ((x / c) < 1)
+            return out * ((x / c) < 1) * (0 < x)
