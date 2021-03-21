@@ -3,10 +3,18 @@
 User Guide
 ==========
 
+.. rubric:: Begginer
+
 .. toctree::
     installation
-    first_steps.ipynb
+    irreps
+    convolution
     normalization
+
+.. rubric:: Advanced
+
+.. toctree::
+
     equivar_testing
     jit
     change_of_basis

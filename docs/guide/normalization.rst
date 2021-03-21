@@ -1,3 +1,5 @@
+.. _norm guide:
+
 Normalization
 =============
 
