@@ -36,7 +36,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
     number : int
         number of basis functions :math:`N`
 
-    basis : {'gaussian', 'cosine', 'fourier', 'smooth_finite'}
+    basis : {'gaussian', 'cosine', 'fourier', 'bessel', 'smooth_finite'}
         choice of basis family
 
     endpoint : bool
@@ -84,6 +84,14 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
 
     .. jupyter-execute::
 
+        plt.plot(x, soft_one_hot_linspace(x, -0.5, 1.5, 3, 'bessel', endpoint=False));
+
+    .. jupyter-execute::
+
+        plt.plot(x, soft_one_hot_linspace(x, -0.5, 1.5, 3, 'bessel', endpoint=True));
+
+    .. jupyter-execute::
+
         for basis in ['gaussian', 'cosine', 'fourier', 'smooth_finite']:
             for endpoint in [False, True]:
                 y = soft_one_hot_linspace(x, -0.5, 1.5, 4, basis, endpoint)
@@ -117,3 +125,16 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         else:
             i = torch.arange(1, number + 1, dtype=x.dtype, device=x.device)
             return torch.sin(math.pi * i * x) / math.sqrt(0.25 + number / 2) * (0 < x) * (x < 1)
+
+    if basis == 'bessel':
+        x = x[..., None]
+        x_ = x - start
+        c = (end - start)
+        bessel_roots = torch.arange(1, number+1, dtype=x.dtype, device=x.device) * math.pi
+        out =  math.sqrt(2 / c) * torch.sin(bessel_roots * x_ / c) / x_
+
+        if endpoint:
+            return out
+
+        else:
+            return out * ((x_ / c) < 1)
