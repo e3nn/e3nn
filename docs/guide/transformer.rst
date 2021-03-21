@@ -1,5 +1,7 @@
-Attention mechanism
-===================
+.. _transformer guide:
+
+Transformer
+===========
 
 (Add some text to tell that attention mechanism is useful and well known)
 
@@ -37,7 +39,7 @@ They are function of the input features :math:`f`.
 
 all these formula are well illustrated by the figure (2) of the same article.
 
-.. image:: attention.png
+.. image:: transformer.png
     :width: 600
 
 First we need to define the irreps of the inputs, the queries, the keys and the ouputs.
