@@ -21,6 +21,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         \sum_{i=1}^N y_i^2 \approx 1
 
     See the last plot below.
+    Note that ``bessel`` basis cannot be normalized.
 
     Parameters
     ----------
@@ -37,7 +38,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         number of basis functions :math:`N`
 
     basis : {'gaussian', 'cosine', 'fourier', 'bessel', 'smooth_finite'}
-        choice of basis family; note that due to the 1/x term, 'bessel' basis does not satisfy the normalization of other basis choices
+        choice of basis family; note that due to the :math:`1/x` term, ``bessel`` basis does not satisfy the normalization of other basis choices
 
     endpoint : bool
         if ``endpoint=False`` then for all :math:`x` outside of the interval defined by ``(start, end)``, :math:`\forall i, \; f_i(x) \approx 0`
@@ -128,9 +129,9 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
 
     if basis == 'bessel':
         x = x[..., None] - start
-        c = (end - start)
+        c = end - start
         bessel_roots = torch.arange(1, number + 1, dtype=x.dtype, device=x.device) * math.pi
-        out =  math.sqrt(2 / c) * torch.sin(bessel_roots * x / c) / x
+        out = math.sqrt(2 / c) * torch.sin(bessel_roots * x / c) / x
 
         if endpoint:
             return out
