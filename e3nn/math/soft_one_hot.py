@@ -127,14 +127,12 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
             return torch.sin(math.pi * i * x) / math.sqrt(0.25 + number / 2) * (0 < x) * (x < 1)
 
     if basis == 'bessel':
-        x = x[..., None]
-        x_ = x - start
+        x = x[..., None] - start
         c = (end - start)
-        bessel_roots = torch.arange(1, number+1, dtype=x.dtype, device=x.device) * math.pi
-        out =  math.sqrt(2 / c) * torch.sin(bessel_roots * x_ / c) / x_
+        bessel_roots = torch.arange(1, number + 1, dtype=x.dtype, device=x.device) * math.pi
+        out =  math.sqrt(2 / c) * torch.sin(bessel_roots * x / c) / x
 
         if endpoint:
             return out
-
         else:
-            return out * ((x_ / c) < 1)
+            return out * ((x / c) < 1)
