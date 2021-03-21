@@ -106,6 +106,7 @@ class ReducedTensorProducts:
 
     Examples
     --------
+    >>> torch.set_default_dtype(torch.float64)
     >>> tp = ReducedTensorProducts('ij=-ji', i='1o')
     >>> x = torch.tensor([1.0, 0.0, 0.0])
     >>> y = torch.tensor([0.0, 1.0, 0.0])
