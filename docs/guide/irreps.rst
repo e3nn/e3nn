@@ -3,7 +3,7 @@
 Irreducible representations
 ===========================
 
-This page is a begginer introduction to the main object of ``e3nn`` library: `Irreps`.
+This page is a beginner introduction to the main object of ``e3nn`` library: `Irreps`.
 All the core component of ``e3nn`` can be found in ``e3nn.o3``.
 ``o3`` stands for the group of 3d orthogonal matrices, which is equivalently the group of rotation and inversion.
 

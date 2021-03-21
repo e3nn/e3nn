@@ -3,7 +3,7 @@
 User Guide
 ==========
 
-.. rubric:: Begginer
+.. rubric:: Beginner
 
 .. toctree::
     installation
