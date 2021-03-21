@@ -60,7 +60,7 @@ class SimpleNetwork(torch.nn.Module):
             batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
 
         # Create graph
-        edge_index = radius_graph(data['pos'], self.max_radius, batch)
+        edge_index = radius_graph(data['pos'], self.max_radius, batch, max_num_neighbors=len(data['pos']) - 1)
         edge_src = edge_index[0]
         edge_dst = edge_index[1]
 

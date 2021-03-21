@@ -3,7 +3,9 @@ Euclidean neural networks
 
 ``e3nn`` is a python library based on pytorch_ to create equivariant neural networks for the group of :math:`O(3)`.
 
-The simplest example to start with is :ref:`tetris_poly`.
+- Guide to the `Irreps`: :ref:`irreps guide`
+- Guide to implement a convolution :ref:`conv guide`
+- The simplest example to start with is :ref:`tetris_poly`.
 
 All the functions to manipulate rotations (rotation matrices, Euler angles, quaternions, convertions, ...) can be found here :ref:`Rotation functions`.
 The irreducible representations of :math:`O(3)` (more info at :ref:`Irreducible representations`) are represented by the class `Irrep`.
@@ -52,7 +54,7 @@ Which can be represented by
     D_x = irreps_x.D_from_matrix(R)
     D_y = irreps_y.D_from_matrix(R)
 
-    plt.imshow(torch.kron(D_x, D_y));
+    plt.imshow(torch.kron(D_x, D_y), cmap='bwr', vmin=-1, vmax=1);
 
 
 This representation is not irreducible (is reducible). It can be decomposed into irreps by a change of basis. The outerproduct followed by the change of basis is done by the class `FullTensorProduct`.
@@ -70,7 +72,7 @@ As a sanity check, we can verify that the representation of the tensor prodcut i
 .. jupyter-execute::
 
     D = tp.irreps_out.D_from_matrix(R)
-    plt.imshow(D);
+    plt.imshow(D, cmap='bwr', vmin=-1, vmax=1);
 
 
 `FullTensorProduct` is a special case of `TensorProduct`, other ones like `FullyConnectedTensorProduct` can contained weights what can be learned, very useful to create neural networks.
