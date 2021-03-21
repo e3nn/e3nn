@@ -37,7 +37,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         number of basis functions :math:`N`
 
     basis : {'gaussian', 'cosine', 'fourier', 'bessel', 'smooth_finite'}
-        choice of basis family
+        choice of basis family; note that due to the 1/x term, 'bessel' basis does not satisfy the normalization of other basis choices
 
     endpoint : bool
         if ``endpoint=False`` then for all :math:`x` outside of the interval defined by ``(start, end)``, :math:`\forall i, \; f_i(x) \approx 0`
