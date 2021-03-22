@@ -439,9 +439,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         import matplotlib.patches as patches
 
         if ax is None:
-            fig, ax = plt.subplots()
-        else:
-            fig = ax.get_figure()
+            ax = plt.gca()
+
+        fig = ax.get_figure()
 
         # hexagon
         verts = [
@@ -544,12 +544,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         padding = 3
         fontsize = 10
 
-        def format_ir(ir):
-            return f"{ir.mul} $\\times$ {ir.ir.l}{'e' if ir.ir.p == 1 else 'o'}"
+        def format_ir(mul_ir):
+            return f"{mul_ir.mul} $\\times$ {mul_ir.ir}"
 
-        for i, ir in enumerate(self.irreps_in1):
+        for i, mul_ir in enumerate(self.irreps_in1):
             ax.annotate(
-                format_ir(ir),
+                format_ir(mul_ir),
                 s_in1[i],
                 horizontalalignment='right',
                 textcoords='offset points',
@@ -557,9 +557,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 fontsize=fontsize
             )
 
-        for i, ir in enumerate(self.irreps_in2):
+        for i, mul_ir in enumerate(self.irreps_in2):
             ax.annotate(
-                format_ir(ir),
+                format_ir(mul_ir),
                 s_in2[i],
                 horizontalalignment='left',
                 textcoords='offset points',
@@ -567,9 +567,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 fontsize=fontsize
             )
 
-        for i, ir in enumerate(self.irreps_out):
+        for i, mul_ir in enumerate(self.irreps_out):
             ax.annotate(
-                format_ir(ir),
+                format_ir(mul_ir),
                 s_out[i],
                 horizontalalignment='center',
                 verticalalignment='top',
