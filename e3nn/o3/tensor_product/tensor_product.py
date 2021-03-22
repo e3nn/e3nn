@@ -416,7 +416,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             Whether to color paths by the sum of their weights.
 
         ax : `matplotlib.Axes`, default None
-            The axes to plot on. If ``None``, a new figure will be created. 
+            The axes to plot on. If ``None``, a new figure will be created.
 
         Returns
         -------
@@ -543,6 +543,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         # add labels
         padding = 3
         fontsize = 10
+
         def format_ir(ir):
             return f"{ir.mul} $\\times$ {ir.ir.l}{'e' if ir.ir.p == 1 else 'o'}"
 
