@@ -40,7 +40,7 @@ They are functions of the input features :math:`f`.
 all these formula are well illustrated by the figure (2) of the same article.
 
 .. image:: transformer.png
-    :width: 600
+    :width: 650
 
 First we need to define the irreps of the inputs, the queries, the keys and the outputs.
 Note that outputs and values share the same irreps.
