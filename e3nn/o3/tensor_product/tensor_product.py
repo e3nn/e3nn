@@ -443,7 +443,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         ]
 
         path = Path(verts, codes)
-        patch = patches.PathPatch(path, facecolor='none', lw=1)
+        patch = patches.PathPatch(path, facecolor='none', lw=1, zorder=2)
         ax.add_patch(patch)
 
         n = len(self.irreps_in1)
