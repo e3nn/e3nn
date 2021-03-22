@@ -464,25 +464,28 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         s_out = [a + (i + 1) / (n + 1) * (b - a) for i in range(n)]
 
         # get weights
-        weight = self._get_weights(weight)
-        path_weight = []
-        flat_weight_index = 0
-        for ins in self.instructions:
-            if ins.has_weight:
-                wdim = prod(ins.path_shape)
-                this_weight = weight.detach()[
-                    ...,
-                    flat_weight_index:flat_weight_index + wdim
-                ]
-                path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
-                flat_weight_index += wdim
-            else:
-                path_weight.append(0)
-        path_weight = np.asarray(path_weight)
-        path_weight /= np.abs(path_weight).max()
+        if weight is None and not self.internal_weights:
+            plot_weight = False
+        elif plot_weight:
+            weight = self._get_weights(weight)
+            path_weight = []
+            flat_weight_index = 0
+            for ins in self.instructions:
+                if ins.has_weight:
+                    wdim = prod(ins.path_shape)
+                    this_weight = weight.detach()[
+                        ...,
+                        flat_weight_index:flat_weight_index + wdim
+                    ]
+                    path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
+                    flat_weight_index += wdim
+                else:
+                    path_weight.append(0)
+            path_weight = np.asarray(path_weight)
+            path_weight /= np.abs(path_weight).max()
         cmap = matplotlib.cm.get_cmap('bwr')
 
-        for ins, ins_weight in zip(self.instructions, path_weight):
+        for ins_index, ins in enumerate(self.instructions):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)
 
             verts = []
@@ -495,7 +498,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             codes += [Path.MOVETO, Path.LINETO]
 
             if plot_weight:
-                color = cmap(0.5 * ins_weight + 0.5) if ins.has_weight else 'black'
+                color = cmap(0.5 * path_weight[ins_index] + 0.5) if ins.has_weight else 'black'
             else:
                 color = cmap(1.0) if ins.has_weight else 'black'
 
@@ -505,7 +508,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 edgecolor=color,
                 alpha=0.5,
                 ls='-',
-                lw=ins.path_weight / min(i.path_weight for i in self.instructions),
+                lw=1.5 * ins.path_weight / min(i.path_weight for i in self.instructions),
             ))
 
         # add labels
