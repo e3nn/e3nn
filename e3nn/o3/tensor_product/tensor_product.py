@@ -399,7 +399,30 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             real_weight = self._get_weights(weight)
             return self._compiled_main_out(x, y, real_weight, self._wigner_buf)
 
-    def visualize(self):  # pragma: no cover
+    def visualize(
+        self,
+        weight: Optional[torch.Tensor] = None,
+        plot_weight: bool = True,
+        ax=None
+    ):  # pragma: no cover
+        r"""Visualize the connectivity of this `TensorProduct`
+
+        Parameters
+        ----------
+        weight : `Optional[torch.Tensor]`, default None
+            like `weight` argument to ``forward()``
+
+        plot_weight : `bool`, default True
+            Whether to color paths by the sum of their weights.
+
+        ax : `matplotlib.Axes`, default None
+            The axes to plot on. If ``None``, a new figure will be created.
+
+        Returns
+        -------
+        (fig, ax)
+            The figure and axes on which the plot was drawn.
+        """
         import numpy as np
 
         def _intersection(x, u, y, v):
@@ -410,17 +433,32 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             mu = np.sum((u * uv - v * u2) * (y - x)) / det
             return y + mu * v
 
+        import matplotlib
         import matplotlib.pyplot as plt
         from matplotlib.path import Path
         import matplotlib.patches as patches
 
-        ax = plt.gca()
+        if ax is None:
+            ax = plt.gca()
+
+        fig = ax.get_figure()
 
         # hexagon
         verts = [
             np.array([np.cos(a * 2 * np.pi / 6), np.sin(a * 2 * np.pi / 6)])
             for a in range(6)
         ]
+        verts = np.asarray(verts)
+
+        # scale it
+        factor = 0.2 / 2
+        min_aspect = 1 / 2
+        h_factor = max(len(self.irreps_in2), len(self.irreps_in1))
+        w_factor = len(self.irreps_out)
+        if h_factor / w_factor < min_aspect:
+            h_factor = min_aspect * w_factor
+        verts[:, 1] *= h_factor * factor
+        verts[:, 0] *= w_factor * factor
 
         codes = [
             Path.MOVETO,
@@ -434,7 +472,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         ]
 
         path = Path(verts, codes)
-        patch = patches.PathPatch(path, facecolor='none', lw=1)
+        patch = patches.PathPatch(path, facecolor='none', lw=1, zorder=2)
         ax.add_patch(patch)
 
         n = len(self.irreps_in1)
@@ -454,7 +492,29 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         s_out = [a + (i + 1) / (n + 1) * (b - a) for i in range(n)]
 
-        for ins in self.instructions:
+        # get weights
+        if weight is None and not self.internal_weights:
+            plot_weight = False
+        elif plot_weight:
+            weight = self._get_weights(weight)
+            path_weight = []
+            flat_weight_index = 0
+            for ins in self.instructions:
+                if ins.has_weight:
+                    wdim = prod(ins.path_shape)
+                    this_weight = weight.detach()[
+                        ...,
+                        flat_weight_index:flat_weight_index + wdim
+                    ]
+                    path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
+                    flat_weight_index += wdim
+                else:
+                    path_weight.append(0)
+            path_weight = np.asarray(path_weight)
+            path_weight /= np.abs(path_weight).max()
+        cmap = matplotlib.cm.get_cmap('bwr')
+
+        for ins_index, ins in enumerate(self.instructions):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)
 
             verts = []
@@ -466,28 +526,65 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             verts += [s_in2[ins.i_in2], y]
             codes += [Path.MOVETO, Path.LINETO]
 
+            if plot_weight:
+                color = cmap(0.5 * path_weight[ins_index] + 0.5) if ins.has_weight else 'black'
+            else:
+                color = 'green' if ins.has_weight else 'black'
+
             ax.add_patch(patches.PathPatch(
                 Path(verts, codes),
                 facecolor='none',
-                edgecolor='red' if ins.has_weight else 'black',
+                edgecolor=color,
                 alpha=0.5,
                 ls='-',
-                lw=ins.path_weight / min(i.path_weight for i in self.instructions),
+                lw=1.5 * ins.path_weight / min(i.path_weight for i in self.instructions),
             ))
 
-        for i, ir in enumerate(self.irreps_in1):
-            ax.annotate(ir, s_in1[i], horizontalalignment='right')
+        # add labels
+        padding = 3
+        fontsize = 10
 
-        for i, ir in enumerate(self.irreps_in2):
-            ax.annotate(ir, s_in2[i], horizontalalignment='left')
+        def format_ir(mul_ir):
+            return f"{mul_ir.mul} $\\times$ {mul_ir.ir}"
 
-        for i, ir in enumerate(self.irreps_out):
-            ax.annotate(ir, s_out[i], horizontalalignment='center', verticalalignment='top', rotation=90)
+        for i, mul_ir in enumerate(self.irreps_in1):
+            ax.annotate(
+                format_ir(mul_ir),
+                s_in1[i],
+                horizontalalignment='right',
+                textcoords='offset points',
+                xytext=(-padding, 0),
+                fontsize=fontsize
+            )
+
+        for i, mul_ir in enumerate(self.irreps_in2):
+            ax.annotate(
+                format_ir(mul_ir),
+                s_in2[i],
+                horizontalalignment='left',
+                textcoords='offset points',
+                xytext=(padding, 0),
+                fontsize=fontsize
+            )
+
+        for i, mul_ir in enumerate(self.irreps_out):
+            ax.annotate(
+                format_ir(mul_ir),
+                s_out[i],
+                horizontalalignment='center',
+                verticalalignment='top',
+                rotation=90,
+                textcoords='offset points',
+                xytext=(0, -padding),
+                fontsize=fontsize
+            )
 
         ax.set_xlim(-2, 2)
         ax.set_ylim(-2, 2)
         ax.axis('equal')
         ax.axis('off')
+
+        return fig, ax
 
 
 class FullyConnectedTensorProduct(TensorProduct):

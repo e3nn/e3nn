@@ -4,7 +4,7 @@ import torch
 from e3nn.math import soft_one_hot_linspace
 
 
-@pytest.mark.parametrize('basis', ['gaussian', 'cosine', 'fourier'])
+@pytest.mark.parametrize('basis', ['gaussian', 'cosine', 'fourier', 'bessel'])
 def test_zero_out(basis):
     x1 = torch.linspace(-2.0, -1.1, 20)
     x2 = torch.linspace(2.1, 3.0, 20)
