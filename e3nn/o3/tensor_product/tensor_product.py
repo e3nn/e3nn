@@ -430,6 +430,17 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             np.array([np.cos(a * 2 * np.pi / 6), np.sin(a * 2 * np.pi / 6)])
             for a in range(6)
         ]
+        verts = np.asarray(verts)
+
+        # scale it
+        factor = 0.2 / 2
+        min_aspect = 1 / 2
+        h_factor = max(len(self.irreps_in2), len(self.irreps_in1))
+        w_factor = len(self.irreps_out)
+        if h_factor / w_factor < min_aspect:
+            h_factor = min_aspect * w_factor
+        verts[:, 1] *= h_factor * factor
+        verts[:, 0] *= w_factor * factor
 
         codes = [
             Path.MOVETO,
@@ -513,10 +524,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # add labels
         padding = 2
-        fontthresh = [10, 12, 16]  # make the font size smaller when more than this many irreps
-        fontsizes = (11, 8, 8, 6)
+        fontsize = 10
 
-        fontsize = fontsizes[np.searchsorted(fontthresh, len(self.irreps_in1))]
         for i, ir in enumerate(self.irreps_in1):
             ax.annotate(
                 ir,
@@ -527,7 +536,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 fontsize=fontsize
             )
 
-        fontsize = fontsizes[np.searchsorted(fontthresh, len(self.irreps_in2))]
         for i, ir in enumerate(self.irreps_in2):
             ax.annotate(
                 ir,
@@ -538,7 +546,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 fontsize=fontsize
             )
 
-        fontsize = fontsizes[np.searchsorted(fontthresh, len(self.irreps_out))]
         for i, ir in enumerate(self.irreps_out):
             ax.annotate(
                 ir,
