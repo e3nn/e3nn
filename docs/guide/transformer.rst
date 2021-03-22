@@ -83,6 +83,23 @@ In order to generate weights that depends on the radii, we project the edges len
     edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, max_radius, number_of_basis, 'smooth_finite', False)
     edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
 
+We will also need a number between 0 and 1 that indicates smoothly if the length of the edge is smaller than ``max_radius``.
+
+.. jupyter-execute::
+
+    edge_weight_cutoff = soft_unit_step(10 * (1 - edge_length / max_radius))
+
+Here is a figure of the function used:
+
+.. jupyter-execute::
+    :hide-code:
+
+    x = torch.linspace(0.0, 1.5, 100)
+    plt.plot(x, soft_unit_step(10 * (1 - x / max_radius)))
+    plt.xlabel('edge length')
+    plt.ylabel('weight cutoff')
+    plt.tight_layout();
+
 To create the values and the keys we have to use the relative position of the edges. We will use the spherical harmonics to have a richer describtor of the relative positions:
 
 .. jupyter-execute::
@@ -134,8 +151,9 @@ Finally we can just use all the modules we created to compute the attention mech
     v = tp_v(f[edge_src], edge_sh, fc_v(edge_length_embedded))
 
     # compute the softmax (per edge)
-    exp = dot(q[edge_dst], k).exp()  # compute the numerator
+    exp = edge_weight_cutoff[:, None] * dot(q[edge_dst], k).exp()  # compute the numerator
     z = scatter(exp, edge_dst, dim=0, dim_size=len(f))  # compute the denominator (per nodes)
+    z[z == 0] = 1  # to avoid 0/0 when all the neighbors are exactly at the cutoff
     alpha = exp / z[edge_dst]
 
     # compute the outputs (per node)
@@ -143,12 +161,96 @@ Finally we can just use all the modules we created to compute the attention mech
 
 Note that this implementation has small differences with the article.
 
-- In this implementation the ``dot`` operation has weights (just because it is simple to make it with weights).
-- The radial neural networks are fed with embeddings that goes smoothly to zero when the edge length reach ``max_radius``. This ensure that the whole operation is smooth when we move the points (deleting/creating new edges).
-- The output is weighted with :math:`\sqrt(\alpha_{ij})` instead of :math:`\alpha_{ij}` to ensure a proper normalization. As checked below.
+- Special care was taken to make the whole operation smooth when we move the points (deleting/creating new edges). It was done via ``edge_weight_cutoff``, ``edge_length_embedded`` and the property :math:`f(0)=0` for the radial neural network.
+- The output is weighted with :math:`\sqrt{\alpha_{ij}}` instead of :math:`\alpha_{ij}` to ensure a proper normalization.
+
+Both are checked below, starting by the normalization.
 
 .. jupyter-execute::
 
     f_out.mean().item(), f_out.std().item()
+
+Let's put eveything into a function to check the smoothness and the equivariance.
+
+.. jupyter-execute::
+
+    def transformer(f, pos):
+        edge_src, edge_dst = radius_graph(pos, max_radius)
+        edge_vec = pos[edge_src] - pos[edge_dst]
+        edge_length = edge_vec.norm(dim=1)
+
+        edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, max_radius, number_of_basis, 'smooth_finite', False)
+        edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
+        edge_weight_cutoff = soft_unit_step(10 * (1 - edge_length / max_radius))
+
+        edge_sh = o3.spherical_harmonics(irreps_sh, edge_vec, True, normalization='component')
+
+        q = h_q(f)
+        k = tp_k(f[edge_src], edge_sh, fc_k(edge_length_embedded))
+        v = tp_v(f[edge_src], edge_sh, fc_v(edge_length_embedded))
+
+        exp = edge_weight_cutoff[:, None] * dot(q[edge_dst], k).exp()
+        z = scatter(exp, edge_dst, dim=0, dim_size=len(f))
+        z[z == 0] = 1
+        alpha = exp / z[edge_dst]
+
+        return scatter(alpha.sqrt() * v, edge_dst, dim=0, dim_size=len(f))
+
+Here is a smoothness check: tow nodes are placed at a distance 1 (``max_radius > 1``) so they see each other.
+A third node coming from far away moves slowly towards them.
+
+.. jupyter-execute::
+    :hide-output:
+
+    f = irreps_input.randn(3, -1)
+
+    xs = torch.linspace(-1.3, -1.0, 200)
+    outputs = []
+
+    for x in xs:
+        pos = torch.tensor([
+            [0.0, 0.5, 0.0],       # this node always sees...
+            [0.0, -0.5, 0.0],      # ...this node
+            [x.item(), 0.0, 0.0],  # this node moves slowly
+        ])
+
+        with torch.no_grad():
+            outputs.append(transformer(f, pos))
+
+    outputs = torch.stack(outputs)
+    plt.plot(xs, outputs[:, 0, [0, 1, 14, 15, 16]], 'k')  # plots 2 scalars and 1 vector
+    plt.plot(xs, outputs[:, 1, [0, 1, 14, 15, 16]], 'g')
+    plt.plot(xs, outputs[:, 2, [0, 1, 14, 15, 16]], 'r')
+
+.. jupyter-execute::
+    :hide-code:
+
+    plt.plot(xs, outputs[:, 0, [0, 1, 14, 15, 16]], 'k')
+    plt.plot(xs, outputs[:, 1, [0, 1, 14, 15, 16]], 'g')
+    plt.plot(xs, outputs[:, 2, [0, 1, 14, 15, 16]], 'r')
+    plt.xlabel('3rd node position')
+    plt.ylabel('output features')
+    plt.plot([], [], 'k', label='1st node')
+    plt.plot([], [], 'g', label='2nd node')
+    plt.plot([], [], 'r', label='3rd node')
+    plt.legend()
+    plt.tight_layout();
+
+
+Finally we can check the equivariance:
+
+.. jupyter-execute::
+
+    f = irreps_input.randn(10, -1)
+    pos = torch.randn(10, 3)
+
+    rot = o3.rand_matrix()
+    D_in = irreps_input.D_from_matrix(rot)
+    D_out = irreps_output.D_from_matrix(rot)
+
+    f_before = transformer(f @ D_in.T, pos @ rot.T)
+    f_after = transformer(f, pos) @ D_out.T
+
+    torch.allclose(f_before, f_after, atol=1e-3, rtol=1e-3)
 
 .. _SE(3)-Transformers: https://proceedings.neurips.cc/paper/2020/file/15231a7ce4ba789d13b722cc5c955834-Paper.pdf
