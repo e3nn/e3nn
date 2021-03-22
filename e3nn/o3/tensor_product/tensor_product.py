@@ -511,7 +511,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             if plot_weight:
                 color = cmap(0.5 * path_weight[ins_index] + 0.5) if ins.has_weight else 'black'
             else:
-                color = cmap(1.0) if ins.has_weight else 'black'
+                color = 'green' if ins.has_weight else 'black'
 
             ax.add_patch(patches.PathPatch(
                 Path(verts, codes),
