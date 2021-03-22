@@ -399,7 +399,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             real_weight = self._get_weights(weight)
             return self._compiled_main_out(x1, x2, real_weight, self._wigner_buf)
 
-    def visualize(self, ax=None):  # pragma: no cover
+    def visualize(
+        self,
+        weight: Optional[torch.Tensor] = None,
+        plot_weight: bool = True,
+        ax=None
+    ):  # pragma: no cover
         import numpy as np
 
         def _intersection(x, u, y, v):
@@ -410,6 +415,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             mu = np.sum((u * uv - v * u2) * (y - x)) / det
             return y + mu * v
 
+        import matplotlib
         import matplotlib.pyplot as plt
         from matplotlib.path import Path
         import matplotlib.patches as patches
@@ -457,7 +463,26 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         s_out = [a + (i + 1) / (n + 1) * (b - a) for i in range(n)]
 
+        # get weights
+        weight = self._get_weights(weight)
+        path_weight = []
+        flat_weight_index = 0
         for ins in self.instructions:
+            if ins.has_weight:
+                wdim = prod(ins.path_shape)
+                this_weight = weight.detach()[
+                    ...,
+                    flat_weight_index:flat_weight_index + wdim
+                ]
+                path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
+                flat_weight_index += wdim
+            else:
+                path_weight.append(0)
+        path_weight = np.asarray(path_weight)
+        path_weight /= np.abs(path_weight).max()
+        cmap = matplotlib.cm.get_cmap('bwr')
+
+        for ins, ins_weight in zip(self.instructions, path_weight):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)
 
             verts = []
@@ -469,10 +494,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             verts += [s_in2[ins.i_in2], y]
             codes += [Path.MOVETO, Path.LINETO]
 
+            if plot_weight:
+                color = cmap(0.5 * ins_weight + 0.5) if ins.has_weight else 'black'
+            else:
+                color = cmap(1.0) if ins.has_weight else 'black'
+
             ax.add_patch(patches.PathPatch(
                 Path(verts, codes),
                 facecolor='none',
-                edgecolor='red' if ins.has_weight else 'black',
+                edgecolor=color,
                 alpha=0.5,
                 ls='-',
                 lw=ins.path_weight / min(i.path_weight for i in self.instructions),
