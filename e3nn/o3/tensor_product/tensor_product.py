@@ -523,12 +523,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             ))
 
         # add labels
-        padding = 2
+        padding = 3
         fontsize = 10
+        def format_ir(ir):
+            return f"{ir.mul} $\\times$ {ir.ir.l}{'e' if ir.ir.p == 1 else 'o'}"
 
         for i, ir in enumerate(self.irreps_in1):
             ax.annotate(
-                ir,
+                format_ir(ir),
                 s_in1[i],
                 horizontalalignment='right',
                 textcoords='offset points',
@@ -538,7 +540,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         for i, ir in enumerate(self.irreps_in2):
             ax.annotate(
-                ir,
+                format_ir(ir),
                 s_in2[i],
                 horizontalalignment='left',
                 textcoords='offset points',
@@ -548,7 +550,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         for i, ir in enumerate(self.irreps_out):
             ax.annotate(
-                ir,
+                format_ir(ir),
                 s_out[i],
                 horizontalalignment='center',
                 verticalalignment='top',
