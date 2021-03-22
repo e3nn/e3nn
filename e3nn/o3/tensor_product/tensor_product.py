@@ -405,6 +405,24 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         plot_weight: bool = True,
         ax=None
     ):  # pragma: no cover
+        r"""Visualize the connectivity of this `TensorProduct`
+
+        Parameters
+        ----------
+        weight : `Optional[torch.Tensor]`, default None
+            like `weight` argument to ``forward()``
+
+        plot_weight : `bool`, default True
+            Whether to color paths by the sum of their weights.
+
+        ax : `matplotlib.Axes`, default None
+            The axes to plot on. If ``None``, a new figure will be created. 
+
+        Returns
+        -------
+        (fig, ax)
+            The figure and axes on which the plot was drawn.
+        """
         import numpy as np
 
         def _intersection(x, u, y, v):
