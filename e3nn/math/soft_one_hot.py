@@ -21,6 +21,7 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         \sum_{i=1}^N y_i^2 \approx 1
 
     See the last plot below.
+    Note that ``bessel`` basis cannot be normalized.
 
     Parameters
     ----------
@@ -36,8 +37,8 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
     number : int
         number of basis functions :math:`N`
 
-    basis : {'gaussian', 'cosine', 'fourier', 'smooth_finite'}
-        choice of basis family
+    basis : {'gaussian', 'cosine', 'fourier', 'bessel', 'smooth_finite'}
+        choice of basis family; note that due to the :math:`1/x` term, ``bessel`` basis does not satisfy the normalization of other basis choices
 
     endpoint : bool
         if ``endpoint=False`` then for all :math:`x` outside of the interval defined by ``(start, end)``, :math:`\forall i, \; f_i(x) \approx 0`
@@ -84,6 +85,14 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
 
     .. jupyter-execute::
 
+        plt.plot(x, soft_one_hot_linspace(x, -0.5, 1.5, 3, 'bessel', endpoint=False));
+
+    .. jupyter-execute::
+
+        plt.plot(x, soft_one_hot_linspace(x, -0.5, 1.5, 3, 'bessel', endpoint=True));
+
+    .. jupyter-execute::
+
         for basis in ['gaussian', 'cosine', 'fourier', 'smooth_finite']:
             for endpoint in [False, True]:
                 y = soft_one_hot_linspace(x, -0.5, 1.5, 4, basis, endpoint)
@@ -117,3 +126,14 @@ def soft_one_hot_linspace(x, start, end, number, basis='gaussian', endpoint=True
         else:
             i = torch.arange(1, number + 1, dtype=x.dtype, device=x.device)
             return torch.sin(math.pi * i * x) / math.sqrt(0.25 + number / 2) * (0 < x) * (x < 1)
+
+    if basis == 'bessel':
+        x = x[..., None] - start
+        c = end - start
+        bessel_roots = torch.arange(1, number + 1, dtype=x.dtype, device=x.device) * math.pi
+        out = math.sqrt(2 / c) * torch.sin(bessel_roots * x / c) / x
+
+        if endpoint:
+            return out
+        else:
+            return out * ((x / c) < 1) * (0 < x)

@@ -341,14 +341,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             return weight
 
     @torch.jit.export
-    def right(self, x2, weight: Optional[torch.Tensor] = None):
+    def right(self, y, weight: Optional[torch.Tensor] = None):
         r"""evaluate partially :math:`w x \cdot \otimes y`
 
         It returns an operator in the form of a matrix.
 
         Parameters
         ----------
-        x2 : `torch.Tensor`
+        y : `torch.Tensor`
             tensor of shape ``(..., irreps_in2.dim)``
 
         weight : `torch.Tensor` or list of `torch.Tensor`, optional
@@ -363,21 +363,21 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
-        assert x2.shape[-1] == self._in2_dim, "Incorrect last dimension for x2"
+        assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
 
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_right(x2, real_weight, self._wigner_buf)
+            return self._compiled_main_right(y, real_weight, self._wigner_buf)
 
-    def forward(self, x1, x2, weight: Optional[torch.Tensor] = None):
+    def forward(self, x, y, weight: Optional[torch.Tensor] = None):
         r"""evaluate :math:`w x \otimes y`
 
         Parameters
         ----------
-        x1 : `torch.Tensor`
+        x : `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim)``
 
-        x2 : `torch.Tensor`
+        y : `torch.Tensor`
             tensor of shape ``(..., irreps_in2.dim)``
 
         weight : `torch.Tensor` or list of `torch.Tensor`, optional
@@ -392,12 +392,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        assert x1.shape[-1] == self._in1_dim, "Incorrect last dimension for x1"
-        assert x2.shape[-1] == self._in2_dim, "Incorrect last dimension for x2"
+        assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
+        assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
 
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_out(x1, x2, real_weight, self._wigner_buf)
+            return self._compiled_main_out(x, y, real_weight, self._wigner_buf)
 
     def visualize(
         self,

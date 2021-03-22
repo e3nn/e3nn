@@ -20,15 +20,15 @@ pip install torch-geometric
 
 See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions.
 
-## e3nn
-
-For now the library is pure python, therefore the installation precedure is very simple:
+## e3nn (stable)
 
 ```
 pip install e3nn
 ```
 
-or clone the main branch and execute
+## e3nn (unstable)
+
+Clone the main branch and execute
 
 ```
 python setup.py develop

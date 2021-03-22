@@ -14,6 +14,8 @@ It contains fundamental mathematical operations such as tensor products and sphe
 - install [pytorch_geometric](https://github.com/rusty1s/pytorch_geometric)
 - `pip install e3nn`
 
+It is recommanded to install using pip. The main branch is considered as unstable.
+
 See [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
 
 ### Previous version

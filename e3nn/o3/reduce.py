@@ -120,7 +120,7 @@ class ReducedTensorProducts:
     >>> x, y = torch.randn(2, 3)
     >>> a = torch.einsum('zij,i,j->z', tp.change_of_basis, x, y)
     >>> b = tp(x, y)
-    >>> assert torch.allclose(a, b)
+    >>> assert torch.allclose(a, b, atol=1e-3, rtol=1e-3)
     """
     def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, **irreps):
         if filter_ir_out is not None:
