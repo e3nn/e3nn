@@ -27,7 +27,7 @@ We will implement the formula (1) of `SE(3)-Transformers`_. The output features 
     \alpha_{ij} = \frac{\exp(q_i^T k_j)}{\sum_{j'=1}^n \exp(q_i^T k_{j'})}
 
 where :math:`q, k, v` are respectively called the queries, keys and values.
-They are function of the input features :math:`f`.
+They are functions of the input features :math:`f`.
 
 .. math::
 
@@ -42,7 +42,7 @@ all these formula are well illustrated by the figure (2) of the same article.
 .. image:: transformer.png
     :width: 600
 
-First we need to define the irreps of the inputs, the queries, the keys and the ouputs.
+First we need to define the irreps of the inputs, the queries, the keys and the outputs.
 Note that outputs and values share the same irreps.
 
 .. jupyter-execute::
@@ -145,7 +145,7 @@ Note that this implementation has small differences with the article.
 
 - In this implementation the ``dot`` operation has weights (just because it is simple to make it with weights).
 - The radial neural networks are fed with embeddings that goes smoothly to zero when the edge length reach ``max_radius``. This ensure that the whole operation is smooth when we move the points (deleting/creating new edges).
-- The output is weight with :math:`\sqrt(\alpha_{ij})` instead of :math:`\alpha_{ij}` to ensure a proper normalization. As checked below.
+- The output is weighted with :math:`\sqrt(\alpha_{ij})` instead of :math:`\alpha_{ij}` to ensure a proper normalization. As checked below.
 
 .. jupyter-execute::
 
