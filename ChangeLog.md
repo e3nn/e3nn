@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `in_place` option for `e3nn.util.jit` compilation functions
 - New `@compile_mode("unsupported")` for modules that do not support TorchScript
 - flake8 settings have been added to `setup.cfg` for improved code style
+- `basis='bessel'` option to `math.soft_one_hot_linspace`
 
 ### Changed
 - `o3.TensorProduct` now uses `torch.fx` to generate it's code
