@@ -513,25 +513,32 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # add labels
         padding = 2
+        fontthresh = [10, 12, 16]  # make the font size smaller when more than this many irreps
+        fontsizes = (11, 8, 8, 6)
 
+        fontsize = fontsizes[np.searchsorted(fontthresh, len(self.irreps_in1))]
         for i, ir in enumerate(self.irreps_in1):
             ax.annotate(
                 ir,
                 s_in1[i],
                 horizontalalignment='right',
                 textcoords='offset points',
-                xytext=(-padding, 0)
+                xytext=(-padding, 0),
+                fontsize=fontsize
             )
 
+        fontsize = fontsizes[np.searchsorted(fontthresh, len(self.irreps_in2))]
         for i, ir in enumerate(self.irreps_in2):
             ax.annotate(
                 ir,
                 s_in2[i],
                 horizontalalignment='left',
                 textcoords='offset points',
-                xytext=(padding, 0)
+                xytext=(padding, 0),
+                fontsize=fontsize
             )
 
+        fontsize = fontsizes[np.searchsorted(fontthresh, len(self.irreps_out))]
         for i, ir in enumerate(self.irreps_out):
             ax.annotate(
                 ir,
@@ -540,7 +547,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 verticalalignment='top',
                 rotation=90,
                 textcoords='offset points',
-                xytext=(0, -padding)
+                xytext=(0, -padding),
+                fontsize=fontsize
             )
 
         ax.set_xlim(-2, 2)
