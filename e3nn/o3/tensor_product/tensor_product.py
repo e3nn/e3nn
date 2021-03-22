@@ -508,14 +508,37 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 lw=ins.path_weight / min(i.path_weight for i in self.instructions),
             ))
 
+        # add labels
+        padding = 2
+
         for i, ir in enumerate(self.irreps_in1):
-            ax.annotate(ir, s_in1[i], horizontalalignment='right')
+            ax.annotate(
+                ir,
+                s_in1[i],
+                horizontalalignment='right',
+                textcoords='offset points',
+                xytext=(-padding, 0)
+            )
 
         for i, ir in enumerate(self.irreps_in2):
-            ax.annotate(ir, s_in2[i], horizontalalignment='left')
+            ax.annotate(
+                ir,
+                s_in2[i],
+                horizontalalignment='left',
+                textcoords='offset points',
+                xytext=(padding, 0)
+            )
 
         for i, ir in enumerate(self.irreps_out):
-            ax.annotate(ir, s_out[i], horizontalalignment='center', verticalalignment='top', rotation=90)
+            ax.annotate(
+                ir,
+                s_out[i],
+                horizontalalignment='center',
+                verticalalignment='top',
+                rotation=90,
+                textcoords='offset points',
+                xytext=(0, -padding)
+            )
 
         ax.set_xlim(-2, 2)
         ax.set_ylim(-2, 2)
