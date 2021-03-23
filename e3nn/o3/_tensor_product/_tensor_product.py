@@ -1,6 +1,8 @@
 from typing import Optional, List, Union
 
 import torch
+
+import e3nn
 from e3nn import o3
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
@@ -168,8 +170,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         normalization: str = 'component',
         internal_weights=None,
         shared_weights=None,
-        _specialized_code: bool = True,
-        _optimize_einsums: bool = True
+        _specialized_code: Optional[bool] = None,
+        _optimize_einsums: Optional[bool] = None
     ):
         # === Setup ===
         super().__init__()
@@ -237,8 +239,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         ]
         self.instructions = instructions
 
-        self._specialized_code = _specialized_code
-        self._optimize_einsums = _optimize_einsums
+        opt_defaults = e3nn.get_optimization_defaults()
+        self._specialized_code = _specialized_code if _specialized_code is not None else opt_defaults['specialized_code']
+        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
+        del opt_defaults
 
         # Generate the actual tensor product code
         code_out, code_right, wigners = codegen_tensor_product(
