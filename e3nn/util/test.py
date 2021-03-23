@@ -67,6 +67,10 @@ def assert_equivariant(
             the threshold below which the equivariance error must fall. If ``None``, (the default), ``FLOAT_TOLERANCE[torch.get_default_dtype()]`` is used.
         **kwargs : kwargs
             passed through to ``equivariance_error``.
+
+    Returns
+    -------
+    The same as ``equivariance_error``: a dictionary mapping tuples ``(parity_k, did_translate)`` to errors
     """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
@@ -98,6 +102,8 @@ def assert_equivariant(
             "; ".join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
         )
         assert len(problems) == 0, errstr
+
+    return errors
 
 
 def equivariance_error(
@@ -172,14 +178,17 @@ def equivariance_error(
             x2 = func(*args_in)
 
             # Deal with output shapes
-            if len(irreps_out) == 1:
+            assert type(x1) == type(x2), f"Inconsistant return types {type(x1)} and {type(x2)}"
+            if isinstance(x1, torch.Tensor):
                 # Make sequences
                 x1 = [x1]
                 x2 = [x2]
-            else:
+            elif isinstance(x1, list) or isinstance(x1, tuple):
                 # They're already tuples
                 x1 = list(x1)
                 x2 = list(x2)
+            else:
+                raise TypeError(f"equivariance_error cannot handle output type {type(x1)}")
             assert len(x1) == len(x2)
             assert len(x1) == len(irreps_out)
 

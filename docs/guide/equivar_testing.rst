@@ -33,6 +33,31 @@ In addition to `Irreps`-like objects, ``irreps_in`` can also contain two special
  * ``'cartesian_points'``: ``(N, 3)`` tensors containing XYZ points in real space that are equivariant under rotations *and* translations
  * ``None``: any input or output that is invariant and should be left alone
 
-These can be used to test models that operate on full graphs that include position information:
+These can be used to test models that operate on full graphs that include position information::
 
-.. literalinclude:: ../../tests/nn/models/gate_points_2101_test.py
+    import torch
+    from torch_geometric.data import Data
+    from e3nn.nn.models.gate_points_2101 import Network
+    from e3nn.util.test import assert_equivariant
+
+    # kwargs = ...
+    network = Network(**kwargs)
+
+    def wrapper(pos, x, z):
+        data = Data(pos=pos, x=x, z=z, batch=torch.zeros(pos.shape[0], dtype=torch.long))
+        return f(data)
+
+    assert_equivariant(
+        wrapper,
+        irreps_in=['cartesian_points', f.irreps_in, f.irreps_node_attr],
+        irreps_out=[f.irreps_out],
+    )
+
+To test equivariance on a specific graph, `args_in` can be used::
+
+    assert_equivariant(
+        wrapper,
+        irreps_in=['cartesian_points', f.irreps_in, f.irreps_node_attr],
+        args_in=[my_pos, my_x, my_z],
+        irreps_out=[f.irreps_out],
+    )
