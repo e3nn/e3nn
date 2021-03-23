@@ -67,6 +67,10 @@ def assert_equivariant(
             the threshold below which the equivariance error must fall. If ``None``, (the default), ``FLOAT_TOLERANCE[torch.get_default_dtype()]`` is used.
         **kwargs : kwargs
             passed through to ``equivariance_error``.
+
+    Returns
+    -------
+    The same as ``equivariance_error``: a dictionary mapping tuples ``(parity_k, did_translate)`` to errors
     """
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
@@ -98,6 +102,8 @@ def assert_equivariant(
             "; ".join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
         )
         assert len(problems) == 0, errstr
+
+    return errors
 
 
 def equivariance_error(
