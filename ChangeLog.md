@@ -8,7 +8,8 @@ Most recent change on the top!
 
 ## [Unreleased]
 ### Added
- - Added `e3nn.set_optimization_defaults()` and `e3nn.get_optimization_defaults()`
+- Added `e3nn.set_optimization_defaults()` and `e3nn.get_optimization_defaults()`
+- Constructors for empty `Irreps`: `Irreps()` and `Irreps("")`
 
 ### Changed
 - Renamed `o3.spherical_harmonics` arguement `xyz` into `x`
