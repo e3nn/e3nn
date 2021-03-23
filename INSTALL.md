@@ -32,7 +32,7 @@ $ cd opt_einsum_fx/
 $ pip install .
 ```
 
-If you encounter any issues when `opt_einsum_fx` is installed, please file an issue on the appropriate repository.
+`opt_einsum_fx` can be enabled/disabled using `e3nn.set_optimization_defaults(optimize_einsums=True/False)`. If you encounter any issues when `opt_einsum_fx` is enabled, please file an issue on the appropriate repository.
 
 ## e3nn
 
