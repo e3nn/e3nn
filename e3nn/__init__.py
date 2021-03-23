@@ -12,7 +12,7 @@ _OPT_DEFAULTS: Dict[str, bool] = dict(
 def set_optimization_defaults(
     specialized_code: bool = True,
     optimize_einsums: bool = True
-):
+) -> None:
     r"""Globally set the default optimization settings.
 
     Parameters
@@ -26,6 +26,6 @@ def set_optimization_defaults(
     _OPT_DEFAULTS['optimize_einsums'] = optimize_einsums
 
 
-def get_optimization_defaults():
+def get_optimization_defaults() -> Dict[str, bool]:
     r"""Get the global default optimization settings."""
     return dict(_OPT_DEFAULTS)
