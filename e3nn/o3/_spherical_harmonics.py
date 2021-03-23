@@ -9,7 +9,6 @@ from sympy.printing.pycode import pycode
 import torch
 
 from e3nn import o3
-from .irreps import Irreps
 from e3nn.util.jit import compile_mode
 
 
@@ -28,25 +27,25 @@ class SphericalHarmonics(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_out: Union[int, List[int], str, Irreps],
+        irreps_out: Union[int, List[int], str, o3.Irreps],
         normalize: bool,
         normalization: str = 'integral',
-        irreps_in: Any = Irreps("1x1o"),
+        irreps_in: Any = o3.Irreps("1x1o"),
     ):
         super().__init__()
         self.normalize = normalize
         self.normalization = normalization
         assert normalization in ['integral', 'component', 'norm']
 
-        irreps_in = Irreps(irreps_in)
-        if irreps_in not in (Irreps("1x1o"), Irreps("1x1e")):
+        irreps_in = o3.Irreps(irreps_in)
+        if irreps_in not in (o3.Irreps("1x1o"), o3.Irreps("1x1e")):
             raise ValueError(f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a psuedovector (`1x1e`), not `{irreps_in}`")
         self.irreps_in = irreps_in
         input_p = irreps_in[0].ir.p
 
         if isinstance(irreps_out, str):
-            irreps_out = Irreps(irreps_out)
-        if isinstance(irreps_out, Irreps):
+            irreps_out = o3.Irreps(irreps_out)
+        if isinstance(irreps_out, o3.Irreps):
             ls = []
             for mul, (l, p) in irreps_out:
                 if p != input_p**l:
@@ -57,7 +56,7 @@ class SphericalHarmonics(torch.nn.Module):
         else:
             ls = list(irreps_out)
 
-        irreps_out = Irreps([(1, (l, input_p**l)) for l in ls]).simplify()
+        irreps_out = o3.Irreps([(1, (l, input_p**l)) for l in ls]).simplify()
         self.irreps_out = irreps_out
         self._ls_list = ls
         self._lmax = max(ls)
@@ -97,7 +96,7 @@ class SphericalHarmonics(torch.nn.Module):
 
 
 def spherical_harmonics(
-    l: Union[int, List[int], str, Irreps],
+    l: Union[int, List[int], str, o3.Irreps],
     xyz: torch.Tensor,
     normalize: bool,
     normalization: str = 'integral'

@@ -42,7 +42,7 @@ def wigner_D(l, alpha, beta, gamma):
     * :math:`D(\text{identity rotation}) = \text{identity matrix}`
     * :math:`D(R_1 \circ R_2) = D(R_1) \circ D(R_2)`
     * :math:`D(R^{-1}) = D(R)^{-1} = D(R)^T`
-    * :math:`D(\text{rotation around Y axis})` has some property that allows us to use FFT in `s2grid`
+    * :math:`D(\text{rotation around Y axis})` has some property that allows us to use FFT in `ToS2Grid`
 
     Code of this function has beed copied from `lie_learn <https://github.com/AMLab-Amsterdam/lie_learn>`_ made by Taco Cohen.
 

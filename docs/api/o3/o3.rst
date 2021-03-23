@@ -8,15 +8,15 @@ All functions in this module are accessible via ``o3`` submodule:
     from e3nn import o3
 
     R = o3.rand_matrix(10)
-    o3.Irreps.spherical_harmonics(4).D_from_matrix(R)
+    D = o3.Irreps.spherical_harmonics(4).D_from_matrix(R)
 
 .. rubric:: Overview
 
 .. toctree::
-    o3_wigner
+    o3_rotation
     o3_irreps
     o3_tp
     o3_sh
-    o3_rotation
     o3_reduce
     o3_s2grid
+    o3_wigner

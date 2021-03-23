@@ -3,6 +3,6 @@
 Parametrization of Rotations
 ============================
 
-.. automodule:: e3nn.o3.rotation
+.. automodule:: e3nn.o3._rotation
     :members:
     :show-inheritance:

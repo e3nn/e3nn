@@ -184,20 +184,10 @@ Similarly, the next spherical harmonic function :math:`Y^3` is the :math:`L=3` p
 
 The functions below are more efficient versions not using `ElementwiseTensorProduct`:
 
-.. rubric:: Overview
-
-.. autosummary::
-    :nosignatures:
-
-    e3nn.o3.cartesian_spherical_harmonics
-    e3nn.o3.angular_spherical_harmonics
-
 .. rubric:: Details
 
-.. automodule:: e3nn.o3.cartesian_spherical_harmonics
-    :members:
-    :show-inheritance:
+.. autofunction:: e3nn.o3.spherical_harmonics
 
-.. automodule:: e3nn.o3.angular_spherical_harmonics
-    :members:
-    :show-inheritance:
+.. autofunction:: e3nn.o3.spherical_harmonics_alpha_beta
+
+.. autofunction:: e3nn.o3.legendre

@@ -43,6 +43,10 @@ Irreps of :math:`O(3)` are often confused with the spherical harmonics, the rela
 .. _irreps: https://en.wikipedia.org/wiki/Irreducible_representation
 .. _wigner: https://en.wikipedia.org/wiki/Wigner_D-matrix
 
-.. automodule:: e3nn.o3.irreps
+.. autoclass:: e3nn.o3.Irrep
+    :members:
+    :show-inheritance:
+
+.. autoclass:: e3nn.o3.Irreps
     :members:
     :show-inheritance:
