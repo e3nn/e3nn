@@ -18,14 +18,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     Parameters
     ----------
-    in1 : `Irreps` or list of tuple
-        List of first inputs ``(multiplicity, irrep[, variance])``.
+    in1 : `Irreps`
+        Irreps for the first input.
 
-    in2 : `Irreps` or list of tuple
-        List of second inputs ``(multiplicity, irrep[, variance])``.
+    in2 : `Irreps`
+        Irreps for the second input.
 
-    out : `Irreps` or list of tuple
-        List of outputs ``(multiplicity, irrep[, variance])``.
+    out : `Irreps`
+        Irreps for the output.
 
     instructions : list of tuple
         List of instructions ``(i_1, i_2, i_out, mode, train[, path_weight])``
@@ -34,6 +34,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         * mode: determines the way the multiplicities are treated, "uvw" is fully connected
         * train: `True` of `False` if this path is weighed by a parameter
         * path weight: how much this path should contribute to the output
+
+    in1_var : list of float, Tensor, or None
+        Variance for each irrep in ``irreps_in1``. If ``None``, all default to ``1.0``.
+
+    in2_var : list of float, Tensor, or None
+        Variance for each irrep in ``irreps_in2``. If ``None``, all default to ``1.0``.
+
+    out_var : list of float, Tensor, or None
+        Variance for each irrep in ``irreps_out``. If ``None``, all default to ``1.0``.
 
     normalization : {'component', 'norm'}
         the way it is assumed the representation are normalized. If it is set to "norm":
@@ -166,10 +175,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         in1,
         in2,
         out,
-        instructions,
+        instructions: List[tuple],
+        in1_var: Optional[Union[List[float], torch.Tensor]] = None,
+        in2_var: Optional[Union[List[float], torch.Tensor]] = None,
+        out_var: Optional[Union[List[float], torch.Tensor]] = None,
         normalization: str = 'component',
-        internal_weights=None,
-        shared_weights=None,
+        internal_weights: Optional[bool] = None,
+        shared_weights: Optional[bool] = None,
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None
     ):
@@ -193,33 +205,30 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.shared_weights = shared_weights
 
         # Determine irreps
-        try:
-            in1 = o3.Irreps(in1)
-        except AssertionError:
-            pass
-        try:
-            in2 = o3.Irreps(in2)
-        except AssertionError:
-            pass
-        try:
-            out = o3.Irreps(out)
-        except AssertionError:
-            pass
-
-        in1 = [x if len(x) == 3 else x + (1.0,) for x in in1]
-        in2 = [x if len(x) == 3 else x + (1.0,) for x in in2]
-        out = [x if len(x) == 3 else x + (1.0,) for x in out]
-
-        self.irreps_in1 = o3.Irreps([(mul, ir) for mul, ir, _var in in1])
-        self.irreps_in2 = o3.Irreps([(mul, ir) for mul, ir, _var in in2])
-        self.irreps_out = o3.Irreps([(mul, ir) for mul, ir, _var in out])
+        self.irreps_in1 = o3.Irreps(in1)
+        self.irreps_in2 = o3.Irreps(in2)
+        self.irreps_out = o3.Irreps(out)
 
         self._in1_dim = self.irreps_in1.dim
         self._in2_dim = self.irreps_in2.dim
 
-        self.in1_var = [var for _, _, var in in1]
-        self.in2_var = [var for _, _, var in in2]
-        self.out_var = [var for _, _, var in out]
+        if in1_var is None:
+            self.in1_var = [1.0 for _ in range(len(self.irreps_in1))]
+        else:
+            self.in1_var = [float(var) for var in in1_var]
+            assert len(self.in1_var) == len(self.irreps_in1), "Len of ir1_var must be equal to len(irreps_in1)"
+
+        if in2_var is None:
+            self.in2_var = [1.0 for _ in range(len(self.irreps_in2))]
+        else:
+            self.in2_var = [float(var) for var in in2_var]
+            assert len(self.in2_var) == len(self.irreps_in2), "Len of ir2_var must be equal to len(irreps_in2)"
+
+        if out_var is None:
+            self.out_var = [1.0 for _ in range(len(self.irreps_out))]
+        else:
+            self.out_var = [float(var) for var in out_var]
+            assert len(self.out_var) == len(self.irreps_out), "Len of out_var must be equal to len(irreps_out)"
 
         # Preprocess instructions into objects
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
