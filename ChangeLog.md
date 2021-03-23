@@ -8,6 +8,7 @@ Most recent change on the top!
 
 ## [Unreleased]
 ### Added
+- Added `e3nn.set_optimization_defaults()` and `e3nn.get_optimization_defaults()`
 - Constructors for empty `Irreps`: `Irreps()` and `Irreps("")`
 
 ### Changed
@@ -28,6 +29,7 @@ Most recent change on the top!
 - flake8 settings have been added to `setup.cfg` for improved code style
 - `TensorProduct.visualize()` can now plot weights
 - `basis='bessel'` option to `math.soft_one_hot_linspace`
+- Optional optimization of `TensorProduct` if [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) is installed
 
 ### Changed
 - `o3.TensorProduct` now uses `torch.fx` to generate it's code
