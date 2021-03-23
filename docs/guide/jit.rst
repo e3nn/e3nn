@@ -183,6 +183,7 @@ Compile mode ``"unsupported"``
 Sometimes you may write modules that use features unsupported by TorchScript regardless of whether you trace or script. To avoid cryptic errors from TorchScript if someone tries to compile a model containing such a module, the module can be marked with ``@compile_mode("unsupported")``:
 
 .. jupyter-execute::
+
     @compile_mode('unsupported')
     class ChildMod(torch.nn.Module):
         pass
