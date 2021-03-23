@@ -361,7 +361,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         The result of this method can be applied with a tensor contraction:
 
-        .. codeblock:: python
+        .. code-block:: python
 
             torch.einsum("...ik,...i->...k", right, input)
 
@@ -428,13 +428,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         Parameters
         ----------
-        weight : `Optional[torch.Tensor]`, default None
-            like `weight` argument to ``forward()``
+        weight : `torch.Tensor`, optional
+            like ``weight`` argument to ``forward()``
 
         plot_weight : `bool`, default True
             Whether to color paths by the sum of their weights.
 
-        ax : `matplotlib.Axes`, default None
+        ax : ``matplotlib.Axes``, default None
             The axes to plot on. If ``None``, a new figure will be created.
 
         Returns

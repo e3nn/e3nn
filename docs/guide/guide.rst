@@ -15,6 +15,7 @@ User Guide
 
 .. toctree::
 
+    transformer
     equivar_testing
     jit
     change_of_basis
