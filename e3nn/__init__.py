@@ -28,4 +28,4 @@ def set_optimization_defaults(
 
 def get_optimization_defaults():
     r"""Get the global default optimization settings."""
-    return _OPT_DEFAULTS
+    return dict(_OPT_DEFAULTS)
