@@ -342,9 +342,28 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     @torch.jit.export
     def right(self, y, weight: Optional[torch.Tensor] = None):
-        r"""evaluate partially :math:`w x \cdot \otimes y`
+        r"""Partially evaluate :math:`w x \otimes y`.
 
-        It returns an operator in the form of a matrix.
+        It returns an operator in the form of a tensor that can act on an arbitrary :math:`x`.
+
+        For example, if the tensor product above is expressed as
+
+        .. math::
+
+            w_{ijk} x_i y_j \rightarrow z_k
+
+        then the right method returns a tensor :math:`b_{ik}` such that
+
+        .. math::
+
+            w_{ijk} y_j \rightarrow b_{ik}
+            x_i b_{ik} \rightarrow z_k
+
+        The result of this method can be applied with a tensor contraction:
+
+        .. codeblock:: python
+
+            torch.einsum("...ik,...i->...k", right, input)
 
         Parameters
         ----------
@@ -370,7 +389,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             return self._compiled_main_right(y, real_weight, self._wigner_buf)
 
     def forward(self, x, y, weight: Optional[torch.Tensor] = None):
-        r"""evaluate :math:`w x \otimes y`
+        r"""Evaluate :math:`w x \otimes y`.
 
         Parameters
         ----------
