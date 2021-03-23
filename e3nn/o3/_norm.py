@@ -38,7 +38,13 @@ class Norm(torch.nn.Module):
             for i, (mul, ir) in enumerate(irreps_in)
         ]
 
-        self.tp = o3.TensorProduct(irreps_in, irreps_in, irreps_out, instr, 'component')
+        self.tp = o3.TensorProduct(
+            irreps_in,
+            irreps_in,
+            irreps_out,
+            instr,
+            normalization='component'
+        )
 
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out.simplify()
