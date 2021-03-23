@@ -25,6 +25,7 @@ Most recent change on the top!
 - flake8 settings have been added to `setup.cfg` for improved code style
 - `TensorProduct.visualize()` can now plot weights
 - `basis='bessel'` option to `math.soft_one_hot_linspace`
+- Optional optimization of `TensorProduct` if [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) is installed
 
 ### Changed
 - `o3.TensorProduct` now uses `torch.fx` to generate it's code
