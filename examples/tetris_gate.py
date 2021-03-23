@@ -106,7 +106,7 @@ class Network(torch.nn.Module):
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
         edge_attr = o3.spherical_harmonics(
             l=self.irreps_sh,
-            xyz=edge_vec,
+            x=edge_vec,
             normalize=True,
             normalization='component'
         )

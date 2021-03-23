@@ -84,7 +84,7 @@ class InvariantPolynomial(torch.nn.Module):
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
         edge_sh = o3.spherical_harmonics(
             l=self.irreps_sh,
-            xyz=edge_vec,
+            x=edge_vec,
             normalize=False,  # here we don't normalize otherwise it would not be a polynomial
             normalization='component'
         )

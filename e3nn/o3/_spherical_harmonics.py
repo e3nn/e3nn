@@ -67,13 +67,12 @@ class SphericalHarmonics(torch.nn.Module):
         if self._lmax > _lmax:
             raise NotImplementedError(f'spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more')
 
-    def forward(self, xyz: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         with torch.autograd.profiler.record_function(self._prof_str):
             if self.normalize:
-                xyz = torch.nn.functional.normalize(xyz, dim=-1)  # forward 0's instead of nan for zero-radius
+                x = torch.nn.functional.normalize(x, dim=-1)  # forward 0's instead of nan for zero-radius
 
-            x, y, z = xyz[..., 0], xyz[..., 1], xyz[..., 2]
-            sh = _spherical_harmonics(self._lmax, x, y, z)
+            sh = _spherical_harmonics(self._lmax, x[..., 0], x[..., 1], x[..., 2])
 
             if not self._is_range_lmax:
                 sh = torch.cat([
@@ -97,7 +96,7 @@ class SphericalHarmonics(torch.nn.Module):
 
 def spherical_harmonics(
     l: Union[int, List[int], str, o3.Irreps],
-    xyz: torch.Tensor,
+    x: torch.Tensor,
     normalize: bool,
     normalization: str = 'integral'
 ):
@@ -136,11 +135,11 @@ def spherical_harmonics(
     l : int or list of int
         degree of the spherical harmonics.
 
-    xyz : `torch.Tensor`
+    x : `torch.Tensor`
         tensor :math:`x` of shape ``(..., 3)``.
 
     normalize : bool
-        normalize ``xyz`` on the sphere
+        normalize ``x`` on the sphere
 
     normalization : {'integral', 'component', 'norm'}
         * *component*: :math:`\|Y^l(x)\|^2 = 2l+1, x \in S^2`
@@ -168,7 +167,7 @@ def spherical_harmonics(
 
     """
     sh = SphericalHarmonics(l, normalize, normalization)
-    return sh(xyz)
+    return sh(x)
 
 
 @torch.jit.script
