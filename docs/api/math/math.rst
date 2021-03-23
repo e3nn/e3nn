@@ -1,11 +1,12 @@
 math
 ====
 
-.. toctree::
-    soft_one_hot
-    soft_heaviside
+.. autofunction:: e3nn.math.direct_sum
 
+.. autofunction:: e3nn.math.orthonormalize
 
-.. automodule:: e3nn.math
-    :members:
-    :show-inheritance:
+.. autofunction:: e3nn.math.complete_basis
+
+.. autofunction:: e3nn.math.soft_one_hot_linspace
+
+.. autofunction:: e3nn.math.soft_unit_step

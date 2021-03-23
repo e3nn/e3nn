@@ -102,10 +102,22 @@ class Network(torch.nn.Module):
     def forward(self, data) -> torch.Tensor:
         num_nodes = 4  # typical number of nodes
 
-        edge_src, edge_dst = radius_graph(data.pos, 2.5, data.batch)
+        edge_src, edge_dst = radius_graph(x=data.pos, r=2.5, batch=data.batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_attr = o3.spherical_harmonics(self.irreps_sh, edge_vec, True, normalization='component')
-        edge_length_embedded = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.5, 2.5, 3, 'smooth_finite', False) * 3**0.5
+        edge_attr = o3.spherical_harmonics(
+            l=self.irreps_sh,
+            xyz=edge_vec,
+            normalize=True,
+            normalization='component'
+        )
+        edge_length_embedded = soft_one_hot_linspace(
+            x=edge_vec.norm(dim=1),
+            srat=0.5,
+            end=2.5,
+            number=3,
+            basis='smooth_finite',
+            cutoff=True
+        ) * 3**0.5
 
         x = scatter(edge_attr, edge_dst, dim=0).div(self.num_neighbors**0.5)
 

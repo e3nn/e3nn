@@ -1,3 +1,3 @@
-from .groups import *  # noqa
-from .linalg import *  # noqa
-from .reduce import *  # noqa
+from ._groups import *  # noqa
+from ._linalg import *  # noqa
+from ._reduce import *  # noqa

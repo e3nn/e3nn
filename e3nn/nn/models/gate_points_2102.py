@@ -310,7 +310,14 @@ class Network(torch.nn.Module):
         edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
         edge_sh = o3.spherical_harmonics(self.irreps_edge_attr, edge_vec, True, normalization='component')
         edge_length = edge_vec.norm(dim=1)
-        edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, self.max_radius, self.number_of_basis).mul(self.number_of_basis**0.5)
+        edge_length_embedded = soft_one_hot_linspace(
+            x=edge_length,
+            start=0.0,
+            end=self.max_radius,
+            number=self.number_of_basis,
+            basis='gaussian',
+            cutoff=False
+        ).mul(self.number_of_basis**0.5)
         edge_attr = smooth_cutoff(edge_length / self.max_radius)[:, None] * edge_sh
 
         if self.input_has_node_in and 'x' in data:

@@ -8,7 +8,7 @@ In this example we create an *equivariant polynomial* to classify tetris.
 We use the following feature of e3nn:
 
 * `Irreps`
-* `spherical_harmonics <e3nn.o3.cartesian_spherical_harmonics.spherical_harmonics>`
+* `o3.spherical_harmonics`
 * `FullyConnectedTensorProduct`
 
 And the following features of `pytorch_geometric <https://pytorch-geometric.readthedocs.io/en/latest/>`_
