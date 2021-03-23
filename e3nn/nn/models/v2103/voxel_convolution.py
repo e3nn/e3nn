@@ -3,7 +3,6 @@ This is a tentative implementation of voxel convolution
 
 >>> test()
 """
-import math
 import torch
 
 from e3nn import o3
@@ -30,7 +29,7 @@ class Convolution(torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_out)
         self.irreps_sh = o3.Irreps(irreps_sh)
         self.size = size
-        self.num_gaussian = self.size
+        self.num_rbfs = self.size
 
         # self-connection
         self.sc = Linear(self.irreps_in, self.irreps_out)
@@ -51,7 +50,7 @@ class Convolution(torch.nn.Module):
 
         self.tp = FullyConnectedTensorProduct(self.irreps_in, self.irreps_sh, self.irreps_out, shared_weights=False)
 
-        self.weight = torch.nn.Parameter(torch.randn(self.num_gaussian, self.tp.weight_numel))
+        self.weight = torch.nn.Parameter(torch.randn(self.num_rbfs, self.tp.weight_numel))
 
     def forward(self, x):
         r"""
@@ -68,8 +67,15 @@ class Convolution(torch.nn.Module):
         """
         sc = self.sc(x.transpose(1, 4)).transpose(1, 4)
 
-        weight = soft_one_hot_linspace(self.d, 0.0, 1.0, self.num_gaussian) @ self.weight
-        weight = weight * (math.pi * self.d).cos()[:, :, :, None] / (self.size ** (3/2))
+        weight = soft_one_hot_linspace(
+            x=self.d,
+            start=0.0,
+            end=1.0,
+            number=self.num_rbfs,
+            basis='smooth_finite',
+            cutoff=True,
+        ) @ self.weight
+        weight = weight / (self.size ** (3/2))
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
         kernel = torch.einsum('xyzio->oixyz', kernel)
         return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2)

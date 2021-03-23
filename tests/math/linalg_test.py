@@ -5,6 +5,8 @@ from e3nn import o3
 
 
 def test_intertwiners():
+    torch.set_default_dtype(torch.float64)
+
     G = SO3()
     A = torch.randn(9, 9)
 

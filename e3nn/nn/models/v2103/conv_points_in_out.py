@@ -137,6 +137,6 @@ def test():
     edge_src, edge_dst = radius(pos_out, pos_in, r=2.0)
     edge_vec = pos_in[edge_src] - pos_out[edge_dst]
     edge_attr = o3.spherical_harmonics([0, 1], edge_vec, True)
-    edge_scalar_attr = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, 2.0, 4)
+    edge_scalar_attr = soft_one_hot_linspace(x=edge_vec.norm(dim=1), start=0.0, end=2.0, number=4, basis='smooth_finite', cutoff=True)
 
     conv(node_input, node_attr_input, node_attr_output, edge_src, edge_dst, edge_attr, edge_scalar_attr)

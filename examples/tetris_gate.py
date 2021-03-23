@@ -112,7 +112,7 @@ class Network(torch.nn.Module):
         )
         edge_length_embedded = soft_one_hot_linspace(
             x=edge_vec.norm(dim=1),
-            srat=0.5,
+            start=0.5,
             end=2.5,
             number=3,
             basis='smooth_finite',
