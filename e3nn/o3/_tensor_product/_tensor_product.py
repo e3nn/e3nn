@@ -88,12 +88,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     >>> module = TensorProduct(
     ...     "8x0o + 8x1o",
-    ...     [(16, "1o", 1/16)],
+    ...     "16x1o",
     ...     "16x1e",
     ...     [
     ...         (0, 0, 0, "uvw", True, 3),
     ...         (1, 0, 0, "uvw", True, 1),
-    ...     ]
+    ...     ],
+    ...     in2_var=[1/16]
     ... )
 
     Example of a dot product:
