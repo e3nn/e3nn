@@ -306,8 +306,13 @@ class Irreps(tuple):
 
     >>> Irrep("2e") in Irreps("0e + 2e")
     True
+
+    Empty Irreps
+
+    >>> Irreps(), Irreps("")
+    (, )
     """
-    def __new__(cls, irreps):
+    def __new__(cls, irreps=None):
         if isinstance(irreps, Irreps):
             return super().__new__(cls, irreps)
 
@@ -316,19 +321,22 @@ class Irreps(tuple):
             out.append(_MulIr(1, Irrep(irreps)))
         elif isinstance(irreps, str):
             try:
-                for mul_ir in irreps.split('+'):
-                    if 'x' in mul_ir:
-                        mul, ir = mul_ir.split('x')
-                        mul = int(mul)
-                        ir = Irrep(ir)
-                    else:
-                        mul = 1
-                        ir = Irrep(mul_ir)
+                if irreps.strip() != "":
+                    for mul_ir in irreps.split('+'):
+                        if 'x' in mul_ir:
+                            mul, ir = mul_ir.split('x')
+                            mul = int(mul)
+                            ir = Irrep(ir)
+                        else:
+                            mul = 1
+                            ir = Irrep(mul_ir)
 
-                    assert isinstance(mul, int) and mul >= 0
-                    out.append(_MulIr(mul, ir))
+                        assert isinstance(mul, int) and mul >= 0
+                        out.append(_MulIr(mul, ir))
             except Exception:
                 raise ValueError(f"unable to convert string \"{irreps}\" into an Irreps")
+        elif irreps is None:
+            pass
         else:
             for mul_ir in irreps:
                 if isinstance(mul_ir, str):

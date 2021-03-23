@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the top!
 
 ## [Unreleased]
+### Added
+- Constructors for empty `Irreps`: `Irreps()` and `Irreps("")`
+
 ### Changed
 - Renamed `o3.spherical_harmonics` arguement `xyz` into `x`
 - Renamed `math.soft_one_hot_linspace` argument `endpoint` into `cutoff`, `cutoff = not endpoint`
