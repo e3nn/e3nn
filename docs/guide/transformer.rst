@@ -3,7 +3,8 @@
 Transformer
 ===========
 
-(Add some text to tell that attention mechanism is useful and well known)
+> The Transformer is a deep learning model introduced in 2017 that utilizes the mechanism of attention. It is used primarily in the field of natural language processing (NLP), but recent research has also developed its application in other tasks like video understanding.
+`Wikipedia`_
 
 .. jupyter-execute::
     :hide-code:
@@ -254,3 +255,4 @@ Finally we can check the equivariance:
     torch.allclose(f_before, f_after, atol=1e-3, rtol=1e-3)
 
 .. _SE(3)-Transformers: https://proceedings.neurips.cc/paper/2020/file/15231a7ce4ba789d13b722cc5c955834-Paper.pdf
+.. _Wikipedia: https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)

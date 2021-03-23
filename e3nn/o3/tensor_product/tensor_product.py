@@ -361,7 +361,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         The result of this method can be applied with a tensor contraction:
 
-        .. codeblock:: python
+        .. code-block:: python
 
             torch.einsum("...ik,...i->...k", right, input)
 
