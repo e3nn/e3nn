@@ -1,7 +1,7 @@
 .. _Irreducible representations:
 
-o3 - Irreps
-===========
+Irreps
+======
 
 A group representation :math:`(D,V)` describe the action of a group :math:`G` on a vector space :math:`V`
 

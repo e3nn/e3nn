@@ -1,5 +1,5 @@
-nn - Norm-Based Activation
-==========================
+Norm-Based Activation
+=====================
 
 .. automodule:: e3nn.nn.normact
     :members:

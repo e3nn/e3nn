@@ -1,5 +1,5 @@
-nn - Fully Connected Neural Network
-===================================
+Fully Connected Neural Network
+==============================
 
 .. automodule:: e3nn.nn.fc
     :members:

@@ -1,5 +1,5 @@
-o3 - Tensor Product
-===================
+Tensor Product
+==============
 
 Two characteristics of all tensor products (denoted :math:`\otimes`) are:
 

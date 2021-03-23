@@ -1,5 +1,5 @@
-nn - Gate
-=========
+Gate
+====
 
 .. automodule:: e3nn.nn.gate
     :members:

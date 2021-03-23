@@ -1,13 +1,6 @@
 nn
 ==
 
-All functions in this module are accessible via ``nn`` submodule:
-
-.. code-block:: python
-
-    from e3nn import nn
-
-
 .. rubric:: Overview
 
 .. toctree::

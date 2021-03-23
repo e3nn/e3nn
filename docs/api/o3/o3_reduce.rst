@@ -1,5 +1,5 @@
-o3 - Reduction of tensors in Irreps
-===================================
+Reduction of Tensors in Irreps
+==============================
 
 .. automodule:: e3nn.o3.reduce
     :members:

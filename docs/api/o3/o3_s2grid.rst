@@ -1,5 +1,5 @@
-o3 - Conversion to Signal on the sphere
-=======================================
+Grid Signal on the Sphere
+=========================
 
 .. automodule:: e3nn.o3.s2grid
     :members:

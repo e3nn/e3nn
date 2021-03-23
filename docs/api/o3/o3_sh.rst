@@ -1,7 +1,7 @@
 .. _Spherical Harmonics:
 
-o3 - Spherical Harmonics
-========================
+Spherical Harmonics
+===================
 
 The spherical harmonics :math:`Y^l(x)` are functions defined on the sphere :math:`S^2`.
 They form a basis of the space on function on the sphere:

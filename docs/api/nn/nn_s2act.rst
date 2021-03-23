@@ -1,5 +1,5 @@
-nn - S2 Activation
-==================
+Spherical Activation
+====================
 
 .. automodule:: e3nn.nn.s2act
     :members:

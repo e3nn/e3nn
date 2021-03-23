@@ -1,5 +1,5 @@
-io - Spherical Tensor
-=====================
+Spherical Tensor
+================
 
 There exists 4 types of function on the sphere depending on how the parity affects it.
 The representation of the coefficients are affected by this choice:

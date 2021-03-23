@@ -1,5 +1,5 @@
-nn - Batch Normalization
-========================
+Batch Normalization
+===================
 
 .. automodule:: e3nn.nn.batchnorm
     :members:
