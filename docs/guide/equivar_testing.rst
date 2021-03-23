@@ -53,7 +53,7 @@ These can be used to test models that operate on full graphs that include positi
         irreps_out=[f.irreps_out],
     )
 
-To test equivariance on a specific graph, `args_in` can be used:
+To test equivariance on a specific graph, `args_in` can be used::
 
     assert_equivariant(
         wrapper,
