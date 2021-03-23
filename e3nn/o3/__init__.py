@@ -1,10 +1,10 @@
-from ._irreps import *  # noqa
-from ._wigner import *  # noqa
-from ._tensor_product import *  # noqa
-from ._angular_spherical_harmonics import *  # noqa
-from ._spherical_harmonics import *  # noqa
-from ._reduce import *  # noqa
 from ._rotation import *  # noqa
+from ._wigner import *  # noqa
+from ._irreps import *  # noqa
+from ._tensor_product import *  # noqa
+from ._spherical_harmonics import *  # noqa
+from ._angular_spherical_harmonics import *  # noqa
+from ._reduce import *  # noqa
 from ._s2grid import *  # noqa
 from ._linear import *  # noqa
 from ._norm import *  # noqa
