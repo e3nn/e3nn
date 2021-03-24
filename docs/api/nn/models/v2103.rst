@@ -9,7 +9,7 @@ Let's create a simple network and evaluate it on random data.
 .. jupyter-execute::
 
     import torch
-    from e3nn.nn.models.v2103 import SimpleNetwork
+    from e3nn.nn.models.v2103.gate_points_networks import SimpleNetwork
 
     net = SimpleNetwork(
         irreps_in="3x0e + 2x1o",
@@ -76,7 +76,7 @@ In the following network, the edges attributes are the spherical harmonics :math
 
 .. jupyter-execute::
 
-    from e3nn.nn.models.v2103 import NetworkForAGraphWithAttributes
+    from e3nn.nn.models.v2103.gate_points_networks import NetworkForAGraphWithAttributes
     from torch_cluster import radius_graph
 
     max_radius = 3.0
