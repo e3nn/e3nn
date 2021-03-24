@@ -10,13 +10,13 @@ It contains fundamental mathematical operations such as tensor products and sphe
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
 
 ## Installation
-- install [pytorch](https://pytorch.org/)
-- install [pytorch_geometric](https://github.com/rusty1s/pytorch_geometric)
-- `pip install e3nn`
+```
+pip install e3nn
+```
 
 It is recommanded to install using pip. The main branch is considered as unstable.
 
-See [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
+For details and optional dependencies, see [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
 
 ### Previous version
 e3nn has been recently refactored. The last version before refactoring can be installed with the command `pip install e3nn==0.1.1`

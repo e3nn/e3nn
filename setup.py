@@ -37,7 +37,6 @@ setup(
         'sympy',
         'scipy',   # only for SphericalTensor.find_peaks
         'torch>=1.8.0',  # >= 1.8 is required for FX
-        'torch_geometric',
     ],
     include_package_data=True,
     classifiers=[
