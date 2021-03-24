@@ -2,9 +2,7 @@
 TorchScript JIT Support
 =======================
 
-PyTorch provides two ways to compile code into TorchScript: `tracing and scripting <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html>`_.
-Tracing follows the tensor operations on an example input, allowing complex Python control flow if that control flow does not depend on the data itself.
-Scripting compiles a subset of Python directly into TorchScript, allowing data-dependent control flow but only limited Python features.
+PyTorch provides two ways to compile code into TorchScript: `tracing and scripting <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html>`_. Tracing follows the tensor operations on an example input, allowing complex Python control flow if that control flow does not depend on the data itself. Scripting compiles a subset of Python directly into TorchScript, allowing data-dependent control flow but only limited Python features.
 
 This is a problem for e3nn, where many modules --- such as ``TensorProduct`` --- use significant Python control flow based on ``Irreps`` as well as features like inheritance that are incompatible with scripting. Other modules like ``Gate``, however, contain important but simple data-dependent control flow. Thus ``Gate`` needs to be scripted, even though it contains a ``TensorProduct`` that has to be traced.
 
