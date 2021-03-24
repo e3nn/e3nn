@@ -105,6 +105,6 @@ In the following graph we show the four possible behavior under parity for a fun
     plot(st.plotly_surface(x, centers=centers, radius=False))
 
 
-.. automodule:: e3nn.io.spherical_tensor
+.. autoclass:: e3nn.io.SphericalTensor
     :members:
     :show-inheritance:

@@ -15,6 +15,7 @@ Most recent change on the bottom.
 - Renamed `o3.spherical_harmonics` arguement `xyz` into `x`
 - Renamed `math.soft_one_hot_linspace` argument `endpoint` into `cutoff`, `cutoff = not endpoint`
 - Variances are now provided to `o3.TensorProduct` through explicit `in1_var`, `in2_var`, `out_var` parameters
+- Submodules define `__all__`; documentation uses shorter module names for the classes/methods.
 
 ### Removed
 - Variances can no longer be provided to `o3.TensorProduct` in the list-of-tuple format for `irreps_in1`, etc.

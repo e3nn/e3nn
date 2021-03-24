@@ -1,6 +1,6 @@
 Norm-Based Activation
 =====================
 
-.. automodule:: e3nn.nn.normact
+.. autoclass:: e3nn.nn.NormActivation
     :members:
     :show-inheritance:

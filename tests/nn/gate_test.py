@@ -2,7 +2,7 @@ import torch
 
 from e3nn.o3 import Irreps
 from e3nn.nn import Gate, Activation
-from e3nn.nn.gate import _Sortcut
+from e3nn.nn._gate import _Sortcut
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 

@@ -1,6 +1,6 @@
 Fully Connected Neural Network
 ==============================
 
-.. automodule:: e3nn.nn.fc
+.. autoclass:: e3nn.nn.FullyConnectedNet
     :members:
     :show-inheritance:

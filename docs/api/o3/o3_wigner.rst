@@ -1,5 +1,6 @@
 Wigner Functions
 ================
 
-.. automodule:: e3nn.o3._wigner
-    :members:
+.. autofunction:: e3nn.o3.wigner_D
+
+.. autofunction:: e3nn.o3.wigner_3j

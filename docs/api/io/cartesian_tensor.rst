@@ -1,6 +1,6 @@
 Cartesian Tensor
 ================
 
-.. automodule:: e3nn.io.cartesian_tensor
+.. autoclass:: e3nn.io.CartesianTensor
     :members:
     :show-inheritance:

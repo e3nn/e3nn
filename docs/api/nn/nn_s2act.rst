@@ -1,6 +1,6 @@
 Spherical Activation
 ====================
 
-.. automodule:: e3nn.nn.s2act
+.. autoclass:: e3nn.nn.S2Activation
     :members:
     :show-inheritance:

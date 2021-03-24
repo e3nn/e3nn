@@ -1,6 +1,10 @@
 Gate
 ====
 
-.. automodule:: e3nn.nn.gate
+.. autoclass:: e3nn.nn.Activation
+    :members:
+    :show-inheritance:
+
+.. autoclass:: e3nn.nn.Gate
     :members:
     :show-inheritance:

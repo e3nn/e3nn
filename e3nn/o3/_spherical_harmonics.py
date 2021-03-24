@@ -14,9 +14,9 @@ from e3nn.util.jit import compile_mode
 
 @compile_mode('script')
 class SphericalHarmonics(torch.nn.Module):
-    """JITable module version of ``e3nn.o3.spherical_harmonics``.
+    """JITable module version of :meth:`e3nn.o3.spherical_harmonics`.
 
-    Parameters are idential to ``e3nn.o3.spherical_harmonics``.
+    Parameters are identical to :meth:`e3nn.o3.spherical_harmonics`.
     """
     normalize: bool
     normalization: str
