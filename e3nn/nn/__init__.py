@@ -1,10 +1,10 @@
-from .extract import Extract, ExtractIr
-from .batchnorm import BatchNorm
-from .fc import FullyConnectedNet
-from .gate import Activation, Gate
-from .identity import Identity
-from .s2act import S2Activation
-from .normact import NormActivation
+from ._extract import Extract, ExtractIr
+from ._batchnorm import BatchNorm
+from ._fc import FullyConnectedNet
+from ._gate import Activation, Gate
+from ._identity import Identity
+from ._s2act import S2Activation
+from ._normact import NormActivation
 
 
 __all__ = [
