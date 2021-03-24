@@ -1,7 +1,7 @@
 o3
 ==
 
-All functions in this module are accessible via ``o3`` submodule:
+All functions in this module are accessible via the ``o3`` submodule:
 
 .. jupyter-execute::
 

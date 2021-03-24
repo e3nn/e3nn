@@ -207,7 +207,7 @@ def equivariance_error(
 
 
 # TODO: this is only for things marked with @compile_mode.
-# Make something else for general script/tracability
+# Make something else for general script/traceability
 def assert_auto_jitable(
     func,
     error_on_warnings=True,

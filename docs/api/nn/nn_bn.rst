@@ -1,6 +1,6 @@
 Batch Normalization
 ===================
 
-.. automodule:: e3nn.nn.batchnorm
+.. autoclass:: e3nn.nn.BatchNorm
     :members:
     :show-inheritance:
