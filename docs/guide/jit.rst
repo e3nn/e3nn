@@ -2,7 +2,7 @@
 TorchScript JIT Support
 =======================
 
-PyTorch provides two ways to compile code into TorchScript: ``tracing and scripting <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html>``_. Tracing follows the tensor operations on an example input, allowing complex Python control flow if that control flow does not depend on the data itself. Scripting compiles a subset of Python directly into TorchScript, allowing data-dependent control flow but only limited Python features.
+PyTorch provides two ways to compile code into TorchScript: `tracing and scripting <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html>`_. Tracing follows the tensor operations on an example input, allowing complex Python control flow if that control flow does not depend on the data itself. Scripting compiles a subset of Python directly into TorchScript, allowing data-dependent control flow but only limited Python features.
 
 This is a problem for e3nn, where many modules --- such as ``TensorProduct`` --- use significant Python control flow based on ``Irreps`` as well as features like inheritance that are incompatible with scripting. Other modules like ``Gate``, however, contain important but simple data-dependent control flow. Thus ``Gate`` needs to be scripted, even though it contains a ``TensorProduct`` that has to be traced.
 
@@ -28,7 +28,7 @@ We define a simple module that includes data-dependent control flow:
             if torch.any(norm > 7.):
                 return norm
             else:
-                return norm * 0.5 
+                return norm * 0.5
 
     irreps = Irreps("2x0e + 1x1o")
     mod = MyModule(irreps)
@@ -88,7 +88,7 @@ Say we define:
         def forward(self, x):
             return self.mymod(x) + 3.
 
-And trace an instance of `AnotherModule` using `e3nn.util.jit.trace`:
+And trace an instance of ``AnotherModule`` using `e3nn.util.jit.trace`:
 
 .. jupyter-execute::
 
@@ -117,7 +117,7 @@ Customizing Tracing Inputs
 ==========================
 
 Submodules can also be compiled automatically using tracing if they are marked with ``@compile_mode('trace')``. When submodules are compiled by tracing it must be possible to generate plausible input examples on the fly.
-    
+
 These example inputs can be generated automatically based on the ``irreps_in`` of the module (the specifics are the same as for ``assert_equivariant``). If this is not possible or would yield incorrect results, a module can define a ``_make_tracing_inputs`` method that generates example inputs of correct shape and type.
 
 .. jupyter-execute::
@@ -127,18 +127,18 @@ These example inputs can be generated automatically based on the ``irreps_in`` o
         def forward(self, x: torch.Tensor, indexes: torch.LongTensor):
             return x[indexes].sum()
 
-        # Because this module has no `irreps_in`, and because 
-        # `irreps_in` can't describe indexes, since it's a LongTensor, 
+        # Because this module has no `irreps_in`, and because
+        # `irreps_in` can't describe indexes, since it's a LongTensor,
         # we impliment _make_tracing_inputs
         def _make_tracing_inputs(self, n: int):
             import random
-            # The compiler asks for n example inputs --- 
-            # this is only a suggestion, the only requirement 
+            # The compiler asks for n example inputs ---
+            # this is only a suggestion, the only requirement
             # is that at least one be returned.
             return [
                 {
                     'forward': (
-                        torch.randn(5, random.randint(1, 3)), 
+                        torch.randn(5, random.randint(1, 3)),
                         torch.arange(3)
                     )
                 }

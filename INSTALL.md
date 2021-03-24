@@ -25,7 +25,7 @@ See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cud
 
 ### Optional: opt_einsum_fx (beta)
 
-e3nn can use [`opt_einsum_fx`]() to optimize the performance of `TensorProduct`s. To enable this, install `opt_einsum_fx`:
+e3nn can use [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) to optimize the performance of `TensorProduct`s. To enable this, install `opt_einsum_fx`:
 ```bash
 $ git clone https://github.com/Linux-cpp-lisp/opt_einsum_fx.git
 $ cd opt_einsum_fx/
