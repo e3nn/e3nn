@@ -10,12 +10,12 @@ In `e3nn.util.test`, the library provides some tools for confirming that functio
     In [3]: from e3nn.util.test import equivariance_error
 
     In [4]: equivariance_error(
-                tp, 
+                tp,
                 args_in=[tp.irreps_in1.randn(1, -1), tp.irreps_in2.randn(1, -1)],
                 irreps_in=[tp.irreps_in1, tp.irreps_in2],
                 irreps_out=[tp.irreps_out]
             )
-    Out[4]: 
+    Out[4]:
     {(tensor(0.), False): tensor(1.1921e-07, grad_fn=<MaxBackward1>),
     (tensor(1.), False): tensor(1.1921e-07, grad_fn=<MaxBackward1>)}
 
@@ -53,7 +53,7 @@ These can be used to test models that operate on full graphs that include positi
         irreps_out=[f.irreps_out],
     )
 
-To test equivariance on a specific graph, `args_in` can be used::
+To test equivariance on a specific graph, ``args_in`` can be used::
 
     assert_equivariant(
         wrapper,
