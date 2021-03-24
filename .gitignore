@@ -12,3 +12,4 @@ _build
 build
 dist
 .ipynb_checkpoints
+*.so
