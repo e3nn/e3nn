@@ -1,6 +1,7 @@
 import itertools
 import collections
 import warnings
+from typing import List
 
 import torch
 
@@ -14,16 +15,13 @@ class Irrep(tuple):
     This class does not contain any data, it is a structure that describe the representation.
     It is typically used as argument of other classes of the library to define the input and output representations of functions.
 
-    Attributes
+    Parameters
     ----------
     l : int
-        non negative integer, the degree of the representation, :math:`l = 0, 1, \dots`
+        non-negative integer, the degree of the representation, :math:`l = 0, 1, \dots`
 
     p : {1, -1}
         the parity of the representation
-
-    dim : int
-        the dimension of the representation
 
     Examples
     --------
@@ -52,28 +50,42 @@ class Irrep(tuple):
     1x1o+1x2o
     """
     def __new__(cls, l, p=None):
-        if isinstance(l, Irrep) and p is None:
-            return l
+        if p is None:
+            if isinstance(l, Irrep):
+                return l
 
-        if isinstance(l, str) and p is None:
-            try:
-                name = l.strip()
-                l = int(name[:-1])
-                assert l >= 0
-                p = {
-                    'e': 1,
-                    'o': -1,
-                    'y': (-1)**l,
-                }[name[-1]]
-            except Exception:
-                raise ValueError(f"unable to convert string \"{name}\" into an Irrep")
-
-        if isinstance(l, tuple) and p is None:
-            l, p = l
+            if isinstance(l, str):
+                try:
+                    name = l.strip()
+                    l = int(name[:-1])
+                    assert l >= 0
+                    p = {
+                        'e': 1,
+                        'o': -1,
+                        'y': (-1)**l,
+                    }[name[-1]]
+                except Exception:
+                    raise ValueError(f"unable to convert string \"{name}\" into an Irrep")
+            elif isinstance(l, tuple):
+                l, p = l
 
         assert isinstance(l, int) and l >= 0, l
         assert p in [-1, 1], p
         return super().__new__(cls, (l, p))
+
+    @property
+    def l(self) -> int:
+        r"""The dimension of the representation, :math:`l = 0, 1, \dots`."""
+        return self[0]
+
+    @property
+    def p(self) -> int:
+        r"""The parity of the representation, :math:`p = \pm 1`."""
+        return self[1]
+
+    def __iter__(self):
+        yield self.l
+        yield self.p
 
     def __repr__(self):
         p = {+1: 'e', -1: 'o'}[self.p]
@@ -183,29 +195,23 @@ class Irrep(tuple):
         return self.D_from_angles(*o3.matrix_to_angles(R), k)
 
     @property
-    def l(self) -> int:
-        return self[0]
-
-    @property
-    def p(self) -> int:
-        return self[1]
-
-    @property
     def dim(self) -> int:
+        """The dimension of the representation, :math:`2 l + 1`."""
         return 2 * self.l + 1
 
-    def __mul__(self, ir):
-        r"""generate the irreps from the product of two irreps
+    def __mul__(self, other):
+        r"""Generate the irreps from the product of two irreps.
 
         Returns
         -------
         generator of `Irrep`
         """
-        ir = Irrep(ir)
-        p = self.p * ir.p
-        lmin = abs(self.l - ir.l)
-        lmax = self.l + ir.l
-        return [Irrep(l, p) for l in range(lmin, lmax + 1)]
+        other = Irrep(other)
+        p = self.p * other.p
+        lmin = abs(self.l - other.l)
+        lmax = self.l + other.l
+        for l in range(lmin, lmax + 1):
+            yield Irrep(l, p)
 
     def count(self, _value):
         raise NotImplementedError
@@ -213,16 +219,16 @@ class Irrep(tuple):
     def index(self, _value):
         raise NotImplementedError
 
-    def __rmul__(self, mul):
+    def __rmul__(self, other):
         r"""
         >>> 3 * Irrep('1e')
         3x1e
         """
-        assert isinstance(mul, int)
-        return Irreps([(mul, self)])
+        assert isinstance(other, int)
+        return Irreps([(other, self)])
 
-    def __add__(self, irreps):
-        return Irreps(self) + Irreps(irreps)
+    def __add__(self, other):
+        return Irreps(self) + Irreps(other)
 
     def __contains__(self, _object):
         raise NotImplementedError
@@ -334,7 +340,7 @@ class Irreps(tuple):
                         assert isinstance(mul, int) and mul >= 0
                         out.append(_MulIr(mul, ir))
             except Exception:
-                raise ValueError(f"unable to convert string \"{irreps}\" into an Irreps")
+                raise ValueError(f"Unable to convert string \"{irreps}\" into an Irreps")
         elif irreps is None:
             pass
         else:
@@ -353,13 +359,13 @@ class Irreps(tuple):
                 elif len(mul_ir) == 3:
                     mul, l, p = mul_ir
                     ir = Irrep(l, p)
-                    warnings.warn("prefer using [(mul, (l, p))] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
+                    warnings.warn("Use the argument format [(mul, (l, p)), ...] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
                 else:
                     mul = None
                     ir = None
 
-                assert isinstance(mul, int) and mul >= 0
-                assert ir is not None
+                if not (isinstance(mul, int) and mul >= 0 and ir is not None):
+                    raise ValueError(f"Unable to interpret \"{mul_ir}\" as an irrep.")
 
                 out.append(_MulIr(mul, ir))
         return super().__new__(cls, out)
@@ -387,7 +393,7 @@ class Irreps(tuple):
         return Irreps([(1, (l, (-1)**l)) for l in range(lmax + 1)])
 
     def slices(self):
-        r"""list of slices
+        r"""List of slices corresponding to indices for each irrep.
 
         Examples
         --------
@@ -398,12 +404,12 @@ class Irreps(tuple):
         s = []
         i = 0
         for mul_ir in self:
-            s += [slice(i, i + mul_ir.dim)]
+            s.append(slice(i, i + mul_ir.dim))
             i += mul_ir.dim
         return s
 
     def randn(self, *size, normalization='component', requires_grad=False, dtype=None, device=None):
-        r"""random tensor
+        r"""Random tensor.
 
         Parameters
         ----------
@@ -423,7 +429,8 @@ class Irreps(tuple):
         >>> Irreps("5x0e + 10x1o").randn(5, -1, 5, normalization='norm').shape
         torch.Size([5, 35, 5])
 
-        >>> Irreps("2o").randn(2, -1, 3, normalization='norm').norm(dim=1).sub(1).abs().max().item() < 1e-5
+        >>> random_tensor = Irreps("2o").randn(2, -1, 3, normalization='norm')
+        >>> random_tensor.norm(dim=1).sub(1).abs().max().item() < 1e-5
         True
         """
         di = size.index(-1)
@@ -432,8 +439,7 @@ class Irreps(tuple):
 
         if normalization == 'component':
             return torch.randn(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
-
-        if normalization == 'norm':
+        elif normalization == 'norm':
             x = torch.zeros(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
             with torch.no_grad():
                 for s, (mul, ir) in zip(self.slices(), self):
@@ -441,8 +447,8 @@ class Irreps(tuple):
                     r.div_(r.norm(2, dim=di + 1, keepdim=True))
                     x.narrow(di, s.start, mul * ir.dim).copy_(r.reshape(*lsize, -1, *rsize))
             return x
-
-        assert False, "normalization needs to be 'norm' or 'component'"
+        else:
+            raise ValueError("Normalization needs to be 'norm' or 'component'")
 
     def __getitem__(self, i):
         x = super().__getitem__(i)
@@ -452,11 +458,11 @@ class Irreps(tuple):
 
     def __contains__(self, ir) -> bool:
         ir = Irrep(ir)
-        return ir in (ir for _, ir in self)
+        return ir in (irrep for _, irrep in self)
 
     def count(self, ir) -> int:
         ir = Irrep(ir)
-        return sum(mul for mul, ir in self if ir == ir)
+        return sum(mul for mul, irrep in self if ir == irrep)
 
     def index(self, _object):
         raise NotImplementedError
@@ -482,7 +488,7 @@ class Irreps(tuple):
         return Irreps(super().__rmul__(other))
 
     def simplify(self):
-        """simplify the representation
+        """Simplify the representations.
 
         Returns
         -------
@@ -510,7 +516,7 @@ class Irreps(tuple):
         return Irreps(out)
 
     def sort(self):
-        r"""sort the representation
+        r"""Sort the representations.
 
         Returns
         -------
@@ -547,7 +553,7 @@ class Irreps(tuple):
         return sum(mul for mul, _ in self)
 
     @property
-    def ls(self):
+    def ls(self) -> List[int]:
         return [l for mul, (l, p) in self for _ in range(mul)]
 
     @property
@@ -555,7 +561,7 @@ class Irreps(tuple):
         return max(self.ls)
 
     def __repr__(self):
-        return "+".join(f"{mulir}" for mulir in self)
+        return "+".join(f"{mul_ir}" for mul_ir in self)
 
     def D_from_angles(self, alpha, beta, gamma, k=None):
         r"""Matrix of the representation
@@ -606,9 +612,6 @@ class Irreps(tuple):
         ----------
         R : `torch.Tensor`
             tensor of shape :math:`(..., 3, 3)`
-
-        k : `torch.Tensor`, optional
-            tensor of shape :math:`(...)`
 
         Returns
         -------
