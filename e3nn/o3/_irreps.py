@@ -83,10 +83,6 @@ class Irrep(tuple):
         r"""The parity of the representation, :math:`p = \pm 1`."""
         return self[1]
 
-    def __iter__(self):
-        yield self.l
-        yield self.p
-
     def __repr__(self):
         p = {+1: 'e', -1: 'o'}[self.p]
         return f"{self.l}{p}"
