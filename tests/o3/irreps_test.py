@@ -20,6 +20,14 @@ def test_creation():
     o3.Irreps([(16, "3e"), '1e', (256, (1, -1))])
 
 
+def test_empty_irreps():
+    assert o3.Irreps() == o3.Irreps("") == o3.Irreps([])
+    assert len(o3.Irreps()) == 0
+    assert o3.Irreps().dim == 0
+    assert o3.Irreps().ls == []
+    assert o3.Irreps().num_irreps == 0
+
+
 def test_slice():
     irreps = o3.Irreps("16x1e + 3e + 2e + 5o")
     assert isinstance(irreps[2:], o3.Irreps)
