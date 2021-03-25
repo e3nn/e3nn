@@ -75,7 +75,7 @@ class Irrep(tuple):
 
     @property
     def l(self) -> int:
-        r"""The dimension of the representation, :math:`l = 0, 1, \dots`."""
+        r"""The degree of the representation, :math:`l = 0, 1, \dots`."""
         return self[0]
 
     @property
