@@ -45,6 +45,7 @@ def test_properties():
     irreps = o3.Irreps("4x1e + 6x2e + 12x2o")
     assert o3.Irreps(repr(irreps)) == irreps
 
+
 def test_arithmetic():
     assert 3 * o3.Irrep("6o") == o3.Irreps("3x6o")
     products = list(o3.Irrep("1o") * o3.Irrep("2e"))
