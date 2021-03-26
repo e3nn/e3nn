@@ -63,7 +63,6 @@ class Convolution(torch.nn.Module):
         -------
         `torch.Tensor`
             tensor of shape ``(batch, irreps_out.dim, x, y, z)``
-
         """
         sc = self.sc(x.transpose(1, 4)).transpose(1, 4)
 
@@ -81,8 +80,70 @@ class Convolution(torch.nn.Module):
         return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2)
 
 
+class LowPassFilter(torch.nn.Module):
+    def __init__(self, scale, stride=1, transposed=False, steps=(1, 1, 1)):
+        super().__init__()
+
+        sigma = 0.5 * (scale ** 2 - 1)  ** 0.5
+
+        size = int(1 + 2 * 2.5 * sigma)
+        if size % 2 == 0:
+            size += 1
+
+        r = torch.linspace(-1, 1, size)
+        x = r * steps[0] / min(steps)
+        x = x[x.abs() <= 1]
+        y = r * steps[1] / min(steps)
+        y = y[y.abs() <= 1]
+        z = r * steps[2] / min(steps)
+        z = z[z.abs() <= 1]
+        lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+        lattice = (size // 2) * lattice
+
+        kernel = torch.exp(-lattice.norm(dim=-1).pow(2) / (2 * sigma **2))
+        kernel = kernel / kernel.sum()
+        if transposed:
+            kernel = kernel * stride**3
+        kernel = kernel[None, None]
+        self.register_buffer('kernel', kernel)
+
+        self.scale = scale
+        self.stride = stride
+        self.size = size
+        self.transposed = transposed
+
+    def forward(self, image):
+        """
+        Parameters
+        ----------
+        image : `torch.Tensor`
+            tensor of shape ``(..., x, y, z)``
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape ``(..., x, y, z)``
+        """
+        if self.scale <= 1:
+            assert self.stride == 1
+            return image
+
+        out = image
+        out = out.reshape(-1, 1, *out.shape[-3:])
+        if self.transposed:
+            out = torch.nn.functional.conv_transpose3d(out, self.kernel, padding=self.size // 2, stride=self.stride)
+        else:
+            out = torch.nn.functional.conv3d(out, self.kernel, padding=self.size // 2, stride=self.stride)
+        out = out.reshape(*image.shape[:-3], *out.shape[-3:])
+        return out
+
+
 def test():
     conv = Convolution("0e + 1e", "0e + 1e + 1o + 2e + 2o", o3.Irreps.spherical_harmonics(lmax=3), 5)
 
     x = torch.randn(10, 4, 32, 32, 32)
     conv(x)
+
+    fi = LowPassFilter(2.0)
+
+    fi(x)
