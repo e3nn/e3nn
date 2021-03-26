@@ -39,7 +39,7 @@ class SphericalHarmonics(torch.nn.Module):
 
         irreps_in = o3.Irreps(irreps_in)
         if irreps_in not in (o3.Irreps("1x1o"), o3.Irreps("1x1e")):
-            raise ValueError(f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a psuedovector (`1x1e`), not `{irreps_in}`")
+            raise ValueError(f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a pseudovector (`1x1e`), not `{irreps_in}`")
         self.irreps_in = irreps_in
         input_p = irreps_in[0].ir.p
 
@@ -48,8 +48,9 @@ class SphericalHarmonics(torch.nn.Module):
         if isinstance(irreps_out, o3.Irreps):
             ls = []
             for mul, (l, p) in irreps_out:
-                if p != input_p**l:
-                    raise ValueError(f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity p = {p}, which is inconsistant with the input parity {input_p} — the output parity should have been p = {input_p**l}")
+                # TODO
+                # if p != input_p**l:
+                #     raise ValueError(f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity p = {p}, which is inconsistent with the input parity {input_p} — the output parity should have been p = {input_p**l}")
                 ls.extend([l]*mul)
         elif isinstance(irreps_out, int):
             ls = [irreps_out]
