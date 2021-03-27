@@ -22,7 +22,7 @@ class Convolution(torch.nn.Module):
     size : int
     steps : tuple of int
     """
-    def __init__(self, irreps_in, irreps_out, irreps_sh, size, steps=(1, 1, 1)):
+    def __init__(self, irreps_in, irreps_out, irreps_sh, size, steps=(1, 1, 1), **kwargs):
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
@@ -30,6 +30,7 @@ class Convolution(torch.nn.Module):
         self.irreps_sh = o3.Irreps(irreps_sh)
         self.size = size
         self.num_rbfs = self.size
+        self.kwargs = kwargs
 
         # self-connection
         self.sc = Linear(self.irreps_in, self.irreps_out)
@@ -77,7 +78,7 @@ class Convolution(torch.nn.Module):
         weight = weight / (self.size ** (3/2))
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
         kernel = torch.einsum('xyzio->oixyz', kernel)
-        return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2)
+        return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2, **self.kwargs)
 
 
 class LowPassFilter(torch.nn.Module):
