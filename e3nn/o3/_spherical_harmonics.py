@@ -30,12 +30,21 @@ class SphericalHarmonics(torch.nn.Module):
         irreps_out: Union[int, List[int], str, o3.Irreps],
         normalize: bool,
         normalization: str = 'integral',
-        irreps_in: Any = o3.Irreps("1x1o"),
+        irreps_in: Any = None,
     ):
         super().__init__()
         self.normalize = normalize
         self.normalization = normalization
         assert normalization in ['integral', 'component', 'norm']
+
+        if isinstance(irreps_out, str):
+            irreps_out = o3.Irreps(irreps_out)
+        if isinstance(irreps_out, o3.Irreps) and irreps_in is None:
+            for mul, (l, p) in irreps_out:
+                if l % 2 == 1 and p == 1:
+                    irreps_in = o3.Irreps("1e")
+        if irreps_in is None:
+            irreps_in = o3.Irreps("1o")
 
         irreps_in = o3.Irreps(irreps_in)
         if irreps_in not in (o3.Irreps("1x1o"), o3.Irreps("1x1e")):
@@ -43,14 +52,11 @@ class SphericalHarmonics(torch.nn.Module):
         self.irreps_in = irreps_in
         input_p = irreps_in[0].ir.p
 
-        if isinstance(irreps_out, str):
-            irreps_out = o3.Irreps(irreps_out)
         if isinstance(irreps_out, o3.Irreps):
             ls = []
             for mul, (l, p) in irreps_out:
-                # TODO
-                # if p != input_p**l:
-                #     raise ValueError(f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity p = {p}, which is inconsistent with the input parity {input_p} — the output parity should have been p = {input_p**l}")
+                if p != input_p**l:
+                    raise ValueError(f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity p = {p}, which is inconsistent with the input parity {input_p} — the output parity should have been p = {input_p**l}")
                 ls.extend([l]*mul)
         elif isinstance(irreps_out, int):
             ls = [irreps_out]
