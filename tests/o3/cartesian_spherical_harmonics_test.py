@@ -22,7 +22,12 @@ def test_weird_irreps():
     # Bad parity
     with pytest.raises(ValueError):
         # L = 1 shouldn't be even for a vector input
-        o3.spherical_harmonics("1x0e + 4x1e + 3x2e", torch.randn(2, 3), True)
+        o3.SphericalHarmonics(
+            irreps_out="1x0e + 4x1e + 3x2e",
+            normalize=True,
+            normalization='integral',
+            irreps_in="1o",
+        )
 
     # Good parity but psuedovector input
     _ = o3.SphericalHarmonics(
