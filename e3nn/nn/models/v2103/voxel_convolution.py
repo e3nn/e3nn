@@ -31,7 +31,7 @@ class Convolution(torch.nn.Module):
         self.size = size
         self.num_rbfs = self.size
 
-        if not 'padding' in kwargs:
+        if 'padding' not in kwargs:
             kwargs['padding'] = self.size // 2
         self.kwargs = kwargs
 
