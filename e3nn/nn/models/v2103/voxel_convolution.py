@@ -30,6 +30,9 @@ class Convolution(torch.nn.Module):
         self.irreps_sh = o3.Irreps(irreps_sh)
         self.size = size
         self.num_rbfs = self.size
+
+        if not 'padding' in kwargs:
+            kwargs['padding'] = self.size // 2
         self.kwargs = kwargs
 
         # self-connection
@@ -44,7 +47,15 @@ class Convolution(torch.nn.Module):
         z = r * steps[2] / min(steps)
         z = z[z.abs() <= 1]
         lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
-        self.register_buffer('d', lattice.norm(dim=-1))
+        emb = soft_one_hot_linspace(
+            x=lattice.norm(dim=-1),
+            start=0.0,
+            end=1.0,
+            number=self.num_rbfs,
+            basis='smooth_finite',
+            cutoff=True,
+        )
+        self.register_buffer('emb', emb)
 
         sh = o3.spherical_harmonics(self.irreps_sh, lattice, True, 'component')  # [x, y, z, irreps_sh.dim]
         self.register_buffer('sh', sh)
@@ -67,18 +78,11 @@ class Convolution(torch.nn.Module):
         """
         sc = self.sc(x.transpose(1, 4)).transpose(1, 4)
 
-        weight = soft_one_hot_linspace(
-            x=self.d,
-            start=0.0,
-            end=1.0,
-            number=self.num_rbfs,
-            basis='smooth_finite',
-            cutoff=True,
-        ) @ self.weight
+        weight = self.emb @ self.weight
         weight = weight / (self.size ** (3/2))
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
         kernel = torch.einsum('xyzio->oixyz', kernel)
-        return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, padding=self.size // 2, **self.kwargs)
+        return sc + 0.1 * torch.nn.functional.conv3d(x, kernel, **self.kwargs)
 
 
 class LowPassFilter(torch.nn.Module):
