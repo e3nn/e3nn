@@ -432,6 +432,18 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             real_weight = self._get_weights(weight)
             return self._compiled_main_out(x, y, real_weight, self._wigner_buf)
 
+    def weight_view_for_instruction(
+        self,
+        instruction: int,
+        weight: Optional[torch.Tensor] = None
+    ):
+        if not self.instructions[instruction].has_weight:
+            raise ValueError(f"Instruction {instruction} has no weights.")
+        offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
+        ins = self.instructions[instruction]
+        weight = self._get_weights(weight)
+        return weight[offset:offset + prod(ins.path_shape)].reshape(ins.path_shape)
+
     def visualize(
         self,
         weight: Optional[torch.Tensor] = None,
@@ -529,22 +541,16 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if weight is None and not self.internal_weights:
             plot_weight = False
         elif plot_weight:
-            weight = self._get_weights(weight)
-            path_weight = []
-            flat_weight_index = 0
-            for ins in self.instructions:
-                if ins.has_weight:
-                    wdim = prod(ins.path_shape)
-                    this_weight = weight.detach()[
-                        ...,
-                        flat_weight_index:flat_weight_index + wdim
-                    ]
-                    path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
-                    flat_weight_index += wdim
-                else:
-                    path_weight.append(0)
-            path_weight = np.asarray(path_weight)
-            path_weight /= np.abs(path_weight).max()
+            with torch.no_grad():
+                path_weight = []
+                for ins_i, ins in enumerate(self.instructions):
+                    if ins.has_weight:
+                        this_weight = self.weight_view_for_instruction(ins_i, weight=weight)
+                        path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
+                    else:
+                        path_weight.append(0)
+                path_weight = np.asarray(path_weight)
+                path_weight /= np.abs(path_weight).max()
         cmap = matplotlib.cm.get_cmap('bwr')
 
         for ins_index, ins in enumerate(self.instructions):
