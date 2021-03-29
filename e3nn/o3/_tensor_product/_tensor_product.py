@@ -143,16 +143,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     ...         if ir_out in ir_1 * ir_2
     ...     ]
     ... )
-    >>> ws = []
-    >>> for ins in module.instructions:
-    ...     if ins.has_weight:
-    ...         weight = torch.empty(ins.path_shape)
+    >>> with torch.no_grad():
+    ...     for weight in module.weight_views():
     ...         mul_1, mul_2, mul_out = weight.shape
     ...         # formula from torch.nn.init.xavier_uniform_
     ...         a = (6 / (mul_1 * mul_2 + mul_out))**0.5
-    ...         ws += [weight.uniform_(-a, a).view(-1)]
-    >>> with torch.no_grad():
-    ...     module.weight[:] = torch.cat(ws)
+    ...         new_weight = torch.empty_like(weight)
+    ...         new_weight.uniform_(-a, a)
+    ...         weight[:] = new_weight
     >>> n = 1_000
     >>> vars = module(irreps_1.randn(n, -1), irreps_2.randn(n, -1)).var(0)
     >>> assert vars.min() > 1 / 3
@@ -436,13 +434,60 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self,
         instruction: int,
         weight: Optional[torch.Tensor] = None
-    ):
+    ) -> torch.Tensor:
+        r"""View of weights corresponding to ``instruction``.
+
+        Parameters
+        ----------
+        instruction : int
+            The index of the instruction to get a view on the weights for. ``self.instructions[instruction].has_weight`` must be ``True``.
+
+        weight : `torch.Tensor`, optional
+            like ``weight`` argument to ``forward()``
+
+        Returns
+        -------
+        A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction``th instruction.
+        """
         if not self.instructions[instruction].has_weight:
             raise ValueError(f"Instruction {instruction} has no weights.")
         offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
         ins = self.instructions[instruction]
         weight = self._get_weights(weight)
         return weight[offset:offset + prod(ins.path_shape)].reshape(ins.path_shape)
+
+    def weight_views(
+        self,
+        weight: Optional[torch.Tensor] = None,
+        yield_instruction: bool = False
+    ):
+        r"""Iterator over weight views for each weighted instruction.
+
+        Parameters
+        ----------
+        weight : `torch.Tensor`, optional
+            like ``weight`` argument to ``forward()``
+
+        yield_instruction : `bool`, default False
+            Whether to also yield the corresponding instruction.
+
+        Yields
+        ------
+        If ``yield_instruction`` is ``True``, yields ``(instruction_index, instruction, weight_view)``.
+        Otherwise, yields ``weight_view``.
+        """
+        weight = self._get_weights(weight)
+        offset = 0
+        for ins_i, ins in enumerate(self.instructions):
+            if ins.has_weight:
+                flatsize = prod(ins.path_shape)
+                this_weight = weight[offset:offset + flatsize].reshape(ins.path_shape)
+                offset += flatsize
+                if yield_instruction:
+                    yield ins_i, ins, this_weight
+                else:
+                    yield this_weight
+        return
 
     def visualize(
         self,
