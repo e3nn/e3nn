@@ -151,6 +151,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     ...         new_weight = torch.empty_like(weight)
     ...         new_weight.uniform_(-a, a)
     ...         weight[:] = new_weight
+    tensor(...)
     >>> n = 1_000
     >>> vars = module(irreps_1.randn(n, -1), irreps_2.randn(n, -1)).var(0)
     >>> assert vars.min() > 1 / 3
