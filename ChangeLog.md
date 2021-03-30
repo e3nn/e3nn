@@ -11,6 +11,7 @@ Most recent change on the bottom.
 - Added `e3nn.set_optimization_defaults()` and `e3nn.get_optimization_defaults()`
 - Constructors for empty `Irreps`: `Irreps()` and `Irreps("")`
 - Additional tests, docs, and refactoring for `Irrep` and `Irreps`.
+- Added `TensorProduct.weight_views()` and `TensorProduct.weight_view_for_instruction()`
 
 ### Changed
 - Renamed `o3.spherical_harmonics` arguement `xyz` into `x`

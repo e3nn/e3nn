@@ -302,6 +302,40 @@ def test_input_weights_jit():
     )
 
 
+def test_weight_view_for_instruction():
+    irreps_in1 = Irreps("1e + 2e + 3x3o")
+    irreps_in2 = Irreps("1e + 2e + 3x3o")
+    irreps_out = Irreps("1e + 2e + 3x3o")
+    x1 = irreps_in1.randn(2, -1)
+    x2 = irreps_in2.randn(2, -1)
+    m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
+
+    # Find all paths to the first output
+    ins_idexes = [i for i, ins in enumerate(m.instructions) if ins.i_out == 0]
+    with torch.no_grad():
+        for i in ins_idexes:
+            m.weight_view_for_instruction(i).zero_()
+
+    out = m(x1, x2)
+    assert torch.all(out[:, :1] == 0.0)
+    assert torch.any(out[:, 1:] > 0.0)
+
+
+def test_weight_views():
+    irreps_in1 = Irreps("1e + 2e + 3x3o")
+    irreps_in2 = Irreps("1e + 2e + 3x3o")
+    irreps_out = Irreps("1e + 2e + 3x3o")
+    x1 = irreps_in1.randn(2, -1)
+    x2 = irreps_in2.randn(2, -1)
+    m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
+
+    with torch.no_grad():
+        for w in m.weight_views():
+            w.zero_()
+
+    assert torch.all(m(x1, x2) == 0.0)
+
+
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
 def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
