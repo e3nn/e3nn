@@ -12,6 +12,7 @@ Most recent change on the bottom.
 - Constructors for empty `Irreps`: `Irreps()` and `Irreps("")`
 - Additional tests, docs, and refactoring for `Irrep` and `Irreps`.
 - Added `TensorProduct.weight_views()` and `TensorProduct.weight_view_for_instruction()`
+- Fix Docs for ExtractIr
 
 ### Changed
 - Renamed `o3.spherical_harmonics` arguement `xyz` into `x`
