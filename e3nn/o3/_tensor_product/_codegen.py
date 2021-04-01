@@ -349,13 +349,17 @@ def codegen_tensor_product(
             #         \- this is the `memory_limit` option in opt_einsum
             # TODO: allow user to choose opt_einsum parameters?
             #
-            # We use float32 to save memory, since optimize_einsums doesn't look at traced dtypes
+            # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
             batchdim = 4
             example_inputs = (
-                irreps_in1.randn(batchdim, -1, dtype=torch.float32),
-                irreps_in2.randn(batchdim, -1, dtype=torch.float32),
-                torch.randn(1 if shared_weights else batchdim, flat_weight_index, dtype=torch.float32),
-                torch.randn(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
+                torch.zeros((batchdim, irreps_in1.dim), dtype=torch.float32),
+                torch.zeros((batchdim, irreps_in2.dim), dtype=torch.float32),
+                torch.zeros(
+                    1 if shared_weights else batchdim,
+                    flat_weight_index,
+                    dtype=torch.float32
+                ),
+                torch.zeros(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
 
             graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
