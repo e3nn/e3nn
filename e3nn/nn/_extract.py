@@ -82,7 +82,7 @@ class ExtractIr(torch.nn.Module):
         irreps_in : `Irreps`
             representation of the input
 
-        ir : list of `Irrep`
+        ir : `Irrep`
             representation to extract
         """
         super().__init__()
