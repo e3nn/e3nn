@@ -20,6 +20,9 @@ Most recent change on the bottom.
 - Variances are now provided to `o3.TensorProduct` through explicit `in1_var`, `in2_var`, `out_var` parameters
 - Submodules define `__all__`; documentation uses shorter module names for the classes/methods.
 
+### Fixed
+ - Enabling/disabling einsum optimization no longer affects PyTorch RNG state.
+
 ### Removed
 - Variances can no longer be provided to `o3.TensorProduct` in the list-of-tuple format for `irreps_in1`, etc.
 
