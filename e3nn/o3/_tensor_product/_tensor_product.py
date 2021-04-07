@@ -172,9 +172,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     def __init__(
         self,
-        in1,
-        in2,
-        out,
+        irreps_in1: o3.Irreps,
+        irreps_in2: o3.Irreps,
+        irreps_out: o3.Irreps,
         instructions: List[tuple],
         in1_var: Optional[Union[List[float], torch.Tensor]] = None,
         in2_var: Optional[Union[List[float], torch.Tensor]] = None,
@@ -205,9 +205,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.shared_weights = shared_weights
 
         # Determine irreps
-        self.irreps_in1 = o3.Irreps(in1)
-        self.irreps_in2 = o3.Irreps(in2)
-        self.irreps_out = o3.Irreps(out)
+        self.irreps_in1 = o3.Irreps(irreps_in1)
+        self.irreps_in2 = o3.Irreps(irreps_in2)
+        self.irreps_out = o3.Irreps(irreps_out)
 
         self._in1_dim = self.irreps_in1.dim
         self._in2_dim = self.irreps_in2.dim

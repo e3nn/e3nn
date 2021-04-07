@@ -15,6 +15,7 @@ Most recent change on the bottom.
 - Fix Docs for ExtractIr
 
 ### Changed
+- Renamed `o3.TensorProduct` arguments in `irreps_in1`, `irreps_in2` and `irreps_out`
 - Renamed `o3.spherical_harmonics` arguement `xyz` into `x`
 - Renamed `math.soft_one_hot_linspace` argument `endpoint` into `cutoff`, `cutoff = not endpoint`
 - Variances are now provided to `o3.TensorProduct` through explicit `in1_var`, `in2_var`, `out_var` parameters
