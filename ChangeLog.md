@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.2.5] - 2021-04-07
 ### Added
 - Added `e3nn.set_optimization_defaults()` and `e3nn.get_optimization_defaults()`
 - Constructors for empty `Irreps`: `Irreps()` and `Irreps("")`
