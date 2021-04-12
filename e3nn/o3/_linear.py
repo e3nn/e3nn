@@ -96,8 +96,18 @@ class Linear(CodeGenMixin, torch.nn.Module):
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer('weight', torch.Tensor())
 
-        # TODO: what to do with this?
-        # self.output_mask = self.tp.output_mask
+        # == Compute output mask ==
+        if self.irreps_out.dim > 0:
+            # an output is connected to an input if one exists with the same L, p
+            output_mask = torch.cat([
+                torch.ones(mul * ir.dim)
+                if any(ir_in == ir for _, ir_in in self.irreps_in)
+                else torch.zeros(mul * ir.dim)
+                for _, (mul, ir) in enumerate(self.irreps_out)
+            ])
+        else:
+            output_mask = torch.ones(0)
+        self.register_buffer('output_mask', output_mask)
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"
@@ -198,7 +208,6 @@ def _codegen_linear(
         flat_weight_index += path_nweight
 
         ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[i_in])
-        # TODO: this makes the results the same as the old one, but is it really a good initialization for a Linear?
         alpha = 1.0 / math.sqrt(mul_ir_in.mul * sum(1 if i_out_this == i_out else 0 for _, i_out_this in instr))
         ein_out = alpha * ein_out
 

@@ -69,3 +69,10 @@ def test_linear_like_tp(irreps_in, irreps_out):
             torch.float64: 1e-10
         }[torch.get_default_dtype()]
     )
+
+
+def test_output_mask():
+    irreps_in = o3.Irreps("1e + 2e")
+    irreps_out = o3.Irreps("3e + 5x2o")
+    m = o3.Linear(irreps_in, irreps_out)
+    assert torch.all(m.output_mask == torch.zeros(m.irreps_out.dim, dtype=torch.bool))
