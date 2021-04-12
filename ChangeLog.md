@@ -13,6 +13,8 @@ Most recent change on the bottom.
 ### Changed
 - `o3.Linear` now has more efficient specialized code
 
+### Fixed
+- Fixed a problem with temporary files on windows
 
 ## [0.2.5] - 2021-04-07
 ### Added
