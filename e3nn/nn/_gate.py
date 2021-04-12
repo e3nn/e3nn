@@ -67,6 +67,10 @@ class Activation(torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_out).simplify()
         self.acts = torch.nn.ModuleList(acts)
 
+    def __repr__(self):
+        acts = "".join(["x" if a is not None else " " for a in self.acts])
+        return f"{self.__class__.__name__} [{acts}] ({self.irreps_in} -> {self.irreps_out})"
+
     def forward(self, features, dim=-1):
         '''evaluate
 
