@@ -194,8 +194,8 @@ def _codegen_linear(
 
         ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[i_in])
         # TODO: this makes the results the same as the old one, but is it really a good initialization for a Linear?
-        alpha = math.sqrt(mul_ir_in.mul * sum(1 if i_out_this == i_out else 0 for _, i_out_this in instr))
-        ein_out = ein_out / alpha
+        alpha = 1.0 / math.sqrt(mul_ir_in.mul * sum(1 if i_out_this == i_out else 0 for _, i_out_this in instr))
+        ein_out = alpha * ein_out
 
         out_list += [ein_out.reshape(batch_out, mul_ir_out.dim)]
 

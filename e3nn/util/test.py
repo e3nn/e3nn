@@ -1,3 +1,4 @@
+from typing import List, Union
 import random
 import itertools
 import warnings
@@ -43,6 +44,74 @@ try:
         torch.set_default_dtype(old_dtype)
 except ImportError:
     pass
+
+
+def random_irreps(
+    n: int = 1,
+    lmax: int = 4,
+    mul_min: int = 0,
+    mul_max: int = 5,
+    len_min: int = 0,
+    len_max: int = 4,
+    clean: bool = False,
+    allow_empty: bool = True
+):
+    r"""Generate random irreps parameters for testing.
+
+    Parameters
+    ----------
+        n : int, optional
+            How many to generate; defaults to 1.
+        lmax : int, optional
+            The maximum L to generate (inclusive); defaults to 4.
+        mul_min : int, optional
+            The smallest multiplicity to generate, defaults to 0.
+        mul_max : int, optional
+            The largest multiplicity to generate, defaults to 5.
+        len_min : int, optional
+            The smallest number of irreps to generate, defaults to 0.
+        len_max : int, optional
+            The largest number of irreps to generate, defaults to 4.
+        clean : bool, optional
+            If ``True``, only ``o3.Irreps`` objects will be returned. If ``False`` (the default), ``Irreps``-like objects like strings and lists of tuples can be returned.
+        allow_empty : bool, optional
+            Whether to allow generating empty ``Irreps``.
+    Returns
+    -------
+        An irreps-like object if ``n == 1`` or a list of them if ``n > 1``
+    """
+    assert n >= 1
+    assert lmax >= 0
+    assert mul_min >= 0
+    assert mul_max >= mul_min
+
+    out = []
+    for _ in range(n):
+        this_irreps = []
+        for _ in range(random.randint(len_min, len_max)):
+            this_irreps.append((
+                random.randint(mul_min, mul_max),
+                (random.randint(0, lmax), random.choice((1, -1)))
+            ))
+        if not allow_empty and all(m == 0 for m, _ in this_irreps):
+            this_irreps[-1] = (random.randint(1, mul_max), this_irreps[-1][1])
+        this_irreps = o3.Irreps(this_irreps)
+
+        if clean:
+            outtype = "irreps"
+        else:
+            outtype = random.choice(("irreps", "str", "list"))
+        if outtype == "irreps":
+            out.append(this_irreps)
+        elif outtype == "str":
+            out.append(repr(this_irreps))
+        elif outtype == "list":
+            out.append([(mul_ir.mul, (mul_ir.ir.l, mul_ir.ir.p)) for mul_ir in this_irreps])
+
+    if n == 1:
+        return out[0]
+    else:
+        return out
 
 
 def assert_equivariant(

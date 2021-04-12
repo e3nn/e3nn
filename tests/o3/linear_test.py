@@ -1,9 +1,11 @@
+import pytest
+
 from typing import Optional
 
 import torch
 
 from e3nn import o3
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps
 
 
 class SlowLinear(torch.nn.Module):
@@ -49,13 +51,21 @@ def test_linear():
     assert_auto_jitable(m)
 
 
-def test_linear_like_tp():
+# We want to be sure to test a multiple-same L case
+@pytest.mark.parametrize("irreps_in", ["1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4))
+@pytest.mark.parametrize("irreps_out", ["1e + 2e + 3x3o + 3x1e"] + random_irreps(n=4))
+def test_linear_like_tp(irreps_in, irreps_out):
     """Test that Linear gives the same results as the corresponding TensorProduct."""
-    irreps_in = o3.Irreps("1e + 2e + 4x1e + 3x3o")
-    irreps_out = o3.Irreps("1e + 2e + 3x3o + 3x1e")
     m = o3.Linear(irreps_in, irreps_out)
     m_true = SlowLinear(irreps_in, irreps_out)
     with torch.no_grad():
         m_true.tp.weight[:] = m.weight
-    inp = torch.randn(4, irreps_in.dim)
-    assert torch.allclose(m(inp), m_true(inp))
+    inp = torch.randn(4, m.irreps_in.dim)
+    assert torch.allclose(
+        m(inp),
+        m_true(inp),
+        atol={
+            torch.float32: 1e-7,
+            torch.float64: 1e-10
+        }[torch.get_default_dtype()]
+    )
