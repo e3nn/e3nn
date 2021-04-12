@@ -14,7 +14,7 @@ from ._codegen import codegen_tensor_product
 
 @compile_mode('script')
 class TensorProduct(CodeGenMixin, torch.nn.Module):
-    r"""Tensor Product with parametrizable paths
+    r"""Tensor product with parametrized paths.
 
     Parameters
     ----------
@@ -28,12 +28,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         Irreps for the output.
 
     instructions : list of tuple
-        List of instructions ``(i_1, i_2, i_out, mode, train[, path_weight])``
-        it means: Put ``in1[i_1]`` :math:`\otimes` ``in2[i_2]`` into ``out[i_out]``
+        List of instructions ``(i_1, i_2, i_out, mode, train[, path_weight])``.
 
-        * mode: determines the way the multiplicities are treated, "uvw" is fully connected
-        * train: `True` of `False` if this path is weighed by a parameter
-        * path weight: how much this path should contribute to the output
+        Each instruction puts ``in1[i_1]`` :math:`\otimes` ``in2[i_2]`` into ``out[i_out]``.
+
+        * ``mode``: `str`. Determines the way the multiplicities are treated, ``"uvw"`` is fully connected.
+        * ``train``: `bool`. `True` if this path has a weight, otherwise `False`.
+        * ``path_weight``: `float`. How much this path contributes to the output.
 
     in1_var : list of float, Tensor, or None
         Variance for each irrep in ``irreps_in1``. If ``None``, all default to ``1.0``.
@@ -45,7 +46,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         Variance for each irrep in ``irreps_out``. If ``None``, all default to ``1.0``.
 
     normalization : {'component', 'norm'}
-        the way it is assumed the representation are normalized. If it is set to "norm":
+        The assumed normalization of representations. If it is set to "norm":
 
         .. math::
 
@@ -682,7 +683,7 @@ class FullyConnectedTensorProduct(TensorProduct):
 
         z_w = \sum_{u,v} w_{uvw} x_u \otimes y_v + \cdots \text{other paths}
 
-    where :math:`u,v,w` are the indices of the multiplicites.
+    where :math:`u,v,w` are the indices of the multiplicities.
 
     Parameters
     ----------
@@ -726,13 +727,13 @@ class FullyConnectedTensorProduct(TensorProduct):
 
 
 class ElementwiseTensorProduct(TensorProduct):
-    r"""Elementwise-Connected tensor product
+    r"""Elementwise connected tensor product.
 
     .. math::
 
         z_u = x_u \otimes y_u
 
-    where :math:`u` runs over the irrep note that ther is no weights.
+    where :math:`u` runs over the irreps. Note that there are no weights.
 
     Parameters
     ----------
@@ -800,13 +801,13 @@ class ElementwiseTensorProduct(TensorProduct):
 
 
 class FullTensorProduct(TensorProduct):
-    r"""Full tensor product between two irreps
+    r"""Full tensor product between two irreps.
 
     .. math::
 
         z_{uv} = x_u \otimes y_v
 
-    where :math:`u` and :math:`v` runs over the irrep, note that ther is no weights.
+    where :math:`u` and :math:`v` run over the irreps. Note that there are no weights.
 
     Parameters
     ----------

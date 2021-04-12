@@ -8,7 +8,9 @@ from e3nn.util.jit import compile_mode
 
 @compile_mode('trace')
 class Activation(torch.nn.Module):
-    r"""Scalar activation function
+    r"""Scalar activation function.
+
+    Odd scalar inputs require activation functions with a defined parity (odd or even).
 
     Parameters
     ----------
