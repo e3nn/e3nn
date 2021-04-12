@@ -51,11 +51,11 @@ def test_linear():
 
 def test_linear_like_tp():
     """Test that Linear gives the same results as the corresponding TensorProduct."""
-    irreps_in = o3.Irreps("1e + 2e + 3x3o")
-    irreps_out = o3.Irreps("1e + 2e + 3x3o")
+    irreps_in = o3.Irreps("1e + 2e + 4x1e + 3x3o")
+    irreps_out = o3.Irreps("1e + 2e + 3x3o + 3x1e")
     m = o3.Linear(irreps_in, irreps_out)
     m_true = SlowLinear(irreps_in, irreps_out)
     with torch.no_grad():
         m_true.tp.weight[:] = m.weight
-    inp = torch.randn(3, irreps_in.dim)
+    inp = torch.randn(4, irreps_in.dim)
     assert torch.allclose(m(inp), m_true(inp))

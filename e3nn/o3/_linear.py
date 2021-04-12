@@ -188,13 +188,14 @@ def _codegen_linear(
             :,
             flat_weight_index:flat_weight_index + path_nweight
         ].reshape(
-            (() if shared_weights else (-1,)) + (mul_ir_out.mul, 1, mul_ir_out.mul)
+            (() if shared_weights else (-1,)) + (mul_ir_in.mul, mul_ir_out.mul)
         )
         flat_weight_index += path_nweight
 
-        ein_out = torch.einsum(f"{z}uvw,zui->zwi", w, x_list[i_in])
+        ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[i_in])
         # TODO: this makes the results the same as the old one, but is it really a good initialization for a Linear?
-        ein_out = math.sqrt(1.0 / mul_ir_in.mul) * ein_out
+        alpha = math.sqrt(mul_ir_in.mul * sum(1 if i_out_this == i_out else 0 for _, i_out_this in instr))
+        ein_out = ein_out / alpha
 
         out_list += [ein_out.reshape(batch_out, mul_ir_out.dim)]
 
