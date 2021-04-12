@@ -21,7 +21,7 @@ copyright = '2020, e3nn Developers'
 author = 'e3nn Developers'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2.5'
+release = '0.2.6'
 
 
 # -- General configuration ---------------------------------------------------
