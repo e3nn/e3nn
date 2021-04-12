@@ -2,7 +2,7 @@ import torch
 
 from e3nn import o3
 from e3nn.nn import Identity
-from e3nn.o3 import FullyConnectedTensorProduct, Linear, FullTensorProduct, Norm
+from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
@@ -27,17 +27,6 @@ def test_id():
 
     assert_equivariant(m)
     assert_auto_jitable(m, strict_shapes=False)
-
-
-def test_linear():
-    irreps_in = o3.Irreps("1e + 2e + 3x3o")
-    irreps_out = o3.Irreps("1e + 2e + 3x3o")
-    m = Linear(irreps_in, irreps_out)
-    print(m)
-    m(torch.randn(irreps_in.dim))
-
-    assert_equivariant(m)
-    assert_auto_jitable(m)
 
 
 def test_full():
