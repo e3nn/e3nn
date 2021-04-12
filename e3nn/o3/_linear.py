@@ -24,17 +24,22 @@ class Linear(CodeGenMixin, torch.nn.Module):
         representation of the output
 
     internal_weights : bool
-        see `TensorProduct`
+        whether the ``Linear`` should store its own weights. Defaults to ``True`` unless ``shared_weights`` is explicitly set to ``False``, for consistancy with ``TensorProduct``.
 
     shared_weights : bool
-        see `TensorProduct`
+        whether the ``Linear`` should be weighted individually for each input in a batch. Defaults to ``False``. Cannot be ``True`` if ``internal_weights`` is ``True``.
+
+    Attributes
+    ----------
+    weight_numel : int
+        the size of the weights for this ``Linear``
 
     Examples
     --------
     Linearly combines 4 scalars into 8 scalars and 16 vectors into 8 vectors.
 
     >>> lin = Linear("4x0e+16x1o", "8x0e+8x1o")
-    >>> lin.tp.weight_numel
+    >>> lin.weight_numel
     160
     """
     weight_numel: int
