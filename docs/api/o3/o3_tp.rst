@@ -38,13 +38,6 @@ In a fully connected tensor product, all possible paths are created. The outputs
 In the elementwise tensor product, the irreps are multiplied one by one. Note how the inputs have been split and how the multiplicities of the outputs match with the multiplicities of the input.
 
 
-.. jupyter-execute::
-
-    o3.Linear('5x0e + 4x1e', '6x0e + 7x1e').tp.visualize()
-
-The linear operation is a special case of a tensor product with a constant scalar ``1.0``.
-
-
 .. autoclass:: e3nn.o3.TensorProduct
     :members:
     :show-inheritance:

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `e3nn.util.test.random_irreps` convinience function for writing tests
+
+### Changed
+- `o3.Linear` now has more efficient specialized code
+
 
 ## [0.2.5] - 2021-04-07
 ### Added
