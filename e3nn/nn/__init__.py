@@ -1,7 +1,8 @@
 from ._extract import Extract, ExtractIr
+from ._activation import Activation
 from ._batchnorm import BatchNorm
 from ._fc import FullyConnectedNet
-from ._gate import Activation, Gate
+from ._gate import Gate
 from ._identity import Identity
 from ._s2act import S2Activation
 from ._normact import NormActivation
