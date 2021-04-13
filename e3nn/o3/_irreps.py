@@ -457,6 +457,17 @@ class Irreps(tuple):
         return ir in (irrep for _, irrep in self)
 
     def count(self, ir) -> int:
+        r"""Multiplicity of ``ir``.
+
+        Parameters
+        ----------
+        ir : `Irrep`
+
+        Returns
+        -------
+        `int`
+            total multiplicity of ``ir``
+        """
         ir = Irrep(ir)
         return sum(mul for mul, irrep in self if ir == irrep)
 

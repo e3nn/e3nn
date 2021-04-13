@@ -449,7 +449,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         Returns
         -------
-        A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction``th instruction.
+        `torch.Tensor`
+            A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th instruction.
         """
         if not self.instructions[instruction].has_weight:
             raise ValueError(f"Instruction {instruction} has no weights.")
