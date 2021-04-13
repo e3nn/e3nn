@@ -96,14 +96,14 @@ class MessagePassing(torch.nn.Module):
                 (mul, ir)
                 for mul, ir in self.irreps_node_hidden
                 if ir.l == 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
-            ])
+            ]).simplify()
             irreps_gated = o3.Irreps([
                 (mul, ir)
                 for mul, ir in self.irreps_node_hidden
                 if ir.l > 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
             ])
             ir = "0e" if tp_path_exists(irreps_node, self.irreps_edge_attr, "0e") else "0o"
-            irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated])
+            irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated]).simplify()
 
             gate = Gate(
                 irreps_scalars, [act[ir.p] for _, ir in irreps_scalars],  # scalar
