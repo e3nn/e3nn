@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.2.7] - 2021-04-14
 ### Added
 - `uuu` connection mode in `o3.TensorProduct` now has specialized code
 
