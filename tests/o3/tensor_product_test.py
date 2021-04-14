@@ -87,7 +87,9 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     [
         ('uvw', True),
         ('uvu', True),
+        ('uvu', False),
         ('uvv', True),
+        ('uvv', False),
         ('uuu', True),
         ('uuu', False)
     ]
