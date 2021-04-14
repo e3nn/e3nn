@@ -304,6 +304,14 @@ def codegen_tensor_product(
                 if specialized_code and key == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}u,zu,zu->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                     ein_right = torch.einsum(f"{z}u,uw,zu->zuw", w_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and key == (1, 1, 1) and normalization == "component":
+                    ein_out = torch.einsum(
+                        f"{z}u,zui->zui",
+                        w_out,
+                        torch.cross(x1_out, x2_out, dim=2)
+                    ) / sqrt(2)
+                    # For cross product, use the general case right()
+                    ein_right = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w_right, w3j_right, e1_right, x2_right)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum(f"{z}u,zu,zuj->zuj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
                     ein_right = torch.einsum(f"{z}u,uw,zui->zuwi", w_right, e2_right, x2_right)
@@ -320,6 +328,10 @@ def codegen_tensor_product(
                 if specialized_code and key == (0, 0, 0):
                     ein_out = torch.einsum("zu,zu->zu", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                     ein_right = torch.einsum("uw,zu->zuw", e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and key == (1, 1, 1) and normalization == "component":
+                    ein_out = torch.cross(x1_out, x2_out, dim=2) * (1.0 / sqrt(2))
+                    # For cross product, use the general case right()
+                    ein_right = torch.einsum("ijk,uw,zuj->zuiwk", w3j_right, e1_right, x2_right)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum("zu,zuj->zuj", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
                     ein_right = torch.einsum("uw,zui->zuwi", e2_right, x2_right)
