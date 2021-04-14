@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `uuu` connection mode in `o3.TensorProduct` now has specialized code
+
 ### Fixed
 - Fixed an issue with `Activation` (used by `Gate`). It was only applying the first activation function provided. `Activation('0e+0e', [act1, act2])` was equivalent to `Activation('2x0e', [act1])`. Solved by removing the `.simplify()` applied to `self.irreps_in`.
+- `Gate` will not accept non-scalar `irreps_gates` or `irreps_scalars`
 
 ## [0.2.6] - 2021-04-12
 ### Added

@@ -4,7 +4,7 @@ import logging
 import torch
 from torch.utils.benchmark import Timer
 
-from e3nn.o3 import Irreps, FullyConnectedTensorProduct
+from e3nn.o3 import Irreps, FullyConnectedTensorProduct, ElementwiseTensorProduct
 from e3nn.util.jit import compile
 
 
@@ -35,6 +35,7 @@ def main():
     parser.add_argument("--backward", type=t_or_f, default=True)
     parser.add_argument("--opt-ein", type=t_or_f, default=True)
     parser.add_argument("--specialized-code", type=t_or_f, default=True)
+    parser.add_argument("--elementwise", action='store_true')
     parser.add_argument("-n", type=int, default=1000)
     parser.add_argument("--batch", type=int, default=10)
 
@@ -51,14 +52,31 @@ def main():
     irreps_in1 = Irreps(args.irreps_in1 if args.irreps_in1 else args.irreps)
     irreps_in2 = Irreps(args.irreps_in2 if args.irreps_in2 else args.irreps)
     irreps_out = Irreps(args.irreps_out if args.irreps_out else args.irreps)
-    tp = FullyConnectedTensorProduct(
-        irreps_in1,
-        irreps_in2,
-        irreps_out,
-        _specialized_code=args.specialized_code,
-        _optimize_einsums=args.opt_ein
-    )
+
+    if args.elementwise:
+        tp = ElementwiseTensorProduct(
+            irreps_in1,
+            irreps_in2,
+            _specialized_code=args.specialized_code,
+            _optimize_einsums=args.opt_ein
+        )
+        if args.backward:
+            print("Elementwise TP has no weights, cannot backward. Setting --backward False.")
+            args.backward = False
+    else:
+        tp = FullyConnectedTensorProduct(
+            irreps_in1,
+            irreps_in2,
+            irreps_out,
+            _specialized_code=args.specialized_code,
+            _optimize_einsums=args.opt_ein
+        )
     tp = tp.to(device=device)
+    assert len(tp.instructions) > 0, "Bad irreps, no instructions"
+    print(f"Tensor product: {tp}")
+    print("Instructions:")
+    for ins in tp.instructions:
+        print(f"  {ins}")
 
     # from https://pytorch.org/docs/master/_modules/torch/utils/benchmark/utils/timer.html#Timer.timeit
     warmup = max(int(args.n // 100), 1)

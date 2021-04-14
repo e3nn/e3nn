@@ -82,47 +82,106 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
 
 @pytest.mark.parametrize('normalization', ['component', 'norm'])
-@pytest.mark.parametrize('mode', ['uvw', 'uvu', 'uvv'])
-def test_specialized_code(float_tolerance, normalization, mode):
+@pytest.mark.parametrize(
+    'mode,weighted',
+    [
+        ('uvw', True),
+        ('uvu', True),
+        ('uvu', False),
+        ('uvv', True),
+        ('uvv', False),
+        ('uuu', True),
+        ('uuu', False)
+    ]
+)
+def test_specialized_code(normalization, mode, weighted, float_tolerance):
     irreps_in1 = Irreps('4x0e + 4x1e + 4x2e')
     irreps_in2 = Irreps('5x0e + 5x1e + 5x2e')
     irreps_out = Irreps('6x0e + 6x1e + 6x2e')
 
     if mode == 'uvu':
         irreps_out = irreps_in1
-    if mode == 'uvv':
+    elif mode == 'uvv':
         irreps_out = irreps_in2
+    elif mode == 'uuu':
+        irreps_in2 = irreps_in1
+        irreps_out = irreps_in1
 
-    tps = []
-    for sc in [False, True]:
-        torch.manual_seed(0)
-        ins = [
-            (0, 0, 0, mode, True, 1.0),
+    ins = [
+        (0, 0, 0, mode, weighted, 1.0),
 
-            (0, 1, 1, mode, True, 1.0),
-            (1, 0, 1, mode, True, 1.0),
-            (1, 1, 0, mode, True, 1.0),
+        (0, 1, 1, mode, weighted, 1.0),
+        (1, 0, 1, mode, weighted, 1.0),
+        (1, 1, 0, mode, weighted, 1.0),
 
-            (1, 1, 1, mode, True, 1.0),
+        (1, 1, 1, mode, weighted, 1.0),
 
-            (0, 2, 2, mode, True, 1.0),
-            (2, 0, 2, mode, True, 1.0),
-            (2, 2, 0, mode, True, 1.0),
+        (0, 2, 2, mode, weighted, 1.0),
+        (2, 0, 2, mode, weighted, 1.0),
+        (2, 2, 0, mode, weighted, 1.0),
 
-            (2, 1, 1, mode, True, 1.0),
-        ]
-        tps += [TensorProduct(irreps_in1, irreps_in2, irreps_out, ins, normalization=normalization, _specialized_code=sc)]
+        (2, 1, 1, mode, weighted, 1.0),
+    ]
+    tp1 = TensorProduct(
+        irreps_in1, irreps_in2, irreps_out,
+        ins, normalization=normalization,
+        _specialized_code=False
+    )
+    tp2 = TensorProduct(
+        irreps_in1, irreps_in2, irreps_out,
+        ins, normalization=normalization,
+        _specialized_code=True
+    )
+    with torch.no_grad():
+        tp2.weight[:] = tp1.weight
 
-    tp1, tp2 = tps
     x = irreps_in1.randn(3, -1)
     y = irreps_in2.randn(3, -1)
     assert (tp1(x, y) - tp2(x, y)).abs().max() < float_tolerance
+    assert (tp1.right(y) - tp2.right(y)).abs().max() < float_tolerance
 
 
 def test_empty_irreps():
     tp = FullyConnectedTensorProduct('0e + 1e', Irreps([]), '0e + 1e')
     out = tp(torch.randn(1, 2, 4), torch.randn(2, 1, 0))
     assert out.shape == (2, 2, 4)
+
+
+def test_single_out():
+    tp1 = TensorProduct(
+        "5x0e", "5x0e", "5x0e",
+        [(0, 0, 0, "uvw", True, 1.0)]
+    )
+    tp2 = TensorProduct(
+        "5x0e", "5x0e", "5x0e + 3x0o",
+        [(0, 0, 0, "uvw", True, 1.0)]
+    )
+    with torch.no_grad():
+        tp2.weight[:] = tp1.weight
+    x1, x2 = torch.randn(3, 5), torch.randn(3, 5)
+    out1 = tp1(x1, x2)
+    out2 = tp2(x1, x2)
+    assert out1.shape == (3, 5)
+    assert out2.shape == (3, 8)
+    assert torch.allclose(out1, out2[:, :5])
+    assert torch.all(out2[:, 5:] == 0)
+
+
+def test_specialized_wigners():
+    """If all paths use specialized code, there should be no wigners"""
+    tp = FullyConnectedTensorProduct(
+        "5x0e + 3x0o",
+        "4x0e", "4x0e + 1x3o",
+        _specialized_code=True
+    )
+    assert torch.numel(tp._wigner_buf) == 0
+    tp = FullyConnectedTensorProduct(
+        "5x0e + 3x0o",
+        "4x0e", "4x0e + 1x3o",
+        _specialized_code=False
+    )
+    # There should only be the 0x0->0 wigner
+    assert torch.numel(tp._wigner_buf) == 1
 
 
 def test_empty_inputs():
@@ -164,9 +223,13 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
         orig_tp(x1, x2),
         opt_tp(x1, x2),
     )
+    assert torch.allclose(
+        orig_tp.right(x2),
+        opt_tp.right(x2),
+    )
 
 
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=4))
 @pytest.mark.parametrize('special_code', [True, False])
 @pytest.mark.parametrize('opt_ein', [True, False])
 @pytest.mark.parametrize('jit', [True, False])
@@ -181,7 +244,9 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
         _specialized_code=special_code,
         _optimize_einsums=opt_ein
     )
-    opt_tp.load_state_dict(orig_tp.state_dict())
+    # We don't use state_dict here since that contains things like wigners that can differ between optimized and unoptimized TPs
+    with torch.no_grad():
+        opt_tp.weight[:] = orig_tp.weight
     assert opt_tp._specialized_code == special_code
     assert opt_tp._optimize_einsums == opt_ein
 
@@ -202,6 +267,11 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
         orig_tp(x1, x2),
         opt_tp(x1, x2),
         atol=float_tolerance  # numerical optimizations can cause meaningful numerical error by changing operations
+    )
+    assert torch.allclose(
+        orig_tp.right(x2),
+        opt_tp.right(x2),
+        atol=float_tolerance
     )
 
 

@@ -565,6 +565,8 @@ class Irreps(tuple):
 
     @property
     def lmax(self) -> int:
+        if len(self) == 0:
+            raise ValueError("Cannot get lmax of empty Irreps")
         return max(self.ls)
 
     def __repr__(self):

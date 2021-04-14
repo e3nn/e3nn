@@ -171,10 +171,13 @@ def _codegen_linear(
         ws = ws.reshape(-1, weight_numel)
 
     # = extract individual input irreps =
-    x_list = [
-        x[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
-        for i, mul_ir in zip(irreps_in.slices(), irreps_in)
-    ]
+    if len(irreps_in) == 1:
+        x_list = [x.reshape(batch_out, irreps_in[0].mul, irreps_in[0].ir.dim)]
+    else:
+        x_list = [
+            x[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
+            for i, mul_ir in zip(irreps_in.slices(), irreps_in)
+        ]
 
     z = '' if shared_weights else 'z'
 
@@ -199,10 +202,14 @@ def _codegen_linear(
 
         # Extract the weight from the flattened weight tensor
         path_nweight = mul_ir_in.mul*mul_ir_out.mul
-        w = ws[
-            :,
-            flat_weight_index:flat_weight_index + path_nweight
-        ].reshape(
+        if len(instr) == 1:
+            w = ws
+        else:
+            w = ws[
+                :,
+                flat_weight_index:flat_weight_index + path_nweight
+            ]
+        w = w.reshape(
             (() if shared_weights else (-1,)) + (mul_ir_in.mul, mul_ir_out.mul)
         )
         flat_weight_index += path_nweight
@@ -214,14 +221,18 @@ def _codegen_linear(
         out_list += [ein_out.reshape(batch_out, mul_ir_out.dim)]
 
     # = Return the result =
-    out = torch.cat([
+    out = [
         _sum_tensors(
             [out for (_, i_out_ins), out in zip(instr, out_list) if i_out_ins == i_out],
             shape=(batch_out, mul_ir_out.dim),
             like=x
         )
         for i_out, mul_ir_out in enumerate(irreps_out)
-    ], dim=1)
+    ]
+    if len(out) > 1:
+        out = torch.cat(out, dim=1)
+    else:
+        out = out[0]
 
     out = out.reshape(outsize)
 
