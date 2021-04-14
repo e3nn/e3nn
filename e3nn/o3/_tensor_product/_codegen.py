@@ -262,7 +262,17 @@ def codegen_tensor_product(
                     ein_right = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w_right, w3j_right, x2_right)
             else:
                 # not so useful operation because u is summed
-                ein_out = torch.einsum("ijk,zuvij->zvk", w3j_out, xx)
+                # only specialize out for this path
+                if specialized_code and key == (0, 0, 0):
+                    ein_out = torch.einsum("zu,zv->zv", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_in1.ir.l == 0:
+                    ein_out = torch.einsum("zu,zvj->zvj", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
+                elif specialized_code and mul_ir_in2.ir.l == 0:
+                    ein_out = torch.einsum("zui,zv->zvi", x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_out.ir.l == 0:
+                    ein_out = torch.einsum("zui,zvi->zv", x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
+                else:
+                    ein_out = torch.einsum("ijk,zuvij->zvk", w3j_out, xx)
                 s2ones = fx.Proxy(graph_right.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2_right.device.node, dtype=x2_right.dtype.node)))
                 ein_right = torch.einsum("u,ijk,zvj->zuivk", s2ones, w3j_right, x2_right)
         if ins.connection_mode == 'uuw':
