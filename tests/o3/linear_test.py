@@ -60,6 +60,20 @@ def test_linear():
     assert_auto_jitable(m)
 
 
+def test_single_out():
+    l1 = o3.Linear("5x0e", "5x0e")
+    l2 = o3.Linear("5x0e", "5x0e + 3x0o")
+    with torch.no_grad():
+        l1.weight[:] = l2.weight
+    x = torch.randn(3, 5)
+    out1 = l1(x)
+    out2 = l2(x)
+    assert out1.shape == (3, 5)
+    assert out2.shape == (3, 8)
+    assert torch.allclose(out1, out2[:, :5])
+    assert torch.all(out2[:, 5:] == 0)
+
+
 # We want to be sure to test a multiple-same L case and a single irrep case
 @pytest.mark.parametrize(
     "irreps_in", ["5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4)

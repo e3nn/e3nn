@@ -202,10 +202,14 @@ def _codegen_linear(
 
         # Extract the weight from the flattened weight tensor
         path_nweight = mul_ir_in.mul*mul_ir_out.mul
-        w = ws[
-            :,
-            flat_weight_index:flat_weight_index + path_nweight
-        ].reshape(
+        if len(instr) == 1:
+            w = ws
+        else:
+            w = ws[
+                :,
+                flat_weight_index:flat_weight_index + path_nweight
+            ]
+        w = w.reshape(
             (() if shared_weights else (-1,)) + (mul_ir_in.mul, mul_ir_out.mul)
         )
         flat_weight_index += path_nweight
