@@ -105,27 +105,34 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
         irreps_in2 = irreps_in1
         irreps_out = irreps_in1
 
-    tps = []
-    for sc in [False, True]:
-        torch.manual_seed(0)
-        ins = [
-            (0, 0, 0, mode, weighted, 1.0),
+    ins = [
+        (0, 0, 0, mode, weighted, 1.0),
 
-            (0, 1, 1, mode, weighted, 1.0),
-            (1, 0, 1, mode, weighted, 1.0),
-            (1, 1, 0, mode, weighted, 1.0),
+        (0, 1, 1, mode, weighted, 1.0),
+        (1, 0, 1, mode, weighted, 1.0),
+        (1, 1, 0, mode, weighted, 1.0),
 
-            (1, 1, 1, mode, weighted, 1.0),
+        (1, 1, 1, mode, weighted, 1.0),
 
-            (0, 2, 2, mode, weighted, 1.0),
-            (2, 0, 2, mode, weighted, 1.0),
-            (2, 2, 0, mode, weighted, 1.0),
+        (0, 2, 2, mode, weighted, 1.0),
+        (2, 0, 2, mode, weighted, 1.0),
+        (2, 2, 0, mode, weighted, 1.0),
 
-            (2, 1, 1, mode, weighted, 1.0),
-        ]
-        tps += [TensorProduct(irreps_in1, irreps_in2, irreps_out, ins, normalization=normalization, _specialized_code=sc)]
+        (2, 1, 1, mode, weighted, 1.0),
+    ]
+    tp1 = TensorProduct(
+        irreps_in1, irreps_in2, irreps_out,
+        ins, normalization=normalization,
+        _specialized_code=False
+    )
+    tp2 = TensorProduct(
+        irreps_in1, irreps_in2, irreps_out,
+        ins, normalization=normalization,
+        _specialized_code=True
+    )
+    with torch.no_grad():
+        tp2.weight[:] = tp1.weight
 
-    tp1, tp2 = tps
     x = irreps_in1.randn(3, -1)
     y = irreps_in2.randn(3, -1)
     assert (tp1(x, y) - tp2(x, y)).abs().max() < float_tolerance
