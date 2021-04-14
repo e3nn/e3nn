@@ -181,7 +181,8 @@ def codegen_tensor_product(
             w_right = ws_right[:, flat_weight_index:flat_weight_index + prod(ins.path_shape)].reshape((() if shared_weights else (-1,)) + tuple(ins.path_shape))
             flat_weight_index += prod(ins.path_shape)
 
-        # We didn't make this instruction specialized, so do the general case
+        # Construct the general xx in case this instruction isn't specialized
+        # If this isn't used, the dead code will get removed
         key = (ins.i_in1, ins.i_in2, ins.connection_mode[:2])
         if key not in xx_dict:
             if ins.connection_mode[:2] == 'uv':
@@ -305,6 +306,16 @@ def codegen_tensor_product(
         # Close the profiler block
         graph_out.call_function(torch.ops.profiler._record_function_exit, (handle_out,))
         graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
+
+        # Remove unused w3js:
+        if len(w3j_out.node.users) == 0 and len(w3j_right.node.users) == 0:
+            del w3j[-1]
+            # The w3j nodes are reshapes, so we have to remove them from the graph
+            # Although they are dead code, they try to reshape to dimensions that don't exist
+            # (since the corresponding w3js are not in w3j)
+            # so they screw up the shape propagation, even though they would be removed later as dead code by TorchScript.
+            graph_out.erase_node(w3j_dict_out.pop(key).node)
+            graph_right.erase_node(w3j_dict_right.pop(key).node)
 
     # = Return the result =
     out_out = [
