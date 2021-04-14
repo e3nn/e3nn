@@ -89,13 +89,14 @@ def codegen_tensor_product(
     batch_out = x1s_out.shape[0]
     batch_right = x2s_right.shape[0]
 
+    # = Determine number of weights and reshape weights ==
     weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.has_weight)
     if weight_numel > 0:
         ws_out = ws_out.reshape(-1, weight_numel)
         ws_right = ws_right.reshape(-1, weight_numel)
     del weight_numel
 
-    # = extract wigners =
+    # = book-keeping for wigners =
     w3j = []
     w3j_dict_out = dict()
     w3j_dict_right = dict()
@@ -104,6 +105,7 @@ def codegen_tensor_product(
         return (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
 
     # = extract individual input irreps =
+    # If only one input irrep, can avoid creating a view
     if len(irreps_in1) == 1:
         x1_list_out = [x1s_out.reshape(batch_out, irreps_in1[0].mul, irreps_in1[0].ir.dim)]
     else:
@@ -114,6 +116,7 @@ def codegen_tensor_product(
 
     x2_list_out = []
     x2_list_right = []
+    # If only one input irrep, can avoid creating a view
     if len(irreps_in2) == 1:
         x2_list_out.append(
             x2s_out.reshape(batch_out, irreps_in2[0].mul, irreps_in2[0].ir.dim)
@@ -130,9 +133,13 @@ def codegen_tensor_product(
                 x2s_right[:, i].reshape(batch_right, mul_ir.mul, mul_ir.ir.dim)
             )
 
+    # The einsum string index to prepend to the weights if the weights are not shared and have a batch dimension
     z = '' if shared_weights else 'z'
+
+    # Cache of input irrep pairs whose outer products (xx) have already been computed
     xx_dict = dict()
 
+    # Current index in the flat weight tensor
     flat_weight_index = 0
 
     out_list_out = []
@@ -191,6 +198,8 @@ def codegen_tensor_product(
                 xx_dict[key] = torch.einsum('zui,zuj->zuij', x1_out, x2_out)
         xx = xx_dict[key]
 
+        # Create a proxy & request for the relevant wigner w3j
+        # If not used (because of specialized code), will get removed later.
         key = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
         if key not in w3j:
             i = sum(w3j_dim(*k) for k in w3j)
@@ -375,6 +384,7 @@ def codegen_tensor_product(
     if len(out_out) > 1:
         out_out = torch.cat(out_out, dim=1)
     else:
+        # Avoid an unnecessary copy in a size one torch.cat
         out_out = out_out[0]
 
     out_right = [
