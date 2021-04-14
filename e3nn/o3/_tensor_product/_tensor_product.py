@@ -18,13 +18,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     Parameters
     ----------
-    in1 : `Irreps`
+    irreps_in1 : `Irreps`
         Irreps for the first input.
 
-    in2 : `Irreps`
+    irreps_in2 : `Irreps`
         Irreps for the second input.
 
-    out : `Irreps`
+    irreps_out : `Irreps`
         Irreps for the output.
 
     instructions : list of tuple
