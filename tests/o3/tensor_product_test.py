@@ -125,6 +125,26 @@ def test_empty_irreps():
     assert out.shape == (2, 2, 4)
 
 
+def test_single_out():
+    tp1 = TensorProduct(
+        "5x0e", "5x0e", "5x0e",
+        [(0, 0, 0, "uvw", True, 1.0)]
+    )
+    tp2 = TensorProduct(
+        "5x0e", "5x0e", "5x0e + 3x0o",
+        [(0, 0, 0, "uvw", True, 1.0)]
+    )
+    with torch.no_grad():
+        tp2.weight[:] = tp1.weight
+    x1, x2 = torch.randn(3, 5), torch.randn(3, 5)
+    out1 = tp1(x1, x2)
+    out2 = tp2(x1, x2)
+    assert out1.shape == (3, 5)
+    assert out2.shape == (3, 8)
+    assert torch.allclose(out1, out2[:, :5])
+    assert torch.all(out2[:, 5:] == 0)
+
+
 def test_empty_inputs():
     tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))

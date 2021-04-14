@@ -104,16 +104,31 @@ def codegen_tensor_product(
         return (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
 
     # = extract individual input irreps =
-    x1_list_out = [
-        x1s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
-        for i, mul_ir in zip(irreps_in1.slices(), irreps_in1)
-    ]
+    if len(irreps_in1) == 1:
+        x1_list_out = [x1s_out.reshape(batch_out, irreps_in1[0].mul, irreps_in1[0].ir.dim)]
+    else:
+        x1_list_out = [
+            x1s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
+            for i, mul_ir in zip(irreps_in1.slices(), irreps_in1)
+        ]
 
     x2_list_out = []
     x2_list_right = []
-    for i, mul_ir in zip(irreps_in2.slices(), irreps_in2):
-        x2_list_out.append(x2s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim))
-        x2_list_right.append(x2s_right[:, i].reshape(batch_right, mul_ir.mul, mul_ir.ir.dim))
+    if len(irreps_in2) == 1:
+        x2_list_out.append(
+            x2s_out.reshape(batch_out, irreps_in2[0].mul, irreps_in2[0].ir.dim)
+        )
+        x2_list_right.append(
+            x2s_right.reshape(batch_right, irreps_in2[0].mul, irreps_in2[0].ir.dim)
+        )
+    else:
+        for i, mul_ir in zip(irreps_in2.slices(), irreps_in2):
+            x2_list_out.append(
+                x2s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
+            )
+            x2_list_right.append(
+                x2s_right[:, i].reshape(batch_right, mul_ir.mul, mul_ir.ir.dim)
+            )
 
     z = '' if shared_weights else 'z'
     xx_dict = dict()
@@ -292,16 +307,20 @@ def codegen_tensor_product(
         graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
 
     # = Return the result =
-    out_out = torch.cat([
+    out_out = [
         _sum_tensors(
             [out for ins, out in zip(instructions, out_list_out) if ins.i_out == i_out],
             shape=(batch_out, mul_ir_out.dim),
             like=x1s_out
         )
         for i_out, mul_ir_out in enumerate(irreps_out)
-    ], dim=1)
+    ]
+    if len(out_out) > 1:
+        out_out = torch.cat(out_out, dim=1)
+    else:
+        out_out = out_out[0]
 
-    out_right = torch.cat([
+    out_right = [
         torch.cat([
             _sum_tensors(
                 [out for ins, out in zip(instructions, out_list_right) if (ins.i_in1, ins.i_out) == (i_in1, i_out)],
@@ -311,7 +330,11 @@ def codegen_tensor_product(
             for i_out, mul_ir_out in enumerate(irreps_out)
         ], dim=2)
         for i_in1, mul_ir_in1 in enumerate(irreps_in1)
-    ], dim=1)
+    ]
+    if len(out_right) > 1:
+        out_right = torch.cat(out_right, dim=1)
+    else:
+        out_right = out_right[0]
 
     out_out = out_out.reshape(outsize_out)
     out_right = out_right.reshape(outsize_right)
