@@ -207,6 +207,17 @@ def codegen_tensor_product(
             if specialized_code and key == (0, 0, 0):
                 ein_out = torch.einsum(f"{z}uvw,zu,zv->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                 ein_right = torch.einsum(f"{z}uvw,zv->zuw", w_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+            elif specialized_code and key == (1, 1, 1) and normalization == "component":
+                cross_x1_out = x1_out.reshape(batch_out, mul_ir_in1.mul, 1, 3)
+                cross_x2_out = x2_out.reshape(batch_out, 1, mul_ir_in2.mul, 3)
+                cross_x1_out, cross_x2_out = torch.broadcast_tensors(cross_x1_out, cross_x2_out)
+                ein_out = torch.einsum(
+                    f"{z}uvw,zuvi->zwi",
+                    w_out,
+                    torch.cross(cross_x1_out, cross_x2_out, dim=3)
+                ) / sqrt(2)
+                # For cross product, use the general case right()
+                ein_right = torch.einsum(f"{z}uvw,ijk,zvj->zuiwk", w_right, w3j_right, x2_right)
             elif specialized_code and mul_ir_in1.ir.l == 0:
                 ein_out = torch.einsum(f"{z}uvw,zu,zvj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
                 ein_right = torch.einsum(f"{z}uvw,zvi->zuwi", w_right, x2_right)
@@ -225,6 +236,17 @@ def codegen_tensor_product(
                 if specialized_code and key == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}uv,zu,zv->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                     ein_right = torch.einsum(f"{z}uv,uw,zv->zuw", w_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                elif specialized_code and key == (1, 1, 1) and normalization == "component":
+                    cross_x1_out = x1_out.reshape(batch_out, mul_ir_in1.mul, 1, 3)
+                    cross_x2_out = x2_out.reshape(batch_out, 1, mul_ir_in2.mul, 3)
+                    cross_x1_out, cross_x2_out = torch.broadcast_tensors(cross_x1_out, cross_x2_out)
+                    ein_out = torch.einsum(
+                        f"{z}uv,zuvi->zui",
+                        w_out,
+                        torch.cross(cross_x1_out, cross_x2_out, dim=3)
+                    ) / sqrt(2)
+                    # For cross product, use the general case right()
+                    ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", w_right, w3j_right, e1_right, x2_right)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uv,zu,zvj->zuj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
                     ein_right = torch.einsum(f"{z}uv,uw,zvi->zuwi", w_right, e1_right, x2_right)
