@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - `o3.Norm` now has specialized code
+- `squared` option to `o3.Norm`
 
 ### Fixed
 - No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`
