@@ -54,13 +54,10 @@ class NormActivation(torch.nn.Module):
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_in)
 
-        if normalize:
-            if epsilon is None:
-                epsilon = 1e-8
-            elif not epsilon > 0:
-                raise ValueError(f"epsilon {epsilon} is invalid, must be strictly positive.")
-        elif epsilon is not None:
-            raise ValueError("Using epsilon when normalize = False makes no sense.")
+        if epsilon is None:
+            epsilon = 1e-8
+        elif not epsilon > 0:
+            raise ValueError(f"epsilon {epsilon} is invalid, must be strictly positive.")
 
         self.norm = o3.Norm(irreps_in, epsilon=epsilon)
         self.scalar_nonlinearity = scalar_nonlinearity
