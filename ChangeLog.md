@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `o3.Norm` now has specialized code
+
+### Fixed
+- No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`
 
 ## [0.2.7] - 2021-04-14
 ### Added

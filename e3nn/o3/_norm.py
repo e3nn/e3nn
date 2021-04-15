@@ -2,7 +2,8 @@ from typing import Tuple, Optional
 
 import torch
 from torch import fx
-import torch_scatter
+# This import appears to be unused but is needed to register `torch_scatter` with PyTorch
+import torch_scatter  # noqa: F401
 
 from e3nn import o3
 from e3nn.util.codegen import CodeGenMixin
