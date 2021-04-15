@@ -12,15 +12,12 @@ from ._tensor_product._codegen import _get_code
 
 @compile_mode('script')
 class Norm(CodeGenMixin, torch.nn.Module):
-    r"""Norm operation
+    r"""Norm of each irrep in a direct sum of irreps.
 
     Parameters
     ----------
     irreps_in : `Irreps`
         representation of the input
-
-    normalization : {'component', 'norm'}
-        see `TensorProduct`
 
     Examples
     --------
@@ -45,7 +42,7 @@ class Norm(CodeGenMixin, torch.nn.Module):
         return f"{self.__class__.__name__}({self.irreps_in})"
 
     def forward(self, features):
-        """evaluate
+        """Compute norms of irreps in ``features``.
 
         Parameters
         ----------
