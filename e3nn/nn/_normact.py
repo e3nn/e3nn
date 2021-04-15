@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 import torch
 
 from e3nn import o3
@@ -22,8 +24,8 @@ class NormActivation(torch.nn.Module):
     normalize : bool
         whether to normalize the input features before multiplying them by the scalars from the nonlinearity
 
-    epsilon : float
-        when ``normalize`ing, norms smaller than ``epsilon`` will be clamped to ``epsilon`` to avoid division by zero
+    epsilon : float, optional
+        when ``normalize``ing, norms smaller than ``epsilon`` will be clamped up to ``epsilon`` to avoid division by zero. See also ``epsilon`` parameter to ``o3.Norm``. Cannot be specified if ``normalize`` is ``False``.
 
     bias : bool
         whether to apply a learnable additive bias to the inputs of the ``scalar_nonlinearity``
@@ -40,18 +42,28 @@ class NormActivation(torch.nn.Module):
     >>> print(n(feats).reshape(1, 2, 3).norm(dim=-1))
     tensor([[0.8497, 0.8497]])
     """
-    def __init__(self,
-                 irreps_in,
-                 scalar_nonlinearity,
-                 normalize=True,
-                 epsilon=1e-8,
-                 bias=False):
+    def __init__(
+        self,
+        irreps_in,
+        scalar_nonlinearity: Callable,
+        normalize: bool = True,
+        epsilon: Optional[float] = None,
+        bias: bool = False
+    ):
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_in)
-        self.norm = o3.Norm(irreps_in)
+
+        if normalize:
+            if epsilon is None:
+                epsilon = 1e-8
+            elif not epsilon > 0:
+                raise ValueError(f"epsilon {epsilon} is invalid, must be strictly positive.")
+        elif epsilon is not None:
+            raise ValueError("Using epsilon when normalize = False makes no sense.")
+
+        self.norm = o3.Norm(irreps_in, epsilon=epsilon)
         self.scalar_nonlinearity = scalar_nonlinearity
-        self.register_buffer('epsilon', torch.as_tensor(epsilon))
         self.normalize = normalize
         self.bias = bias
         if self.bias:
@@ -77,18 +89,12 @@ class NormActivation(torch.nn.Module):
         '''
         norms = self.norm(features)
 
-        # Apply nonlinearity
+        nonlin_arg = norms
+        if self.bias:
+            nonlin_arg = nonlin_arg + self.biases
+
+        scalings = self.scalar_nonlinearity(nonlin_arg)
         if self.normalize:
-            epsilon_norms = norms.clone()
-            epsilon_norms[epsilon_norms < self.epsilon] = self.epsilon
-            nonlin_arg = epsilon_norms
-            if self.bias:
-                nonlin_arg = nonlin_arg + self.biases
-            scalings = self.scalar_nonlinearity(nonlin_arg) / epsilon_norms
-        else:
-            nonlin_arg = norms
-            if self.bias:
-                nonlin_arg = nonlin_arg + self.biases
-            scalings = self.scalar_nonlinearity(nonlin_arg)
+            scalings = scalings / norms
 
         return self.scalar_multiplier(scalings, features)
