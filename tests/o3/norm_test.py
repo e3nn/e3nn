@@ -8,7 +8,7 @@ from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irrep
 
 class SlowNorm(torch.nn.Module):
     r"""Slow norm using TensorProduct"""
-    def __init__(self, irreps_in):
+    def __init__(self, irreps_in, epsilon=None):
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in).simplify()
@@ -29,19 +29,28 @@ class SlowNorm(torch.nn.Module):
 
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out.simplify()
+        self.epsilon = None if epsilon is None else float(epsilon)
 
     def forward(self, features):
-        return self.tp(features, features).sqrt()
+        out = self.tp(features, features)
+        if self.epsilon is not None:
+            eps_squared = self.epsilon**2
+            for_sqrt = out.clone()
+            for_sqrt[out < eps_squared] = eps_squared
+        else:
+            for_sqrt = out
+        return for_sqrt.sqrt()
 
 
 @pytest.mark.parametrize(
     "irreps_in", ["", "5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4)
 )
 @pytest.mark.parametrize("batchdim", [(4,), (1,), tuple(), (5, 3, 7)])
-def test_norm_like_tp(irreps_in, batchdim):
+@pytest.mark.parametrize("eps", [None, 1e-3])
+def test_norm_like_tp(irreps_in, batchdim, eps):
     """Test that Norm gives the same results as the corresponding TensorProduct."""
-    m = o3.Norm(irreps_in)
-    m_true = SlowNorm(irreps_in)
+    m = o3.Norm(irreps_in, epsilon=eps)
+    m_true = SlowNorm(irreps_in, epsilon=eps)
     inp = torch.randn(batchdim + (m.irreps_in.dim,))
     out = m(inp)
     out_true = m_true(inp)
@@ -59,3 +68,12 @@ def test_norm():
     m(torch.randn(irreps_in.dim))
     assert_equivariant(m)
     assert_auto_jitable(m)
+
+
+def test_epsilon():
+    irreps_in = o3.Irreps("3x1o")
+    inp = torch.zeros(irreps_in.dim)
+    inp[4] = 1.0
+    m = o3.Norm(irreps_in, epsilon=1e-6)
+    norms = m(inp)
+    assert torch.all(norms == torch.Tensor([1e-6, 1.0, 1e-6]))

@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import torch
 from torch import fx
@@ -19,6 +19,9 @@ class Norm(CodeGenMixin, torch.nn.Module):
     irreps_in : `Irreps`
         representation of the input
 
+    epsilon : float, optional
+        if not ``None``, norms smaller than ``epsilon`` will be "rounded" up to ``epsilon`` *before* any square roots are taken. (Doing the masking internally in ``Norm`` this way prevents NaNs in gradients.)
+
     Examples
     --------
     Compute the norms of 17 vectors.
@@ -27,12 +30,19 @@ class Norm(CodeGenMixin, torch.nn.Module):
     >>> norm(torch.randn(17 * 3)).shape
     torch.Size([17])
     """
-    def __init__(self, irreps_in):
+    epsilon: Optional[float]
+
+    def __init__(self, irreps_in, epsilon: Optional[float] = None):
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps([(mul, "0e") for mul, _ in self.irreps_in]).simplify()
 
-        code, indptr = _codegen_norm(self.irreps_in)
+        if epsilon is not None:
+            epsilon = float(epsilon)
+            assert epsilon > 0
+        self.epsilon = epsilon
+
+        code, indptr = _codegen_norm(self.irreps_in, self.epsilon)
         self._codegen_register({
             "_compiled_main": code
         })
@@ -57,7 +67,7 @@ class Norm(CodeGenMixin, torch.nn.Module):
         return self._compiled_main(features, self._indptr)
 
 
-def _codegen_norm(irreps_in: o3.Irreps,) -> Tuple[str, torch.Tensor]:
+def _codegen_norm(irreps_in: o3.Irreps, epsilon: Optional[float]) -> Tuple[str, torch.Tensor]:
     graph_out = fx.Graph()
 
     # = Function definitions =
@@ -102,7 +112,15 @@ def _codegen_norm(irreps_in: o3.Irreps,) -> Tuple[str, torch.Tensor]:
         )
     )
     out = fx.Proxy(out)
-    out = torch.sqrt(out)
+
+    # == Do the epsilon and sqrt ==
+    if epsilon is not None:
+        epsilon = epsilon*epsilon  # we're in squared units
+        for_sqrt = out.clone()
+        for_sqrt.masked_fill_(out < epsilon, epsilon)
+    else:
+        for_sqrt = out
+    out = torch.sqrt(for_sqrt)
 
     # = Return the result =
     out = out.reshape(outsize)
