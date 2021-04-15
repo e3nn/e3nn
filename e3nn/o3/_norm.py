@@ -92,11 +92,13 @@ def _codegen_norm(irreps_in: o3.Irreps,) -> Tuple[str, torch.Tensor]:
     # fx can't trace this directly
     # https://pytorch-scatter.readthedocs.io/en/latest/functions/segment_csr.html
     # segment_csr is the most efficient way to do these sums
+    # We call the ops version directly to (1) fix the FX function name issues and (2) avoid unnecessary nesting
     out = graph_out.call_function(
-        torch_scatter.segment_csr,
+        torch.ops.torch_scatter.segment_sum_csr,
         args=(
             x.node,
             indptr_proxy.node,
+            None
         )
     )
     out = fx.Proxy(out)
@@ -109,11 +111,4 @@ def _codegen_norm(irreps_in: o3.Irreps,) -> Tuple[str, torch.Tensor]:
     # check graphs
     graph_out.lint()
 
-    # stupid hack to avoid issues with FX finding the wrong name for segment_csr
-    code = _get_code(graph_out)
-    code = code.replace(
-        "torch_scatter.segment_csr.segment_csr",
-        "torch_scatter.segment_csr"
-    )
-
-    return code, indptr
+    return _get_code(graph_out), indptr
