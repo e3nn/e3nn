@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple
 
 import torch
 from torch import fx
@@ -113,7 +113,7 @@ def _codegen_norm(irreps_in: o3.Irreps, squared: bool) -> Tuple[str, torch.Tenso
     out = fx.Proxy(out)
 
     if not squared:
-        out = torch.sqrt(out)
+        out = out.relu().sqrt()
 
     # = Return the result =
     out = out.reshape(outsize)

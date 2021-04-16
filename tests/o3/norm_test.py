@@ -65,3 +65,17 @@ def test_norm():
     m(torch.randn(irreps_in.dim))
     assert_equivariant(m)
     assert_auto_jitable(m)
+
+
+def test_grad():
+    """Confirm has zero grad at zero"""
+    irreps_in = o3.Irreps("2x0e + 3x0o")
+    norm = o3.Norm(irreps_in)
+    with torch.autograd.set_detect_anomaly(True):
+        inp = torch.zeros(norm.irreps_in.dim, requires_grad=True)
+        out = norm(inp)
+        grads = torch.autograd.grad(
+            outputs=out.sum(),
+            inputs=inp,
+        )[0]
+        assert torch.allclose(grads, torch.zeros(1))
