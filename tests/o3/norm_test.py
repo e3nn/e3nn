@@ -32,3 +32,17 @@ def test_grad(squared):
             inputs=inp,
         )[0]
         assert torch.allclose(grads, torch.zeros(1))
+
+
+@pytest.mark.parametrize("squared", [True, False])
+def test_vector_norm(squared):
+    n = 10
+    batch = 3
+    irreps_in = o3.Irreps([(n, (1, -1))])
+    vecs = torch.randn(batch, n, 3)
+    norm_mod = o3.Norm(irreps_in, squared=squared)
+    norms = norm_mod(vecs.reshape(batch, -1))
+    norms_true = vecs.norm(dim=-1)
+    if squared:
+        norms_true.square_()
+    assert torch.allclose(norms_true, norms.reshape(batch, n))
