@@ -12,10 +12,11 @@ def _transform(dat, irreps_dat, rot_mat, translation=0.):
         if irreps is None:
             out.append(a)
         elif irreps == 'cartesian_points':
-            out.append((a @ rot_mat.T) + translation)
+            translation = torch.as_tensor(translation, device=a.device)
+            out.append((a @ rot_mat.T.to(a.device)) + translation)
         else:
             # For o3.Irreps
-            out.append(a @ irreps.D_from_matrix(rot_mat).T)
+            out.append(a @ irreps.D_from_matrix(rot_mat).T.to(a.device))
     return out
 
 
