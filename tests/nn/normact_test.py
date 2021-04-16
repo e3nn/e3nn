@@ -103,6 +103,7 @@ def test_norm_activation_equivariant(do_bias, nonlin):
 @pytest.mark.parametrize('do_bias', [True, False])
 @pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
 def test_zeros(do_bias, nonlin):
+    """Confirm that `epsilon` gives non-NaN grads"""
     irreps_in = e3nn.o3.Irreps("2x0e + 3x0o")
     norm_act = NormActivation(
         irreps_in=irreps_in,

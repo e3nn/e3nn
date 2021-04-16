@@ -25,7 +25,7 @@ class NormActivation(torch.nn.Module):
         whether to normalize the input features before multiplying them by the scalars from the nonlinearity
 
     epsilon : float, optional
-        when ``normalize``ing, norms smaller than ``epsilon`` will be clamped up to ``epsilon`` to avoid division by zero. See also ``epsilon`` parameter to ``o3.Norm``. Cannot be specified if ``normalize`` is ``False``.
+        when ``normalize``ing, norms smaller than ``epsilon`` will be clamped up to ``epsilon`` to avoid division by zero and NaN gradients. Not allowed when ``normalize`` is False.
 
     bias : bool
         whether to apply a learnable additive bias to the inputs of the ``scalar_nonlinearity``
@@ -42,6 +42,9 @@ class NormActivation(torch.nn.Module):
     >>> print(n(feats).reshape(1, 2, 3).norm(dim=-1))
     tensor([[0.8497, 0.8497]])
     """
+    epsilon: Optional[float]
+    _eps_squared: float
+
     def __init__(
         self,
         irreps_in,
@@ -54,12 +57,20 @@ class NormActivation(torch.nn.Module):
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_in)
 
-        if epsilon is None:
+        if epsilon is None and normalize:
             epsilon = 1e-8
+        elif epsilon is not None and not normalize:
+            raise ValueError("epsilon and normalize = False don't make sense together")
         elif not epsilon > 0:
             raise ValueError(f"epsilon {epsilon} is invalid, must be strictly positive.")
+        self.epsilon = epsilon
+        if self.epsilon is not None:
+            self._eps_squared = epsilon * epsilon
+        else:
+            self._eps_squared = 0.0  # doesn't matter
 
-        self.norm = o3.Norm(irreps_in, epsilon=epsilon)
+        # if we have an epsilon, use squared and do the sqrt ourselves
+        self.norm = o3.Norm(irreps_in, squared=(epsilon is not None))
         self.scalar_nonlinearity = scalar_nonlinearity
         self.normalize = normalize
         self.bias = bias
@@ -85,6 +96,11 @@ class NormActivation(torch.nn.Module):
             tensor of shape ``(..., irreps_in.dim)``
         '''
         norms = self.norm(features)
+        if self._eps_squared > 0:
+            # See TFN for the original version of this approach:
+            # https://github.com/tensorfieldnetworks/tensorfieldnetworks/blob/master/tensorfieldnetworks/utils.py#L22
+            norms[norms < self._eps_squared] = self._eps_squared
+            norms = norms.sqrt()
 
         nonlin_arg = norms
         if self.bias:
