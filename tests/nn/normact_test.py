@@ -98,3 +98,24 @@ def test_norm_activation_equivariant(do_bias, nonlin):
 
     assert_equivariant(norm_act)
     assert_auto_jitable(norm_act)
+
+
+@pytest.mark.parametrize('do_bias', [True, False])
+@pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
+def test_zeros(do_bias, nonlin):
+    """Confirm that `epsilon` gives non-NaN grads"""
+    irreps_in = e3nn.o3.Irreps("2x0e + 3x0o")
+    norm_act = NormActivation(
+        irreps_in=irreps_in,
+        scalar_nonlinearity=nonlin,
+        bias=do_bias,
+        normalize=True,
+    )
+    with torch.autograd.set_detect_anomaly(True):
+        inp = torch.zeros(norm_act.irreps_in.dim, requires_grad=True)
+        out = norm_act(inp)
+        grads = torch.autograd.grad(
+            outputs=out.sum(),
+            inputs=inp,
+        )[0]
+        assert torch.all(torch.isfinite(grads))
