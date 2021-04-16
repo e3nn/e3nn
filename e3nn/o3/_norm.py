@@ -14,8 +14,7 @@ class Norm(torch.nn.Module):
         representation of the input
 
     squared : bool, optional
-        Whether to return the squared norm. ``False`` by default, i.e. the norm itself (sqrt of squared norm) is returned. Setting this to ``True`` in situations where the extra power of two doesn't matter can help avoid NaNs in gradients from square
-        roots.
+        Whether to return the squared norm. ``False`` by default, i.e. the norm itself (sqrt of squared norm) is returned.
 
     Examples
     --------
