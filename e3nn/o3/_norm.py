@@ -20,11 +20,9 @@ class Norm(CodeGenMixin, torch.nn.Module):
     irreps_in : `Irreps`
         representation of the input
 
-    epsilon : float, optional
-        if not ``None``, norms smaller than ``epsilon`` will be "rounded" up to ``epsilon`` *before* any square roots are taken. (Doing the masking internally in ``Norm`` this way prevents NaNs in gradients.)
-
     squared : bool, optional
-        Whether to return the squared norm. ``False`` by default, i.e. the norm itself (sqrt of squared norm) is returned. Setting this to ``True`` in situations where the extra power of two doesn't matter can help avoid NaNs without ``epsilon``.
+        Whether to return the squared norm. ``False`` by default, i.e. the norm itself (sqrt of squared norm) is returned. Setting this to ``True`` in situations where the extra power of two doesn't matter can help avoid NaNs in gradients from square
+        roots.
 
     Examples
     --------
@@ -34,23 +32,16 @@ class Norm(CodeGenMixin, torch.nn.Module):
     >>> norm(torch.randn(17 * 3)).shape
     torch.Size([17])
     """
-    epsilon: Optional[float]
     squared: bool
 
-    def __init__(self, irreps_in, epsilon: Optional[float] = None, squared: bool = False):
+    def __init__(self, irreps_in, squared: bool = False):
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps([(mul, "0e") for mul, _ in self.irreps_in]).simplify()
 
-        if epsilon is not None:
-            epsilon = float(epsilon)
-            assert epsilon > 0
-        self.epsilon = epsilon
         self.squared = squared
-        if squared and epsilon is not None:
-            raise ValueError("epsilon doesn't make sense if `squared` is True")
 
-        code, indptr = _codegen_norm(self.irreps_in, self.epsilon, self.squared)
+        code, indptr = _codegen_norm(self.irreps_in, self.squared)
         self._codegen_register({
             "_compiled_main": code
         })
@@ -75,7 +66,7 @@ class Norm(CodeGenMixin, torch.nn.Module):
         return self._compiled_main(features, self._indptr)
 
 
-def _codegen_norm(irreps_in: o3.Irreps, epsilon: Optional[float], squared: bool) -> Tuple[str, torch.Tensor]:
+def _codegen_norm(irreps_in: o3.Irreps, squared: bool) -> Tuple[str, torch.Tensor]:
     graph_out = fx.Graph()
 
     # = Function definitions =
@@ -121,18 +112,8 @@ def _codegen_norm(irreps_in: o3.Irreps, epsilon: Optional[float], squared: bool)
     )
     out = fx.Proxy(out)
 
-    # == Do the epsilon and sqrt ==
-    if epsilon is not None:
-        epsilon = epsilon*epsilon  # we're in squared units
-        for_sqrt = out.clone()
-        for_sqrt.masked_fill_(out < epsilon, epsilon)
-    else:
-        for_sqrt = out
-
     if not squared:
-        out = torch.sqrt(for_sqrt)
-    else:
-        out = for_sqrt
+        out = torch.sqrt(out)
 
     # = Return the result =
     out = out.reshape(outsize)
