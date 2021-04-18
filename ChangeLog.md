@@ -10,6 +10,9 @@ Most recent change on the bottom.
 ### Added
 - `squared` option to `o3.Norm`
 
+### Changed
+- `ReducedTensorProducts` is a (scriptable) `torch.nn.Module`
+
 ### Fixed
 - No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`
 

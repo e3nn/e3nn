@@ -1,8 +1,10 @@
 import collections
 import torch
+from torch import fx
 from e3nn import o3
 from e3nn.math import group, orthonormalize
 from e3nn.util import explicit_default_types
+from e3nn.util.jit import compile_mode
 
 
 _TP = collections.namedtuple('tp', 'op, args')
@@ -73,7 +75,8 @@ def _get_ops(path):
         yield op
 
 
-class ReducedTensorProducts:
+@compile_mode('script')
+class ReducedTensorProducts(fx.GraphModule):
     r"""reduce a tensor with symmetries into irreducible representations
 
     Parameters
@@ -123,6 +126,8 @@ class ReducedTensorProducts:
     >>> assert torch.allclose(a, b, atol=1e-3, rtol=1e-3)
     """
     def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, **irreps):
+        super().__init__(self, fx.Graph())
+
         if filter_ir_out is not None:
             filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
 
@@ -134,7 +139,7 @@ class ReducedTensorProducts:
             if len(i) != 1:
                 raise TypeError(f"got an unexpected keyword argument '{i}'")
 
-        for _s, p in formulas:
+        for _sign, p in formulas:
             f = "".join(f0[i] for i in p)
             for i, j in zip(f0, f):
                 if i in irreps and j in irreps and irreps[i] != irreps[j]:
@@ -152,10 +157,12 @@ class ReducedTensorProducts:
             if i not in f0:
                 raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
 
-        Q, _ = group.reduce_permutation(f0,
-                                        formulas,
-                                        dtype=torch.float64,
-                                        **{i: irs.dim for i, irs in irreps.items()})
+        Q, _ = group.reduce_permutation(
+            f0,
+            formulas,
+            dtype=torch.float64,
+            **{i: irs.dim for i, irs in irreps.items()}
+        )
 
         Ps = collections.defaultdict(list)
 
@@ -195,27 +202,22 @@ class ReducedTensorProducts:
                 change_of_basis.append(C)
 
         dtype, _ = explicit_default_types(None, None)
-        self.outputs = outputs
-        self.change_of_basis = torch.cat(change_of_basis).to(dtype=dtype)
+        self.register_buffer('change_of_basis', torch.cat(change_of_basis).to(dtype=dtype))
 
-        self.tps = {
-            op: o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
-            for op in tps
-        }
+        tps = list(tps)
+        for i, op in enumerate(tps):
+            tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
+            setattr(self, f'tp{i}', tp)
+
+        graph = fx.Graph()
+        inputs = [
+            fx.Proxy(graph.placeholder(f"x{i}", torch.Tensor))
+            for i in f0
+        ]
+
         self.irreps_in = tuple(irreps[i] for i in f0)
         self.irreps_out = o3.Irreps([ir for ir, _ in outputs]).simplify()
 
-    def __repr__(self):
-        return f"""{self.__class__.__name__}(
-    in: {' times '.join(map(repr, self.irreps_in))}
-    out: {self.irreps_out}
-)"""
-
-    def to(self, dtype=None, device=None):
-        for _, tp in self.tps.items():
-            tp.to(dtype=dtype, device=device)
-
-    def __call__(self, *xs):
         values = dict()
 
         def evaluate(path):
@@ -223,12 +225,24 @@ class ReducedTensorProducts:
                 return values[path]
 
             if isinstance(path, _INPUT):
-                out = xs[path.tensor][..., path.start:path.stop]
-                values[path] = out
-                return out
+                out = inputs[path.tensor]
+                if (path.start, path.stop) != (0, self.irreps_in[path.tensor].dim):
+                    out = out[..., path.start:path.stop]
             if isinstance(path, _TP):
-                out = self.tps[path.op](evaluate(path.args[0]), evaluate(path.args[1]))
-                values[path] = out
-                return out
+                x1 = evaluate(path.args[0]).node
+                x2 = evaluate(path.args[1]).node
+                out = fx.Proxy(graph.call_module(f'tp{tps.index(path.op)}', (x1, x2)))
+            values[path] = out
+            return out
 
-        return torch.cat([evaluate(path) for _ir, path in self.outputs], dim=-1)
+        out = torch.cat([evaluate(path) for _ir, path in outputs], dim=-1)
+        graph.output(out.node)
+
+        self.graph = graph
+        self.recompile()
+
+    def __repr__(self):
+        return f"""{self.__class__.__name__}(
+    in: {' times '.join(map(repr, self.irreps_in))}
+    out: {self.irreps_out}
+)"""

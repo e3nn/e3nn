@@ -26,7 +26,10 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
 
     if irreps_in is None:
         if hasattr(func, 'irreps_in'):
-            irreps_in = [func.irreps_in]
+            if isinstance(func.irreps_in, list) or isinstance(func.irreps_in, tuple):
+                irreps_in = list(func.irreps_in)
+            else:
+                irreps_in = [func.irreps_in]
         elif hasattr(func, 'irreps_in1'):
             irreps_in = [func.irreps_in1, func.irreps_in2]
         else:

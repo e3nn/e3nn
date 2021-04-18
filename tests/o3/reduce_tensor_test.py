@@ -1,7 +1,7 @@
 import torch
 
 from e3nn import o3
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
@@ -17,6 +17,7 @@ def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
     assert (Q1 - Q).abs().max() < 10*float_tolerance
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
+    assert_auto_jitable(tp)
 
 
 def test_reduce_tensor_antisymmetric_L2(float_tolerance):
@@ -35,6 +36,7 @@ def test_reduce_tensor_antisymmetric_L2(float_tolerance):
     assert (Q1 - Q2).abs().max() < 10*float_tolerance
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
+    assert_auto_jitable(tp)
 
 
 def test_reduce_tensor_elasticity_tensor():
@@ -42,6 +44,7 @@ def test_reduce_tensor_elasticity_tensor():
     irreps = tp.irreps_out
     assert irreps.dim == 21
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
+    assert_auto_jitable(tp)
 
 
 def test_reduce_tensor_elasticity_tensor_parity():
@@ -50,12 +53,7 @@ def test_reduce_tensor_elasticity_tensor_parity():
     assert all(p == 1 for _, (_, p) in irreps)
     assert irreps.dim == 21
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
-
-
-# def test_reduce_tensor_rot():
-#     tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i=o3.quaternion_to_matrix, has_parity=False)
-#     irreps = tp.irreps_out
-#     assert irreps.dim == 21
+    assert_auto_jitable(tp)
 
 
 def test_reduce_tensor_equivariance(float_tolerance):
@@ -74,3 +72,4 @@ def test_reduce_tensor_equivariance(float_tolerance):
     assert (q1 - q2).abs().max() < 10*float_tolerance
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
+    assert_auto_jitable(tp)
