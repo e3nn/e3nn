@@ -26,9 +26,9 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
     SPECIAL_VALS = ['cartesian_points', None]
 
     if (irreps_in is None or irreps_out is None) and isinstance(func, torch.jit.ScriptModule):
-            warnings.warn(
-                "Asking to infer irreps in/out of a compiled TorchScript module. This is unreliable, please provide `irreps_in` and `irreps_out` explicitly."
-            )
+        warnings.warn(
+            "Asking to infer irreps in/out of a compiled TorchScript module. This is unreliable, please provide `irreps_in` and `irreps_out` explicitly."
+        )
 
     if irreps_in is None:
         if hasattr(func, 'irreps_in'):
