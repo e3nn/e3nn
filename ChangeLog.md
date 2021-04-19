@@ -15,6 +15,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`
+- Modules with `@compile_mode('trace')` can now be compiled when their dtype and the current default dtype are different
 
 ## [0.2.7] - 2021-04-14
 ### Added
