@@ -26,17 +26,14 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
 
     if irreps_in is None:
         if hasattr(func, 'irreps_in'):
-            if isinstance(func.irreps_in, list) or isinstance(func.irreps_in, tuple):
-                irreps_in = list(func.irreps_in)
-            else:
-                irreps_in = [func.irreps_in]
+            irreps_in = func.irreps_in  # gets checked for type later
         elif hasattr(func, 'irreps_in1'):
             irreps_in = [func.irreps_in1, func.irreps_in2]
         else:
             raise ValueError("Cannot infer irreps_in for %r; provide them explicitly" % func)
     if irreps_out is None:
         if hasattr(func, 'irreps_out'):
-            irreps_out = [func.irreps_out]
+            irreps_out = func.irreps_out  # gets checked for type later
         else:
             raise ValueError("Cannot infer irreps_out for %r; provide them explicitly" % func)
 
