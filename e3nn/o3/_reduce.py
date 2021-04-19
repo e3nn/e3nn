@@ -215,7 +215,7 @@ class ReducedTensorProducts(fx.GraphModule):
             for i in f0
         ]
 
-        self.irreps_in = tuple(irreps[i] for i in f0)
+        self.irreps_in = [irreps[i] for i in f0]
         self.irreps_out = o3.Irreps([ir for ir, _ in outputs]).simplify()
 
         values = dict()
