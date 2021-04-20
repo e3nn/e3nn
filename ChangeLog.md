@@ -12,6 +12,7 @@ Most recent change on the bottom.
 
 ### Changed
 - `ReducedTensorProducts` is a (scriptable) `torch.nn.Module`
+- change `e3nn.nn.models.v2103.voxel_convolution.Convolution` arguments. `diameter` and `steps` caracterize the filter size in physical units. Now `num_radial_basis` needs to be provided.
 
 ### Fixed
 - No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`

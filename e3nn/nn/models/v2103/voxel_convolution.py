@@ -3,6 +3,7 @@ This is a tentative implementation of voxel convolution
 
 >>> test()
 """
+import math
 import torch
 
 from e3nn import o3
@@ -16,53 +17,74 @@ class Convolution(torch.nn.Module):
     Parameters
     ----------
     irreps_in : `Irreps`
+        input irreps
+
     irreps_out : `Irreps`
+        output irreps
+
     irreps_sh : `Irreps`
         set typically to ``o3.Irreps.spherical_harmonics(lmax)``
-    size : int
-    steps : tuple of int
+
+    diameter : float
+        diameter of the filter in physical units
+
+    num_radial_basis : int
+        number of radial basis functions
+
+    steps : tuple of float
+        size of the pixel in physical units
     """
-    def __init__(self, irreps_in, irreps_out, irreps_sh, size, steps=(1, 1, 1), **kwargs):
+    def __init__(self, irreps_in, irreps_out, irreps_sh, diameter, num_radial_basis, steps=(1.0, 1.0, 1.0), **kwargs):
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_out)
         self.irreps_sh = o3.Irreps(irreps_sh)
-        self.size = size
-        self.num_rbfs = self.size
 
-        if 'padding' not in kwargs:
-            kwargs['padding'] = self.size // 2
-        self.kwargs = kwargs
+        self.num_radial_basis = num_radial_basis
 
         # self-connection
         self.sc = Linear(self.irreps_in, self.irreps_out)
 
         # connection with neighbors
-        r = torch.linspace(-1, 1, self.size)
-        x = r * steps[0] / min(steps)
-        x = x[x.abs() <= 1]
-        y = r * steps[1] / min(steps)
-        y = y[y.abs() <= 1]
-        z = r * steps[2] / min(steps)
-        z = z[z.abs() <= 1]
+        r = diameter / 2
+
+        s = math.floor(r / steps[0])
+        x = torch.arange(-s, s + 1.0) * steps[0]
+
+        s = math.floor(r / steps[1])
+        y = torch.arange(-s, s + 1.0) * steps[1]
+
+        s = math.floor(r / steps[2])
+        z = torch.arange(-s, s + 1.0) * steps[2]
+
         lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+
+        if 'padding' not in kwargs:
+            kwargs['padding'] = tuple(s // 2 for s in lattice.shape)
+        self.kwargs = kwargs
+
         emb = soft_one_hot_linspace(
             x=lattice.norm(dim=-1),
             start=0.0,
-            end=1.0,
-            number=self.num_rbfs,
+            end=r,
+            number=self.num_radial_basis,
             basis='smooth_finite',
             cutoff=True,
         )
         self.register_buffer('emb', emb)
 
-        sh = o3.spherical_harmonics(self.irreps_sh, lattice, True, 'component')  # [x, y, z, irreps_sh.dim]
+        sh = o3.spherical_harmonics(
+            l=self.irreps_sh,
+            x=lattice,
+            normalize=True,
+            normalization='component'
+        )  # [x, y, z, irreps_sh.dim]
         self.register_buffer('sh', sh)
 
         self.tp = FullyConnectedTensorProduct(self.irreps_in, self.irreps_sh, self.irreps_out, shared_weights=False)
 
-        self.weight = torch.nn.Parameter(torch.randn(self.num_rbfs, self.tp.weight_numel))
+        self.weight = torch.nn.Parameter(torch.randn(self.num_radial_basis, self.tp.weight_numel))
 
     def forward(self, x):
         r"""
@@ -144,7 +166,7 @@ class LowPassFilter(torch.nn.Module):
 
 
 def test():
-    conv = Convolution("0e + 1e", "0e + 1e + 1o + 2e + 2o", o3.Irreps.spherical_harmonics(lmax=3), 5)
+    conv = Convolution("0e + 1e", "0e + 1e + 1o + 2e + 2o", o3.Irreps.spherical_harmonics(lmax=3), diameter=5, num_radial_basis=5, steps=(1, 1, 1))
 
     x = torch.randn(10, 4, 32, 32, 32)
     conv(x)
