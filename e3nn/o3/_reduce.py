@@ -98,7 +98,7 @@ class ReducedTensorProducts(fx.GraphModule):
 
     Attributes
     ----------
-    irreps_in : tuple of `Irreps`
+    irreps_in : list of `Irreps`
         input representations
 
     irreps_out : `Irreps`
