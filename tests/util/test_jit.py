@@ -4,8 +4,9 @@ import warnings
 import torch
 
 from e3nn.o3 import Linear, Irreps
+from e3nn.nn import FullyConnectedNet
 from e3nn.util.jit import script, trace_module, compile_mode, compile
-from e3nn.util.test import assert_equivariant
+from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
 def test_submod_tracing():
@@ -137,3 +138,18 @@ def test_unsupported():
     mod = Supermod()
     with pytest.raises(NotImplementedError):
         mod = script(mod)
+
+
+def test_trace_dtypes():
+    # FullyConnectedNet is traced
+    fc = FullyConnectedNet([8, 16, 8])
+    assert len(fc.weights) > 0
+    # compile in a dtype other than the default
+    target_dtype = {
+        torch.float32: torch.float64,
+        torch.float64: torch.float32
+    }[torch.get_default_dtype()]
+    fc = fc.to(dtype=target_dtype)
+    for weight in fc.weights:
+        assert weight.dtype == target_dtype
+    assert_auto_jitable(fc)

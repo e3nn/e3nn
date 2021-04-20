@@ -122,7 +122,8 @@ def compile(
 def get_tracing_inputs(
     mod: torch.nn.Module,
     n: int = 1,
-    device: Optional[torch.device] = None
+    device: Optional[torch.device] = None,
+    dtype: Optional[torch.dtype] = None
 ):
     """Get random tracing inputs for ``mod``.
 
@@ -136,7 +137,9 @@ def get_tracing_inputs(
         n : int, default = 1
             A hint for how many inputs are wanted. Usually n will be returned, but modules don't necessarily have to.
         device : torch.device
-            The device to do tracing on.
+            The device to do tracing on. If `None` (default), will be guessed.
+        dtype : torch.dtype
+            The dtype to trace with. If `None` (default), will be guessed.
 
     Returns
     -------
@@ -144,7 +147,7 @@ def get_tracing_inputs(
         Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of arguments.
     """
     # Avoid circular imports
-    from ._argtools import _get_io_irreps, _rand_args, _to_device, _get_device
+    from ._argtools import _get_io_irreps, _rand_args, _to_device_dtype, _get_device, _get_floating_dtype
     # - Get inputs -
     if hasattr(mod, _MAKE_TRACING_INPUTS):
         # This returns a trace_module style dict of method names to test inputs
@@ -163,8 +166,10 @@ def get_tracing_inputs(
     # - Put them on the right device -
     if device is None:
         device = _get_device(mod)
+    if dtype is None:
+        dtype = _get_floating_dtype(mod)
     # Move them
-    trace_inputs = _to_device(trace_inputs, device)
+    trace_inputs = _to_device_dtype(trace_inputs, device, dtype)
     return trace_inputs
 
 
