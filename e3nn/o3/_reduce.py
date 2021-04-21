@@ -184,8 +184,8 @@ class ReducedTensorProducts(fx.GraphModule):
 
             # remove paths
             paths = [path for path, c in zip(paths, A.norm(dim=0)) if c > eps]
-            A = A[:, A.norm(dim=0) > eps]
             Cs = [C for C, c in zip(Cs, A.norm(dim=0)) if c > eps]
+            A = A[:, A.norm(dim=0) > eps]
 
             assert A.shape[0] == A.shape[1]
 
