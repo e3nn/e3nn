@@ -31,7 +31,7 @@ class normalize2mom(torch.nn.Module):
             device = _get_device(f)
 
         with torch.no_grad():
-            cst = moment(f, 2, dtype=dtype, device=device).pow(-0.5).item()
+            cst = moment(f, 2, dtype=torch.float64, device='cpu').pow(-0.5).item()
 
         if abs(cst - 1) < 1e-4:
             self._is_id = True

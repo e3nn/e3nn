@@ -2,6 +2,23 @@ import torch
 from e3nn import o3
 from e3nn.nn import BatchNorm
 from e3nn.util.test import assert_equivariant
+import pytest
+
+
+@pytest.mark.parametrize('affine', [True, False])
+@pytest.mark.parametrize('reduce', ['mean', 'max'])
+@pytest.mark.parametrize('normalization', ['norm', 'component'])
+def test_modes(affine, reduce, normalization):
+    irreps = o3.Irreps("10x0e + 5x1e")
+
+    m = BatchNorm(irreps, affine=affine, reduce=reduce, normalization=normalization)
+    repr(m)
+
+    m.train()
+    m(irreps.randn(20, 20, -1))
+
+    m.eval()
+    m(irreps.randn(20, 20, -1))
 
 
 def test_normalization(float_tolerance):
