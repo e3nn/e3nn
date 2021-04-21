@@ -13,6 +13,7 @@ Most recent change on the bottom.
 
 ### Changed
 - `ReducedTensorProducts` is a (scriptable) `torch.nn.Module`
+- e3nn now requires the latest stable PyTorch, >=1.8.1
 
 ### Fixed
 - No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`
