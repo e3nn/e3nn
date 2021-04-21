@@ -496,6 +496,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self,
         weight: Optional[torch.Tensor] = None,
         plot_weight: bool = True,
+        aspect_ratio=1,
         ax=None
     ):  # pragma: no cover
         r"""Visualize the connectivity of this `TensorProduct`
@@ -544,14 +545,22 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         verts = np.asarray(verts)
 
         # scale it
-        factor = 0.2 / 2
-        min_aspect = 1 / 2
-        h_factor = max(len(self.irreps_in2), len(self.irreps_in1))
-        w_factor = len(self.irreps_out)
-        if h_factor / w_factor < min_aspect:
-            h_factor = min_aspect * w_factor
-        verts[:, 1] *= h_factor * factor
-        verts[:, 0] *= w_factor * factor
+        assert aspect_ratio in ['auto'] or isinstance(aspect_ratio, (float, int))
+
+        if aspect_ratio == 'auto':
+            factor = 0.2 / 2
+            min_aspect = 1 / 2
+            h_factor = max(len(self.irreps_in2), len(self.irreps_in1))
+            w_factor = len(self.irreps_out)
+            if h_factor / w_factor < min_aspect:
+                h_factor = min_aspect * w_factor
+            verts[:, 1] *= h_factor * factor
+            verts[:, 0] *= w_factor * factor
+
+        if isinstance(aspect_ratio, (float, int)):
+            factor = 0.1 * max(len(self.irreps_in2), len(self.irreps_in1), len(self.irreps_out))
+            verts[:, 1] *= factor
+            verts[:, 0] *= aspect_ratio * factor
 
         codes = [
             Path.MOVETO,
@@ -594,12 +603,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 for ins_i, ins in enumerate(self.instructions):
                     if ins.has_weight:
                         this_weight = self.weight_view_for_instruction(ins_i, weight=weight)
-                        path_weight.append(torch.sign(this_weight.sum()) * this_weight.abs().sum())
+                        path_weight.append(this_weight.pow(2).mean())
                     else:
                         path_weight.append(0)
                 path_weight = np.asarray(path_weight)
                 path_weight /= np.abs(path_weight).max()
-        cmap = matplotlib.cm.get_cmap('bwr')
+        cmap = matplotlib.cm.get_cmap('Blues')
 
         for ins_index, ins in enumerate(self.instructions):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)
@@ -614,7 +623,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             codes += [Path.MOVETO, Path.LINETO]
 
             if plot_weight:
-                color = cmap(0.5 * path_weight[ins_index] + 0.5) if ins.has_weight else 'black'
+                color = cmap(path_weight[ins_index]) if ins.has_weight else 'black'
             else:
                 color = 'green' if ins.has_weight else 'black'
 

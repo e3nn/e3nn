@@ -10,10 +10,12 @@ Most recent change on the bottom.
 ### Added
 - `squared` option to `o3.Norm`
 - `e3nn.nn.models.v2104.voxel_convolution.Convolution` made to be resolution agnostic
+- `TensorProduct.visualize` keyword argument `aspect_ratio`
 
 ### Changed
 - `ReducedTensorProducts` is a (scriptable) `torch.nn.Module`
 - e3nn now requires the latest stable PyTorch, >=1.8.1
+- `TensorProduct.visualize`: color of paths based on `w.pow(2).mean()` instead of `w.sum().sign() * w.abs().sum()`
 
 ### Fixed
 - No more NaN gradients of `o3.Norm`/`nn.NormActivation` at zero when using `epsilon`
