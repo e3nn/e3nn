@@ -4,72 +4,76 @@ from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
-def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
-    tp = o3.ReducedTensorProducts('ijk=-ikj=-jik', i='1e')
-    irreps = tp.irreps_out
-    Q = tp.change_of_basis
-
-    assert irreps == ((1, (0, 1)),)
-    r = o3.rand_angles()
-    D = o3.wigner_D(1, *r)
-    Q = Q.reshape(3, 3, 3)
-    Q1 = torch.einsum('li,mj,nk,ijk', D, D, D, Q)
-    assert (Q1 - Q).abs().max() < 10*float_tolerance
+def test_antisymmetric_matrix(float_tolerance):
+    tp = o3.ReducedTensorProducts('ij=-ji', i='5x0e + 1e')
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
     assert_auto_jitable(tp)
+
+    Q = tp.change_of_basis
+    x = torch.randn(2, 5 + 3)
+    assert (tp(*x) - torch.einsum('xij,i,j', Q, *x)).abs().max() < float_tolerance
+
+    assert (Q + torch.einsum("xij->xji", Q)).abs().max() < float_tolerance
+
+
+def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
+    tp = o3.ReducedTensorProducts('ijk=-ikj=-jik', i='1e')
+    assert tp.irreps_out == o3.Irreps('0e')
+
+    assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
+    assert_auto_jitable(tp)
+
+    Q = tp.change_of_basis
+    x = torch.randn(3, 3)
+    assert (tp(*x) - torch.einsum('xijk,i,j,k', Q, *x)).abs().max() < float_tolerance
+
+    assert (Q + torch.einsum("xijk->xikj", Q)).abs().max() < float_tolerance
+    assert (Q + torch.einsum("xijk->xjik", Q)).abs().max() < float_tolerance
 
 
 def test_reduce_tensor_antisymmetric_L2(float_tolerance):
     tp = o3.ReducedTensorProducts('ijk=-ikj=-jik', i='2e')
-    irreps = tp.irreps_out
-    Q = tp.change_of_basis
-    assert irreps[0] == (1, (1, 1))
-    q = Q[:3].reshape(3, 5, 5, 5)
-
-    r = o3.rand_angles()
-    D1 = o3.wigner_D(1, *r)
-    D2 = o3.wigner_D(2, *r)
-    Q1 = torch.einsum('il,jm,kn,zijk->zlmn', D2, D2, D2, q)
-    Q2 = torch.einsum('yz,zijk->yijk', D1, q)
-
-    assert (Q1 - Q2).abs().max() < 10*float_tolerance
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
     assert_auto_jitable(tp)
 
+    Q = tp.change_of_basis
+    x = torch.randn(3, 5)
+    assert (tp(*x) - torch.einsum('xijk,i,j,k', Q, *x)).abs().max() < float_tolerance
 
-def test_reduce_tensor_elasticity_tensor():
+    assert (Q + torch.einsum("xijk->xikj", Q)).abs().max() < float_tolerance
+    assert (Q + torch.einsum("xijk->xjik", Q)).abs().max() < float_tolerance
+
+
+def test_reduce_tensor_elasticity_tensor(float_tolerance):
     tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i='1e')
-    irreps = tp.irreps_out
-    assert irreps.dim == 21
+    assert tp.irreps_out.dim == 21
+
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
     assert_auto_jitable(tp)
 
-
-def test_reduce_tensor_elasticity_tensor_parity():
-    tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i='1o')
-    irreps = tp.irreps_out
-    assert all(p == 1 for _, (_, p) in irreps)
-    assert irreps.dim == 21
-    assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
-    assert_auto_jitable(tp)
-
-
-def test_reduce_tensor_equivariance(float_tolerance):
-    ir = o3.Irreps('1e')
-    tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i=ir)
-    irreps = tp.irreps_out
     Q = tp.change_of_basis
+    x = torch.randn(4, 3)
+    assert (tp(*x) - torch.einsum('xijkl,i,j,k,l', Q, *x)).abs().max() < float_tolerance
 
-    abc = o3.rand_angles()
-    R = ir.D_from_angles(*abc)
-    D = irreps.D_from_angles(*abc)
+    assert (Q - torch.einsum("xijkl->xjikl", Q)).abs().max() < float_tolerance
+    assert (Q - torch.einsum("xijkl->xijlk", Q)).abs().max() < float_tolerance
+    assert (Q - torch.einsum("xijkl->xklij", Q)).abs().max() < float_tolerance
 
-    q1 = torch.einsum('qmnop,mi,nj,ok,pl->qijkl', Q, R, R, R, R)
-    q2 = torch.einsum('qa,aijkl->qijkl', D, Q)
 
-    assert (q1 - q2).abs().max() < 10*float_tolerance
+def test_reduce_tensor_elasticity_tensor_parity(float_tolerance):
+    tp = o3.ReducedTensorProducts('ijkl=jikl=klij', i='1o')
+    assert tp.irreps_out.dim == 21
+    assert all(ir.p == 1 for _, ir in tp.irreps_out)
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
     assert_auto_jitable(tp)
+
+    Q = tp.change_of_basis
+    x = torch.randn(4, 3)
+    assert (tp(*x) - torch.einsum('xijkl,i,j,k,l', Q, *x)).abs().max() < float_tolerance
+
+    assert (Q - torch.einsum("xijkl->xjikl", Q)).abs().max() < float_tolerance
+    assert (Q - torch.einsum("xijkl->xijlk", Q)).abs().max() < float_tolerance
+    assert (Q - torch.einsum("xijkl->xklij", Q)).abs().max() < float_tolerance

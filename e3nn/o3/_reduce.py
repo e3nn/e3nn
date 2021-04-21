@@ -2,7 +2,7 @@ import collections
 import torch
 from torch import fx
 from e3nn import o3
-from e3nn.math import group, orthonormalize
+from e3nn.math import group
 from e3nn.util import explicit_default_types
 from e3nn.util.jit import compile_mode
 
@@ -157,7 +157,7 @@ class ReducedTensorProducts(fx.GraphModule):
             if i not in f0:
                 raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
 
-        Q, _ = group.reduce_permutation(
+        base_perm, _ = group.reduce_permutation(
             f0,
             formulas,
             dtype=torch.float64,
@@ -166,43 +166,67 @@ class ReducedTensorProducts(fx.GraphModule):
 
         Ps = collections.defaultdict(list)
 
-        for ir, path, C in _wigner_nj(*[irreps[i] for i in f0], filter_ir_mid=filter_ir_mid, dtype=torch.float64):
+        for ir, path, base_o3 in _wigner_nj(*[irreps[i] for i in f0], filter_ir_mid=filter_ir_mid, dtype=torch.float64):
             if filter_ir_out is None or ir in filter_ir_out:
-                P = C.flatten(1) @ Q.flatten(1).T
-                Ps[ir].append((P.flatten(), path, C))
+                P = base_o3.flatten(1) @ base_perm.flatten(1).T
+                if P.norm() > eps:  # if this Irrep is present in the premutation basis we keep it
+                    Ps[ir].append((path, base_o3))
 
-        tps = set()
         outputs = []
         change_of_basis = []
+        irreps_out = []
 
         for ir in Ps:
-            P = torch.stack([P for P, _, _ in Ps[ir]])
-            paths = [path for _, path, _ in Ps[ir]]
-            Cs = [C for _, _, C in Ps[ir]]
+            mul = len(Ps[ir])
+            paths = [path for path, _ in Ps[ir]]
+            base_o3 = torch.stack([R for _, R in Ps[ir]])
 
-            _, A = orthonormalize(P, eps)
+            R = base_o3.flatten(2)  # [multiplicity, ir, input basis] (u,j,omega)
+            P = base_perm.flatten(1)  # [permutation basis, input basis] (a,omega)
 
-            # remove paths
-            paths = [path for path, c in zip(paths, A.norm(dim=0)) if c > eps]
-            Cs = [C for C, c in zip(Cs, A.norm(dim=0)) if c > eps]
-            A = A[:, A.norm(dim=0) > eps]
+            Xs = []
+            for j in range(ir.dim):
+                RR = R[:, j] @ R[:, j].T  # (u,u)
+                PP = P @ P.T  # (a,a)
+                RP = R[:, j] @ P.T  # (u,a)
 
-            assert A.shape[0] == A.shape[1]
+                prob = torch.cat([
+                    torch.cat([RR, -RP], dim=1),
+                    torch.cat([-RP.T, PP], dim=1)
+                ], dim=0)
+                eigenvalues, eigenvectors = torch.symeig(prob, eigenvectors=True)
+                X = eigenvectors[:, eigenvalues < eps][:mul].T  # [solutions, multiplicity]
+                X = torch.linalg.qr(X, mode='r').R
+                for i, x in enumerate(X):
+                    for j in range(i, mul):
+                        if x[j] < eps:
+                            x.neg_()
+                        if x[j] > eps:
+                            break
 
-            for path in paths:
-                for op in _get_ops(path):
-                    tps.add(op)
+                Xs.append(X)
 
-            for path in paths:
-                outputs.append((
-                    ir, path
-                ))
+            for X in Xs:
+                assert (X - Xs[0]).abs().max() < eps
 
-            for C in Cs:
+            X = Xs[0]
+            for x in X:
+                C = torch.einsum("u,ui...->i...", x, base_o3)
+                correction = (ir.dim / C.pow(2).sum())**0.5
+                C = correction * C
+
+                outputs.append([((correction * v).item(), p) for v, p in zip(x, paths) if v.abs() > eps])
                 change_of_basis.append(C)
+                irreps_out.append((1, ir))
 
         dtype, _ = explicit_default_types(None, None)
         self.register_buffer('change_of_basis', torch.cat(change_of_basis).to(dtype=dtype))
+
+        tps = set()
+        for vp_list in outputs:
+            for v, p in vp_list:
+                for op in _get_ops(p):
+                    tps.add(op)
 
         tps = list(tps)
         for i, op in enumerate(tps):
@@ -216,7 +240,7 @@ class ReducedTensorProducts(fx.GraphModule):
         ]
 
         self.irreps_in = [irreps[i] for i in f0]
-        self.irreps_out = o3.Irreps([ir for ir, _ in outputs]).simplify()
+        self.irreps_out = o3.Irreps(irreps_out).simplify()
 
         values = dict()
 
@@ -235,7 +259,15 @@ class ReducedTensorProducts(fx.GraphModule):
             values[path] = out
             return out
 
-        out = torch.cat([evaluate(path) for _ir, path in outputs], dim=-1)
+        outs = []
+        for vp_list in outputs:
+            v, p = vp_list[0]
+            out = v * evaluate(p)
+            for v, p in vp_list[1:]:
+                out = out + v * evaluate(p)
+            outs.append(out)
+
+        out = torch.cat(outs, dim=-1)
         graph.output(out.node)
 
         self.graph = graph
