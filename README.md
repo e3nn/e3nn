@@ -32,11 +32,11 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
 
 ## Citing
 ```
-@software{mario_geiger_2021_4681980,
+@software{mario_geiger_2021_4688711,
   author       = {Mario Geiger and
                   Tess Smidt and
-                  Benjamin Kurt Miller and
                   Alby M. and
+                  Benjamin Kurt Miller and
                   Wouter Boomsma and
                   Bradley Dice and
                   Kostiantyn Lapchevskyi and
@@ -52,9 +52,9 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
   month        = apr,
   year         = 2021,
   publisher    = {Zenodo},
-  version      = {0.2.6},
-  doi          = {10.5281/zenodo.4681980},
-  url          = {https://doi.org/10.5281/zenodo.4681980}
+  version      = {0.2.7},
+  doi          = {10.5281/zenodo.4688711},
+  url          = {https://doi.org/10.5281/zenodo.4688711}
 }
 ```
 
