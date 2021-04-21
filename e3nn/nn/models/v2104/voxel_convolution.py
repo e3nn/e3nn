@@ -61,7 +61,7 @@ class Convolution(torch.nn.Module):
         lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
 
         if 'padding' not in kwargs:
-            kwargs['padding'] = tuple(s // 2 for s in lattice.shape)
+            kwargs['padding'] = tuple(s // 2 for s in lattice.shape[:3])
         self.kwargs = kwargs
 
         emb = soft_one_hot_linspace(
