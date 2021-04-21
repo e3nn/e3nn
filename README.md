@@ -10,6 +10,9 @@ It contains fundamental mathematical operations such as tensor products and sphe
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
 
 ## Installation
+
+**Important:** install pytorch and only then run the command 
+
 ```
 pip install e3nn
 ```
