@@ -274,7 +274,9 @@ class ReducedTensorProducts(fx.GraphModule):
         self.recompile()
 
     def __repr__(self):
-        return f"""{self.__class__.__name__}(
-    in: {' times '.join(map(repr, self.irreps_in))}
-    out: {self.irreps_out}
-)"""
+        return (
+            f"ReducedTensorProducts(\n"
+            f"    in: {' times '.join(map(repr, self.irreps_in))}\n"
+            f"    out: {self.irreps_out}\n"
+            ")"
+        )
