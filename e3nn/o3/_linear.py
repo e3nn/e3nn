@@ -6,13 +6,12 @@ from torch import fx
 
 import e3nn
 from e3nn import o3
-from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-from ._tensor_product._codegen import _get_code, _sum_tensors
+from ._tensor_product._codegen import _sum_tensors
 
 
 @compile_mode('script')
-class Linear(CodeGenMixin, torch.nn.Module):
+class Linear(torch.nn.Module):
     r"""Linear operation equivariant to :math:`O(3)`
 
     Parameters
@@ -78,15 +77,16 @@ class Linear(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # == Generate code ==
-        code, self.weight_numel = _codegen_linear(
+        graph, self.weight_numel = _codegen_linear(
             self.irreps_in,
             self.irreps_out,
             shared_weights=shared_weights,
             optimize_einsums=self._optimize_einsums
         )
-        self._codegen_register({
-            "_compiled_main": code
-        })
+        self._compiled_main = torch.jit.script(fx.GraphModule(
+            root=self,
+            graph=graph
+        ))
 
         # == Generate weights ==
         if internal_weights and self.weight_numel > 0:
@@ -139,7 +139,7 @@ def _codegen_linear(
     irreps_out: o3.Irreps,
     shared_weights: bool = False,
     optimize_einsums: bool = True,
-) -> Tuple[str, int]:
+) -> Tuple[fx.Graph, int]:
     graph_out = fx.Graph()
 
     # = Function definitions =
@@ -156,7 +156,7 @@ def _codegen_linear(
         graph_out.output(out.node, torch.Tensor)
         # Short circut
         # 0 is weight_numel
-        return _get_code(graph_out), 0
+        return graph_out, 0
 
     x = x.reshape(-1, irreps_in.dim)
     batch_out = x.shape[0]
@@ -261,4 +261,4 @@ def _codegen_linear(
             )
             graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
 
-    return _get_code(graph_out), weight_numel
+    return graph_out, weight_numel
