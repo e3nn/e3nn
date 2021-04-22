@@ -1,15 +1,12 @@
 from typing import Dict
+import io
 
 import torch
 from torch import fx
 
-from ._eval import eval_code
 
-
-def _get_code(graph: fx.Graph) -> str:
-    """Hack to get free function code for an fx.GraphModule"""
-    code = graph.python_code('')
-    return code.replace("def forward(self, ", "def main(")
+def _dummy_getstate():
+    return None
 
 
 class CodeGenMixin:
@@ -30,25 +27,23 @@ class CodeGenMixin:
                 Dictionary mapping method names to their code.
         """
         if not hasattr(self, "__codegen__"):
-            # func_name -> code
-            self.__codegen__ = {}
-        self.__codegen__.update({
-            fname: _get_code(graph)
-            for fname, graph in funcs.items()
-        })
-        if compile:
-            self._codegen_compile()
+            # list of submodule names that are managed by this object
+            self.__codegen__ = []
+        self.__codegen__.extend(funcs.keys())
 
-    def _codegen_compile(self):
-        """Compile and set all registered dynamically generated methods."""
-        if hasattr(self, "__codegen__"):
-            # Compile the generated or static code
-            for fname, code in self.__codegen__.items():
-                setattr(
-                    self,
-                    fname,
-                    torch.jit.script(eval_code(code)["main"])
-                )
+        for fname, graph in funcs.items():
+            assert isinstance(graph, fx.Graph)
+            scriptmod = torch.jit.script(fx.GraphModule(
+                root=self,
+                graph=graph,
+                class_name=fname
+            ))
+            assert isinstance(scriptmod, torch.jit.ScriptModule)
+            # To prevent pickle from erroring, even though we don't actually try
+            # to serialize the scriptmodule.
+            scriptmod.__getstate__ = _dummy_getstate
+            # Add the ScriptModule as a submodule so it can be called
+            setattr(self, fname, scriptmod)
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
     # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances
@@ -64,21 +59,36 @@ class CodeGenMixin:
         if hasattr(self, "__codegen__"):
             # We cant save compiled functions
             for fname in self.__codegen__:
-                out.pop(fname, None)
+                smod = getattr(self, fname)
+                # Save the compiled code as TorchScript IR
+                buffer = io.BytesIO()
+                torch.jit.save(smod, buffer)
+                # Serialize that IR (just some `bytes`) instead of
+                # the ScriptModule
+                out[fname] = buffer.getvalue()
         return out
 
     def __setstate__(self, d):
         d = d.copy()
-        if "__codegen__" in d:
-            codegen_state = d.pop("__codegen__")
-            # Remove any compiled methods that somehow entered the state
-            for k in codegen_state:
-                d.pop(k, None)
-            self.__codegen__ = codegen_state
-            self._codegen_compile()
 
+        # We need to initialize self first so that we can add submodules
         # We need to check if other parent classes of self define __getstate__
         if hasattr(super(CodeGenMixin, self), "__setstate__"):
             super(CodeGenMixin, self).__setstate__(d)
         else:
             self.__dict__.update(d)
+
+        if "__codegen__" in d:
+            codegen_state = d.pop("__codegen__")
+            for fname in codegen_state:
+                # Make sure bytes, not ScriptModules, got made
+                assert isinstance(getattr(self, fname), bytes)
+                # Load the TorchScript IR buffer
+                buffer = d[fname]
+                assert isinstance(buffer, bytes)
+                buffer = io.BytesIO(buffer)
+                smod = torch.jit.load(buffer)
+                assert isinstance(smod, torch.jit.ScriptModule)
+                # Add the ScriptModule as a submodule
+                setattr(self, fname, smod)
+            self.__codegen__ = codegen_state
