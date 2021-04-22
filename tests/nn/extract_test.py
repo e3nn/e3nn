@@ -1,5 +1,7 @@
 import pytest
 
+import copy
+
 import torch
 
 from e3nn.nn import Extract, ExtractIr
@@ -34,3 +36,10 @@ def test_extract_ir():
     assert torch.all(out == torch.Tensor([1., 2.]))
     assert_auto_jitable(c)
     assert_equivariant(c)
+
+
+def test_copy():
+    c = Extract('1e + 0e + 0e', ['0e', '0e'], [(1,), (2,)])
+    _ = copy.deepcopy(c)
+    c = ExtractIr('1e + 0e + 0e', '0e')
+    _ = copy.deepcopy(c)
