@@ -7,11 +7,12 @@ from torch import fx
 import e3nn
 from e3nn import o3
 from e3nn.util.jit import compile_mode
+from e3nn.util.codegen import CodeGenMixin
 from ._tensor_product._codegen import _sum_tensors
 
 
 @compile_mode('script')
-class Linear(torch.nn.Module):
+class Linear(CodeGenMixin, torch.nn.Module):
     r"""Linear operation equivariant to :math:`O(3)`
 
     Parameters
@@ -83,10 +84,9 @@ class Linear(torch.nn.Module):
             shared_weights=shared_weights,
             optimize_einsums=self._optimize_einsums
         )
-        self._compiled_main = torch.jit.script(fx.GraphModule(
-            root=self,
-            graph=graph
-        ))
+        self._codegen_register({
+            "_compiled_main": graph
+        })
 
         # == Generate weights ==
         if internal_weights and self.weight_numel > 0:

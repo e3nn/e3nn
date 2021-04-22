@@ -1,29 +1,39 @@
 from typing import Dict
 
-from ._eval import eval_code
+import torch
+from torch import fx
+
+
+def _get_code(graph: fx.Graph) -> str:
+    """Hack to get free function code for an fx.GraphModule"""
+    code = graph.python_code('')
+    return code.replace("def forward(self, ", "def main(")
 
 
 class CodeGenMixin:
-    """Mixin for classes that dynamically generate some of their methods.
+    """Mixin for classes that dynamically generate TorchScript code using FX.
 
-    This class manages evaluating generated code for subclasses while remaining pickle/deepcopy compatible. If subclasses need to override ``__getstate__``/``__setstate__``, they should be sure to call CodeGenMixin's first and use its output.
+    This class manages evaluating and compiling generated code for subclasses while remaining pickle/deepcopy compatible. If subclasses need to override ``__getstate__``/``__setstate__``, they should be sure to call CodeGenMixin's first and use its output.
     """
     def _codegen_register(
         self,
-        funcs: Dict[str, str],
+        funcs: Dict[str, fx.Graph],
         compile: bool = True
     ) -> None:
         """Register dynamically generated methods.
 
         Parameters
         ----------
-            funcs : Dict[str, str]
+            funcs : Dict[str, fx.Graph]
                 Dictionary mapping method names to their code.
         """
         if not hasattr(self, "__codegen__"):
             # func_name -> code
             self.__codegen__ = {}
-        self.__codegen__.update(funcs)
+        self.__codegen__.update({
+            fname: _get_code(graph)
+            for fname, graph in funcs.items()
+        })
         if compile:
             self._codegen_compile()
 
@@ -32,7 +42,15 @@ class CodeGenMixin:
         if hasattr(self, "__codegen__"):
             # Compile the generated or static code
             for fname, code in self.__codegen__.items():
-                setattr(self, fname, eval_code(code).main)
+                globals_our = {}
+                fx.graph_module.exec_with_source(code, globals_our)
+                # TorchScript gets upset when this doesn't exist:
+                globals_our["main"].__module__ = "e3nn.util.codegen._fake_namespace"
+                setattr(
+                    self,
+                    fname,
+                    torch.jit.script(globals_our.pop("main"))
+                )
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
     # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances

@@ -6,6 +6,7 @@ import torch.fx
 import e3nn
 from e3nn import o3
 from e3nn.util.jit import compile_mode
+from e3nn.util.codegen import CodeGenMixin
 from e3nn.util import prod
 
 from ._instruction import Instruction
@@ -13,7 +14,7 @@ from ._codegen import codegen_tensor_product
 
 
 @compile_mode('script')
-class TensorProduct(torch.nn.Module):
+class TensorProduct(CodeGenMixin, torch.nn.Module):
     r"""Tensor product with parametrized paths.
 
     Parameters
@@ -268,15 +269,10 @@ class TensorProduct(torch.nn.Module):
             self._specialized_code,
             self._optimize_einsums
         )
-        # We always compile the internal code:
-        self._compiled_main_out = torch.jit.script(torch.fx.GraphModule(
-            root=self,
-            graph=graph_out
-        ))
-        self._compiled_main_right = torch.jit.script(torch.fx.GraphModule(
-            root=self,
-            graph=graph_right
-        ))
+        self._codegen_register({
+            "_compiled_main_out": graph_out,
+            "_compiled_main_right": graph_right
+        })
 
         self._wigners = wigners
 
