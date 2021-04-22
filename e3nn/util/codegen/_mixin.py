@@ -3,6 +3,8 @@ from typing import Dict
 import torch
 from torch import fx
 
+from ._eval import eval_code
+
 
 def _get_code(graph: fx.Graph) -> str:
     """Hack to get free function code for an fx.GraphModule"""
@@ -42,14 +44,10 @@ class CodeGenMixin:
         if hasattr(self, "__codegen__"):
             # Compile the generated or static code
             for fname, code in self.__codegen__.items():
-                globals_our = {}
-                fx.graph_module.exec_with_source(code, globals_our)
-                # TorchScript gets upset when this doesn't exist:
-                globals_our["main"].__module__ = "e3nn.util.codegen._fake_namespace"
                 setattr(
                     self,
                     fname,
-                    torch.jit.script(globals_our.pop("main"))
+                    torch.jit.script(eval_code(code)["main"])
                 )
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:

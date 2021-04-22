@@ -1,25 +1,23 @@
 """
 Evaluate a python string as code
 """
-import importlib.machinery
-import importlib.util
-import tempfile
 import functools
-import os.path
+import inspect
+
+from torch import fx
 
 
 # Set a large but finite maximum size to prevent long-running or unusual client codes from growing memory use without bound.
 @functools.lru_cache(maxsize=512)
 def eval_code(code):
     r"""
-    save code in a temporary file and import it as a module
+    Evaluate ``code`` and return its globals as a dict.
+
+    Uses ``torch.fx`` and some hacks to maintain TorchScript compatability.
     """
-    with tempfile.TemporaryDirectory() as temp_dir:
-        new_filename = os.path.join(temp_dir, "__gencode.py")
-        with open(new_filename, 'w+b') as new_file:
-            new_file.write(bytes(code, 'ascii'))
-        loader = importlib.machinery.SourceFileLoader('main', new_filename)
-        spec = importlib.util.spec_from_loader(loader.name, loader)
-        mod = importlib.util.module_from_spec(spec)
-        loader.exec_module(mod)
-    return mod
+    globals_tmp = {}
+    fx.graph_module.exec_with_source(code, globals_tmp)
+    if "main" in globals_tmp and inspect.isfunction(globals_tmp["main"]):
+        # TorchScript gets upset when this doesn't exist:
+        globals_tmp["main"].__module__ = "e3nn.util.codegen._fake_namespace"
+    return globals_tmp
