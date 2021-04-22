@@ -10,13 +10,6 @@ from e3nn.util import prod
 from ._instruction import Instruction
 
 
-def _get_code(graph):
-    x = graph.python_code('')
-    x = x.replace('def forward(self, ', '@torch.jit.script\ndef main(')
-    x = x.replace('Ellipsis', '...')
-    return x
-
-
 def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
     if len(xs) > 0:
         out = xs[0]
@@ -38,7 +31,7 @@ def codegen_tensor_product(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[str, str, list]:
+) -> Tuple[fx.Graph, fx.Graph, list]:
     graph_out = fx.Graph()
     graph_right = fx.Graph()
 
@@ -70,7 +63,7 @@ def codegen_tensor_product(
         graph_right.output(out_right.node, torch.Tensor)
         # Short circut
         # the empty list is wigners
-        return _get_code(graph_out), _get_code(graph_right), []
+        return graph_out, graph_right, []
 
     # = Broadcast inputs =
     if shared_weights:
@@ -454,4 +447,4 @@ def codegen_tensor_product(
             graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
             graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
 
-    return _get_code(graph_out), _get_code(graph_right), w3j
+    return graph_out, graph_right, w3j

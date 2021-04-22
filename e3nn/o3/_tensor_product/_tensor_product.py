@@ -1,10 +1,10 @@
 from typing import Optional, List, Union
 
 import torch
+import torch.fx
 
 import e3nn
 from e3nn import o3
-from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from e3nn.util import prod
 
@@ -13,7 +13,7 @@ from ._codegen import codegen_tensor_product
 
 
 @compile_mode('script')
-class TensorProduct(CodeGenMixin, torch.nn.Module):
+class TensorProduct(torch.nn.Module):
     r"""Tensor product with parametrized paths.
 
     Parameters
@@ -255,7 +255,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # Generate the actual tensor product code
-        code_out, code_right, wigners = codegen_tensor_product(
+        graph_out, graph_right, wigners = codegen_tensor_product(
             self.irreps_in1,
             self.in1_var,
             self.irreps_in2,
@@ -268,11 +268,16 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self._specialized_code,
             self._optimize_einsums
         )
+        # We always compile the internal code:
+        self._compiled_main_out = torch.jit.script(torch.fx.GraphModule(
+            root=self,
+            graph=graph_out
+        ))
+        self._compiled_main_right = torch.jit.script(torch.fx.GraphModule(
+            root=self,
+            graph=graph_right
+        ))
 
-        self._codegen_register({
-            '_compiled_main_out': code_out,
-            '_compiled_main_right': code_right,
-        })
         self._wigners = wigners
 
         # === Determine weights ===
