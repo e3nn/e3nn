@@ -1,5 +1,6 @@
 import random
 import copy
+import tempfile
 
 import pytest
 import torch
@@ -415,3 +416,22 @@ def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
     tp_copy = copy.deepcopy(tp)
     res2 = tp_copy(x1, x2)
     assert torch.allclose(res1, res2)
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
+def test_save(l1, p1, l2, p2, lo, po, mode, weight):
+    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+    with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+        torch.save(tp, tmp.name)
+        tp2 = torch.load(tmp.name)
+    with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+        tp_jit = assert_auto_jitable(tp)
+        tp_jit.save(tmp.name)
+        tp3 = torch.jit.load(tmp.name)
+    x1 = torch.randn(2, tp.irreps_in1.dim)
+    x2 = torch.randn(2, tp.irreps_in2.dim)
+    res1 = tp(x1, x2)
+    res2 = tp2(x1, x2)
+    res3 = tp3(x1, x2)
+    assert torch.allclose(res1, res2)
+    assert torch.allclose(res1, res3)
