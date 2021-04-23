@@ -3,7 +3,7 @@ import torch
 from e3nn.o3 import Irreps
 from e3nn.nn import Gate
 from e3nn.nn._gate import _Sortcut
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
 
 
 def test_gate():
@@ -15,3 +15,4 @@ def test_gate():
     g = Gate(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated)
     assert_equivariant(g)
     assert_auto_jitable(g)
+    assert_normalized(g)

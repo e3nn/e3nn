@@ -1,4 +1,5 @@
 import random
+import math
 import itertools
 import warnings
 
@@ -6,7 +7,7 @@ import torch
 
 from e3nn import o3
 from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode, _MAKE_TRACING_INPUTS
-from ._argtools import _get_args_in, _get_io_irreps, _transform
+from ._argtools import _get_args_in, _get_io_irreps, _transform, _rand_args
 
 
 FLOAT_TOLERANCE = {
@@ -339,3 +340,64 @@ def assert_auto_jitable(
                     raise AssertionError("Traced function didn't error on bad input shape")
 
     return func_jit
+
+
+# TODO: custom in_vars, out_vars support
+def assert_normalized(
+    func,
+    irreps_in=None,
+    irreps_out=None,
+    normalization: str = "component",
+    n: int = 10_000,
+    atol: float = 0.1,
+) -> None:
+    r"""Assert that ``func`` is normalized.
+
+    See https://docs.e3nn.org/en/stable/guide/normalization.html.
+
+    Parameters
+    ----------
+        irreps_in : object
+            see ``equivariance_error``
+        irreps_out : object
+            see ``equivariance_error``
+        normalization : str, default "component"
+            one of "component" or "norm"
+        n : int, default 10_000
+            the number of samples to use to estimate moments
+        atol : float, default 0.1
+            tolerance for checking moments
+    """
+    # Prevent pytest from showing this function in the traceback
+    __tracebackhide__ = True
+
+    if normalization not in ("component", "norm"):
+        raise ValueError(f"invalid normalization `{normalization}`")
+
+    irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
+
+    args_in = _rand_args(irreps_in, batch_size=n)
+    # args_in gives component normalized irreps
+    if normalization == "norm":
+        for i, irreps in enumerate(irreps_in):
+            for mul_ir, ir_slice in zip(irreps, irreps.slices()):
+                args_in[i][:, ir_slice].div_(math.sqrt(mul_ir.ir.dim))
+
+    outs = func(*args_in)
+    if not isinstance(outs, list) or isinstance(outs, tuple):
+        outs = (outs,)
+    assert len(outs) == len(irreps_out)
+    for out, irreps in zip(outs, irreps_out):
+        if irreps == "cartesian_points" or irreps is None:
+            continue
+        if normalization == "component":
+            targets = [1.0] * len(irreps)
+        elif normalization == "norm":
+            targets = [1.0 / math.sqrt(ir.dim) for _, ir in irreps]
+        expected_square = out.square().mean(dim=0)
+        for i, (target, ir_slice) in enumerate(zip(targets, irreps.slices())):
+            assert torch.allclose(
+                expected_square[ir_slice],
+                torch.as_tensor(target),
+                atol=atol
+            ), f"< x_i^2 > = {expected_square[ir_slice].detach().tolist()} !~= {target} for output irrep #{i}, {irreps[i]}"

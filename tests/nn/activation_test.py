@@ -4,7 +4,7 @@ import torch
 
 from e3nn import o3
 from e3nn.nn import Activation
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
 
 
 @pytest.mark.parametrize(
@@ -28,3 +28,5 @@ def test_activation(irreps_in, acts):
         true_up_to_factor = act(inp[:, ir_slice])
         factors = this_out / true_up_to_factor
         assert torch.allclose(factors, factors[0])
+
+    assert_normalized(a)
