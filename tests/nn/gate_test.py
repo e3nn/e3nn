@@ -1,14 +1,9 @@
 import torch
 
 from e3nn.o3 import Irreps
-from e3nn.nn import Gate, Activation
+from e3nn.nn import Gate
 from e3nn.nn._gate import _Sortcut
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
-
-
-def test_activation():
-    a = Activation("256x0o", [torch.abs])
-    assert_auto_jitable(a)
 
 
 def test_gate():
