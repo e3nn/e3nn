@@ -47,6 +47,6 @@ def test_bad_normalize():
 def test_normalized_ident():
     def ident(x1):
         return x1
-    ident.irreps_in = random_irreps(clean=True,  allow_empty=False)
+    ident.irreps_in = random_irreps(clean=True, allow_empty=False)
     ident.irreps_out = ident.irreps_in
     assert_normalized(ident)

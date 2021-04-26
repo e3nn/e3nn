@@ -386,17 +386,14 @@ def assert_normalized(
             tolerance for checking moments. Higher values for this prevent explosive computational costs for this test.
     """
     # Prevent pytest from showing this function in the traceback
-    #__tracebackhide__ = True
+    __tracebackhide__ = True
 
     if normalization not in ("component", "norm"):
         raise ValueError(f"invalid normalization `{normalization}`")
 
     irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
 
-    if (
-        all(i.num_irreps == 0 for i in irreps_in) or \
-        all(i.num_irreps == 0 for i in irreps_out)
-    ):
+    if all(i.num_irreps == 0 for i in irreps_in) or all(i.num_irreps == 0 for i in irreps_out):
         # Short-circut
         return
 
