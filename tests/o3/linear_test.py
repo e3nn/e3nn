@@ -62,7 +62,7 @@ def test_linear():
         m,
         n_weight=125,
         n_input=10_000,
-        atol=0.3
+        atol=0.4
     )
 
 

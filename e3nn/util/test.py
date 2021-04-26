@@ -453,7 +453,6 @@ def assert_normalized(
             targets = [1.0 / math.sqrt(ir.dim) for _, ir in irreps]
 
         for i, (target, ir_slice) in enumerate(zip(targets, irreps.slices())):
-            print(expected_square)
             assert torch.allclose(
                 expected_square[ir_slice],
                 torch.as_tensor(target),
