@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 
 from e3nn import o3
-from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps, assert_normalized
 
 
 class SlowLinear(torch.nn.Module):
@@ -58,6 +58,12 @@ def test_linear():
 
     assert_equivariant(m)
     assert_auto_jitable(m)
+    assert_normalized(
+        m,
+        n_weight=125,
+        n_input=5000,
+        atol=0.2  # Linear admits stricter
+    )
 
 
 def test_single_out():
