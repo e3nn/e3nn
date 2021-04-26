@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- Normalization testing with `assert_normalized`
 
 ## [0.2.8] - 2021-04-21
 ### Added
