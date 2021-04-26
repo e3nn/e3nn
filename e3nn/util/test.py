@@ -1,3 +1,5 @@
+from typing import Iterable, Optional
+
 import random
 import math
 import itertools
@@ -84,6 +86,11 @@ def random_irreps(
     assert lmax >= 0
     assert mul_min >= 0
     assert mul_max >= mul_min
+
+    if not allow_empty and len_min == 0:
+        len_min = 1
+    assert len_min >= 0
+    assert len_max >= len_min
 
     out = []
     for _ in range(n):
@@ -344,60 +351,114 @@ def assert_auto_jitable(
 
 # TODO: custom in_vars, out_vars support
 def assert_normalized(
-    func,
+    func: torch.nn.Module,
     irreps_in=None,
     irreps_out=None,
     normalization: str = "component",
-    n: int = 10_000,
+    n_input: int = 10_000,
+    n_weight: Optional[int] = None,
+    weights: Optional[Iterable[torch.nn.Parameter]] = None,
     atol: float = 0.1,
 ) -> None:
     r"""Assert that ``func`` is normalized.
 
-    See https://docs.e3nn.org/en/stable/guide/normalization.html.
+    See https://docs.e3nn.org/en/stable/guide/normalization.html for more information on the normalization scheme.
+
+    ``atol``, ``n_input``, and ``n_weight`` may need to be significantly higher in order to converge the statistics to pass the test.
 
     Parameters
     ----------
+        func : torch.nn.Module
+            the module to test
         irreps_in : object
             see ``equivariance_error``
         irreps_out : object
             see ``equivariance_error``
         normalization : str, default "component"
-            one of "component" or "norm"
-        n : int, default 10_000
-            the number of samples to use to estimate moments
+            one of "component" or "norm". Note that this is defined for both the inputs and the outputs; if you need seperate normalizations for input and output please file a feature request.
+        n_input : int, default 10_000
+            the number of input samples to use for each weight init
+        n_weight : int, default 20
+            the number of weight initializations to sample
+        weights : optional iterable of parameters
+            the weights to reinitialize ``n_weight`` times. If ``None`` (default), ``func.parameters()`` will be used.
         atol : float, default 0.1
-            tolerance for checking moments
+            tolerance for checking moments. Higher values for this prevent explosive computational costs for this test.
     """
     # Prevent pytest from showing this function in the traceback
-    __tracebackhide__ = True
+    #__tracebackhide__ = True
 
     if normalization not in ("component", "norm"):
         raise ValueError(f"invalid normalization `{normalization}`")
 
     irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
 
-    args_in = _rand_args(irreps_in, batch_size=n)
-    # args_in gives component normalized irreps
-    if normalization == "norm":
-        for i, irreps in enumerate(irreps_in):
-            for mul_ir, ir_slice in zip(irreps, irreps.slices()):
-                args_in[i][:, ir_slice].div_(math.sqrt(mul_ir.ir.dim))
+    if (
+        all(i.num_irreps == 0 for i in irreps_in) or \
+        all(i.num_irreps == 0 for i in irreps_out)
+    ):
+        # Short-circut
+        return
 
-    outs = func(*args_in)
-    if not isinstance(outs, list) or isinstance(outs, tuple):
-        outs = (outs,)
-    assert len(outs) == len(irreps_out)
-    for out, irreps in zip(outs, irreps_out):
+    if weights is None:
+        if isinstance(func, torch.nn.Module):
+            weights = func.parameters()
+        else:
+            weights = []
+    weights = list(weights)
+
+    if len(weights) == 0:
+        assert n_weight is None or n_weight == 1, "Without weights to re-init, n_weight must be 1 or None"
+        n_weight = 1
+    else:
+        n_weight = 20 if n_weight is None else n_weight
+
+    with torch.no_grad():
+        expected_squares = [torch.zeros(irreps.dim) for irreps in irreps_out]
+        n_samples = 0
+        for weight_init in range(n_weight):
+            # generate weight sample
+            for param in weights:
+                param.normal_()
+
+            # generate input sample
+            args_in = _rand_args(irreps_in, batch_size=n_input)
+            # args_in gives component normalized irreps
+            if normalization == "norm":
+                for i, irreps in enumerate(irreps_in):
+                    for mul_ir, ir_slice in zip(irreps, irreps.slices()):
+                        args_in[i][:, ir_slice].div_(math.sqrt(mul_ir.ir.dim))
+
+            # run func
+            this_outs = func(*args_in)
+            if not isinstance(this_outs, list) or isinstance(this_outs, tuple):
+                this_outs = (this_outs,)
+            assert len(this_outs) == len(irreps_out)
+
+            # square
+            this_outs = [e.square() for e in this_outs]
+
+            # update running average
+            for i in range(len(irreps_out)):
+                assert this_outs[i].shape[0] == n_input
+                update = this_outs[i].sum(dim=0) - n_input*expected_squares[i]
+                update.div_(n_input + n_samples)
+                expected_squares[i].add_(update)
+            n_samples += n_input
+
+    # check them
+    for expected_square, irreps in zip(expected_squares, irreps_out):
         if irreps == "cartesian_points" or irreps is None:
             continue
         if normalization == "component":
             targets = [1.0] * len(irreps)
         elif normalization == "norm":
             targets = [1.0 / math.sqrt(ir.dim) for _, ir in irreps]
-        expected_square = out.square().mean(dim=0)
+
         for i, (target, ir_slice) in enumerate(zip(targets, irreps.slices())):
+            print(expected_square)
             assert torch.allclose(
                 expected_square[ir_slice],
                 torch.as_tensor(target),
                 atol=atol
-            ), f"< x_i^2 > = {expected_square[ir_slice].detach().tolist()} !~= {target} for output irrep #{i}, {irreps[i]}"
+            ), f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {(expected_square[ir_slice] - target).abs().max().item():.6f}"
