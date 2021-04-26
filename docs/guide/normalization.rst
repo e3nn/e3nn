@@ -84,7 +84,7 @@ Testing
 
 You can use ``e3nn.util.test.assert_normalized`` to check whether a function or module is normalized at initialization:
 
-.. code::
+.. jupyter-execute::
 
     from e3nn.util.test import assert_normalized
     from e3nn import o3
