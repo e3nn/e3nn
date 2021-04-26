@@ -61,8 +61,8 @@ def test_linear():
     assert_normalized(
         m,
         n_weight=125,
-        n_input=5000,
-        atol=0.2  # Linear admits stricter
+        n_input=10_000,
+        atol=0.3
     )
 
 
