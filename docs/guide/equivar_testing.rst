@@ -82,3 +82,10 @@ To test equivariance on a specific graph, ``args_in`` can be used:
         args_in=[my_pos, my_x],
         irreps_out=[f.irreps_out],
     )
+
+Logging
+-------
+``assert_equivariant`` also logs the equivariance error to the ``e3nn.util.test`` logger with level ``INFO`` regardless of whether the test fails. When running in pytest, these logs can be seen using the `"Live Logs" feature <https://docs.pytest.org/en/stable/logging.html#live-logs>`_:
+
+.. code::
+    pytest tests/ --log-cli-level info

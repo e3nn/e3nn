@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - Normalization testing with `assert_normalized`
+- Optional logging for equivariance and normalization tests
 
 ## [0.2.8] - 2021-04-21
 ### Added

@@ -4,6 +4,8 @@ import random
 import math
 import itertools
 import warnings
+import logging
+import inspect
 
 import torch
 
@@ -12,6 +14,19 @@ from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode, _MAKE_T
 from ._argtools import _get_args_in, _get_io_irreps, _transform, _rand_args
 
 
+# Make a logger for reporting error statistics
+logger = logging.getLogger(__name__)
+
+
+def _logging_name(func) -> str:
+    """Get a decent string representation of ``func`` for logging"""
+    if inspect.isfunction(func):
+        return func.__name__
+    else:
+        return repr(func)
+
+
+# The default float tolerance
 FLOAT_TOLERANCE = {
     t: torch.as_tensor(v, dtype=t)
     for t, v in {
@@ -121,6 +136,17 @@ def random_irreps(
         return out
 
 
+def _format_equivar_error(errors: dict) -> str:
+    return "; ".join(
+        "(parity_k={:d}, did_translate={}) -> error={:.3e}".format(
+            int(k[0]),
+            bool(k[1]),
+            float(v)
+        )
+        for k, v in errors.items()
+    )
+
+
 def assert_equivariant(
     func,
     args_in=None,
@@ -128,7 +154,7 @@ def assert_equivariant(
     irreps_out=None,
     tolerance=None,
     **kwargs
-):
+) -> dict:
     r"""Assert that ``func`` is equivariant.
 
     Parameters
@@ -166,6 +192,13 @@ def assert_equivariant(
         irreps_out=irreps_out,
         **kwargs
     )
+
+    logger.info(
+        "Tested equivariance of %s -- max componentwise errors: %s",
+        _logging_name(func),
+        _format_equivar_error(errors),
+    )
+
     # Check it
     if tolerance is None:
         tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
@@ -173,10 +206,8 @@ def assert_equivariant(
     problems = {case: err for case, err in errors.items() if err > tolerance}
 
     if len(problems) != 0:
-        errstr = (
-            "Largest componentwise equivariance error was too large for: "
-            "; ".join("(parity_k={:d}, did_translate={}) -> error={:.3e}".format(int(k[0]), bool(k[1]), float(v)) for k, v in problems.items())
-        )
+        errstr = "Largest componentwise equivariance error was too large for: "
+        errstr += _format_equivar_error(problems)
         assert len(problems) == 0, errstr
 
     return errors
@@ -453,8 +484,12 @@ def assert_normalized(
             targets = [1.0 / math.sqrt(ir.dim) for _, ir in irreps]
 
         for i, (target, ir_slice) in enumerate(zip(targets, irreps.slices())):
-            assert torch.allclose(
-                expected_square[ir_slice],
-                torch.as_tensor(target),
-                atol=atol
-            ), f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {(expected_square[ir_slice] - target).abs().max().item():.6f}"
+            if ir_slice.start == ir_slice.stop:
+                continue
+            max_componentwise = (expected_square[ir_slice] - target).abs().max().item()
+            logger.info(
+                "Tested normalization of %r: max componentwise error %.6f",
+                _logging_name(func),
+                max_componentwise
+            )
+            assert max_componentwise <= atol, f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {max_componentwise:.6f}"
