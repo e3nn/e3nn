@@ -101,9 +101,9 @@ def test_normalized(l1, p1, l2, p2, lo, po, mode, weight):
     # especially for uvuv
     assert_normalized(
         m,
-        n_weight=100,
+        n_weight=75,
         n_input=10_000,
-        atol=0.4
+        atol=0.5
     )
 
 

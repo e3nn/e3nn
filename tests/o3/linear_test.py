@@ -60,9 +60,9 @@ def test_linear():
     assert_auto_jitable(m)
     assert_normalized(
         m,
-        n_weight=125,
+        n_weight=50,
         n_input=10_000,
-        atol=0.4
+        atol=0.5
     )
 
 
