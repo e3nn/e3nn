@@ -11,6 +11,10 @@ Most recent change on the bottom.
 - Normalization testing with `assert_normalized`
 - Optional logging for equivariance and normalization tests
 
+### Changed
+- Generated code (modules like `TensorProduct`, `Linear`, `Extract`) now pickled using TorchScript IR, rather than Python source code.
+- e3nn now only requires PyTorch >= 1.8.0 rather than 1.8.1
+
 ## [0.2.8] - 2021-04-21
 ### Added
 - `squared` option to `o3.Norm`

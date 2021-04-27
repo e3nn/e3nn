@@ -117,7 +117,6 @@ def legendre(l, z, y=None):
 _legendre_code = """
 import torch
 
-@torch.jit.script
 def main(z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     out = z.new_zeros(z.shape + (lsize,))
 
@@ -145,7 +144,7 @@ def _legendre_genjit(ls):
     code = _legendre_code
     code = code.replace("lsize", str(sum(2 * l + 1 for l in ls)))
     code = code.replace("# fill out", fill)
-    return eval_code(code).main
+    return torch.jit.script(eval_code(code)["main"])
 
 
 def _poly_legendre(l, m):

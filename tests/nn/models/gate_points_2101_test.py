@@ -121,8 +121,14 @@ def test_copy(network):
 
 def test_save(network):
     f, random_graph = network
+    # Get a saved, loaded network
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(f, tmp.name)
         f2 = torch.load(tmp.name)
     x = random_graph()
     assert torch.all(f(x) == f2(x))
+    # Get a double-saved network
+    with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+        torch.save(f2, tmp.name)
+        f3 = torch.load(tmp.name)
+    assert torch.all(f(x) == f3(x))

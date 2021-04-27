@@ -251,7 +251,7 @@ class ReducedTensorProducts(fx.GraphModule):
             if isinstance(path, _INPUT):
                 out = inputs[path.tensor]
                 if (path.start, path.stop) != (0, self.irreps_in[path.tensor].dim):
-                    out = out[..., path.start:path.stop]
+                    out = out.narrow(-1, path.start, path.stop - path.start)
             if isinstance(path, _TP):
                 x1 = evaluate(path.args[0]).node
                 x2 = evaluate(path.args[1]).node
@@ -274,7 +274,9 @@ class ReducedTensorProducts(fx.GraphModule):
         self.recompile()
 
     def __repr__(self):
-        return f"""{self.__class__.__name__}(
-    in: {' times '.join(map(repr, self.irreps_in))}
-    out: {self.irreps_out}
-)"""
+        return (
+            f"ReducedTensorProducts(\n"
+            f"    in: {' times '.join(map(repr, self.irreps_in))}\n"
+            f"    out: {self.irreps_out}\n"
+            ")"
+        )
