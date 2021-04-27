@@ -78,3 +78,14 @@ It imply that the two first moments of :math:`x \cdot w` (and therefore mean and
                                   &= \sum_{i} \sum_{j} \langle x_i x_j \rangle \langle w_i w_j \rangle
 
                                   &= \sigma^2 \sum_{i} \langle x_i^2 \rangle
+
+Testing
+-------
+
+You can use ``e3nn.util.test.assert_normalized`` to check whether a function or module is normalized at initialization:
+
+.. code::
+
+    from e3nn.util.test import assert_normalized
+    from e3nn import o3
+    assert_normalized(o3.Linear("10x0e", "10x0e"))

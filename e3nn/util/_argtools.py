@@ -1,3 +1,5 @@
+from typing import Optional
+
 import random
 import warnings
 
@@ -76,11 +78,12 @@ def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
     return args_in, irreps_in, irreps_out
 
 
-def _rand_args(irreps_in):
+def _rand_args(irreps_in, batch_size: Optional[int] = None):
     if not all((isinstance(i, Irreps) or i == 'cartesian_points') for i in irreps_in):
         raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
-    # Generate random args with random size batch dim between 1 and 4:
-    batch_size = random.randint(1, 4)
+    if batch_size is None:
+        # Generate random args with random size batch dim between 1 and 4:
+        batch_size = random.randint(1, 4)
     args_in = [
         torch.randn(batch_size, 3) if (irreps == 'cartesian_points') else irreps.randn(batch_size, -1)
         for irreps in irreps_in
@@ -97,9 +100,6 @@ def _get_device(mod: torch.nn.Module) -> torch.device:
     return a_buf.device if a_buf is not None else 'cpu'
 
 
-_FLOATING_DTYPES = [torch.float32, torch.float64]
-
-
 def _get_floating_dtype(mod: torch.nn.Module) -> torch.dtype:
     """Guess floating dtype for module.
 
@@ -108,13 +108,13 @@ def _get_floating_dtype(mod: torch.nn.Module) -> torch.dtype:
     # Try to a get a parameter
     a_buf = None
     for buf in mod.parameters():
-        if buf.dtype in _FLOATING_DTYPES:
+        if buf.is_floating_point():
             a_buf = buf
             break
     if a_buf is None:
         # If there isn't one, try to get a buffer
         for buf in mod.buffers():
-            if buf.dtype in _FLOATING_DTYPES:
+            if buf.is_floating_point():
                 a_buf = buf
                 break
     return a_buf.dtype if a_buf is not None else torch.get_default_dtype()
@@ -128,7 +128,7 @@ def _to_device_dtype(args, device=None, dtype=None):
         kwargs['dtype'] = dtype
 
     if isinstance(args, torch.Tensor):
-        if args.dtype in _FLOATING_DTYPES:
+        if args.is_floating_point():
             # Only convert dtypes of floating tensors
             return args.to(device=device, dtype=dtype)
         else:

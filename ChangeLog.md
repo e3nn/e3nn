@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- Normalization testing with `assert_normalized`
+- Optional logging for equivariance and normalization tests
+
 ### Changed
 - Generated code (modules like `TensorProduct`, `Linear`, `Extract`) now pickled using TorchScript IR, rather than Python source code.
 - e3nn now only requires PyTorch >= 1.8.0 rather than 1.8.1

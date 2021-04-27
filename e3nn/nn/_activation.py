@@ -96,7 +96,9 @@ class Activation(torch.nn.Module):
                     output.append(features.narrow(dim, index, mul * ir.dim))
                 index += mul * ir.dim
 
-            if output:
+            if len(output) > 1:
                 return torch.cat(output, dim=dim)
+            elif len(output) == 1:
+                return output[0]
             else:
                 return torch.zeros_like(features)
