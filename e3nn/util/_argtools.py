@@ -1,3 +1,5 @@
+from typing import Optional
+
 import random
 import warnings
 
@@ -76,11 +78,12 @@ def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
     return args_in, irreps_in, irreps_out
 
 
-def _rand_args(irreps_in):
+def _rand_args(irreps_in, batch_size: Optional[int] = None):
     if not all((isinstance(i, Irreps) or i == 'cartesian_points') for i in irreps_in):
         raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
-    # Generate random args with random size batch dim between 1 and 4:
-    batch_size = random.randint(1, 4)
+    if batch_size is None:
+        # Generate random args with random size batch dim between 1 and 4:
+        batch_size = random.randint(1, 4)
     args_in = [
         torch.randn(batch_size, 3) if (irreps == 'cartesian_points') else irreps.randn(batch_size, -1)
         for irreps in irreps_in

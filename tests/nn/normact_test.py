@@ -20,6 +20,7 @@ def test_norm_activation(float_tolerance, do_bias, nonlin):
     norm_act = NormActivation(
         irreps_in=irreps_in,
         scalar_nonlinearity=nonlin,
+        normalize=True,
         bias=do_bias
     )
 

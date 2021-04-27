@@ -4,10 +4,15 @@ import copy
 import pytest
 import torch
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
 
 
-def make_tp(l1, p1, l2, p2, lo, po, mode, weight, **kwargs):
+def make_tp(
+    l1, p1, l2, p2, lo, po, mode, weight,
+    mul: int = 25,
+    path_weights: bool = True,
+    **kwargs
+):
     def mul_out(mul):
         if mode == "uvuv":
             return mul**2
@@ -15,14 +20,14 @@ def make_tp(l1, p1, l2, p2, lo, po, mode, weight, **kwargs):
 
     try:
         return TensorProduct(
-            [(25, (l1, p1)), (19, (l1, p1))],
-            [(25, (l2, p2)), (19, (l2, p2))],
-            [(mul_out(25), (lo, po)), (mul_out(19), (lo, po))],
+            [(mul, (l1, p1)), (19, (l1, p1))],
+            [(mul, (l2, p2)), (19, (l2, p2))],
+            [(mul_out(mul), (lo, po)), (mul_out(19), (lo, po))],
             [
                 (0, 0, 0, mode, weight),
                 (1, 1, 1, mode, weight),
-                (0, 0, 1, 'uvw', True, 0.5),
-                (0, 1, 1, 'uvw', True, 0.2),
+                (0, 0, 1, 'uvw', True, 0.5 if path_weights else 1.0),
+                (0, 1, 1, 'uvw', True, 0.2 if path_weights else 1.0),
             ],
             **kwargs
         )
@@ -79,6 +84,27 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
     # equivariance
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+
+# This is a fairly expensive test, so we don't run too many configs
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=8))
+def test_normalized(l1, p1, l2, p2, lo, po, mode, weight):
+    if torch.get_default_dtype() != torch.float32:
+        pytest.skip(
+            "No reason to run expensive normalization tests again at float64 expense."
+        )
+    # Explicit fixed path weights screw with the output normalization,
+    # so don't use them
+    m = make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul=5, path_weights=False)
+    # normalization
+    # n_weight, n_input has to be decently high to ensure statistical convergence
+    # especially for uvuv
+    assert_normalized(
+        m,
+        n_weight=75,
+        n_input=10_000,
+        atol=0.5
+    )
 
 
 @pytest.mark.parametrize('normalization', ['component', 'norm'])
