@@ -139,8 +139,10 @@ def main():
     # `assert_equivariant` also tests parity and translation, and
     # can handle non-(psuedo)scalar outputs.
     # To "interpret" between it and torch_geometric, we use a small wrapper:
+
     def wrapper(pos, batch):
         return f(Data(pos=pos, batch=batch))
+
     # `assert_equivariant` uses logging to print a summary of the equivariance error,
     # so we enable logging
     logging.basicConfig(level=logging.INFO)
