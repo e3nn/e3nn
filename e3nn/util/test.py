@@ -136,7 +136,18 @@ def random_irreps(
         return out
 
 
-def _format_equivar_error(errors: dict) -> str:
+def format_equivariance_error(errors: dict) -> str:
+    """Format the dictionary returned by ``equivariance_error`` into a readable string.
+
+    Parameters
+    ----------
+        errors : dict
+            A dictionary of errors returned by ``equivariance_error``.
+
+    Returns
+    -------
+        A string.
+    """
     return "; ".join(
         "(parity_k={:d}, did_translate={}) -> error={:.3e}".format(
             int(k[0]),
@@ -196,7 +207,7 @@ def assert_equivariant(
     logger.info(
         "Tested equivariance of %s -- max componentwise errors: %s",
         _logging_name(func),
-        _format_equivar_error(errors),
+        format_equivariance_error(errors),
     )
 
     # Check it
@@ -207,7 +218,7 @@ def assert_equivariant(
 
     if len(problems) != 0:
         errstr = "Largest componentwise equivariance error was too large for: "
-        errstr += _format_equivar_error(problems)
+        errstr += format_equivariance_error(problems)
         assert len(problems) == 0, errstr
 
     return errors
