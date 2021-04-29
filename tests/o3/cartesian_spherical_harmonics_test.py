@@ -152,10 +152,17 @@ def test_recurrence_relation(float_tolerance, l):
     assert (a - b).abs().max() < 100*float_tolerance
 
 
-def test_module():
+@pytest.mark.parametrize(
+    "normalization,normalize",
+    [
+        ("integral", True),
+        ("component", True),
+        ("norm", True),
+        ("component", False)  # doesn't matter which we use for False
+    ]
+)
+def test_module(normalization, normalize):
     l = o3.Irreps("0e + 1o + 3o")
-    normalize = True
-    normalization = 'integral'
     sp = o3.SphericalHarmonics(l, normalize, normalization)
     sp_jit = assert_auto_jitable(sp)
     xyz = torch.randn(11, 3)
