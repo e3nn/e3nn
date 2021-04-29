@@ -5,6 +5,8 @@ Exact equivariance to :math:`E(3)`
 
 >>> test()
 """
+import logging
+
 import torch
 from torch_cluster import radius_graph
 from torch_geometric.data import Data, DataLoader
@@ -156,20 +158,31 @@ def main():
     # == Check equivariance ==
     # Because the model outputs (psuedo)scalars, we can easily directly
     # check its equivariance to the same data with new rotations:
+    print("Testing equivariance directly...")
     rotated_data, _ = tetris()
     error = f(rotated_data) - f(data)
     print(f"Equivariance error = {error.abs().max().item():.1e}")
 
+    print("Testing equivariance using `assert_equivariance`...")
     # We can also use the library's `assert_equivariant` helper
     # `assert_equivariant` also tests parity and translation, and
     # can handle non-(psuedo)scalar outputs.
     # To "interpret" between it and torch_geometric, we use a small wrapper:
-    def wrapper(pos):
-        return f(Data(pos=pos, batch=torch.zeros(len(pos), dtype=torch.long)))
+    def wrapper(pos, batch):
+        return f(Data(pos=pos, batch=batch))
+    # `assert_equivariant` uses logging to print a summary of the equivariance error,
+    # so we enable logging
+    logging.basicConfig(level=logging.INFO)
     assert_equivariant(
         wrapper,
-        args_in=[data.pos],
-        irreps_in=["cartesian_points"],
+        # We provide the original data that `assert_equivariant` will transform...
+        args_in=[data.pos, data.batch],
+        # ...in accordance with these irreps...
+        irreps_in=[
+            "cartesian_points",  # pos has vector 1o irreps, but is also translation equivariant
+            None,  # `None` indicates invariant, possibly non-floating-point data
+        ],
+        # ...and confirm that the outputs transform correspondingly for these irreps:
         irreps_out=[f.irreps_out],
     )
 

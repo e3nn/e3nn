@@ -205,7 +205,7 @@ def assert_equivariant(
     )
 
     logger.info(
-        "Tested equivariance of %s -- max componentwise errors: %s",
+        "Tested equivariance of `%s` -- max componentwise errors: %s",
         _logging_name(func),
         format_equivariance_error(errors),
     )
