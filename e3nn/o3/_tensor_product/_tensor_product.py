@@ -745,6 +745,7 @@ class ElementwiseTensorProduct(TensorProduct):
         z_u = x_u \otimes y_u
 
     where :math:`u` runs over the irreps. Note that there are no weights.
+    The output representation is determined by the two input representations.
 
     Parameters
     ----------
@@ -755,7 +756,7 @@ class ElementwiseTensorProduct(TensorProduct):
         representation of the second input
 
     filter_ir_out : iterator of `Irrep`, optional
-        representations of the output
+        filter to select only specific `Irrep` of the output
 
     normalization : {'component', 'norm'}
         see `TensorProduct`
@@ -819,6 +820,7 @@ class FullTensorProduct(TensorProduct):
         z_{uv} = x_u \otimes y_v
 
     where :math:`u` and :math:`v` run over the irreps. Note that there are no weights.
+    The output representation is determined by the two input representations.
 
     Parameters
     ----------
@@ -829,7 +831,7 @@ class FullTensorProduct(TensorProduct):
         representation of the second input
 
     filter_ir_out : iterator of `Irrep`, optional
-        representations of the output
+        filter to select only specific `Irrep` of the output
 
     normalization : {'component', 'norm'}
         see `TensorProduct`
