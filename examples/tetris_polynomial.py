@@ -10,6 +10,8 @@ This example is minimal:
 
 >>> test()
 """
+import logging
+
 import torch
 from torch_cluster import radius_graph
 from torch_geometric.data import Data, DataLoader
@@ -17,6 +19,7 @@ from torch_scatter import scatter
 
 from e3nn import o3
 from e3nn.o3 import FullyConnectedTensorProduct
+from e3nn.util.test import assert_equivariant
 
 
 def tetris():
@@ -71,6 +74,7 @@ class InvariantPolynomial(torch.nn.Module):
             irreps_in2=self.irreps_sh,
             irreps_out=irreps_out,
         )
+        self.irreps_out = self.tp2.irreps_out
 
     def forward(self, data) -> torch.Tensor:
         num_neighbors = 2  # typical number of neighbors
@@ -109,6 +113,7 @@ def main():
 
     optim = torch.optim.Adam(f.parameters(), lr=1e-2)
 
+    # == Train ==
     for step in range(200):
         pred = f(data)
         loss = (pred - labels).pow(2).sum()
@@ -118,13 +123,41 @@ def main():
         optim.step()
 
         if step % 10 == 0:
-            accuracy = pred.round().eq(labels).double().mean().item()
-            print(f"{100 * accuracy:.1f}% accuracy")
+            accuracy = pred.round().eq(labels).all(dim=1).double().mean(dim=0).item()
+            print(f"epoch {step:5d} | loss {loss:<10.1f} | {100 * accuracy:5.1f}% accuracy")
 
-    # Check equivariance
+    # == Check equivariance ==
+    # Because the model outputs (psuedo)scalars, we can easily directly
+    # check its equivariance to the same data with new rotations:
+    print("Testing equivariance directly...")
     rotated_data, _ = tetris()
     error = f(rotated_data) - f(data)
     print(f"Equivariance error = {error.abs().max().item():.1e}")
+
+    print("Testing equivariance using `assert_equivariance`...")
+    # We can also use the library's `assert_equivariant` helper
+    # `assert_equivariant` also tests parity and translation, and
+    # can handle non-(psuedo)scalar outputs.
+    # To "interpret" between it and torch_geometric, we use a small wrapper:
+
+    def wrapper(pos, batch):
+        return f(Data(pos=pos, batch=batch))
+
+    # `assert_equivariant` uses logging to print a summary of the equivariance error,
+    # so we enable logging
+    logging.basicConfig(level=logging.INFO)
+    assert_equivariant(
+        wrapper,
+        # We provide the original data that `assert_equivariant` will transform...
+        args_in=[data.pos, data.batch],
+        # ...in accordance with these irreps...
+        irreps_in=[
+            "cartesian_points",  # pos has vector 1o irreps, but is also translation equivariant
+            None,  # `None` indicates invariant, possibly non-floating-point data
+        ],
+        # ...and confirm that the outputs transform correspondingly for these irreps:
+        irreps_out=[f.irreps_out],
+    )
 
 
 if __name__ == '__main__':

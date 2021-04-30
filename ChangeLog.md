@@ -10,6 +10,7 @@ Most recent change on the bottom.
 ### Added
 - Normalization testing with `assert_normalized`
 - Optional logging for equivariance and normalization tests
+- Public `e3nn.util.test.format_equivariance_error` method for printing equivariance test results
 
 ### Changed
 - Generated code (modules like `TensorProduct`, `Linear`, `Extract`) now pickled using TorchScript IR, rather than Python source code.
