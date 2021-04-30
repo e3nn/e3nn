@@ -760,6 +760,14 @@ class ElementwiseTensorProduct(TensorProduct):
 
     normalization : {'component', 'norm'}
         see `TensorProduct`
+
+    Examples
+    --------
+    Elementwise scalar product
+
+    >>> ElementwiseTensorProduct("5x1o + 5x1e", "10x1e", ["0e", "0o"])
+    ElementwiseTensorProduct(5x1o+5x1e x 10x1e -> 5x0o+5x0e | 10 paths | 0 weights)
+
     """
     def __init__(
         self,
