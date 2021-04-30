@@ -190,22 +190,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         # === Setup ===
         super().__init__()
 
-        assert normalization in ['component', 'norm'], normalization
-        self.normalization = normalization
-
-        if shared_weights is False and internal_weights is None:
-            internal_weights = False
-
-        if shared_weights is None:
-            shared_weights = True
-
-        if internal_weights is None:
-            internal_weights = True
-
-        assert shared_weights or not internal_weights
-        self.internal_weights = internal_weights
-        self.shared_weights = shared_weights
-
         # Determine irreps
         self.irreps_in1 = o3.Irreps(irreps_in1)
         self.irreps_in2 = o3.Irreps(irreps_in2)
@@ -249,6 +233,22 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
         ]
         self.instructions = instructions
+
+        assert normalization in ['component', 'norm'], normalization
+        self.normalization = normalization
+
+        if shared_weights is False and internal_weights is None:
+            internal_weights = False
+
+        if shared_weights is None:
+            shared_weights = True
+
+        if internal_weights is None:
+            internal_weights = shared_weights and any(i.has_weight for i in self.instructions)
+
+        assert shared_weights or not internal_weights
+        self.internal_weights = internal_weights
+        self.shared_weights = shared_weights
 
         opt_defaults = e3nn.get_optimization_defaults()
         self._specialized_code = _specialized_code if _specialized_code is not None else opt_defaults['specialized_code']
