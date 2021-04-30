@@ -146,9 +146,11 @@ def spherical_harmonics(
         tensor :math:`x` of shape ``(..., 3)``.
 
     normalize : bool
-        normalize ``x`` on the sphere
+        whether to normalize the ``x`` to unit vectors that lie on the sphere before projecting onto the spherical harmonics
 
     normalization : {'integral', 'component', 'norm'}
+        normalization of the output tensors --- note that this option is independent of ``normalize``, which controls the processing of the *input*, rather than the output.
+        Valid options:
         * *component*: :math:`\|Y^l(x)\|^2 = 2l+1, x \in S^2`
         * *norm*: :math:`\|Y^l(x)\| = 1, x \in S^2`, ``component / sqrt(2l+1)``
         * *integral*: :math:`\int_{S^2} Y^l_m(x)^2 dx = 1`, ``component / sqrt(4pi)``

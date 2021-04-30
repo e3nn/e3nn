@@ -152,15 +152,8 @@ def test_recurrence_relation(float_tolerance, l):
     assert (a - b).abs().max() < 100*float_tolerance
 
 
-@pytest.mark.parametrize(
-    "normalization,normalize",
-    [
-        ("integral", True),
-        ("component", True),
-        ("norm", True),
-        ("component", False)  # doesn't matter which we use for False
-    ]
-)
+@pytest.mark.parametrize("normalization", ["integral", "component", "norm"])
+@pytest.mark.parametrize("normalize", [True, False])
 def test_module(normalization, normalize):
     l = o3.Irreps("0e + 1o + 3o")
     sp = o3.SphericalHarmonics(l, normalize, normalization)
