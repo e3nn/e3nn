@@ -124,7 +124,7 @@ def spherical_harmonics_s2_grid(lmax, res_beta, res_alpha, dtype=None, device=No
         tensor of shape ``(res_alpha, 2 lmax + 1)``
     """
     betas, alphas = s2_grid(res_beta, res_alpha, dtype=dtype, device=device)
-    shb = o3.legendre(list(range(lmax + 1)), betas.cos(), betas.sin().abs())  # [b, l * m]
+    shb = o3.Legendre(list(range(lmax + 1)))(betas.cos(), betas.sin().abs())  # [b, l * m]
     sha = o3.spherical_harmonics_alpha(lmax, alphas)  # [a, m]
     return betas, alphas, shb, sha
 
