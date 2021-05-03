@@ -11,7 +11,7 @@ It contains fundamental mathematical operations such as tensor products and sphe
 
 ## Installation
 
-**Important:** install pytorch and only then run the command 
+**Important:** install pytorch and only then run the command
 
 ```
 pip install e3nn
@@ -35,7 +35,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
 
 ## Citing
 ```
-@software{mario_geiger_2021_4688711,
+@software{mario_geiger_2021_4708275,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Alby M. and
@@ -51,13 +51,13 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Sophia Sanborn and
                   Josh Rackers and
                   Michael Bailey},
-  title        = {e3nn/e3nn:},
+  title        = {e3nn/e3nn: 2021-04-21},
   month        = apr,
   year         = 2021,
   publisher    = {Zenodo},
-  version      = {0.2.7},
-  doi          = {10.5281/zenodo.4688711},
-  url          = {https://doi.org/10.5281/zenodo.4688711}
+  version      = {0.2.8},
+  doi          = {10.5281/zenodo.4708275},
+  url          = {https://doi.org/10.5281/zenodo.4708275}
 }
 ```
 

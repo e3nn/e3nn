@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.2.9] - 2021-05-04
 ### Added
 - Normalization testing with `assert_normalized`
 - Optional logging for equivariance and normalization tests
