@@ -1,14 +1,45 @@
 r"""Spherical Harmonics as functions of Euler angles
 """
 import math
-from functools import lru_cache
 from typing import List, Tuple
 
 import torch
+from torch import fx
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
-from e3nn.util.codegen import eval_code
+from e3nn.util.jit import compile_mode
 from e3nn import o3
+
+
+@compile_mode('script')
+class SphericalHarmonicsAlphaBeta(torch.nn.Module):
+    """JITable module version of :meth:`e3nn.o3.spherical_harmonics_alpha_beta`.
+
+    Parameters are identical to :meth:`e3nn.o3.spherical_harmonics_alpha_beta`.
+    """
+    _ls_list: List[Tuple[int, int]]
+    _lmax: int
+
+    def __init__(self, l):
+        super().__init__()
+
+        if isinstance(l, o3.Irreps):
+            ls = [l for mul, (l, p) in l for _ in range(mul)]
+        elif isinstance(l, int):
+            ls = [l]
+        else:
+            ls = list(l)
+
+        self._ls_list = [(1, l) for l in ls]
+        self._lmax = max(ls)
+        self.legendre = Legendre(ls)
+
+    def forward(self, alpha: torch.Tensor, beta: torch.Tensor) -> torch.Tensor:
+        y, z = beta.cos(), beta.sin()
+        sha = spherical_harmonics_alpha(self._lmax, alpha.flatten())  # [z, m]
+        shy = self.legendre(y.flatten(), z.flatten())  # [z, l * m]
+        out = _mul_m_lm(self._ls_list, sha, shy)
+        return out.reshape(alpha.shape + (shy.shape[1],))
 
 
 def spherical_harmonics_alpha_beta(l, alpha, beta):
@@ -35,18 +66,8 @@ def spherical_harmonics_alpha_beta(l, alpha, beta):
     `torch.Tensor`
         a tensor of shape ``(..., 2l+1)``
     """
-    if isinstance(l, o3.Irreps):
-        ls = [l for mul, (l, p) in l for _ in range(mul)]
-    elif isinstance(l, int):
-        ls = [l]
-    else:
-        ls = list(l)
-
-    y, z = beta.cos(), beta.sin()
-    sha = spherical_harmonics_alpha(max(ls), alpha.flatten())  # [z, m]
-    shy = legendre(ls, y.flatten(), z.flatten())  # [z, l * m]
-    out = _mul_m_lm([(1, l) for l in ls], sha, shy)
-    return out.reshape(alpha.shape + (shy.shape[1],))
+    sh = SphericalHarmonicsAlphaBeta(l)
+    return sh(alpha, beta)
 
 
 @torch.jit.script
@@ -82,69 +103,40 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
     return out  # [..., m]
 
 
-def legendre(l, z, y=None):
-    r"""Legendre polynomials
+@compile_mode('script')
+class Legendre(fx.GraphModule):
+    def __init__(self, ls):
+        super().__init__(self, fx.Graph())
 
-    Parameters
-    ----------
-    l : int or list of int
-        degree of the polynomial.
+        # == generate code ==
+        graph = self.graph
+        z = fx.Proxy(graph.placeholder('z', torch.Tensor))
+        y = fx.Proxy(graph.placeholder('y', torch.Tensor))
 
-    y : `torch.Tensor`
-        tensor of shape ``(...)``.
+        out = z.new_zeros(z.shape + (sum(2 * l + 1 for l in ls),))
 
-    y : `torch.Tensor`, optional
-        tensor of shape ``(...)``.
+        i = 0
+        for l in ls:
+            leg = []
+            for m in range(l + 1):
+                p = _poly_legendre(l, m)
+                p = list(p.items())
 
-    Returns
-    -------
-    `torch.Tensor`
-        a tensor of shape ``(..., 2l+1)``
-    """
-    if isinstance(l, o3.Irreps):
-        ls = [l for mul, (l, p) in l for _ in range(mul)]
-    elif isinstance(l, int):
-        ls = [l]
-    else:
-        ls = list(l)
+                (zn, yn), c = p[0]
+                x = float(c) * z**zn * y**yn
 
-    if y is None:
-        y = (1 - z**2).relu().sqrt()
+                for (zn, yn), c in p[1:]:
+                    x += float(c) * z**zn * y**yn
 
-    return _legendre_genjit(tuple(ls))(z, y)
+                leg.append(x.unsqueeze(-1))
 
+            for m in range(-l, l + 1):
+                out.narrow(-1, i, 1).copy_(leg[abs(m)])
+                i += 1
 
-_legendre_code = """
-import torch
+        graph.output(out.node, torch.Tensor)
 
-def main(z: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    out = z.new_zeros(z.shape + (lsize,))
-
-# fill out
-
-    return out
-"""
-
-
-@lru_cache()
-def _legendre_genjit(ls):
-    ls = list(ls)
-    fill = ""
-    i = 0
-    for l in ls:
-        for m in range(l + 1):
-            p = _poly_legendre(l, m)
-            formula = " + ".join("{:.25f} * z**{} * y**{}".format(c, zn, yn) for (zn, yn), c in p.items())
-            fill += "    l{} = {}\n".format(m, formula)
-
-        for m in range(-l, l + 1):
-            fill += "    out[..., {}] = l{}\n".format(i, abs(m))
-            i += 1
-
-    code = _legendre_code
-    code = code.replace("lsize", str(sum(2 * l + 1 for l in ls)))
-    code = code.replace("# fill out", fill)
-    return torch.jit.script(eval_code(code)["main"])
+        self.recompile()
 
 
 def _poly_legendre(l, m):

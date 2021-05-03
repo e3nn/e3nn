@@ -3,6 +3,17 @@ import math
 import torch
 from e3nn import o3
 
+from e3nn.util.test import assert_auto_jitable
+
+
+def test_jit(float_tolerance):
+    sh = o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
+    jited = assert_auto_jitable(sh)
+
+    a = torch.randn(5, 4)
+    b = torch.randn(5, 4)
+    return (sh(a, b) - jited(a, b)).abs().max() < float_tolerance
+
 
 def test_sh_equivariance1(float_tolerance):
     r"""test

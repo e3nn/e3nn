@@ -11,10 +11,15 @@ Most recent change on the bottom.
 - Normalization testing with `assert_normalized`
 - Optional logging for equivariance and normalization tests
 - Public `e3nn.util.test.format_equivariance_error` method for printing equivariance test results
+- Module `o3.SphericalHarmonicsAlphaBeta`
 
 ### Changed
 - Generated code (modules like `TensorProduct`, `Linear`, `Extract`) now pickled using TorchScript IR, rather than Python source code.
 - e3nn now only requires PyTorch >= 1.8.0 rather than 1.8.1
+- Changed `o3.legendre` into a module `o3.Legendre`
+
+### Removed
+- Removed `e3nn.util.codegen.eval_code` in favor of `torch.fx`
 
 ## [0.2.8] - 2021-04-21
 ### Added

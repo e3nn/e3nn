@@ -39,9 +39,10 @@ from ._tensor_product import (
 )
 from ._spherical_harmonics import SphericalHarmonics, spherical_harmonics
 from ._angular_spherical_harmonics import (
+    SphericalHarmonicsAlphaBeta,
     spherical_harmonics_alpha_beta,
     spherical_harmonics_alpha,
-    legendre,
+    Legendre,
 )
 from ._reduce import ReducedTensorProducts
 from ._s2grid import (
@@ -96,9 +97,10 @@ __all__ = [
     "FullTensorProduct",
     "SphericalHarmonics",
     "spherical_harmonics",
+    "SphericalHarmonicsAlphaBeta",
     "spherical_harmonics_alpha_beta",
     "spherical_harmonics_alpha",
-    "legendre",
+    "Legendre",
     "ReducedTensorProducts",
     "s2_grid",
     "spherical_harmonics_s2_grid",
