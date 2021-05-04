@@ -533,7 +533,7 @@ class Irreps(tuple):
         --------
 
         >>> Irreps("4x0e + 0x1o + 2x3e").remove_zero_multiplicities()
-        4x0e + 2x3e
+        4x0e+2x3e
 
         """
         out = [(mul, ir) for mul, ir in self if mul > 0]

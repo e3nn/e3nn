@@ -80,6 +80,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
     >>> with torch.no_grad():
     ...     lin1.weight.fill_(1.0)
     ...     lin2.weight.fill_(1.0)
+    Parameter containing:
+    ...
     >>> x = torch.arange(10.0)
     >>> (lin1(x) - lin2(x)).abs().item() > 0.1
     True
