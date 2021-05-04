@@ -439,15 +439,23 @@ def test_weight_views():
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
-    x1 = irreps_in1.randn(2, -1)
-    x2 = irreps_in2.randn(2, -1)
+    batchdim = 3
+    x1 = irreps_in1.randn(batchdim, -1)
+    x2 = irreps_in2.randn(batchdim, -1)
+    # shared weights
     m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
-
     with torch.no_grad():
         for w in m.weight_views():
             w.zero_()
-
     assert torch.all(m(x1, x2) == 0.0)
+
+    # unshared weights
+    m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, shared_weights=False)
+    weights = torch.randn(batchdim, m.weight_numel)
+    with torch.no_grad():
+        for w in m.weight_views(weights):
+            w.zero_()
+    assert torch.all(m(x1, x2, weights) == 0.0)
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))

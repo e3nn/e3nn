@@ -17,6 +17,7 @@ Most recent change on the bottom.
 
 ### Fixed
 - `TensorProduct` can now gracefully handle multiplicities of zero
+- `weight_views`/`weight_view_for_instruction` methods now support `shared_weights=False`
 
 ## [0.2.9] - 2021-05-04
 ### Added

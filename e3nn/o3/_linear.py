@@ -231,9 +231,10 @@ class Linear(CodeGenMixin, torch.nn.Module):
         if weight is None:
             assert self.internal_weights, "Weights must be provided when internal_weights = False"
             weight = self.weight
+        batchshape = weight.shape[:-1]
         offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
         ins = self.instructions[instruction]
-        return weight[offset:offset + prod(ins.path_shape)].view(ins.path_shape)
+        return weight.narrow(-1, offset, prod(ins.path_shape)).view(batchshape + ins.path_shape)
 
     def weight_views(
         self,
@@ -258,10 +259,11 @@ class Linear(CodeGenMixin, torch.nn.Module):
         if weight is None:
             assert self.internal_weights, "Weights must be provided when internal_weights = False"
             weight = self.weight
+        batchshape = weight.shape[:-1]
         offset = 0
         for ins_i, ins in enumerate(self.instructions):
             flatsize = prod(ins.path_shape)
-            this_weight = weight[offset:offset + flatsize].view(ins.path_shape)
+            this_weight = weight.narrow(-1, offset, flatsize).view(batchshape + ins.path_shape)
             offset += flatsize
             if yield_instruction:
                 yield ins_i, ins, this_weight

@@ -458,7 +458,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
         ins = self.instructions[instruction]
         weight = self._get_weights(weight)
-        return weight[offset:offset + prod(ins.path_shape)].view(ins.path_shape)
+        batchshape = weight.shape[:-1]
+        return weight.narrow(-1, offset, prod(ins.path_shape)).view(batchshape + ins.path_shape)
 
     def weight_views(
         self,
@@ -481,11 +482,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         Otherwise, yields ``weight_view``.
         """
         weight = self._get_weights(weight)
+        batchshape = weight.shape[:-1]
         offset = 0
         for ins_i, ins in enumerate(self.instructions):
             if ins.has_weight:
                 flatsize = prod(ins.path_shape)
-                this_weight = weight[offset:offset + flatsize].view(ins.path_shape)
+                this_weight = weight.narrow(-1, offset, flatsize).view(batchshape + ins.path_shape)
                 offset += flatsize
                 if yield_instruction:
                     yield ins_i, ins, this_weight
