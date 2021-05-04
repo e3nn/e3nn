@@ -14,6 +14,9 @@ Most recent change on the bottom.
 ### Changed
 - `o3.Linear` no longer automatically simplifies its `irreps_in` or `irreps_out`. If you want this behaviour, simplify your irreps explicitly!
 
+### Fixed
+- `TensorProduct` can now gracefully handle multiplicities of zero
+
 ## [0.2.9] - 2021-05-04
 ### Added
 - Normalization testing with `assert_normalized`

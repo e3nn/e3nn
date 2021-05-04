@@ -20,8 +20,8 @@ class SlowLinear(torch.nn.Module):
     ):
         super().__init__()
 
-        irreps_in = o3.Irreps(irreps_in).simplify()
-        irreps_out = o3.Irreps(irreps_out).simplify()
+        irreps_in = o3.Irreps(irreps_in)
+        irreps_out = o3.Irreps(irreps_out)
 
         instr = [
             (i_in, 0, i_out, "uvw", True, 1.0)
@@ -80,12 +80,12 @@ def test_single_out():
     assert torch.all(out2[:, 5:] == 0)
 
 
-# We want to be sure to test a multiple-same L case and a single irrep case
+# We want to be sure to test a multiple-same L case, a single irrep case, and an empty irrep case
 @pytest.mark.parametrize(
-    "irreps_in", ["5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4)
+    "irreps_in", ["5x0e", "1e + 2e + 4x1e + 3x3o", "2x1o + 0x3e"] + random_irreps(n=4)
 )
 @pytest.mark.parametrize(
-    "irreps_out", ["5x0e", "1e + 2e + 3x3o + 3x1e"] + random_irreps(n=4)
+    "irreps_out", ["5x0e", "1e + 2e + 3x3o + 3x1e", "2x1o + 0x3e"] + random_irreps(n=4)
 )
 def test_linear_like_tp(irreps_in, irreps_out):
     """Test that Linear gives the same results as the corresponding TensorProduct."""
@@ -97,7 +97,7 @@ def test_linear_like_tp(irreps_in, irreps_out):
     assert torch.allclose(
         m(inp),
         m_true(inp),
-        atol={torch.float32: 1e-7, torch.float64: 1e-10}[torch.get_default_dtype()],
+        atol={torch.float32: 1e-6, torch.float64: 1e-10}[torch.get_default_dtype()],
     )
 
 

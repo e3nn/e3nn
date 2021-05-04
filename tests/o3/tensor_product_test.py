@@ -108,6 +108,23 @@ def test_normalized(l1, p1, l2, p2, lo, po, mode, weight):
     )
 
 
+def test_empty():
+    m = TensorProduct(
+        "0x0e + 1o + 2e",
+        "0e + 1o + 2e",
+        "0x0e + 1o",
+        [
+            (0, 0, 0, "uvw", True),
+            (1, 1, 0, "uvw", True),
+        ],
+    )
+    x1, x2 = m.irreps_in1.randn(4, -1), m.irreps_in2.randn(4, -1)
+    out = m(x1, x2)
+    assert out.shape == (4, m.irreps_out.dim)
+    assert torch.all(out == 0.0)  # no instruction leads to the 1o output
+    m.right(x2)
+
+
 @pytest.mark.parametrize('normalization', ['component', 'norm'])
 @pytest.mark.parametrize(
     'mode,weighted',

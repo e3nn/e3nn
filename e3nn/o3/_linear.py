@@ -132,6 +132,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
                 for i_out, (_, ir_out) in enumerate(self.irreps_out)
                 if ir_in == ir_out
             ]
+            # note that "empty" instructions to/from empty irreps are dealt with in the codegen
 
         instruction_objs = []
         for i_in, i_out in instructions:
@@ -286,6 +287,9 @@ def _codegen_linear(
     outsize = size + (irreps_out.dim,)
 
     # = Short-circut for nothing to do =
+    # We produce no code for empty instructions
+    instructions = [ins for ins in instructions if 0 not in ins.path_shape]
+
     if len(instructions) == 0:
         out = x.new_zeros(outsize)
 
@@ -358,6 +362,7 @@ def _codegen_linear(
             like=x
         )
         for i_out, mul_ir_out in enumerate(irreps_out)
+        if mul_ir_out.mul > 0
     ]
     if len(out) > 1:
         out = torch.cat(out, dim=1)
