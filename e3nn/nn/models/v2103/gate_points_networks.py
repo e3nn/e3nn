@@ -25,6 +25,7 @@ class SimpleNetwork(torch.nn.Module):
         mul=50,
         layers=3,
         lmax=2,
+        pool_nodes=True,
     ) -> None:
         super().__init__()
 
@@ -32,6 +33,7 @@ class SimpleNetwork(torch.nn.Module):
         self.max_radius = max_radius
         self.number_of_basis = 10
         self.num_nodes = num_nodes
+        self.pool_nodes = pool_nodes
 
         irreps_node_hidden = o3.Irreps([
             (mul, (l, p))
@@ -84,7 +86,10 @@ class SimpleNetwork(torch.nn.Module):
 
         node_outputs = self.mp(data['x'], node_attr, edge_src, edge_dst, edge_attr, edge_length_embedding)
 
-        return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+        if self.pool_nodes:
+            return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+        else:
+            return node_outputs
 
 
 class NetworkForAGraphWithAttributes(torch.nn.Module):
@@ -100,6 +105,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
         mul=50,
         layers=3,
         lmax=2,
+        pool_nodes=True,
     ) -> None:
         super().__init__()
 
@@ -108,6 +114,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
         self.number_of_basis = 10
         self.num_nodes = num_nodes
         self.irreps_edge_attr = o3.Irreps(irreps_edge_attr)
+        self.pool_nodes = pool_nodes
 
         irreps_node_hidden = o3.Irreps([
             (mul, (l, p))
@@ -158,7 +165,10 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
 
         node_outputs = self.mp(data['node_input'], data['node_attr'], edge_src, edge_dst, edge_attr, edge_length_embedding)
 
-        return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+        if self.pool_nodes:
+            return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+        else:
+            return node_outputs
 
 
 def test_simple_network():

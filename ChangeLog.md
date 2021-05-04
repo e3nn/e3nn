@@ -8,6 +8,7 @@ Most recent change on the bottom.
 
 ## [Unreleased]
 ### Added
+- `pool_nodes` argument (default `True`) to networks in `e3nn.nn.models.v2104.gate_points_networks`
 - Instruction support for `o3.Linear`
 - `o3.Linear.weight_views` and `o3.Linear.weight_view_for_instruction`
 
