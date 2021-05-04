@@ -307,7 +307,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
                 torch.ones(mul * ir.dim)
-                if any(i.i_out == i_out and i.path_weight > 0 for i in self.instructions)
+                if any(
+                    (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
+                    for ins in self.instructions
+                )
                 else torch.zeros(mul * ir.dim)
                 for i_out, (mul, ir) in enumerate(self.irreps_out)
             ])

@@ -178,7 +178,10 @@ class Linear(CodeGenMixin, torch.nn.Module):
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
                 torch.ones(mul_ir.dim)
-                if any(ins.i_out == i_out for ins in self.instructions)
+                if any(
+                    (ins.i_out == i_out) and (0 not in ins.path_shape)
+                    for ins in self.instructions
+                )
                 else torch.zeros(mul_ir.dim)
                 for i_out, mul_ir in enumerate(self.irreps_out)
             ])
