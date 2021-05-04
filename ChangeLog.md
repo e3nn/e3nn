@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- `pool_nodes` argument (default `True`) to networks in `e3nn.nn.models.v2104.gate_points_networks`
 
 ## [0.2.9] - 2021-05-04
 ### Added
