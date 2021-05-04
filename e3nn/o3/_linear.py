@@ -188,6 +188,63 @@ class Linear(CodeGenMixin, torch.nn.Module):
             weight = self.weight
         return self._compiled_main(features, weight)
 
+    def weight_view_for_instruction(
+        self,
+        instruction: int,
+        weight: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        r"""View of weights corresponding to ``instruction``.
+
+        Parameters
+        ----------
+        instruction : int
+            The index of the instruction to get a view on the weights for.
+
+        weight : `torch.Tensor`, optional
+            like ``weight`` argument to ``forward()``
+
+        Returns
+        -------
+        `torch.Tensor`
+            A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th instruction.
+        """
+        weight = self.weight if weight is None else weight
+        offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
+        ins = self.instructions[instruction]
+        return weight[offset:offset + prod(ins.path_shape)].view(ins.path_shape)
+
+    def weight_views(
+        self,
+        weight: Optional[torch.Tensor] = None,
+        yield_instruction: bool = False
+    ):
+        r"""Iterator over weight views for all instructions.
+
+        Parameters
+        ----------
+        weight : `torch.Tensor`, optional
+            like ``weight`` argument to ``forward()``
+
+        yield_instruction : `bool`, default False
+            Whether to also yield the corresponding instruction.
+
+        Yields
+        ------
+        If ``yield_instruction`` is ``True``, yields ``(instruction_index, instruction, weight_view)``.
+        Otherwise, yields ``weight_view``.
+        """
+        weight = self.weight if weight is None else weight
+        offset = 0
+        for ins_i, ins in enumerate(self.instructions):
+            flatsize = prod(ins.path_shape)
+            this_weight = weight[offset:offset + flatsize].view(ins.path_shape)
+            offset += flatsize
+            if yield_instruction:
+                yield ins_i, ins, this_weight
+            else:
+                yield this_weight
+        return
+
 
 def _codegen_linear(
     irreps_in: o3.Irreps,

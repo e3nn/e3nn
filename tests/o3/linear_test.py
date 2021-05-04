@@ -166,3 +166,19 @@ def test_instructions():
     inp[:, :m.irreps_in[:2].dim] = 0.0
     out = m(inp)
     assert torch.allclose(out, torch.zeros(1))
+
+
+def test_weight_view():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+        instructions=[(0, 1), (1, 0)]
+    )
+    inp = m.irreps_in.randn(3, -1)
+    assert m.weight_view_for_instruction(0).shape == (4, 8)
+    assert m.weight_view_for_instruction(1).shape == (3, 2)
+    # Make weights going to output 0 all zeros
+    with torch.no_grad():
+        m.weight_view_for_instruction(1).fill_(0.0)
+    out = m(inp)
+    assert torch.allclose(out[:, :6], torch.zeros(1))

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+### Added
+- Instruction support for `o3.Linear`
+- `o3.Linear.weight_views` and `o3.Linear.weight_view_for_instruction`
 
 ## [0.2.9] - 2021-05-04
 ### Added
