@@ -55,7 +55,10 @@ def codegen_tensor_product(
         size_right = torch.broadcast_tensors(empty_right.expand(x2s_right.shape[:-1]), empty_right.expand(ws_right.shape[:-1]))[0].shape
 
     # = Short-circut for zero dimensional =
-    if irreps_in1.dim == 0 or irreps_in2.dim == 0 or irreps_out.dim == 0:
+    # We produce no code for empty instructions
+    instructions = [ins for ins in instructions if 0 not in ins.path_shape]
+
+    if len(instructions) == 0:
         out_out = x1s_out.new_zeros(size_out + (irreps_out.dim,))
         out_right = x2s_right.new_zeros(size_right + (irreps_in1.dim, irreps_out.dim,))
 
@@ -372,6 +375,7 @@ def codegen_tensor_product(
             like=x1s_out
         )
         for i_out, mul_ir_out in enumerate(irreps_out)
+        if mul_ir_out.mul > 0
     ]
     if len(out_out) > 1:
         out_out = torch.cat(out_out, dim=1)
@@ -387,8 +391,10 @@ def codegen_tensor_product(
                 like=x2s_right
             )
             for i_out, mul_ir_out in enumerate(irreps_out)
+            if mul_ir_out.mul > 0
         ], dim=2)
         for i_in1, mul_ir_in1 in enumerate(irreps_in1)
+        if mul_ir_in1.mul > 0
     ]
     if len(out_right) > 1:
         out_right = torch.cat(out_right, dim=1)

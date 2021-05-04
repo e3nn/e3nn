@@ -20,8 +20,8 @@ class SlowLinear(torch.nn.Module):
     ):
         super().__init__()
 
-        irreps_in = o3.Irreps(irreps_in).simplify()
-        irreps_out = o3.Irreps(irreps_out).simplify()
+        irreps_in = o3.Irreps(irreps_in)
+        irreps_out = o3.Irreps(irreps_out)
 
         instr = [
             (i_in, 0, i_out, "uvw", True, 1.0)
@@ -80,12 +80,12 @@ def test_single_out():
     assert torch.all(out2[:, 5:] == 0)
 
 
-# We want to be sure to test a multiple-same L case and a single irrep case
+# We want to be sure to test a multiple-same L case, a single irrep case, and an empty irrep case
 @pytest.mark.parametrize(
-    "irreps_in", ["5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4)
+    "irreps_in", ["5x0e", "1e + 2e + 4x1e + 3x3o", "2x1o + 0x3e"] + random_irreps(n=4)
 )
 @pytest.mark.parametrize(
-    "irreps_out", ["5x0e", "1e + 2e + 3x3o + 3x1e"] + random_irreps(n=4)
+    "irreps_out", ["5x0e", "1e + 2e + 3x3o + 3x1e", "2x1o + 0x3e"] + random_irreps(n=4)
 )
 def test_linear_like_tp(irreps_in, irreps_out):
     """Test that Linear gives the same results as the corresponding TensorProduct."""
@@ -97,7 +97,7 @@ def test_linear_like_tp(irreps_in, irreps_out):
     assert torch.allclose(
         m(inp),
         m_true(inp),
-        atol={torch.float32: 1e-7, torch.float64: 1e-10}[torch.get_default_dtype()],
+        atol={torch.float32: 1e-6, torch.float64: 1e-10}[torch.get_default_dtype()],
     )
 
 
@@ -106,3 +106,98 @@ def test_output_mask():
     irreps_out = o3.Irreps("3e + 5x2o")
     m = o3.Linear(irreps_in, irreps_out)
     assert torch.all(m.output_mask == torch.zeros(m.irreps_out.dim, dtype=torch.bool))
+
+
+def test_instructions_parameter():
+    m = o3.Linear("4x0e + 3x4o", "1x2e + 4x0o")
+    assert len(m.instructions) == 0
+    assert not torch.any(m.output_mask)
+
+    with pytest.raises(ValueError):
+        m = o3.Linear(
+            "4x0e + 3x4o",
+            "1x2e + 4x0e",
+            # invalid mixture of 0e and 2e
+            instructions=[(0, 0)]
+        )
+
+    with pytest.raises(IndexError):
+        m = o3.Linear(
+            "4x0e + 3x4o",
+            "1x2e + 4x0e",
+            instructions=[(4, 0)]
+        )
+
+
+def test_empty_instructions():
+    m = o3.Linear(
+        o3.Irreps.spherical_harmonics(3),
+        o3.Irreps.spherical_harmonics(3),
+        instructions=[]
+    )
+    assert len(m.instructions) == 0
+    assert not torch.any(m.output_mask)
+    inp = m.irreps_in.randn(3, -1)
+    out = m(inp)
+    assert torch.all(out == 0.0)
+
+
+def test_default_instructions():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+    )
+    assert len(m.instructions) == 3
+    assert torch.all(m.output_mask)
+    ins_set = set((ins.i_in, ins.i_out) for ins in m.instructions)
+    assert ins_set == {(0, 1), (1, 0), (2, 1)}
+    assert set(ins.path_shape for ins in m.instructions) == {
+        (4, 8), (2, 8), (3, 2)
+    }
+
+
+def test_instructions():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+        instructions=[(0, 1), (1, 0)]
+    )
+    inp = m.irreps_in.randn(3, -1)
+    inp[:, :m.irreps_in[:2].dim] = 0.0
+    out = m(inp)
+    assert torch.allclose(out, torch.zeros(1))
+
+
+def test_weight_view():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+        instructions=[(0, 1), (1, 0)]
+    )
+    inp = m.irreps_in.randn(3, -1)
+    assert m.weight_view_for_instruction(0).shape == (4, 8)
+    assert m.weight_view_for_instruction(1).shape == (3, 2)
+    # Make weights going to output 0 all zeros
+    with torch.no_grad():
+        m.weight_view_for_instruction(1).fill_(0.0)
+    out = m(inp)
+    assert torch.allclose(out[:, :6], torch.zeros(1))
+
+
+def test_weight_view_unshared():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+        instructions=[(0, 1), (1, 0)],
+        shared_weights=False
+    )
+    batchdim = 7
+    inp = m.irreps_in.randn(batchdim, -1)
+    weights = torch.randn(batchdim, m.weight_numel)
+    assert m.weight_view_for_instruction(0, weights).shape == (batchdim, 4, 8)
+    assert m.weight_view_for_instruction(1, weights).shape == (batchdim, 3, 2)
+    # Make weights going to output 0 all zeros
+    with torch.no_grad():
+        m.weight_view_for_instruction(1, weights).fill_(0.0)
+    out = m(inp, weights)
+    assert torch.allclose(out[:, :6], torch.zeros(1))

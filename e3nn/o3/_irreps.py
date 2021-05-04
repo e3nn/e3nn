@@ -522,6 +522,23 @@ class Irreps(tuple):
                 out.append((mul, ir))
         return Irreps(out)
 
+    def remove_zero_multiplicities(self):
+        """Remove any irreps with multiplicities of zero.
+
+        Returns
+        -------
+        `Irreps`
+
+        Examples
+        --------
+
+        >>> Irreps("4x0e + 0x1o + 2x3e").remove_zero_multiplicities()
+        4x0e+2x3e
+
+        """
+        out = [(mul, ir) for mul, ir in self if mul > 0]
+        return Irreps(out)
+
     def sort(self):
         r"""Sort the representations.
 
