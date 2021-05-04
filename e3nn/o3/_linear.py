@@ -22,6 +22,18 @@ class Instruction(NamedTuple):
 class Linear(CodeGenMixin, torch.nn.Module):
     r"""Linear operation equivariant to :math:`O(3)`
 
+    Notes
+    -----
+        ``Linear`` objects created with different partitionings of the same irreps, such as ``Linear("10x0e", "0e")`` and ``Linear("3x0e + 7x0e", "0e")``, are *not* equivalent: the second module has more instructions, which affects normalization. In a rough sense:
+
+            Linear("10x0e", "0e") = normalization_coeff_0 * W_0 @ input
+            Linear("3x0e + 7x0e", "0e") = normalization_coeff_1 * W_1 @ input[:3] + normalization_coeff_2 * W_2 @ input[3:]
+
+        To make them equivalent, simplify ``irreps_in`` before constructing network modules:
+
+            o3.Irreps("3x0e + 7x0e").simplify()  # => 10x0e
+
+
     Parameters
     ----------
     irreps_in : `Irreps`
@@ -58,6 +70,19 @@ class Linear(CodeGenMixin, torch.nn.Module):
     >>> lin = Linear("4x0e + 3x0e", "4x0e + 3x0e", instructions=[(0, 0), (1, 1)])
     >>> lin.weight_numel
     25
+
+    Be careful: because they have different instructions, the following two operations are not normalized in the same way, even though they contain all the same "connections":
+
+    >>> lin1 = Linear("10x0e", "0e")
+    >>> lin2 = Linear("3x0e + 7x0e", "0e")
+    >>> lin1.weight_numel == lin2.weight_numel
+    True
+    >>> with torch.no_grad():
+    ...     lin1.weight.fill_(1.0)
+    ...     lin2.weight.fill_(1.0)
+    >>> x = torch.arange(10.0)
+    >>> (lin1(x) - lin2(x)).abs().item() > 0.1
+    True
 
     """
     weight_numel: int
@@ -100,12 +125,6 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
         # == Instructions ==
         if instructions is None:
-            # In the fully connected case, everything goes everywhere anyway,
-            # so we can simplify the irreps and maybe save some compute:
-            self.irreps_in = self.irreps_in.simplify()
-            self.irreps_out = self.irreps_out.simplify()
-            # ^ we can't do this in the general case; see the block sparse example.
-
             # By default, make all possible connections
             instructions = [
                 (i_in, i_out)
@@ -296,10 +315,6 @@ def _codegen_linear(
     flat_weight_index = 0
 
     out_list = []
-
-    # TODO: ?? "fuse" instructions to make more efficient? I.e.:
-    # instead of (0, 0), (0, 1), etc., do one big einsum of input 0 with many weights,
-    # and then extract the relevant parts for summing the outputs.
 
     for ins in instructions:
         mul_ir_in = irreps_in[ins.i_in]

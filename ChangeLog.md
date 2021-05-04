@@ -11,6 +11,9 @@ Most recent change on the bottom.
 - Instruction support for `o3.Linear`
 - `o3.Linear.weight_views` and `o3.Linear.weight_view_for_instruction`
 
+### Changed
+- `o3.Linear` no longer automatically simplifies its `irreps_in` or `irreps_out`. If you want this behaviour, simplify your irreps explicitly!
+
 ## [0.2.9] - 2021-05-04
 ### Added
 - Normalization testing with `assert_normalized`
