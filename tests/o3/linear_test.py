@@ -106,3 +106,63 @@ def test_output_mask():
     irreps_out = o3.Irreps("3e + 5x2o")
     m = o3.Linear(irreps_in, irreps_out)
     assert torch.all(m.output_mask == torch.zeros(m.irreps_out.dim, dtype=torch.bool))
+
+
+def test_instructions_parameter():
+    m = o3.Linear("4x0e + 3x4o", "1x2e + 4x0o")
+    assert len(m.instructions) == 0
+    assert not torch.any(m.output_mask)
+
+    with pytest.raises(ValueError):
+        m = o3.Linear(
+            "4x0e + 3x4o",
+            "1x2e + 4x0e",
+            # invalid mixture of 0e and 2e
+            instructions=[(0, 0)]
+        )
+
+    with pytest.raises(IndexError):
+        m = o3.Linear(
+            "4x0e + 3x4o",
+            "1x2e + 4x0e",
+            instructions=[(4, 0)]
+        )
+
+
+def test_empty_instructions():
+    m = o3.Linear(
+        o3.Irreps.spherical_harmonics(3),
+        o3.Irreps.spherical_harmonics(3),
+        instructions=[]
+    )
+    assert len(m.instructions) == 0
+    assert not torch.any(m.output_mask)
+    inp = m.irreps_in.randn(3, -1)
+    out = m(inp)
+    assert torch.all(out == 0.0)
+
+
+def test_default_instructions():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+    )
+    assert len(m.instructions) == 3
+    assert torch.all(m.output_mask)
+    ins_set = set((ins.i_in, ins.i_out) for ins in m.instructions)
+    assert ins_set == {(0, 1), (1, 0), (2, 1)}
+    assert set(ins.path_shape for ins in m.instructions) == {
+        (4, 8), (2, 8), (3, 2)
+    }
+
+
+def test_instructions():
+    m = o3.Linear(
+        "4x0e + 3x1o + 2x0e",
+        "2x1o + 8x0e",
+        instructions=[(0, 1), (1, 0)]
+    )
+    inp = m.irreps_in.randn(3, -1)
+    inp[:, :m.irreps_in[:2].dim] = 0.0
+    out = m(inp)
+    assert torch.allclose(out, torch.zeros(1))

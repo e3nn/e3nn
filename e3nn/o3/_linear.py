@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, NamedTuple, List
 import math
 
 import torch
@@ -8,7 +8,14 @@ import e3nn
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 from e3nn.util.codegen import CodeGenMixin
+from e3nn.util import prod
 from ._tensor_product._codegen import _sum_tensors
+
+
+class Instruction(NamedTuple):
+    i_in: int
+    i_out: int
+    path_shape: tuple
 
 
 @compile_mode('script')
@@ -29,6 +36,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
     shared_weights : bool
         whether the ``Linear`` should be weighted individually for each input in a batch. Defaults to ``False``. Cannot be ``True`` if ``internal_weights`` is ``True``.
 
+    instructions : list of 2-tuples, optional
+        list of tuples ``(i_in, i_out)`` indicating which irreps in ``irreps_in`` should contribute to which irreps in ``irreps_out``. If ``None`` (the default), all allowable instructions will be created: every ``(i_in, i_out)`` such that ``irreps_in[i_in].ir == irreps_out[i_out].ir``.
+
     Attributes
     ----------
     weight_numel : int
@@ -41,6 +51,14 @@ class Linear(CodeGenMixin, torch.nn.Module):
     >>> lin = Linear("4x0e+16x1o", "8x0e+8x1o")
     >>> lin.weight_numel
     160
+
+    Create a "block sparse" linear that does not combine two different groups of scalars;
+    note that the number of weights is 4*4 + 3*3 = 25:
+
+    >>> lin = Linear("4x0e + 3x0e", "4x0e + 3x0e", instructions=[(0, 0), (1, 1)])
+    >>> lin.weight_numel
+    25
+
     """
     weight_numel: int
     internal_weights: bool
@@ -52,6 +70,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         irreps_out,
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
+        instructions: Optional[List[Tuple[int, int]]] = None,
         _optimize_einsums: Optional[bool] = None
     ):
         super().__init__()
@@ -70,17 +89,54 @@ class Linear(CodeGenMixin, torch.nn.Module):
         self.internal_weights = internal_weights
         self.shared_weights = shared_weights
 
-        self.irreps_in = o3.Irreps(irreps_in).simplify()
-        self.irreps_out = o3.Irreps(irreps_out).simplify()
+        self.irreps_in = o3.Irreps(irreps_in)
+        self.irreps_out = o3.Irreps(irreps_out)
+        del irreps_in
+        del irreps_out
 
         opt_defaults = e3nn.get_optimization_defaults()
         self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
         del opt_defaults
 
+        # == Instructions ==
+        if instructions is None:
+            # In the fully connected case, everything goes everywhere anyway,
+            # so we can simplify the irreps and maybe save some compute:
+            self.irreps_in = self.irreps_in.simplify()
+            self.irreps_out = self.irreps_out.simplify()
+            # ^ we can't do this in the general case; see the block sparse example.
+
+            # By default, make all possible connections
+            instructions = [
+                (i_in, i_out)
+                for i_in, (_, ir_in) in enumerate(self.irreps_in)
+                for i_out, (_, ir_out) in enumerate(self.irreps_out)
+                if ir_in == ir_out
+            ]
+
+        instruction_objs = []
+        for i_in, i_out in instructions:
+            assert isinstance(i_in, int) and isinstance(i_out, int)
+            if self.irreps_in[i_in].ir != self.irreps_out[i_out].ir:
+                raise ValueError(
+                    f"Invalid instruction to connect irreps_in[{i_in}] = {self.irreps_in[i_in]} to different irrep irreps_out[{i_out}] = {self.irreps_out[i_out]}"
+                )
+            instruction_objs.append(
+                Instruction(
+                    i_in=i_in,
+                    i_out=i_out,
+                    path_shape=(self.irreps_in[i_in].mul, self.irreps_out[i_out].mul)
+                )
+            )
+        self.instructions = instruction_objs
+        del instructions
+        del instruction_objs
+
         # == Generate code ==
         graph, self.weight_numel = _codegen_linear(
             self.irreps_in,
             self.irreps_out,
+            self.instructions,
             shared_weights=shared_weights,
             optimize_einsums=self._optimize_einsums
         )
@@ -98,12 +154,11 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
         # == Compute output mask ==
         if self.irreps_out.dim > 0:
-            # an output is connected to an input if one exists with the same L, p
             output_mask = torch.cat([
-                torch.ones(mul * ir.dim)
-                if any(ir_in == ir for _, ir_in in self.irreps_in)
-                else torch.zeros(mul * ir.dim)
-                for _, (mul, ir) in enumerate(self.irreps_out)
+                torch.ones(mul_ir.dim)
+                if any(ins.i_out == i_out for ins in self.instructions)
+                else torch.zeros(mul_ir.dim)
+                for i_out, mul_ir in enumerate(self.irreps_out)
             ])
         else:
             output_mask = torch.ones(0)
@@ -137,6 +192,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
 def _codegen_linear(
     irreps_in: o3.Irreps,
     irreps_out: o3.Irreps,
+    instructions: List[Instruction],
     shared_weights: bool = False,
     optimize_einsums: bool = True,
 ) -> Tuple[fx.Graph, int]:
@@ -149,8 +205,8 @@ def _codegen_linear(
     size = x.shape[:-1]
     outsize = size + (irreps_out.dim,)
 
-    # = Short-circut for zero dimensional =
-    if irreps_in.dim == 0 or irreps_out.dim == 0:
+    # = Short-circut for nothing to do =
+    if len(instructions) == 0:
         out = x.new_zeros(outsize)
 
         graph_out.output(out.node, torch.Tensor)
@@ -161,12 +217,7 @@ def _codegen_linear(
     x = x.reshape(-1, irreps_in.dim)
     batch_out = x.shape[0]
 
-    weight_numel = sum(
-        mul_in * mul_out
-        for mul_in, ir_in in irreps_in
-        for mul_out, ir_out in irreps_out
-        if ir_in == ir_out
-    )
+    weight_numel = sum(prod(ins.path_shape) for ins in instructions)
     if weight_numel > 0:
         ws = ws.reshape(-1, weight_numel)
 
@@ -185,24 +236,22 @@ def _codegen_linear(
 
     out_list = []
 
-    instr = [
-        (i_in, i_out)
-        for i_in, (_, ir_in) in enumerate(irreps_in)
-        for i_out, (_, ir_out) in enumerate(irreps_out)
-        if ir_in == ir_out
-    ]
+    # TODO: ?? "fuse" instructions to make more efficient? I.e.:
+    # instead of (0, 0), (0, 1), etc., do one big einsum of input 0 with many weights,
+    # and then extract the relevant parts for summing the outputs.
 
-    for i_in, i_out in instr:
-        mul_ir_in = irreps_in[i_in]
-        mul_ir_out = irreps_out[i_out]
+    for ins in instructions:
+        mul_ir_in = irreps_in[ins.i_in]
+        mul_ir_out = irreps_out[ins.i_out]
 
         # Short-circut for empty irreps
         if mul_ir_in.dim == 0 or mul_ir_out.dim == 0:
             continue
 
         # Extract the weight from the flattened weight tensor
-        path_nweight = mul_ir_in.mul*mul_ir_out.mul
-        if len(instr) == 1:
+        path_nweight = prod(ins.path_shape)
+        if len(instructions) == 1:
+            # Avoid unnecessary view when there is only one weight
             w = ws
         else:
             w = ws[
@@ -210,12 +259,17 @@ def _codegen_linear(
                 flat_weight_index:flat_weight_index + path_nweight
             ]
         w = w.reshape(
-            (() if shared_weights else (-1,)) + (mul_ir_in.mul, mul_ir_out.mul)
+            (() if shared_weights else (-1,)) + ins.path_shape
         )
         flat_weight_index += path_nweight
 
-        ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[i_in])
-        alpha = 1.0 / math.sqrt(mul_ir_in.mul * sum(1 if i_out_this == i_out else 0 for _, i_out_this in instr))
+        ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[ins.i_in])
+        alpha = 1.0 / math.sqrt(
+            mul_ir_in.mul * sum(
+                1 if other_ins.i_out == ins.i_out else 0
+                for other_ins in instructions
+            )
+        )
         ein_out = alpha * ein_out
 
         out_list += [ein_out.reshape(batch_out, mul_ir_out.dim)]
@@ -223,7 +277,7 @@ def _codegen_linear(
     # = Return the result =
     out = [
         _sum_tensors(
-            [out for (_, i_out_ins), out in zip(instr, out_list) if i_out_ins == i_out],
+            [out for ins, out in zip(instructions, out_list) if ins.i_out == i_out],
             shape=(batch_out, mul_ir_out.dim),
             like=x
         )
