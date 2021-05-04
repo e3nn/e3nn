@@ -208,7 +208,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th instruction.
         """
-        weight = self.weight if weight is None else weight
+        if weight is None:
+            assert self.internal_weights, "Weights must be provided when internal_weights = False"
+            weight = self.weight
         offset = sum(prod(ins.path_shape) for ins in self.instructions[:instruction])
         ins = self.instructions[instruction]
         return weight[offset:offset + prod(ins.path_shape)].view(ins.path_shape)
@@ -233,7 +235,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
         If ``yield_instruction`` is ``True``, yields ``(instruction_index, instruction, weight_view)``.
         Otherwise, yields ``weight_view``.
         """
-        weight = self.weight if weight is None else weight
+        if weight is None:
+            assert self.internal_weights, "Weights must be provided when internal_weights = False"
+            weight = self.weight
         offset = 0
         for ins_i, ins in enumerate(self.instructions):
             flatsize = prod(ins.path_shape)
