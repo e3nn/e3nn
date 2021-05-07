@@ -124,6 +124,7 @@ def spherical_harmonics(
     It obeys the following property:
 
     .. math::
+
         Y^{l+1}_i(x) &= \text{cste}(l) \; & C_{ijk} Y^l_j(x) x_k
 
         \partial_k Y^{l+1}_i(x) &= \text{cste}(l) \; (l+1) & C_{ijk} Y^l_j(x)

@@ -4,7 +4,7 @@ from torch import nn
 
 
 class BatchNorm(nn.Module):
-    '''Batch normalization for orthonormal representations
+    """Batch normalization for orthonormal representations
 
     It normalizes by the norm of the representations.
     Note that the norm is invariant only for orthonormal representations.
@@ -26,7 +26,7 @@ class BatchNorm(nn.Module):
 
     reduce : {'mean', 'max'}
         method used to reduce
-    '''
+    """
     def __init__(self, irreps, eps=1e-5, momentum=0.1, affine=True, reduce='mean', normalization='component'):
         super().__init__()
 
@@ -62,7 +62,7 @@ class BatchNorm(nn.Module):
         return (1 - self.momentum) * curr + self.momentum * update.detach()
 
     def forward(self, input):
-        '''evaluate
+        """evaluate
 
         Parameters
         ----------
@@ -73,7 +73,7 @@ class BatchNorm(nn.Module):
         -------
         `torch.Tensor`
             tensor of shape ``(batch, ..., irreps.dim)``
-        '''
+        """
         batch, *size, dim = input.shape
         input = input.reshape(batch, -1, dim)  # [batch, sample, stacked features]
 
