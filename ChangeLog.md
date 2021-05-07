@@ -11,6 +11,7 @@ Most recent change on the bottom.
 - `pool_nodes` argument (default `True`) to networks in `e3nn.nn.models.v2104.gate_points_networks`
 - Instruction support for `o3.Linear`
 - `o3.Linear.weight_views` and `o3.Linear.weight_view_for_instruction`
+- `nn.Dropout`
 
 ### Changed
 - `o3.Linear` no longer automatically simplifies its `irreps_in` or `irreps_out`. If you want this behaviour, simplify your irreps explicitly!
