@@ -1,8 +1,10 @@
 import torch
 from e3nn import o3
 from torch import nn
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('unsupported')
 class BatchNorm(nn.Module):
     """Batch normalization for orthonormal representations
 
