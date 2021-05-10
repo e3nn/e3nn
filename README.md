@@ -21,6 +21,13 @@ It is recommanded to install using pip. The main branch is considered as unstabl
 
 For details and optional dependencies, see [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
 
+### Breaking changes
+e3nn is under development.
+The second version number is incremented every time a breaking change is made to the code.
+```
+0.(increment when backwards incompatible release).(increment for backwards compatible release)
+```
+
 ### Previous version
 e3nn has been recently refactored. The last version before refactoring can be installed with the command `pip install e3nn==0.1.1`
 
@@ -35,7 +42,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
 
 ## Citing
 ```
-@software{mario_geiger_2021_4708275,
+@software{mario_geiger_2021_4735637,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Alby M. and
@@ -51,13 +58,13 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Sophia Sanborn and
                   Josh Rackers and
                   Michael Bailey},
-  title        = {e3nn/e3nn: 2021-04-21},
-  month        = apr,
+  title        = {e3nn/e3nn: 2021-05-04},
+  month        = may,
   year         = 2021,
   publisher    = {Zenodo},
-  version      = {0.2.8},
-  doi          = {10.5281/zenodo.4708275},
-  url          = {https://doi.org/10.5281/zenodo.4708275}
+  version      = {0.2.9},
+  doi          = {10.5281/zenodo.4735637},
+  url          = {https://doi.org/10.5281/zenodo.4735637}
 }
 ```
 
