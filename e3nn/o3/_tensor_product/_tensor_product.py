@@ -728,9 +728,9 @@ class FullyConnectedTensorProduct(TensorProduct):
         irreps_out,
         **kwargs
     ):
-        irreps_in1 = o3.Irreps(irreps_in1).simplify()
-        irreps_in2 = o3.Irreps(irreps_in2).simplify()
-        irreps_out = o3.Irreps(irreps_out).simplify()
+        irreps_in1 = o3.Irreps(irreps_in1)
+        irreps_in2 = o3.Irreps(irreps_in2)
+        irreps_out = o3.Irreps(irreps_out)
 
         instr = [
             (i_1, i_2, i_out, 'uvw', True, 1.0)
@@ -821,7 +821,6 @@ class ElementwiseTensorProduct(TensorProduct):
                     (i, i, i_out, 'uuu', False)
                 ]
 
-        kwargs['internal_weights'] = False
         super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)
 
 
@@ -885,5 +884,4 @@ class FullTensorProduct(TensorProduct):
             for i_1, i_2, i_out, mode, train in instr
         ]
 
-        kwargs['internal_weights'] = False
         super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)

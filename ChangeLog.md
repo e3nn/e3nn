@@ -14,7 +14,7 @@ Most recent change on the bottom.
 - `nn.Dropout`
 
 ### Changed
-- `o3.Linear` no longer automatically simplifies its `irreps_in` or `irreps_out`. If you want this behaviour, simplify your irreps explicitly!
+- `o3.Linear` and `o3.FullyConnectedTensorProduct` no longer automatically simplifies its `irreps_in` or `irreps_out`. If you want this behaviour, simplify your irreps explicitly!
 
 ### Fixed
 - `TensorProduct` can now gracefully handle multiplicities of zero
