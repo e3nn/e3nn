@@ -54,7 +54,7 @@ class SimpleNetwork(torch.nn.Module):
 
         self.irreps_in = self.mp.irreps_node_input
         self.irreps_out = self.mp.irreps_node_output
-    
+
     def preprocess(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
         if 'batch' in data:
             batch = data['batch']
