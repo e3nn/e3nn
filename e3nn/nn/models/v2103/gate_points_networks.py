@@ -54,8 +54,8 @@ class SimpleNetwork(torch.nn.Module):
 
         self.irreps_in = self.mp.irreps_node_input
         self.irreps_out = self.mp.irreps_node_output
-
-    def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+    
+    def preprocess(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
         if 'batch' in data:
             batch = data['batch']
         else:
@@ -68,6 +68,11 @@ class SimpleNetwork(torch.nn.Module):
 
         # Edge attributes
         edge_vec = data['pos'][edge_src] - data['pos'][edge_dst]
+
+        return batch, edge_index, edge_src, edge_dst, edge_vec
+
+    def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+        batch, edge_index, edge_src, edge_dst, edge_vec = self.preprocess(data)
         edge_attr = o3.spherical_harmonics(range(self.lmax + 1), edge_vec, True, normalization='component')
 
         # Edge length embedding
