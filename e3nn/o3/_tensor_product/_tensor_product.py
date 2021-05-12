@@ -33,9 +33,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         Each instruction puts ``in1[i_1]`` :math:`\otimes` ``in2[i_2]`` into ``out[i_out]``.
 
-        * ``mode``: `str`. Determines the way the multiplicities are treated, ``"uvw"`` is fully connected.
-        * ``train``: `bool`. `True` if this path has a weight, otherwise `False`.
-        * ``path_weight``: `float`. How much this path contributes to the output.
+        * ``mode``: `str`. Determines the way the multiplicities are treated, ``"uvw"`` is fully connected. Other valid options are: ``'uvw'``, ``'uvu'``, ``'uvv'``, ``'uuw'``, ``'uuu'``, and ``'uvuv'``.
+        * ``train``: `bool`. `True` if this path should have learnable weights, otherwise `False`.
+        * ``path_weight``: `float`. A fixed multiplicative weight to apply to the output of this path. Defaults to 1. Note that setting ``path_weight`` breaks the normalization derived from ``in1_var``/``in2_var``/``out_var``.
 
     in1_var : list of float, Tensor, or None
         Variance for each irrep in ``irreps_in1``. If ``None``, all default to ``1.0``.
@@ -47,22 +47,23 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         Variance for each irrep in ``irreps_out``. If ``None``, all default to ``1.0``.
 
     normalization : {'component', 'norm'}
-        The assumed normalization of representations. If it is set to "norm":
+        The assumed normalization of the input and output representations. If it is set to "norm":
 
         .. math::
 
             \| x \| = \| y \| = 1 \Longrightarrow \| x \otimes y \| = 1
 
     internal_weights : bool
-        does the instance of the class contains the parameters
+        whether the `TensorProduct` contains its learnable weights as a parameter
 
     shared_weights : bool
-        are the parameters shared among the inputs extra dimensions
+        whether the learnable weights are shared among the input's extra dimensions
 
         * `True` :math:`z_i = w x_i \otimes y_i`
         * `False` :math:`z_i = w_i x_i \otimes y_i`
 
-        where here :math:`i` denotes a *batch-like* index
+        where here :math:`i` denotes a *batch-like* index.
+        ``shared_weights`` cannot be `False` if ``internal_weights`` is `True`.
 
     Examples
     --------
