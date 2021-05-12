@@ -286,7 +286,7 @@ def equivariance_error(
             # add parity
             rot_mat *= (-1)**parity_k
             # build translation
-            translation = 10*torch.randn(1, 3, dtype=rot_mat.dtype) if this_do_translate else 0.
+            translation = 10 * torch.randn(1, 3, dtype=rot_mat.dtype) if this_do_translate else 0.
 
             # Evaluate the function on rotated arguments:
             rot_args = _transform(args_in, irreps_in, rot_mat, translation)
@@ -374,7 +374,7 @@ def assert_auto_jitable(
         else:
             for method, bad_args in all_bad_args.items():
                 # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
-                bad_which = random.randint(0, len(bad_args)-1)
+                bad_which = random.randint(0, len(bad_args) - 1)
                 bad_args = list(bad_args)
                 bad_args[bad_which] = bad_args[bad_which][..., :-random.randint(1, 3)]  # make bad shape
                 try:
@@ -480,7 +480,7 @@ def assert_normalized(
             # update running average
             for i in range(len(irreps_out)):
                 assert this_outs[i].shape[0] == n_input
-                update = this_outs[i].sum(dim=0) - n_input*expected_squares[i]
+                update = this_outs[i].sum(dim=0) - n_input * expected_squares[i]
                 update.div_(n_input + n_samples)
                 expected_squares[i].add_(update)
             n_samples += n_input
