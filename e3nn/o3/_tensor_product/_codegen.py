@@ -468,7 +468,6 @@ def codegen_tensor_product(
                 flat_weight_index,
             ),
         )
-
         graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
         graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
 
