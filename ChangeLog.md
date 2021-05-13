@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - `preprocess` function in `e3nn.nn.models.v2103.gate_points_networks.SimpleNetwork`
+- Specialized code for `mode="uuw"`
 
 ## [0.3.0] - 2021-05-10
 ### Added

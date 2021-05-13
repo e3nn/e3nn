@@ -282,8 +282,17 @@ def codegen_tensor_product(
         if ins.connection_mode == 'uuw':
             assert mul_ir_in1.mul == mul_ir_in2.mul
             if ins.has_weight:
-                # TODO implement specialized code
-                ein_out = torch.einsum(f"{z}uw,ijk,zuij->zwk", w_out, w3j_out, xx)
+                if specialized_code and key == (0, 0, 0):
+                    ein_out = torch.einsum(f"{z}uw,zu,zu->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_in1.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uw,zu,zuj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out)
+                elif specialized_code and mul_ir_in2.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uw,zui,zu->zwi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim))
+                elif specialized_code and mul_ir_out.ir.l == 0:
+                    ein_out = torch.einsum(f"{z}uw,zui,zui->zw", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
+                else:
+                    ein_out = torch.einsum(f"{z}uw,ijk,zuij->zwk", w_out, w3j_out, xx)
+                # TODO: specialize right()
                 ein_right = torch.einsum(f"{z}uw,ijk,zuj->zuiwk", w_right, w3j_right, x2_right)
             else:
                 # equivalent to tp(x, y, 'uuu').sum('u')
