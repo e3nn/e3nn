@@ -135,7 +135,9 @@ def test_empty():
         ('uvv', True),
         ('uvv', False),
         ('uuu', True),
-        ('uuu', False)
+        ('uuu', False),
+        ('uuw', True),
+        ('uuw', False)
     ]
 )
 def test_specialized_code(normalization, mode, weighted, float_tolerance):
@@ -150,6 +152,11 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     elif mode == 'uuu':
         irreps_in2 = irreps_in1
         irreps_out = irreps_in1
+    elif mode == 'uuw':
+        irreps_in2 = irreps_in1
+        # When unweighted, uuw is a plain sum over u and requires an output mul of 1
+        if not weighted:
+            irreps_out = Irreps([(1, ir) for _, ir in irreps_out])
 
     ins = [
         (0, 0, 0, mode, weighted, 1.0),
