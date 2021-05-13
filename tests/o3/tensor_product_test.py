@@ -218,23 +218,6 @@ def test_single_out():
     assert torch.all(out2[:, 5:] == 0)
 
 
-def test_specialized_wigners():
-    """If all paths use specialized code, there should be no wigners"""
-    tp = FullyConnectedTensorProduct(
-        "5x0e + 3x0o",
-        "4x0e", "4x0e + 1x3o",
-        _specialized_code=True
-    )
-    assert torch.numel(tp._wigner_buf) == 0
-    tp = FullyConnectedTensorProduct(
-        "5x0e + 3x0o",
-        "4x0e", "4x0e + 1x3o",
-        _specialized_code=False
-    )
-    # There should only be the 0x0->0 wigner
-    assert torch.numel(tp._wigner_buf) == 1
-
-
 def test_empty_inputs():
     tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))

@@ -457,15 +457,13 @@ def codegen_tensor_product(
             #         \- this is the `memory_limit` option in opt_einsum
             # TODO: allow user to choose opt_einsum parameters?
             #
-            # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
             batchdim = 4
             example_inputs = (
-                torch.zeros((batchdim, irreps_in1.dim), dtype=torch.float32),
-                torch.zeros((batchdim, irreps_in2.dim), dtype=torch.float32),
+                torch.zeros((batchdim, irreps_in1.dim)),
+                torch.zeros((batchdim, irreps_in2.dim)),
                 torch.zeros(
                     1 if shared_weights else batchdim,
-                    flat_weight_index,
-                    dtype=torch.float32
+                    flat_weight_index
                 ),
             )
 
