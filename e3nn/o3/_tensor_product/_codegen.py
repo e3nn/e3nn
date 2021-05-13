@@ -31,7 +31,7 @@ def codegen_tensor_product(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[fx.Graph, fx.Graph, list]:
+) -> Tuple[fx.GraphModule, fx.GraphModule]:
     graph_out = fx.Graph()
     graph_right = fx.Graph()
 
@@ -39,11 +39,9 @@ def codegen_tensor_product(
     x1s_out = fx.Proxy(graph_out.placeholder('x1', torch.Tensor))
     x2s_out = fx.Proxy(graph_out.placeholder('x2', torch.Tensor))
     ws_out = fx.Proxy(graph_out.placeholder('w', torch.Tensor))
-    w3js_out = fx.Proxy(graph_out.placeholder('w3j', torch.Tensor))
 
     x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor))
     ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor))
-    w3js_right = fx.Proxy(graph_right.placeholder('w3j', torch.Tensor))
 
     empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')))
     empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')))
@@ -65,8 +63,10 @@ def codegen_tensor_product(
         graph_out.output(out_out.node, torch.Tensor)
         graph_right.output(out_right.node, torch.Tensor)
         # Short circut
-        # the empty list is wigners
-        return graph_out, graph_right, []
+        return (
+            fx.GraphModule({}, graph_out, "tp_forward"),
+            fx.GraphModule({}, graph_right, "tp_right")
+        )
 
     # = Broadcast inputs =
     if shared_weights:
@@ -96,9 +96,6 @@ def codegen_tensor_product(
     w3j = []
     w3j_dict_out = dict()
     w3j_dict_right = dict()
-
-    def w3j_dim(l1, l2, l3):
-        return (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)
 
     # = extract individual input irreps =
     # If only one input irrep, can avoid creating a view
@@ -198,9 +195,8 @@ def codegen_tensor_product(
         # If not used (because of specialized code), will get removed later.
         key = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
         if key not in w3j:
-            i = sum(w3j_dim(*k) for k in w3j)
-            w3j_dict_out[key] = w3js_out[i:i + w3j_dim(*key)].reshape(mul_ir_in1.ir.dim, mul_ir_in2.ir.dim, mul_ir_out.ir.dim)
-            w3j_dict_right[key] = w3js_right[i:i + w3j_dim(*key)].reshape(mul_ir_in1.ir.dim, mul_ir_in2.ir.dim, mul_ir_out.ir.dim)
+            w3j_dict_out[key] = fx.Proxy(graph_out.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"))
+            w3j_dict_right[key] = fx.Proxy(graph_right.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"))
             w3j.append(key)
         w3j_out = w3j_dict_out[key]
         w3j_right = w3j_dict_right[key]
@@ -420,8 +416,23 @@ def codegen_tensor_product(
     graph_out.lint()
     graph_right.lint()
 
-    # TODO: when eliminate_dead_code() is in PyTorch stable, use that
+    # Make GraphModules
+    wigner_mats = {}
+    for l_1, l_2, l_out in w3j:
+        wig = o3.wigner_3j(l_1, l_2, l_out)
 
+        if normalization == 'component':
+            wig *= (2 * l_out + 1) ** 0.5
+        if normalization == 'norm':
+            wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
+
+        wigner_mats[f"_w3j_{l_1}_{l_2}_{l_out}"] = wig
+
+    graphmod_out = fx.GraphModule(wigner_mats, graph_out, class_name="tp_forward")
+    graphmod_right = fx.GraphModule(wigner_mats, graph_right, class_name="tp_right")
+
+    # == Optimize ==
+    # TODO: when eliminate_dead_code() is in PyTorch stable, use that
     if optimize_einsums:
         try:
             from opt_einsum_fx import optimize_einsums_full, jitable
@@ -456,10 +467,9 @@ def codegen_tensor_product(
                     flat_weight_index,
                     dtype=torch.float32
                 ),
-                torch.zeros(sum(w3j_dim(*k) for k in w3j), dtype=torch.float32)
             )
 
-            graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
-            graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
+            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+            graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
 
-    return graph_out, graph_right, w3j
+    return graphmod_out, graphmod_right

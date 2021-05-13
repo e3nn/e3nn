@@ -155,7 +155,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         del instruction_objs
 
         # == Generate code ==
-        graph, self.weight_numel = _codegen_linear(
+        graphmod, self.weight_numel = _codegen_linear(
             self.irreps_in,
             self.irreps_out,
             self.instructions,
@@ -163,7 +163,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
             optimize_einsums=self._optimize_einsums
         )
         self._codegen_register({
-            "_compiled_main": graph
+            "_compiled_main": graphmod
         })
 
         # == Generate weights ==
@@ -283,7 +283,7 @@ def _codegen_linear(
     instructions: List[Instruction],
     shared_weights: bool = False,
     optimize_einsums: bool = True,
-) -> Tuple[fx.Graph, int]:
+) -> Tuple[fx.GraphModule, int]:
     graph_out = fx.Graph()
 
     # = Function definitions =
@@ -303,7 +303,7 @@ def _codegen_linear(
         graph_out.output(out.node, torch.Tensor)
         # Short circut
         # 0 is weight_numel
-        return graph_out, 0
+        return fx.GraphModule({}, graph_out, "linear_forward"), 0
 
     x = x.reshape(-1, irreps_in.dim)
     batch_out = x.shape[0]
@@ -383,6 +383,8 @@ def _codegen_linear(
     # check graphs
     graph_out.lint()
 
+    graphmod_out = fx.GraphModule({}, graph_out, "linear_forward")
+
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
     if optimize_einsums:
         try:
@@ -401,6 +403,6 @@ def _codegen_linear(
                     dtype=torch.float32
                 ),
             )
-            graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
 
-    return graph_out, weight_numel
+    return graphmod_out, weight_numel
