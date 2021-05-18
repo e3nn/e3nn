@@ -62,7 +62,7 @@ def codegen_tensor_product(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[fx.GraphModule, fx.GraphModule]:
+) -> Tuple[fx.GraphModule, fx.GraphModule, fx.GraphModule]:
     graph_out = fx.Graph()
     graph_right = fx.Graph()
 
@@ -96,6 +96,7 @@ def codegen_tensor_product(
         # Short circut
         return (
             fx.GraphModule({}, graph_out, "tp_forward"),
+            fx.GraphModule({}, graph_out, "tp_backward"),
             fx.GraphModule({}, graph_right, "tp_right")
         )
 
@@ -527,11 +528,14 @@ def codegen_tensor_product(
         batch_shape=grad_size_out
     )
     grad_ws = [gw.reshape(-1, prod(ins.path_shape)) for gw, ins in zip(grad_ws, instructions) if gw is not None]
-    grad_ws = _combine(
-        grad_ws,
-        to=range(len(grad_ws)),
-        lengths=[prod(ins.path_shape) for ins in instructions if ins.has_weight], batch_shape=tuple() if shared_weights else grad_size_out
-    )
+    if len(grad_ws) > 0:
+        grad_ws = _combine(
+            grad_ws,
+            to=range(len(grad_ws)),
+            lengths=[prod(ins.path_shape) for ins in instructions if ins.has_weight], batch_shape=tuple() if shared_weights else grad_size_out
+        )
+    else:
+        grad_ws = None
 
     # having make a GraphModule previously seems to add a None output automatically
     # we need to remove this so that the function doesn't return early
@@ -540,7 +544,7 @@ def codegen_tensor_product(
             graph_backward.erase_node(node)
 
     graph_backward.output(
-        (grad_x1s.node, grad_x2s.node, grad_ws.node),
+        (grad_x1s.node, grad_x2s.node, grad_ws.node if grad_ws is not None else None),
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
     )
     graphmod_backward.graph = graph_backward
