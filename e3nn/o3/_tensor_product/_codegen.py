@@ -2,7 +2,6 @@ from math import sqrt
 from typing import List, Tuple, Union
 import copy
 import itertools
-import operator
 
 import torch
 from torch import fx
@@ -44,7 +43,7 @@ def _combine(tensors: List[fx.Proxy], to: List[int], lengths: List[int], batch_s
         graph: fx.Graph = node0.graph
         with graph.inserting_after(node0):
             bufshape = (batch_shape + (sum(lengths),))
-            bufkwargs={"device": tensors[0].device.node, "dtype": tensors[0].dtype.node}
+            bufkwargs = {"device": tensors[0].device.node, "dtype": tensors[0].dtype.node}
         with graph.inserting_after(bufshape.node):
             buffer = fx.Proxy(graph.call_function(
                 torch.zeros,
@@ -504,6 +503,7 @@ def codegen_tensor_product(
         # - Find certain nodes in the grad graph -
         # There doesn't seem to be a better way to identify nodes across a graph copy
         # since fx.Graph removes all custom Node attributes during copy
+
         def find_in_graph_copy(graph: fx.Graph, nodes: List[Union[fx.Node, fx.Proxy]]) -> List[fx.Node]:
             """ !! NOT a general function --- only works if the graphs are copies."""
             nodes = [n.node if isinstance(n, fx.Proxy) else n for n in nodes]
