@@ -603,12 +603,14 @@ def codegen_tensor_product(
     # ==== end build backward ====
 
     # == Eliminate dead code ==
+    from opt_einsum_fx import fuse_reshapes
     from opt_einsum_fx.fx_utils import eliminate_dead_code
     for gm in (graphmod_out, graphmod_right) + (
         (graphmod_backward,) if explicit_backward
         else tuple()
     ):
         eliminate_dead_code(gm.graph)
+        fuse_reshapes(gm.graph, in_place=True)
         gm.recompile()
 
     # == Optimize ==
