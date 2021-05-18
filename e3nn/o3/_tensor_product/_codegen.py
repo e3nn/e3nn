@@ -1,6 +1,8 @@
 from math import sqrt
 from typing import List, Tuple, Union
 import copy
+import itertools
+import operator
 
 import torch
 from torch import fx
@@ -12,6 +14,7 @@ from ._instruction import Instruction
 
 
 def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
+    """Sum a possibly empty list of tensors with given shape"""
     if len(xs) > 0:
         out = xs[0]
         for x in xs[1:]:
@@ -21,6 +24,7 @@ def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
 
 
 def _extract_irreps(inp, irreps):
+    """Extract irreps from one tensor into a list of tensors"""
     # If only one input irrep, can avoid creating a view
     if len(irreps) == 1:
         out = [inp.reshape(-1, irreps[0].mul, irreps[0].ir.dim)]
@@ -32,22 +36,50 @@ def _extract_irreps(inp, irreps):
     return out
 
 
-def _combine(tensors: list, to: List[int], lengths: List[int], batch_shape):
-    out = [
-        _sum_tensors(
-            [t for i, t in zip(to, tensors) if i == i_out],
-            shape=tensors[0].shape[:-1] + (lengths[i_out],),
-            like=tensors[0]
-        )
-        for i_out in range(len(lengths))
-        if lengths[i_out] > 0
-    ]
-    if len(out) > 1:
-        out = torch.cat(out, dim=-1)
+def _combine(tensors: List[fx.Proxy], to: List[int], lengths: List[int], batch_shape, in_place: bool = False):
+    """Sum/cat different tensors into a direct sum"""
+    if in_place:
+        node0: fx.Node = tensors[0].node
+        assert isinstance(node0, fx.Node)
+        graph: fx.Graph = node0.graph
+        with graph.inserting_after(node0):
+            bufshape = (batch_shape + (sum(lengths),))
+            bufkwargs={"device": tensors[0].device.node, "dtype": tensors[0].dtype.node}
+        with graph.inserting_after(bufshape.node):
+            buffer = fx.Proxy(graph.call_function(
+                torch.zeros,
+                args=(bufshape.node,),
+                kwargs=bufkwargs
+            ))
+        del bufkwargs
+        del bufshape
+        starts = list(itertools.accumulate(lengths, initial=0))
+        for i, (tensor, to_idex) in enumerate(zip(tensors, to)):
+            with graph.inserting_after(buffer.node if i == 0 else tensor.node):
+                bufslice = buffer.narrow(-1, starts[to_idex], lengths[to_idex])
+            with graph.inserting_after(bufslice.node):
+                new_shape = batch_shape + (lengths[to_idex],)
+            with graph.inserting_after(new_shape.node):
+                tensor_shaped = tensor.reshape(new_shape)
+            with graph.inserting_after(tensor_shaped.node):
+                bufslice.add_(tensor_shaped)
+        return buffer
     else:
-        # Avoid an unnecessary copy in a size one torch.cat
-        out = out[0]
-    return out.reshape(batch_shape + (sum(lengths),))
+        out = [
+            _sum_tensors(
+                [t for i, t in zip(to, tensors) if i == i_out],
+                shape=tensors[0].shape[:-1] + (lengths[i_out],),
+                like=tensors[0]
+            )
+            for i_out in range(len(lengths))
+            if lengths[i_out] > 0
+        ]
+        if len(out) > 1:
+            out = torch.cat(out, dim=-1)
+        else:
+            # Avoid an unnecessary copy in a size one torch.cat
+            out = out[0]
+        return out.reshape(batch_shape + (sum(lengths),))
 
 
 def codegen_tensor_product(
@@ -412,7 +444,10 @@ def codegen_tensor_product(
         tensors=out_list_out,
         to=[ins.i_out for ins in instructions],
         lengths=[mul_ir.dim for mul_ir in irreps_out],
-        batch_shape=size_out
+        batch_shape=size_out,
+        # If we are doing explicit backward, the inside of forward isn't seen by autograd
+        # As a result, we want to use as many in-place operations as possible to save memory
+        in_place=explicit_backward
     )
 
     out_right = [
