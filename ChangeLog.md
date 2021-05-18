@@ -10,6 +10,8 @@ Most recent change on the bottom.
 ### Added
 - `preprocess` function in `e3nn.nn.models.v2103.gate_points_networks.SimpleNetwork`
 - Specialized code for `mode="uuw"`
+- New optimization options:
+  - `instruction_profiling`: whether to insert profiler blocks for individual `TensorProduct` instructions
 
 ## [0.3.0] - 2021-05-10
 ### Added

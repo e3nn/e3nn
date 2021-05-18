@@ -281,13 +281,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self,
         specialized_code: Optional[bool] = None,
         optimize_einsums: Optional[bool] = None,
-        explicit_backward: Optional[bool] = None
+        explicit_backward: Optional[bool] = None,
+        instruction_profiling: Optional[bool] = None
     ):
         opt_defaults = e3nn.get_optimization_defaults()
         self.compile_options = {}
         self.compile_options['specialized_code'] = specialized_code if specialized_code is not None else opt_defaults['specialized_code']
         self.compile_options['optimize_einsums'] = optimize_einsums if optimize_einsums is not None else opt_defaults['optimize_einsums']
         self.compile_options['explicit_backward'] = explicit_backward if explicit_backward is not None else opt_defaults['explicit_backward']
+        self.compile_options['instruction_profiling'] = instruction_profiling if instruction_profiling is not None else opt_defaults['instruction_profiling']
         del opt_defaults
 
         # Generate the actual tensor product code
@@ -303,7 +305,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             shared_weights=self.shared_weights,
             specialized_code=self.compile_options["specialized_code"],
             optimize_einsums=self.compile_options["optimize_einsums"],
-            explicit_backward=self.compile_options["explicit_backward"]
+            explicit_backward=self.compile_options["explicit_backward"],
+            instruction_profiling=self.compile_options["instruction_profiling"]
         )
         self._codegen_register({
             "_compiled_main_out": graphmod_out,
