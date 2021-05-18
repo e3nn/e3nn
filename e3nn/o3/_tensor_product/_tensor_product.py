@@ -5,7 +5,7 @@ import torch.fx
 
 import e3nn
 from e3nn import o3
-from e3nn.util.jit import compile_mode
+from e3nn.util.jit import compile_mode, set_compile_mode
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util import prod
 
@@ -309,6 +309,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             "_compiled_main_out": graphmod_out,
             "_compiled_main_right": graphmod_right
         })
+
+        if self.compile_options["explicit_backward"]:
+            # TorchScript doesn't support torch.autograd.Function
+            set_compile_mode(self, "unsupported")
+        else:
+            # ... but everything else is supported.
+            set_compile_mode(self, "script")
 
     def __repr__(self):
         npath = sum(prod(i.path_shape) for i in self.instructions)

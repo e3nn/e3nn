@@ -50,6 +50,17 @@ def get_compile_mode(mod: torch.nn.Module) -> str:
     return mode
 
 
+def set_compile_mode(mod: torch.nn.Module, mode: Optional[str]) -> None:
+    """Set the compilation mode of a module.
+
+    Parameters
+    ----------
+        mod : torch.nn.Module
+    """
+    assert mode in _VALID_MODES, "Invalid compile mode `%r`" % mode
+    setattr(mod, _E3NN_COMPILE_MODE, mode)
+
+
 def compile(
     mod: torch.nn.Module,
     n_trace_checks: int = 1,
