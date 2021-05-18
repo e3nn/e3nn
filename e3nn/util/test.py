@@ -328,9 +328,10 @@ def equivariance_error(
 # Make something else for general script/traceability
 def assert_auto_jitable(
     func,
-    error_on_warnings=True,
-    n_trace_checks=2,
-    strict_shapes=True,
+    error_on_warnings: bool = True,
+    n_trace_checks: int = 2,
+    strict_shapes: bool = True,
+    allow_unsupported: bool = False
 ):
     r"""Assert that submodule ``func`` is automatically JITable.
 
@@ -344,6 +345,8 @@ def assert_auto_jitable(
             If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be generated as test inputs for ``torch.jit.trace``.
         strict_shapes : bool
             Test that the traced function errors on inputs with feature dimensions that don't match the input irreps.
+        allow_unsupported : bool
+            If True (False by default), does nothing on ``@compile_mode("unsupported")`` modules.
     Returns
     -------
         The traced TorchScript function.
@@ -351,8 +354,13 @@ def assert_auto_jitable(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    if get_compile_mode(func) is None:
+    mode = get_compile_mode(func)
+
+    if mode is None:
         raise ValueError("assert_auto_jitable is only for modules marked with @compile_mode")
+
+    if allow_unsupported and mode == "unsupported":
+        return
 
     # Test tracing
     with warnings.catch_warnings():
