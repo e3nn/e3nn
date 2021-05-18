@@ -13,7 +13,8 @@ def make_tp(
     l1, p1, l2, p2, lo, po, mode, weight,
     mul: int = 25,
     path_weights: bool = True,
-    **kwargs
+    reraise: bool = True,
+    **kwargs,
 ):
     def mul_out(mul):
         if mode == "uvuv":
@@ -34,7 +35,10 @@ def make_tp(
             **kwargs
         )
     except AssertionError:
-        return None
+        if reraise:
+            raise
+        else:
+            return None
 
 
 def random_params(n=25):
@@ -48,7 +52,7 @@ def random_params(n=25):
         po = random.choice([-1, 1])
         mode = random.choice(['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv'])
         weight = random.choice([True, False])
-        if make_tp(l1, p1, l2, p2, lo, po, mode, weight) is not None:
+        if make_tp(l1, p1, l2, p2, lo, po, mode, weight, reraise=False) is not None:
             params.add((l1, p1, l2, p2, lo, po, mode, weight))
     return params
 
@@ -539,7 +543,8 @@ def test_explicit_backward(
             specialized_code=special_code,
             optimize_einsums=opt_ein,
             explicit_backward=True
-        )
+        ),
+        reraise=True
     )
 
     # make sure its marked as no JIT support
