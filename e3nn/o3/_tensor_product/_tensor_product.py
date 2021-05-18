@@ -257,7 +257,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # Generate the actual tensor product code
-        graphmod_out, graphmod_right = codegen_tensor_product(
+        graphmod_out, graphmod_backwards, graphmod_right = codegen_tensor_product(
             self.irreps_in1,
             self.in1_var,
             self.irreps_in2,
@@ -270,10 +270,28 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self._specialized_code,
             self._optimize_einsums
         )
-        self._codegen_register({
-            "_compiled_main_out": graphmod_out,
-            "_compiled_main_right": graphmod_right
-        })
+        graphmod_out = torch.jit.script(graphmod_out)
+        graphmod_backwards = torch.jit.script(graphmod_backwards)
+
+        class _MyForward(torch.autograd.Function):
+            @staticmethod
+            def forward(ctx, x1, x2, w):
+                ctx.save_for_backward(x1, x2, w)
+                return graphmod_out(x1, x2, w)
+
+            @staticmethod
+            def backward(ctx, grad):
+                x1, x2, w = ctx.saved_tensors
+                ret =  graphmod_backwards(x1, x2, w, grad)
+                return ret
+
+        self._compiled_main_out = _MyForward.apply
+        self._compiled_main_right = torch.jit.script(graphmod_right)
+
+        # self._codegen_register({
+        #     "_compiled_main_out": graphmod_out,
+        #     "_compiled_main_right": graphmod_right
+        # })
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
