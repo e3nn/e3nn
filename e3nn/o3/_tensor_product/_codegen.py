@@ -110,14 +110,24 @@ def codegen_tensor_product(
     x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor))
     ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor))
 
-    empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')))
-    empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')))
-    if shared_weights:
-        size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]))[0].shape
-        size_right = x2s_right.shape[:-1]
+    if not explicit_backward:
+        # Explicit backward can't support broadcasting since it builds the output
+        # shapes directly
+        empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')))
+        empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')))
+        if shared_weights:
+            size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]))[0].shape
+            size_right = x2s_right.shape[:-1]
+        else:
+            size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]), empty_out.expand(ws_out.shape[:-1]))[0].shape
+            size_right = torch.broadcast_tensors(empty_right.expand(x2s_right.shape[:-1]), empty_right.expand(ws_right.shape[:-1]))[0].shape
     else:
-        size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]), empty_out.expand(ws_out.shape[:-1]))[0].shape
-        size_right = torch.broadcast_tensors(empty_right.expand(x2s_right.shape[:-1]), empty_right.expand(ws_right.shape[:-1]))[0].shape
+        size_out = x1s_out.shape[:-1]
+        torch._assert(
+            size_out == x2s_out.shape[:-1],
+            "Batch shapes don't match between x1 and x2 --- please not that broadcasting is not supported with explicit_backward=True"
+        )
+        size_right = x2s_right.shape[:-1]
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
@@ -138,11 +148,14 @@ def codegen_tensor_product(
         )
 
     # = Broadcast inputs =
-    if shared_weights:
-        x1s_out, x2s_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,))
-    else:
-        x1s_out, x2s_out, ws_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,)), ws_out.broadcast_to(size_out + (-1,))
-        x2s_right, ws_right = x2s_right.broadcast_to(size_right + (-1,)), ws_right.broadcast_to(size_right + (-1,))
+    if not explicit_backward:
+        # Explicit backward can't support broadcasting since it builds the output
+        # shapes directly
+        if shared_weights:
+            x1s_out, x2s_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,))
+        else:
+            x1s_out, x2s_out, ws_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,)), ws_out.broadcast_to(size_out + (-1,))
+            x2s_right, ws_right = x2s_right.broadcast_to(size_right + (-1,)), ws_right.broadcast_to(size_right + (-1,))
 
     outsize_right = size_right + (irreps_in1.dim, irreps_out.dim,)
 
@@ -650,9 +663,10 @@ def codegen_tensor_product(
                 ),
             )
 
-            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs,))
             deduplicate(graphmod_out.graph)
             graphmod_out.recompile()
+
             graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
             deduplicate(graphmod_right.graph)
             graphmod_out.recompile()
