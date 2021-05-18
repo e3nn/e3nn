@@ -32,9 +32,10 @@ def main():
     parser.add_argument("--irreps-in2", type=str, default=None)
     parser.add_argument("--irreps-out", type=str, default=None)
     parser.add_argument("--cuda", type=t_or_f, default=True)
-    parser.add_argument("--backward", type=t_or_f, default=True)
+    parser.add_argument("--backward", type=int, default=1)
     parser.add_argument("--opt-ein", type=t_or_f, default=True)
     parser.add_argument("--specialized-code", type=t_or_f, default=True)
+    parser.add_argument("--explicit-backward", type=t_or_f, default=False)
     parser.add_argument("--elementwise", action='store_true')
     parser.add_argument("-n", type=int, default=1000)
     parser.add_argument("--batch", type=int, default=10)
@@ -53,12 +54,17 @@ def main():
     irreps_in2 = Irreps(args.irreps_in2 if args.irreps_in2 else args.irreps)
     irreps_out = Irreps(args.irreps_out if args.irreps_out else args.irreps)
 
+    compile_opts = dict(
+        specialized_code=args.specialized_code,
+        optimize_einsums=args.opt_ein,
+        explicit_backward=args.explicit_backward
+    )
+
     if args.elementwise:
         tp = ElementwiseTensorProduct(
             irreps_in1,
             irreps_in2,
-            _specialized_code=args.specialized_code,
-            _optimize_einsums=args.opt_ein
+            compile_options=compile_opts
         )
         if args.backward:
             print("Elementwise TP has no weights, cannot backward. Setting --backward False.")
@@ -68,8 +74,7 @@ def main():
             irreps_in1,
             irreps_in2,
             irreps_out,
-            _specialized_code=args.specialized_code,
-            _optimize_einsums=args.opt_ein
+            compile_options=compile_opts
         )
     tp = tp.to(device=device)
     assert len(tp.instructions) > 0, "Bad irreps, no instructions"
@@ -81,13 +86,13 @@ def main():
     # from https://pytorch.org/docs/master/_modules/torch/utils/benchmark/utils/timer.html#Timer.timeit
     warmup = max(int(args.n // 100), 1)
 
-    inputs = iter([
+    inputs = [
         (
             irreps_in1.randn(args.batch, -1).to(device=device),
             irreps_in2.randn(args.batch, -1).to(device=device)
         )
         for _ in range(args.n + warmup)
-    ])
+    ]
 
     # compile
     if args.jit:
@@ -95,10 +100,28 @@ def main():
 
     print("starting...")
 
+    if args.backward == 0:
+        extra = ""
+    elif args.backward == 1:
+        extra = "out.sum().backward()\n"
+    elif args.backward == 2:
+        for x1, x2 in inputs:
+            x1.requires_grad_(True)
+            x2.requires_grad_(True)
+        extra = (
+            "grad = torch.autograd.grad(out.sum(), x1, create_graph=True)[0]\n"
+            "grad.sum().backward()\n"
+        )
+    else:
+        raise ValueError(f"Invalid backward=`{args.backward}`>2")
+
+    inputs = iter(inputs)
+
     t = Timer(
         stmt=(
             "tp.zero_grad()\n"
-            "out = tp(*next(inputs))\n" + ("out.sum().backward()\n" if args.backward else '')
+            "x1,x2 = next(inputs)\n"
+            "out = tp(x1, x2)\n" + extra
         ),
         globals={'tp': tp, 'inputs': inputs}
     )
