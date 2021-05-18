@@ -663,7 +663,12 @@ def codegen_tensor_product(
                 ),
             )
 
-            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs,))
+            graphmod_out = jitable(optimize_einsums_full(
+                graphmod_out,
+                example_inputs,
+                # if explict backward, we want to do as much as possible in-place
+                in_place_muls=explicit_backward
+            ))
             deduplicate(graphmod_out.graph)
             graphmod_out.recompile()
 
