@@ -176,12 +176,16 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     tp1 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
         ins, normalization=normalization,
-        _specialized_code=False
+        compile_options=dict(
+            specialized_code=False
+        )
     )
     tp2 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
         ins, normalization=normalization,
-        _specialized_code=True
+        compile_options=dict(
+            specialized_code=True
+        )
     )
     with torch.no_grad():
         tp2.weight[:] = tp1.weight
@@ -237,8 +241,10 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
     """
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
-        _specialized_code=special_code,
-        _optimize_einsums=opt_ein
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein
+        )
     )
     opt_tp = assert_auto_jitable(orig_tp)
 
@@ -270,19 +276,23 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
 def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
-        _specialized_code=False,
-        _optimize_einsums=False
+        compile_options=dict(
+            specialized_code=False,
+            optimize_einsums=False
+        )
     )
     opt_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
-        _specialized_code=special_code,
-        _optimize_einsums=opt_ein
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein
+        )
     )
     # We don't use state_dict here since that contains things like wigners that can differ between optimized and unoptimized TPs
     with torch.no_grad():
         opt_tp.weight[:] = orig_tp.weight
-    assert opt_tp._specialized_code == special_code
-    assert opt_tp._optimize_einsums == opt_ein
+    assert opt_tp.compile_options["specialized_code"] == special_code
+    assert opt_tp.compile_options["optimize_einsums"] == opt_ein
 
     if jit:
         opt_tp = assert_auto_jitable(opt_tp)

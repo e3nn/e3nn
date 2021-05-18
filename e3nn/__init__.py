@@ -5,13 +5,15 @@ from typing import Dict
 
 _OPT_DEFAULTS: Dict[str, bool] = dict(
     specialized_code=True,
-    optimize_einsums=True
+    optimize_einsums=True,
+    explicit_backward=False
 )
 
 
 def set_optimization_defaults(
     specialized_code: bool = True,
-    optimize_einsums: bool = True
+    optimize_einsums: bool = True,
+    explicit_backward: bool = False,
 ) -> None:
     r"""Globally set the default optimization settings.
 
@@ -24,6 +26,7 @@ def set_optimization_defaults(
     """
     _OPT_DEFAULTS['specialized_code'] = specialized_code
     _OPT_DEFAULTS['optimize_einsums'] = optimize_einsums
+    _OPT_DEFAULTS['explicit_backward'] = explicit_backward
 
 
 def get_optimization_defaults() -> Dict[str, bool]:

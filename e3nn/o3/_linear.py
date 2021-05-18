@@ -98,7 +98,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
         instructions: Optional[List[Tuple[int, int]]] = None,
-        _optimize_einsums: Optional[bool] = None
+        compile_options: dict = {}
     ):
         super().__init__()
 
@@ -120,10 +120,6 @@ class Linear(CodeGenMixin, torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_out)
         del irreps_in
         del irreps_out
-
-        opt_defaults = e3nn.get_optimization_defaults()
-        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
-        del opt_defaults
 
         # == Instructions ==
         if instructions is None:
@@ -155,16 +151,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         del instruction_objs
 
         # == Generate code ==
-        graphmod, self.weight_numel = _codegen_linear(
-            self.irreps_in,
-            self.irreps_out,
-            self.instructions,
-            shared_weights=shared_weights,
-            optimize_einsums=self._optimize_einsums
-        )
-        self._codegen_register({
-            "_compiled_main": graphmod
-        })
+        self.recompile(**compile_options)
 
         # == Generate weights ==
         if internal_weights and self.weight_numel > 0:
@@ -188,6 +175,27 @@ class Linear(CodeGenMixin, torch.nn.Module):
         else:
             output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
+
+    def recompile(
+        self,
+        optimize_einsums: Optional[bool] = None
+    ):
+        opt_defaults = e3nn.get_optimization_defaults()
+        self.compile_options = {
+            "optimize_einsums": optimize_einsums if optimize_einsums is not None else opt_defaults['optimize_einsums']
+        }
+        del opt_defaults
+
+        graphmod, self.weight_numel = _codegen_linear(
+            self.irreps_in,
+            self.irreps_out,
+            self.instructions,
+            shared_weights=self.shared_weights,
+            optimize_einsums=self.compile_options["optimize_einsums"]
+        )
+        self._codegen_register({
+            "_compiled_main": graphmod
+        })
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"

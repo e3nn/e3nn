@@ -160,8 +160,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
-    _specialized_code: bool
-    _optimize_einsums: bool
     _profiling_str: str
     normalization: str
     shared_weights: bool
@@ -185,8 +183,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         normalization: str = 'component',
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
-        _specialized_code: Optional[bool] = None,
-        _optimize_einsums: Optional[bool] = None
+        compile_options: dict = {}
     ):
         # === Setup ===
         super().__init__()
@@ -251,29 +248,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.internal_weights = internal_weights
         self.shared_weights = shared_weights
 
-        opt_defaults = e3nn.get_optimization_defaults()
-        self._specialized_code = _specialized_code if _specialized_code is not None else opt_defaults['specialized_code']
-        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
-        del opt_defaults
-
-        # Generate the actual tensor product code
-        graphmod_out, graphmod_backwards, graphmod_right = codegen_tensor_product(
-            self.irreps_in1,
-            self.in1_var,
-            self.irreps_in2,
-            self.in2_var,
-            self.irreps_out,
-            self.out_var,
-            self.instructions,
-            self.normalization,
-            self.shared_weights,
-            self._specialized_code,
-            self._optimize_einsums
-        )
-        self._codegen_register({
-            "_compiled_main_out": (graphmod_out, graphmod_backwards),
-            "_compiled_main_right": graphmod_right
-        })
+        self.recompile(**compile_options)
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
@@ -301,6 +276,39 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # For TorchScript, this needs to be done in advance:
         self._profiling_str = str(self)
+
+    def recompile(
+        self,
+        specialized_code: Optional[bool] = None,
+        optimize_einsums: Optional[bool] = None,
+        explicit_backward: Optional[bool] = None
+    ):
+        opt_defaults = e3nn.get_optimization_defaults()
+        self.compile_options = {}
+        self.compile_options['specialized_code'] = specialized_code if specialized_code is not None else opt_defaults['specialized_code']
+        self.compile_options['optimize_einsums'] = optimize_einsums if optimize_einsums is not None else opt_defaults['optimize_einsums']
+        self.compile_options['explicit_backward'] = explicit_backward if explicit_backward is not None else opt_defaults['explicit_backward']
+        del opt_defaults
+
+        # Generate the actual tensor product code
+        graphmod_out, graphmod_right = codegen_tensor_product(
+            self.irreps_in1,
+            self.in1_var,
+            self.irreps_in2,
+            self.in2_var,
+            self.irreps_out,
+            self.out_var,
+            self.instructions,
+            normalization=self.normalization,
+            shared_weights=self.shared_weights,
+            specialized_code=self.compile_options["specialized_code"],
+            optimize_einsums=self.compile_options["optimize_einsums"],
+            explicit_backward=self.compile_options["explicit_backward"]
+        )
+        self._codegen_register({
+            "_compiled_main_out": graphmod_out,
+            "_compiled_main_right": graphmod_right
+        })
 
     def __repr__(self):
         npath = sum(prod(i.path_shape) for i in self.instructions)

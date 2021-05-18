@@ -62,7 +62,11 @@ def codegen_tensor_product(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[fx.GraphModule, fx.GraphModule, fx.GraphModule]:
+    explicit_backward: bool = False,
+) -> Union[
+    Tuple[Tuple[fx.GraphModule, fx.GraphModule], fx.GraphModule],
+    Tuple[fx.GraphModule, fx.GraphModule]
+]:
     graph_out = fx.Graph()
     graph_right = fx.Graph()
 
@@ -94,9 +98,10 @@ def codegen_tensor_product(
         graph_out.output(out_out.node, torch.Tensor)
         graph_right.output(out_right.node, torch.Tensor)
         # Short circut
+        # if we short circut, no matter what, we don't do explicit backward
+        # there's no reason to register it all
         return (
             fx.GraphModule({}, graph_out, "tp_forward"),
-            fx.GraphModule({}, graph_out, "tp_backward"),
             fx.GraphModule({}, graph_right, "tp_right")
         )
 
@@ -398,8 +403,9 @@ def codegen_tensor_product(
     # - end make instructions -
 
     # === Make a graph for backward ===
-    # We create a graph here so that it doesn't have the output stage for forward
-    graph_backward = copy.deepcopy(graph_out)
+    if explicit_backward:
+        # We create a graph here so that it doesn't have the output stage for forward
+        graph_backward = copy.deepcopy(graph_out)
 
     # === Output for forward ===
     out_out = _combine(
@@ -434,7 +440,6 @@ def codegen_tensor_product(
 
     # === Check graphs ===
     graph_out.lint()
-    graph_backward.lint()
     graph_right.lint()
 
     # === Make GraphModules ===
@@ -450,110 +455,121 @@ def codegen_tensor_product(
         wigner_mats[f"_w3j_{l_1}_{l_2}_{l_out}"] = wig
 
     graphmod_out = fx.GraphModule(wigner_mats, graph_out, class_name="tp_forward")
-    graphmod_backward = fx.GraphModule(wigner_mats, graph_backward, class_name="tp_backward")
+    if explicit_backward:
+        graphmod_backward = fx.GraphModule(wigner_mats, graph_backward, class_name="tp_backward")
     graphmod_right = fx.GraphModule(wigner_mats, graph_right, class_name="tp_right")
 
     # ===== Build backward =====
-    from opt_einsum_fx.grad import grad
-    from opt_einsum_fx.fx_utils import deduplicate
-    # - Find certain nodes in the grad graph -
-    # There doesn't seem to be a better way to identify nodes across a graph copy
-    # since fx.Graph removes all custom Node attributes during copy
-    def find_in_graph_copy(graph: fx.Graph, nodes: List[Union[fx.Node, fx.Proxy]]) -> List[fx.Node]:
-        """ !! NOT a general function --- only works if the graphs are copies."""
-        nodes = [n.node if isinstance(n, fx.Proxy) else n for n in nodes]
-        found = {None: None}
-        ids = [str(n) if n is not None else None for n in nodes]
-        for node in graph.nodes:
-            node_id = str(node)
-            if node_id in ids:
-                found[node_id] = node
-        return [found[node_id] for node_id in ids]
+    if explicit_backward:
+        try:
+            from opt_einsum_fx.grad import grad
+            from opt_einsum_fx.fx_utils import deduplicate
+        except ImportError:
+            raise ImportError("opt_einsum_fx is required for explicit_backward = True")
+        # - Find certain nodes in the grad graph -
+        # There doesn't seem to be a better way to identify nodes across a graph copy
+        # since fx.Graph removes all custom Node attributes during copy
+        def find_in_graph_copy(graph: fx.Graph, nodes: List[Union[fx.Node, fx.Proxy]]) -> List[fx.Node]:
+            """ !! NOT a general function --- only works if the graphs are copies."""
+            nodes = [n.node if isinstance(n, fx.Proxy) else n for n in nodes]
+            found = {None: None}
+            ids = [str(n) if n is not None else None for n in nodes]
+            for node in graph.nodes:
+                node_id = str(node)
+                if node_id in ids:
+                    found[node_id] = node
+            return [found[node_id] for node_id in ids]
 
-    grad_x1_inputs = find_in_graph_copy(graph_backward, x1_list_out)
-    grad_x2_inputs = find_in_graph_copy(graph_backward, x2_list_out)
-    grad_ws_inputs = find_in_graph_copy(graph_backward, ws_list_out)
-    grad_out_list = find_in_graph_copy(graph_backward, out_list_out)
-    grad_size_out = fx.Proxy(find_in_graph_copy(graph_backward, [size_out.node])[0])
+        grad_x1_inputs = find_in_graph_copy(graph_backward, x1_list_out)
+        grad_x2_inputs = find_in_graph_copy(graph_backward, x2_list_out)
+        grad_ws_inputs = find_in_graph_copy(graph_backward, ws_list_out)
+        grad_out_list = find_in_graph_copy(graph_backward, out_list_out)
+        grad_size_out = fx.Proxy(find_in_graph_copy(graph_backward, [size_out.node])[0])
 
-    # - Add a gradient input to the backward graph -
-    with graph_backward.inserting_before(grad_x1_inputs[0]):
-        grad_out = fx.Proxy(graph_backward.placeholder('grad_out', torch.Tensor))
-        grad_out = grad_out.reshape(-1, irreps_out.dim)
-        grad_grad_list = _extract_irreps(grad_out, irreps_out)
-        grad_grad_list = [p.node for p in grad_grad_list]
-    del grad_out
+        # - Add a gradient input to the backward graph -
+        with graph_backward.inserting_before(grad_x1_inputs[0]):
+            grad_out = fx.Proxy(graph_backward.placeholder('grad_out', torch.Tensor))
+            grad_out = grad_out.reshape(-1, irreps_out.dim)
+            grad_grad_list = _extract_irreps(grad_out, irreps_out)
+            grad_grad_list = [p.node for p in grad_grad_list]
+        del grad_out
 
-    # - Compute symbolic gradients -
-    # Gradients with reshapes need shape info
-    from torch.fx.passes.shape_prop import ShapeProp
-    sp = ShapeProp(graphmod_backward)
-    sp.run(
-        torch.zeros(1, irreps_in1.dim),
-        torch.zeros(1, irreps_in2.dim),
-        torch.zeros(((1,) if shared_weights else tuple()) + (weight_numel,)),
-        torch.zeros(1, irreps_out.dim)
-    )
-
-    # Get gradient graphs
-    grad_x1s = []
-    grad_x2s = []
-    grad_ws = []
-    for ins_i, (ins, node) in enumerate(zip(instructions, grad_out_list)):
-        # grads wrt all three vars
-        grad_x1s.append(grad(node, grad_grad_list[ins.i_out], grad_x1_inputs[ins.i_in1]))
-        grad_x2s.append(grad(node, grad_grad_list[ins.i_out], grad_x2_inputs[ins.i_in2]))
-        if ins.has_weight:
-            grad_ws.append(grad(node, grad_grad_list[ins.i_out], grad_ws_inputs[ins_i]))
-        else:
-            grad_ws.append(None)
-    grad_x1s = [fx.Proxy(n) for n in grad_x1s]
-    grad_x2s = [fx.Proxy(n) for n in grad_x2s]
-    grad_ws = [fx.Proxy(n) if n is not None else None for n in grad_ws]
-
-    # - Build output gradients -
-    # This works because gradient is a linear operation => we can interchange it across the final sums + cats.
-    grad_x1s = [g.reshape(-1, irreps_in1[ins.i_in1].dim) for g, ins in zip(grad_x1s, instructions)]
-    grad_x1s = _combine(
-        grad_x1s,
-        to=[ins.i_in1 for ins in instructions],
-        lengths=[mul_ir.dim for mul_ir in irreps_in1],
-        batch_shape=grad_size_out
-    )
-    grad_x2s = [g.reshape(-1, irreps_in2[ins.i_in2].dim) for g, ins in zip(grad_x2s, instructions)]
-    grad_x2s = _combine(
-        grad_x2s,
-        to=[ins.i_in2 for ins in instructions],
-        lengths=[mul_ir.dim for mul_ir in irreps_in2],
-        batch_shape=grad_size_out
-    )
-    grad_ws = [gw.reshape(-1, prod(ins.path_shape)) for gw, ins in zip(grad_ws, instructions) if gw is not None]
-    if len(grad_ws) > 0:
-        grad_ws = _combine(
-            grad_ws,
-            to=range(len(grad_ws)),
-            lengths=[prod(ins.path_shape) for ins in instructions if ins.has_weight], batch_shape=tuple() if shared_weights else grad_size_out
+        # - Compute symbolic gradients -
+        # Gradients with reshapes need shape info
+        from torch.fx.passes.shape_prop import ShapeProp
+        sp = ShapeProp(graphmod_backward)
+        sp.run(
+            torch.zeros(1, irreps_in1.dim),
+            torch.zeros(1, irreps_in2.dim),
+            torch.zeros(((1,) if shared_weights else tuple()) + (weight_numel,)),
+            torch.zeros(1, irreps_out.dim)
         )
-    else:
-        grad_ws = None
 
-    # having make a GraphModule previously seems to add a None output automatically
-    # we need to remove this so that the function doesn't return early
-    for node in graph_backward.nodes:
-        if node.op == "output":
-            graph_backward.erase_node(node)
+        # Get gradient graphs
+        grad_x1s = []
+        grad_x2s = []
+        grad_ws = []
+        for ins_i, (ins, node) in enumerate(zip(instructions, grad_out_list)):
+            # grads wrt all three vars
+            grad_x1s.append(grad(node, grad_grad_list[ins.i_out], grad_x1_inputs[ins.i_in1]))
+            grad_x2s.append(grad(node, grad_grad_list[ins.i_out], grad_x2_inputs[ins.i_in2]))
+            if ins.has_weight:
+                grad_ws.append(grad(node, grad_grad_list[ins.i_out], grad_ws_inputs[ins_i]))
+            else:
+                grad_ws.append(None)
+        grad_x1s = [fx.Proxy(n) for n in grad_x1s]
+        grad_x2s = [fx.Proxy(n) for n in grad_x2s]
+        grad_ws = [fx.Proxy(n) if n is not None else None for n in grad_ws]
 
-    graph_backward.output(
-        (grad_x1s.node, grad_x2s.node, grad_ws.node if grad_ws is not None else None),
-        Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-    )
-    graphmod_backward.graph = graph_backward
-    graphmod_backward.recompile()
+        # - Build output gradients -
+        # This works because gradient is a linear operation => we can interchange it across the final sums + cats.
+        grad_x1s = [g.reshape(-1, irreps_in1[ins.i_in1].dim) for g, ins in zip(grad_x1s, instructions)]
+        grad_x1s = _combine(
+            grad_x1s,
+            to=[ins.i_in1 for ins in instructions],
+            lengths=[mul_ir.dim for mul_ir in irreps_in1],
+            batch_shape=grad_size_out
+        )
+        grad_x2s = [g.reshape(-1, irreps_in2[ins.i_in2].dim) for g, ins in zip(grad_x2s, instructions)]
+        grad_x2s = _combine(
+            grad_x2s,
+            to=[ins.i_in2 for ins in instructions],
+            lengths=[mul_ir.dim for mul_ir in irreps_in2],
+            batch_shape=grad_size_out
+        )
+        grad_ws = [gw.reshape(-1, prod(ins.path_shape)) for gw, ins in zip(grad_ws, instructions) if gw is not None]
+        if len(grad_ws) > 0:
+            grad_ws = _combine(
+                grad_ws,
+                to=range(len(grad_ws)),
+                lengths=[prod(ins.path_shape) for ins in instructions if ins.has_weight], batch_shape=tuple() if shared_weights else grad_size_out
+            )
+        else:
+            grad_ws = None
+
+        # having make a GraphModule previously seems to add a None output automatically
+        # we need to remove this so that the function doesn't return early
+        for node in graph_backward.nodes:
+            if node.op == "output":
+                graph_backward.erase_node(node)
+
+        graph_backward.output(
+            (grad_x1s.node, grad_x2s.node, grad_ws.node if grad_ws is not None else None),
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        )
+
+        graph_backward.lint()
+
+        graphmod_backward.graph = graph_backward
+        graphmod_backward.recompile()
     # ==== end build backward ====
 
     # == Eliminate dead code ==
     from opt_einsum_fx.fx_utils import eliminate_dead_code
-    for gm in (graphmod_out, graphmod_backward, graphmod_right):
+    for gm in (graphmod_out, graphmod_right) + (
+        (graphmod_backward,) if explicit_backward
+        else tuple()
+    ):
         eliminate_dead_code(gm.graph)
         gm.recompile()
 
@@ -594,10 +610,14 @@ def codegen_tensor_product(
             )
 
             graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
-            graphmod_backward = jitable(optimize_einsums_full(
-                graphmod_backward,
-                example_inputs + (torch.ones(batchdim, irreps_out.dim),)
-            ))
+            if explicit_backward:
+                graphmod_backward = jitable(optimize_einsums_full(
+                    graphmod_backward,
+                    example_inputs + (torch.ones(batchdim, irreps_out.dim),)
+                ))
             graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
 
-    return graphmod_out, graphmod_backward, graphmod_right
+    if explicit_backward:
+        return (graphmod_out, graphmod_backward), graphmod_right
+    else:
+        return graphmod_out, graphmod_right
