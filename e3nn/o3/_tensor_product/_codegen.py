@@ -361,6 +361,7 @@ def codegen_tensor_product(
                 if specialized_code and key == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}u,zu,zu->zu", w_out, x1_out.reshape(-1, mul_ir_in1.dim), x2_out.reshape(-1, mul_ir_in2.dim))
                     ein_right = torch.einsum(f"{z}u,uw,zu->zuw", w_right, e2_right, x2_right.reshape(-1, mul_ir_in2.dim))
+                # TODO: support cross!
                 # elif specialized_code and key == (1, 1, 1) and normalization == "component":
                 #     ein_out = torch.einsum(
                 #         f"{z}u,zui->zui",
@@ -498,7 +499,6 @@ def codegen_tensor_product(
     if explicit_backward:
         try:
             from opt_einsum_fx.grad import grad
-            from opt_einsum_fx.fx_utils import deduplicate
         except ImportError:
             raise ImportError("opt_einsum_fx is required for explicit_backward = True")
         # - Find certain nodes in the grad graph -
@@ -613,6 +613,7 @@ def codegen_tensor_product(
     if optimize_einsums:
         try:
             from opt_einsum_fx import optimize_einsums_full, jitable
+            from opt_einsum_fx.fx_utils import deduplicate
         except ImportError:
             # opt_einsum_fx is not installed
             pass
@@ -645,12 +646,19 @@ def codegen_tensor_product(
             )
 
             graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+            deduplicate(graphmod_out.graph)
+            graphmod_out.recompile()
+            graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
+            deduplicate(graphmod_right.graph)
+            graphmod_out.recompile()
+
             if explicit_backward:
                 graphmod_backward = jitable(optimize_einsums_full(
                     graphmod_backward,
                     example_inputs + (torch.ones(batchdim, irreps_out.dim),)
                 ))
-            graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
+                deduplicate(graphmod_backward.graph)
+                graphmod_backward.recompile()
 
     if explicit_backward:
         return (graphmod_out, graphmod_backward), graphmod_right
