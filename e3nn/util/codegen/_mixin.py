@@ -12,14 +12,12 @@ def _make_autograd_func(forward: torch.jit.ScriptModule, backward: torch.jit.Scr
         @staticmethod
         def forward(ctx, *args):
             ctx.save_for_backward(*args)
-            return _MyFunc._forward(*args)
+            return forward(*args)
 
         @staticmethod
         def backward(ctx, *grads):
             args = ctx.saved_tensors + tuple(grads)
-            return _MyFunc._backward(*args)
-    _MyFunc._forward = forward
-    _MyFunc._backward = backward
+            return backward(*args)
     return _MyFunc.apply
 
 
@@ -91,6 +89,9 @@ class CodeGenMixin:
                 assert isinstance(backward, torch.jit.ScriptModule)
                 self.__codegen__[fname] = (forward, backward)
                 setattr(self, fname, _make_autograd_func(forward, backward))
+                # we register as submodules so that .to() works correctly:
+                setattr(self, fname + "_forward", forward)
+                setattr(self, fname + "_backward", backward)
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
     # See pickle docs: https://docs.python.org/3/library/pickle.html#pickling-class-instances
@@ -121,10 +122,12 @@ class CodeGenMixin:
                     del out["_modules"][fname]
                 else:
                     codegen_state[fname] = tuple(_scriptmodule_to_bytes(mod) for mod in smod)
-                    # no need to remove submodule since it was in an autograd function
-                    # but since its an attribute, and not a submodule, we need to 
+                    # since its an attribute, and not a submodule, we need to
                     # remove it from the __dict__ instead:
                     del out[fname]
+                    # We also have to remove the submodules:
+                    del out["_modules"][fname + "_forward"]
+                    del out["_modules"][fname + "_backward"]
 
             out["__codegen__"] = codegen_state
         return out
@@ -156,6 +159,9 @@ class CodeGenMixin:
                     forward, backward = (_scriptmodule_from_bytes(b) for b in buffer)
                     new_codegen_state[fname] = (forward, backward)
                     setattr(self, fname, _make_autograd_func(forward, backward))
+                    # we register as submodules so that .to() works correctly:
+                    setattr(self, fname + "_forward", forward)
+                    setattr(self, fname + "_backward", backward)
                 else:
                     raise TypeError
             self.__codegen__ = new_codegen_state
