@@ -6,6 +6,7 @@ import pytest
 import torch
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
+import e3nn.util.jit
 
 
 def make_tp(
@@ -273,19 +274,29 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
 @pytest.mark.parametrize('special_code', [True, False])
 @pytest.mark.parametrize('opt_ein', [True, False])
 @pytest.mark.parametrize('jit', [True, False])
-def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
+@pytest.mark.parametrize('explicit_backward', [True, False])
+def test_optimizations(
+    l1, p1, l2, p2, lo, po, mode, weight,
+    special_code, opt_ein, jit, explicit_backward,
+    float_tolerance
+):
+    if jit and explicit_backward:
+        pytest.skip("JIT and explicit backwards are not compatible")
+
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
         compile_options=dict(
             specialized_code=False,
-            optimize_einsums=False
+            optimize_einsums=False,
+            explicit_backward=False
         )
     )
     opt_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
         compile_options=dict(
             specialized_code=special_code,
-            optimize_einsums=opt_ein
+            optimize_einsums=opt_ein,
+            explicit_backward=explicit_backward
         )
     )
     # We don't use state_dict here since that contains things like wigners that can differ between optimized and unoptimized TPs
@@ -470,17 +481,18 @@ def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
-def test_save(l1, p1, l2, p2, lo, po, mode, weight):
-    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+@pytest.mark.parametrize("explicit_backward", [True, False])
+def test_save(l1, p1, l2, p2, lo, po, mode, weight, explicit_backward):
+    tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        compile_options=dict(
+            explicit_backward=explicit_backward
+        )
+    )
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp, tmp.name)
         tp2 = torch.load(tmp.name)
-    # JITed, saved TP
-    with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        tp_jit = assert_auto_jitable(tp)
-        tp_jit.save(tmp.name)
-        tp3 = torch.jit.load(tmp.name)
     # Double-saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp2, tmp.name)
@@ -489,8 +501,95 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight):
     x2 = torch.randn(2, tp.irreps_in2.dim)
     res1 = tp(x1, x2)
     res2 = tp2(x1, x2)
-    res3 = tp3(x1, x2)
     res4 = tp4(x1, x2)
     assert torch.allclose(res1, res2)
-    assert torch.allclose(res1, res3)
     assert torch.allclose(res1, res4)
+
+    if not explicit_backward:
+        # JITed, saved TP
+        with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+            tp_jit = assert_auto_jitable(tp)
+            tp_jit.save(tmp.name)
+            tp3 = torch.jit.load(tmp.name)
+        res3 = tp3(x1, x2)
+        assert torch.allclose(res1, res3)
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=4))
+@pytest.mark.parametrize('special_code', [True, False])
+@pytest.mark.parametrize('opt_ein', [True, False])
+@pytest.mark.parametrize('second_order', [True, False])
+def test_explicit_backward(
+    l1, p1, l2, p2, lo, po, mode, weight,
+    special_code, opt_ein, second_order
+):
+    # Build TPs
+    orig_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein,
+            explicit_backward=False
+        )
+    )
+
+    explicit_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein,
+            explicit_backward=True
+        )
+    )
+
+    # make sure its marked as no JIT support
+    with pytest.raises(NotImplementedError):
+        e3nn.util.jit.compile(explicit_tp)
+
+    with torch.no_grad():
+        explicit_tp.weight[:] = orig_tp.weight
+    assert explicit_tp.compile_options["explicit_backward"]
+    assert not orig_tp.compile_options["explicit_backward"]
+
+    # Confirm that it gives same results
+    x1_orig = orig_tp.irreps_in1.randn(2, -1)
+    x2_orig = orig_tp.irreps_in2.randn(2, -1)
+    # two independent compute graphs
+    x1_explicit, x2_explicit = x1_orig.detach().clone(), x2_orig.detach().clone()
+    for t in (x1_explicit, x2_explicit, x1_orig, x2_orig):
+        t.requires_grad_(True)
+    out_orig = orig_tp(x1_orig, x2_orig)
+    out_explicit = explicit_tp(x1_explicit, x2_explicit)
+    assert out_orig.shape == out_explicit.shape
+    # The forward passes should be *exactly* the same
+    assert torch.allclose(out_orig, out_explicit)
+
+    grad_atol = {
+        torch.float32: 1e-5,
+        torch.float64: 1e-10
+    }[torch.get_default_dtype()]
+
+    # for second order, do another grad first
+    if second_order:
+        out_orig = sum(
+            e.sum() for e in torch.autograd.grad(
+                out_orig.sum(),
+                (x1_orig, x2_orig),
+                create_graph=True
+            )
+        )
+        out_explicit = sum(
+            e.sum() for e in torch.autograd.grad(
+                out_explicit.sum(),
+                (x1_explicit, x2_explicit),
+                create_graph=True
+            )
+        )
+        assert torch.allclose(out_orig, out_explicit, atol=10 * grad_atol)
+
+    # Now we do backward passes
+    out_orig.sum().backward()
+    out_explicit.sum().backward()
+    assert torch.allclose(x1_orig.grad, x1_explicit.grad, atol=grad_atol)
+    assert torch.allclose(x2_orig.grad, x2_explicit.grad, atol=grad_atol)
+    assert torch.allclose(orig_tp.weight.grad, explicit_tp.weight.grad, atol=grad_atol)
