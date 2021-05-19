@@ -50,12 +50,15 @@ def main():
     irreps_in1 = Irreps(args.irreps_in1)
     irreps_in2 = Irreps(args.irreps_in2)
     irreps_out = Irreps(args.irreps_out)
+    compile_opts = dict(
+        specialized_code=args.specialized_code,
+        optimize_einsums=args.opt_ein
+    )
     tp = FullyConnectedTensorProduct(
         irreps_in1,
         irreps_in2,
         irreps_out,
-        _specialized_code=args.specialized_code,
-        _optimize_einsums=args.opt_ein
+        compile_options=compile_opts
     )
     tp = tp.to(device=device)
 

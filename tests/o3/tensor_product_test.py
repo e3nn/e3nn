@@ -6,13 +6,15 @@ import pytest
 import torch
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
+import e3nn.util.jit
 
 
 def make_tp(
     l1, p1, l2, p2, lo, po, mode, weight,
     mul: int = 25,
     path_weights: bool = True,
-    **kwargs
+    reraise: bool = True,
+    **kwargs,
 ):
     def mul_out(mul):
         if mode == "uvuv":
@@ -33,7 +35,10 @@ def make_tp(
             **kwargs
         )
     except AssertionError:
-        return None
+        if reraise:
+            raise
+        else:
+            return None
 
 
 def random_params(n=25):
@@ -47,7 +52,7 @@ def random_params(n=25):
         po = random.choice([-1, 1])
         mode = random.choice(['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv'])
         weight = random.choice([True, False])
-        if make_tp(l1, p1, l2, p2, lo, po, mode, weight) is not None:
+        if make_tp(l1, p1, l2, p2, lo, po, mode, weight, reraise=False) is not None:
             params.add((l1, p1, l2, p2, lo, po, mode, weight))
     return params
 
@@ -176,12 +181,16 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     tp1 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
         ins, normalization=normalization,
-        _specialized_code=False
+        compile_options=dict(
+            specialized_code=False
+        )
     )
     tp2 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
         ins, normalization=normalization,
-        _specialized_code=True
+        compile_options=dict(
+            specialized_code=True
+        )
     )
     with torch.no_grad():
         tp2.weight[:] = tp1.weight
@@ -218,23 +227,6 @@ def test_single_out():
     assert torch.all(out2[:, 5:] == 0)
 
 
-def test_specialized_wigners():
-    """If all paths use specialized code, there should be no wigners"""
-    tp = FullyConnectedTensorProduct(
-        "5x0e + 3x0o",
-        "4x0e", "4x0e + 1x3o",
-        _specialized_code=True
-    )
-    assert torch.numel(tp._wigner_buf) == 0
-    tp = FullyConnectedTensorProduct(
-        "5x0e + 3x0o",
-        "4x0e", "4x0e + 1x3o",
-        _specialized_code=False
-    )
-    # There should only be the 0x0->0 wigner
-    assert torch.numel(tp._wigner_buf) == 1
-
-
 def test_empty_inputs():
     tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
@@ -254,8 +246,10 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
     """
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
-        _specialized_code=special_code,
-        _optimize_einsums=opt_ein
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein
+        )
     )
     opt_tp = assert_auto_jitable(orig_tp)
 
@@ -284,22 +278,41 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
 @pytest.mark.parametrize('special_code', [True, False])
 @pytest.mark.parametrize('opt_ein', [True, False])
 @pytest.mark.parametrize('jit', [True, False])
-def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
+@pytest.mark.parametrize('explicit_backward', [True, False])
+def test_optimizations(
+    l1, p1, l2, p2, lo, po, mode, weight,
+    special_code, opt_ein, jit, explicit_backward,
+):
+    if jit and explicit_backward:
+        pytest.skip("JIT and explicit backwards are not compatible")
+
+    # optimizations can cause meaningful numerical error
+    atol = {
+        torch.float32: 1e-3,
+        torch.float64: 1e-6
+    }[torch.get_default_dtype()]
+
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
-        _specialized_code=False,
-        _optimize_einsums=False
+        compile_options=dict(
+            specialized_code=False,
+            optimize_einsums=False,
+            explicit_backward=False
+        )
     )
     opt_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
-        _specialized_code=special_code,
-        _optimize_einsums=opt_ein
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein,
+            explicit_backward=explicit_backward
+        )
     )
     # We don't use state_dict here since that contains things like wigners that can differ between optimized and unoptimized TPs
     with torch.no_grad():
         opt_tp.weight[:] = orig_tp.weight
-    assert opt_tp._specialized_code == special_code
-    assert opt_tp._optimize_einsums == opt_ein
+    assert opt_tp.compile_options["specialized_code"] == special_code
+    assert opt_tp.compile_options["optimize_einsums"] == opt_ein
 
     if jit:
         opt_tp = assert_auto_jitable(opt_tp)
@@ -317,12 +330,12 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
     assert torch.allclose(
         orig_tp(x1, x2),
         opt_tp(x1, x2),
-        atol=float_tolerance  # numerical optimizations can cause meaningful numerical error by changing operations
+        atol=atol
     )
     assert torch.allclose(
         orig_tp.right(x2),
         opt_tp.right(x2),
-        atol=float_tolerance
+        atol=atol
     )
 
 
@@ -477,17 +490,18 @@ def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
-def test_save(l1, p1, l2, p2, lo, po, mode, weight):
-    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+@pytest.mark.parametrize("explicit_backward", [True, False])
+def test_save(l1, p1, l2, p2, lo, po, mode, weight, explicit_backward):
+    tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        compile_options=dict(
+            explicit_backward=explicit_backward
+        )
+    )
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp, tmp.name)
         tp2 = torch.load(tmp.name)
-    # JITed, saved TP
-    with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        tp_jit = assert_auto_jitable(tp)
-        tp_jit.save(tmp.name)
-        tp3 = torch.jit.load(tmp.name)
     # Double-saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp2, tmp.name)
@@ -496,8 +510,104 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight):
     x2 = torch.randn(2, tp.irreps_in2.dim)
     res1 = tp(x1, x2)
     res2 = tp2(x1, x2)
-    res3 = tp3(x1, x2)
     res4 = tp4(x1, x2)
     assert torch.allclose(res1, res2)
-    assert torch.allclose(res1, res3)
     assert torch.allclose(res1, res4)
+
+    if not explicit_backward:
+        # JITed, saved TP
+        with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
+            tp_jit = assert_auto_jitable(tp)
+            tp_jit.save(tmp.name)
+            tp3 = torch.jit.load(tmp.name)
+        res3 = tp3(x1, x2)
+        assert torch.allclose(res1, res3)
+
+
+@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=4))
+@pytest.mark.parametrize('special_code', [True, False])
+@pytest.mark.parametrize('opt_ein', [True, False])
+@pytest.mark.parametrize('second_order', [True, False])
+def test_explicit_backward(
+    l1, p1, l2, p2, lo, po, mode, weight,
+    special_code, opt_ein, second_order
+):
+    atol = {
+        torch.float32: 1e-5,
+        torch.float64: 1e-8
+    }[torch.get_default_dtype()]
+
+    # Build TPs
+    orig_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein,
+            explicit_backward=False
+        )
+    )
+
+    explicit_tp = make_tp(
+        l1, p1, l2, p2, lo, po, mode, weight,
+        compile_options=dict(
+            specialized_code=special_code,
+            optimize_einsums=opt_ein,
+            explicit_backward=True
+        ),
+        reraise=True
+    )
+
+    # make sure its marked as no JIT support
+    with pytest.raises(NotImplementedError):
+        e3nn.util.jit.compile(explicit_tp)
+
+    with torch.no_grad():
+        explicit_tp.weight[:] = orig_tp.weight
+    assert explicit_tp.compile_options["explicit_backward"]
+    assert not orig_tp.compile_options["explicit_backward"]
+
+    # Confirm that it gives same results
+    orig_x1_orig = orig_tp.irreps_in1.randn(2, -1)
+    orig_x2_orig = orig_tp.irreps_in2.randn(2, -1)
+    # two independent compute graphs
+    x1_orig, x2_orig = orig_x1_orig.detach().clone(), orig_x2_orig.detach().clone()
+    x1_explicit, x2_explicit = orig_x1_orig.detach().clone(), orig_x2_orig.detach().clone()
+    for t in (x1_explicit, x2_explicit, x1_orig, x2_orig):
+        t.requires_grad_(True)
+    out_orig = orig_tp(x1_orig, x2_orig)
+    # confirm nothing mutated:
+    assert torch.all(x1_orig == orig_x1_orig)
+    assert torch.all(x2_orig == orig_x2_orig)
+    out_explicit = explicit_tp(x1_explicit, x2_explicit)
+    # confirm nothing mutated:
+    assert torch.all(x1_explicit == orig_x1_orig)
+    assert torch.all(x2_explicit == orig_x2_orig)
+    assert out_orig.shape == out_explicit.shape
+    # The forward passes may not be identical, since
+    # with explicit backward the forward can accumulate things in-place
+    assert torch.allclose(out_orig, out_explicit, atol=atol)
+
+    # for second order, do another grad first
+    if second_order:
+        out_orig = sum(
+            e.sum() for e in torch.autograd.grad(
+                out_orig.sum(),
+                (x1_orig, x2_orig),
+                create_graph=True
+            )
+        )
+        out_explicit = sum(
+            e.sum() for e in torch.autograd.grad(
+                out_explicit.sum(),
+                (x1_explicit, x2_explicit),
+                create_graph=True
+            )
+        )
+        assert torch.allclose(out_orig, out_explicit, atol=10 * atol)
+
+    # Now we do backward passes
+    out_orig.sum().backward()
+    out_explicit.sum().backward()
+    assert torch.allclose(x1_orig.grad, x1_explicit.grad, atol=atol)
+    assert torch.allclose(x2_orig.grad, x2_explicit.grad, atol=atol)
+    assert torch.allclose(orig_tp.weight.grad, explicit_tp.weight.grad, atol=atol)

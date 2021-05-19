@@ -98,7 +98,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
         instructions: Optional[List[Tuple[int, int]]] = None,
-        _optimize_einsums: Optional[bool] = None
+        compile_options: dict = {}
     ):
         super().__init__()
 
@@ -120,10 +120,6 @@ class Linear(CodeGenMixin, torch.nn.Module):
         self.irreps_out = o3.Irreps(irreps_out)
         del irreps_in
         del irreps_out
-
-        opt_defaults = e3nn.get_optimization_defaults()
-        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
-        del opt_defaults
 
         # == Instructions ==
         if instructions is None:
@@ -155,16 +151,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         del instruction_objs
 
         # == Generate code ==
-        graph, self.weight_numel = _codegen_linear(
-            self.irreps_in,
-            self.irreps_out,
-            self.instructions,
-            shared_weights=shared_weights,
-            optimize_einsums=self._optimize_einsums
-        )
-        self._codegen_register({
-            "_compiled_main": graph
-        })
+        self.recompile(**compile_options)
 
         # == Generate weights ==
         if internal_weights and self.weight_numel > 0:
@@ -188,6 +175,27 @@ class Linear(CodeGenMixin, torch.nn.Module):
         else:
             output_mask = torch.ones(0)
         self.register_buffer('output_mask', output_mask)
+
+    def recompile(
+        self,
+        optimize_einsums: Optional[bool] = None
+    ):
+        opt_defaults = e3nn.get_optimization_defaults()
+        self.compile_options = {
+            "optimize_einsums": optimize_einsums if optimize_einsums is not None else opt_defaults['optimize_einsums']
+        }
+        del opt_defaults
+
+        graphmod, self.weight_numel = _codegen_linear(
+            self.irreps_in,
+            self.irreps_out,
+            self.instructions,
+            shared_weights=self.shared_weights,
+            optimize_einsums=self.compile_options["optimize_einsums"]
+        )
+        self._codegen_register({
+            "_compiled_main": graphmod
+        })
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"
@@ -283,7 +291,7 @@ def _codegen_linear(
     instructions: List[Instruction],
     shared_weights: bool = False,
     optimize_einsums: bool = True,
-) -> Tuple[fx.Graph, int]:
+) -> Tuple[fx.GraphModule, int]:
     graph_out = fx.Graph()
 
     # = Function definitions =
@@ -303,7 +311,7 @@ def _codegen_linear(
         graph_out.output(out.node, torch.Tensor)
         # Short circut
         # 0 is weight_numel
-        return graph_out, 0
+        return fx.GraphModule({}, graph_out, "linear_forward"), 0
 
     x = x.reshape(-1, irreps_in.dim)
     batch_out = x.shape[0]
@@ -383,6 +391,8 @@ def _codegen_linear(
     # check graphs
     graph_out.lint()
 
+    graphmod_out = fx.GraphModule({}, graph_out, "linear_forward")
+
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
     if optimize_einsums:
         try:
@@ -401,6 +411,6 @@ def _codegen_linear(
                     dtype=torch.float32
                 ),
             )
-            graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
 
-    return graph_out, weight_numel
+    return graphmod_out, weight_numel

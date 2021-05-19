@@ -5,7 +5,7 @@ import torch.fx
 
 import e3nn
 from e3nn import o3
-from e3nn.util.jit import compile_mode
+from e3nn.util.jit import compile_mode, set_compile_mode
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util import prod
 
@@ -160,8 +160,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
-    _specialized_code: bool
-    _optimize_einsums: bool
     _profiling_str: str
     normalization: str
     shared_weights: bool
@@ -185,8 +183,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         normalization: str = 'component',
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
-        _specialized_code: Optional[bool] = None,
-        _optimize_einsums: Optional[bool] = None
+        compile_options: dict = {}
     ):
         # === Setup ===
         super().__init__()
@@ -251,31 +248,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.internal_weights = internal_weights
         self.shared_weights = shared_weights
 
-        opt_defaults = e3nn.get_optimization_defaults()
-        self._specialized_code = _specialized_code if _specialized_code is not None else opt_defaults['specialized_code']
-        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
-        del opt_defaults
-
-        # Generate the actual tensor product code
-        graph_out, graph_right, wigners = codegen_tensor_product(
-            self.irreps_in1,
-            self.in1_var,
-            self.irreps_in2,
-            self.in2_var,
-            self.irreps_out,
-            self.out_var,
-            self.instructions,
-            self.normalization,
-            self.shared_weights,
-            self._specialized_code,
-            self._optimize_einsums
-        )
-        self._codegen_register({
-            "_compiled_main_out": graph_out,
-            "_compiled_main_right": graph_right
-        })
-
-        self._wigners = wigners
+        self.recompile(**compile_options)
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
@@ -286,24 +259,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         else:
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer('weight', torch.Tensor())
-
-        # w3j
-        wigner_mats = []
-        for l_1, l_2, l_out in wigners:
-            wig = o3.wigner_3j(l_1, l_2, l_out)
-
-            if normalization == 'component':
-                wig *= (2 * l_out + 1) ** 0.5
-            if normalization == 'norm':
-                wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
-
-            wigner_mats.append(wig)
-
-        if len(wigner_mats) > 0:
-            self.register_buffer('_wigner_buf', torch.cat([w.reshape(-1) for w in wigner_mats]))
-        else:
-            # We register an empty buffer so that call signatures don't have to change
-            self.register_buffer('_wigner_buf', torch.Tensor())
 
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
@@ -321,6 +276,49 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # For TorchScript, this needs to be done in advance:
         self._profiling_str = str(self)
+
+    def recompile(
+        self,
+        specialized_code: Optional[bool] = None,
+        optimize_einsums: Optional[bool] = None,
+        explicit_backward: Optional[bool] = None,
+        instruction_profiling: Optional[bool] = None
+    ):
+        opt_defaults = e3nn.get_optimization_defaults()
+        self.compile_options = {}
+        self.compile_options['specialized_code'] = specialized_code if specialized_code is not None else opt_defaults['specialized_code']
+        self.compile_options['optimize_einsums'] = optimize_einsums if optimize_einsums is not None else opt_defaults['optimize_einsums']
+        self.compile_options['explicit_backward'] = explicit_backward if explicit_backward is not None else opt_defaults['explicit_backward']
+        self.compile_options['instruction_profiling'] = instruction_profiling if instruction_profiling is not None else opt_defaults['instruction_profiling']
+        del opt_defaults
+
+        # Generate the actual tensor product code
+        graphmod_out, graphmod_right = codegen_tensor_product(
+            self.irreps_in1,
+            self.in1_var,
+            self.irreps_in2,
+            self.in2_var,
+            self.irreps_out,
+            self.out_var,
+            self.instructions,
+            normalization=self.normalization,
+            shared_weights=self.shared_weights,
+            specialized_code=self.compile_options["specialized_code"],
+            optimize_einsums=self.compile_options["optimize_einsums"],
+            explicit_backward=self.compile_options["explicit_backward"],
+            instruction_profiling=self.compile_options["instruction_profiling"]
+        )
+        self._codegen_register({
+            "_compiled_main_out": graphmod_out,
+            "_compiled_main_right": graphmod_right
+        })
+
+        if self.compile_options["explicit_backward"]:
+            # TorchScript doesn't support torch.autograd.Function
+            set_compile_mode(self, "unsupported")
+        else:
+            # ... but everything else is supported.
+            set_compile_mode(self, "script")
 
     def __repr__(self):
         npath = sum(prod(i.path_shape) for i in self.instructions)
@@ -405,7 +403,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_right(y, real_weight, self._wigner_buf)
+            return self._compiled_main_right(y, real_weight)
 
     def forward(self, x, y, weight: Optional[torch.Tensor] = None):
         r"""Evaluate :math:`w x \otimes y`.
@@ -435,7 +433,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_out(x, y, real_weight, self._wigner_buf)
+            return self._compiled_main_out(x, y, real_weight)
 
     def weight_view_for_instruction(
         self,
