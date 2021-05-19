@@ -11,8 +11,14 @@ def _make_autograd_func(forward: torch.jit.ScriptModule, backward: torch.jit.Scr
     class _MyFunc(torch.autograd.Function):
         @staticmethod
         def forward(ctx, *args):
-            ctx.save_for_backward(*args)
-            return forward(*args)
+            out = forward(*args)
+            ctx.save_for_backward(*out[-1])
+            out = out[:-1]
+            if len(out) == 1:
+                # let it return one tensor
+                return out[0]
+            else:
+                return out
 
         @staticmethod
         def backward(ctx, *grads):
@@ -59,7 +65,7 @@ class CodeGenMixin:
         ----------
             funcs : Dict[str, Union[fx.GraphModule, Tuple[fx.GraphModule, fx.GraphModule]]]
                 Dictionary mapping submodule names to graph modules.
-                If a value is a two-tuple of graph modules, the first is the forward pass and the second is the backward pass.
+                If a value is a two-tuple of graph modules, the first is the forward pass and the second is the backward pass. The last return value of forward is a tuple of tensors to save for backward, which are the first n arguments to the backward.
         """
         if not hasattr(self, "__codegen__"):
             # list of submodule names that are managed by this object
