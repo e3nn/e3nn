@@ -103,9 +103,12 @@ def codegen_tensor_product(
     graph_right = fx.Graph()
 
     # = Function definitions =
-    x1s_out = fx.Proxy(graph_out.placeholder('x1', torch.Tensor))
-    x2s_out = fx.Proxy(graph_out.placeholder('x2', torch.Tensor))
-    ws_out = fx.Proxy(graph_out.placeholder('w', torch.Tensor))
+    x1_out_node = graph_out.placeholder('x1', torch.Tensor)
+    x2_out_node = graph_out.placeholder('x2', torch.Tensor)
+    ws_out_node = graph_out.placeholder('w', torch.Tensor)
+    x1s_out = fx.Proxy(x1_out_node)
+    x2s_out = fx.Proxy(x2_out_node)
+    ws_out = fx.Proxy(ws_out_node)
 
     x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor))
     ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor))
@@ -486,7 +489,21 @@ def codegen_tensor_product(
 
     out_right = out_right.reshape(outsize_right)
 
-    graph_out.output(out_out.node, torch.Tensor)
+    if explicit_backward:
+        # We also have to output the tensors we want to save for the backward pass
+        # Currently, thats the inputs as well as any used outer products
+        saved_xxs = {k: proxy.node for k, proxy in xx_dict.items() if len(proxy.node.users) > 0}
+        graph_out.output(
+            (
+                out_out.node,
+                # what's to save for backward
+                (x1_out_node, x2_out_node, ws_out_node,) + tuple(saved_xxs.values())
+            ),
+            Tuple[torch.Tensor, Tuple[(torch.Tensor,)*(len(saved_xxs) + 3)]]
+        )
+    else:
+        # The normal case: just return the output
+        graph_out.output(out_out.node, torch.Tensor)
     graph_right.output(out_right.node, torch.Tensor)
 
     # === Check graphs ===
@@ -516,10 +533,20 @@ def codegen_tensor_product(
             from opt_einsum_fx.grad import grad
         except ImportError:
             raise ImportError("opt_einsum_fx is required for explicit_backward = True")
+
+        # Gradients with reshapes need shape info
+        # We run shape propagation now while the graph still only has inputs that are easy to know the shapes of
+        from torch.fx.passes.shape_prop import ShapeProp
+        sp = ShapeProp(graphmod_backward)
+        sp.run(
+            torch.zeros(1, irreps_in1.dim),
+            torch.zeros(1, irreps_in2.dim),
+            torch.zeros(((1,) if shared_weights else tuple()) + (weight_numel,)),
+        )
+
         # - Find certain nodes in the grad graph -
         # There doesn't seem to be a better way to identify nodes across a graph copy
         # since fx.Graph removes all custom Node attributes during copy
-
         def find_in_graph_copy(graph: fx.Graph, nodes: List[Union[fx.Node, fx.Proxy]]) -> List[fx.Node]:
             """ !! NOT a general function --- only works if the graphs are copies."""
             nodes = [n.node if isinstance(n, fx.Proxy) else n for n in nodes]
@@ -536,9 +563,24 @@ def codegen_tensor_product(
         grad_ws_inputs = find_in_graph_copy(graph_backward, ws_list_out)
         grad_out_list = find_in_graph_copy(graph_backward, out_list_out)
         grad_size_out = fx.Proxy(find_in_graph_copy(graph_backward, [size_out.node])[0])
+        # We need to find the outer products that we might be able to use from the cache
+        # But we leave them for now since they have to be present for grad()
+        grad_xx_dict = dict(zip(
+            saved_xxs.keys(),
+            find_in_graph_copy(graph_backward, list(saved_xxs.values()))
+        ))
+        grad_xx_shapes = [n.shape[1:] for n in grad_xx_dict.values()]
+        # - Add placeholders for xx saved tensors -
+        # Placeholders for the outer products cached from forward
+        grad_xx_placeholders = []
+        for xx_key, xx_node in grad_xx_dict.items():
+            # Use x1 to get these in before grad_out for correct order
+            with graph_backward.inserting_before(grad_x1_inputs[0]):
+                grad_xx_placeholders.append(graph_backward.placeholder(f"xx_{xx_key[0]}_{xx_key[1]}_{xx_key[2]}", torch.Tensor))
 
         # - Add a gradient input to the backward graph -
-        with graph_backward.inserting_before(grad_x1_inputs[0]):
+        # insert before x2 extract to make sure its after the xx placeholders to maintain correct parameter order
+        with graph_backward.inserting_before(grad_x2_inputs[0]):
             grad_out = fx.Proxy(graph_backward.placeholder('grad_out', torch.Tensor))
             grad_out = grad_out.reshape(-1, irreps_out.dim)
             grad_grad_list = _extract_irreps(grad_out, irreps_out)
@@ -546,16 +588,6 @@ def codegen_tensor_product(
         del grad_out
 
         # - Compute symbolic gradients -
-        # Gradients with reshapes need shape info
-        from torch.fx.passes.shape_prop import ShapeProp
-        sp = ShapeProp(graphmod_backward)
-        sp.run(
-            torch.zeros(1, irreps_in1.dim),
-            torch.zeros(1, irreps_in2.dim),
-            torch.zeros(((1,) if shared_weights else tuple()) + (weight_numel,)),
-            torch.zeros(1, irreps_out.dim)
-        )
-
         # Get gradient graphs
         grad_x1s = []
         grad_x2s = []
@@ -571,6 +603,14 @@ def codegen_tensor_product(
         grad_x1s = [fx.Proxy(n) for n in grad_x1s]
         grad_x2s = [fx.Proxy(n) for n in grad_x2s]
         grad_ws = [fx.Proxy(n) if n is not None else None for n in grad_ws]
+
+        # - Use precomputed xx outer products -
+        # Now that we've computed gradients, we can replace any remaining outer products with their cached versions:
+        for (xx_key, xx_node), xx_inp in zip(grad_xx_dict.items(), grad_xx_placeholders):
+            xx_node.replace_all_uses_with(xx_inp)
+            graph_backward.erase_node(xx_node)
+        del grad_xx_dict
+        del grad_xx_placeholders
 
         # - Build output gradients -
         # This works because gradient is a linear operation => we can interchange it across the final sums + cats.
@@ -679,7 +719,13 @@ def codegen_tensor_product(
             if explicit_backward:
                 graphmod_backward = jitable(optimize_einsums_full(
                     graphmod_backward,
-                    example_inputs + (torch.ones(batchdim, irreps_out.dim),)
+                    example_inputs + tuple(
+                        torch.zeros((batchdim,) + gs)  # from the shapeprop
+                        for gs in grad_xx_shapes
+                    ) + (
+                        # grad_out
+                        torch.ones(batchdim, irreps_out.dim),
+                    )
                 ))
                 deduplicate(graphmod_backward.graph)
                 graphmod_backward.recompile()
