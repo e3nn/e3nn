@@ -282,10 +282,15 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
 def test_optimizations(
     l1, p1, l2, p2, lo, po, mode, weight,
     special_code, opt_ein, jit, explicit_backward,
-    float_tolerance
 ):
     if jit and explicit_backward:
         pytest.skip("JIT and explicit backwards are not compatible")
+
+    # optimizations can cause meaningful numerical error
+    atol = {
+        torch.float32: 1e-3,
+        torch.float64: 1e-6
+    }[torch.get_default_dtype()]
 
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
@@ -325,12 +330,12 @@ def test_optimizations(
     assert torch.allclose(
         orig_tp(x1, x2),
         opt_tp(x1, x2),
-        atol=float_tolerance  # numerical optimizations can cause meaningful numerical error by changing operations
+        atol=atol
     )
     assert torch.allclose(
         orig_tp.right(x2),
         opt_tp.right(x2),
-        atol=float_tolerance
+        atol=atol
     )
 
 
@@ -527,6 +532,11 @@ def test_explicit_backward(
     l1, p1, l2, p2, lo, po, mode, weight,
     special_code, opt_ein, second_order
 ):
+    atol = {
+        torch.float32: 1e-5,
+        torch.float64: 1e-8
+    }[torch.get_default_dtype()]
+
     # Build TPs
     orig_tp = make_tp(
         l1, p1, l2, p2, lo, po, mode, weight,
@@ -557,22 +567,25 @@ def test_explicit_backward(
     assert not orig_tp.compile_options["explicit_backward"]
 
     # Confirm that it gives same results
-    x1_orig = orig_tp.irreps_in1.randn(2, -1)
-    x2_orig = orig_tp.irreps_in2.randn(2, -1)
+    orig_x1_orig = orig_tp.irreps_in1.randn(2, -1)
+    orig_x2_orig = orig_tp.irreps_in2.randn(2, -1)
     # two independent compute graphs
-    x1_explicit, x2_explicit = x1_orig.detach().clone(), x2_orig.detach().clone()
+    x1_orig, x2_orig = orig_x1_orig.detach().clone(), orig_x2_orig.detach().clone()
+    x1_explicit, x2_explicit = orig_x1_orig.detach().clone(), orig_x2_orig.detach().clone()
     for t in (x1_explicit, x2_explicit, x1_orig, x2_orig):
         t.requires_grad_(True)
     out_orig = orig_tp(x1_orig, x2_orig)
+    # confirm nothing mutated:
+    assert torch.all(x1_orig == orig_x1_orig)
+    assert torch.all(x2_orig == orig_x2_orig)
     out_explicit = explicit_tp(x1_explicit, x2_explicit)
+    # confirm nothing mutated:
+    assert torch.all(x1_explicit == orig_x1_orig)
+    assert torch.all(x2_explicit == orig_x2_orig)
     assert out_orig.shape == out_explicit.shape
-    # The forward passes should be *exactly* the same
-    assert torch.allclose(out_orig, out_explicit)
-
-    grad_atol = {
-        torch.float32: 1e-5,
-        torch.float64: 1e-10
-    }[torch.get_default_dtype()]
+    # The forward passes may not be identical, since
+    # with explicit backward the forward can accumulate things in-place
+    assert torch.allclose(out_orig, out_explicit, atol=atol)
 
     # for second order, do another grad first
     if second_order:
@@ -590,11 +603,11 @@ def test_explicit_backward(
                 create_graph=True
             )
         )
-        assert torch.allclose(out_orig, out_explicit, atol=10 * grad_atol)
+        assert torch.allclose(out_orig, out_explicit, atol=10 * atol)
 
     # Now we do backward passes
     out_orig.sum().backward()
     out_explicit.sum().backward()
-    assert torch.allclose(x1_orig.grad, x1_explicit.grad, atol=grad_atol)
-    assert torch.allclose(x2_orig.grad, x2_explicit.grad, atol=grad_atol)
-    assert torch.allclose(orig_tp.weight.grad, explicit_tp.weight.grad, atol=grad_atol)
+    assert torch.allclose(x1_orig.grad, x1_explicit.grad, atol=atol)
+    assert torch.allclose(x2_orig.grad, x2_explicit.grad, atol=atol)
+    assert torch.allclose(orig_tp.weight.grad, explicit_tp.weight.grad, atol=atol)
