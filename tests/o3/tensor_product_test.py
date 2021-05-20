@@ -611,3 +611,12 @@ def test_explicit_backward(
     assert torch.allclose(x1_orig.grad, x1_explicit.grad, atol=atol)
     assert torch.allclose(x2_orig.grad, x2_explicit.grad, atol=atol)
     assert torch.allclose(orig_tp.weight.grad, explicit_tp.weight.grad, atol=atol)
+
+    # Now we do the whole check again, but this time comparing to finite difference, instead of autograd:
+    # gradcheck is meant to work only in double
+    if torch.get_default_dtype() == torch.float64:
+        torch.autograd.gradcheck(
+            explicit_tp,
+            (x1_explicit, x2_explicit),
+        )
+        # TODO: gradgradcheck?
