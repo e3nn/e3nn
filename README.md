@@ -4,8 +4,8 @@
 
 **[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)** | **[Colab](https://colab.research.google.com/drive/1Gps7mMOmzLe3Rt_b012xsz4UyuexTKAf?usp=sharing)**
 
-The aim of this library it to help the developement of E3 equivariant neural networks.
-It contains fundamental mathematical operations such as tensor products and spherical harmonics.
+The aim of this library is to help the developement of E3 equivariant neural networks.
+It contains fundamental mathematical operations such as [tensor products](https://docs.e3nn.org/en/stable/api/o3/o3_tp.html) and [spherical harmonics](https://docs.e3nn.org/en/stable/api/o3/o3_sh.html).
 
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
 
@@ -14,22 +14,19 @@ It contains fundamental mathematical operations such as tensor products and sphe
 **Important:** install pytorch and only then run the command
 
 ```
-pip install e3nn
+pip install --upgrade pip
+pip install --upgrade e3nn
 ```
-
-It is recommanded to install using pip. The main branch is considered as unstable.
 
 For details and optional dependencies, see [INSTALL.md](https://github.com/e3nn/e3nn/blob/main/INSTALL.md)
 
 ### Breaking changes
 e3nn is under development.
+It is recommanded to install using pip. The main branch is considered as unstable.
 The second version number is incremented every time a breaking change is made to the code.
 ```
 0.(increment when backwards incompatible release).(increment for backwards compatible release)
 ```
-
-### Previous version
-e3nn has been recently refactored. The last version before refactoring can be installed with the command `pip install e3nn==0.1.1`
 
 ## Help
 We are happy to help! The best way to get help on `e3nn` is to submit a [Question](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=question&template=question.md&title=%E2%9D%93+%5BQUESTION%5D) or [Bug Report](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=bug&template=bug-report.md&title=%F0%9F%90%9B+%5BBUG%5D).
