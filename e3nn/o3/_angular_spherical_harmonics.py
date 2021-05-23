@@ -47,7 +47,7 @@ def spherical_harmonics_alpha_beta(l, alpha, beta):
 
     .. math:: Y^l(\alpha, \beta) = S^l(\alpha) P^l(\cos(\beta))
 
-    where :math:`P^l` are the `legendre` polynomials
+    where :math:`P^l` are the `Legendre` polynomials
 
 
     Parameters
