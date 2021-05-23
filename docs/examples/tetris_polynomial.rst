@@ -19,13 +19,13 @@ And the following features of `pytorch_geometric <https://pytorch-geometric.read
 .. rubric:: the model
 
 .. literalinclude:: ../../examples/tetris_polynomial.py
-    :lines: 57-103
+    :lines: 60-107
 
 
 .. rubric:: training
 
 .. literalinclude:: ../../examples/tetris_polynomial.py
-    :lines: 107-127
+    :lines: 111-127
     :dedent: 4
 
 Full code `here <https://github.com/e3nn/e3nn/blob/main/examples/tetris_polynomial.py>`_

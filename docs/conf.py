@@ -37,7 +37,6 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "nbsphinx",
     "jupyter_sphinx",
 ]
 
