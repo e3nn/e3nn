@@ -99,6 +99,11 @@ def main():
         extra = ""
     elif args.backward == 1:
         extra = "out.sum().backward()\n"
+        if not args.weighted:
+            # need something to grad wrt
+            for x1, x2 in inputs:
+                x1.requires_grad_(True)
+                x2.requires_grad_(True)
     elif args.backward == 2:
         for x1, x2 in inputs:
             x1.requires_grad_(True)
