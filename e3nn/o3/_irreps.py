@@ -475,8 +475,8 @@ class Irreps(tuple):
         raise NotImplementedError
 
     def __add__(self, irreps):
-        irreps = Irreps(irreps)
-        return Irreps(super().__add__(irreps))
+        irreps = type(self)(irreps)
+        return type(self)(super().__add__(irreps))
 
     def __mul__(self, other):
         r"""
@@ -485,14 +485,14 @@ class Irreps(tuple):
         """
         if isinstance(other, Irreps):
             raise NotImplementedError("Use o3.TensorProduct for this, see the documentation")
-        return Irreps(super().__mul__(other))
+        return type(self)(super().__mul__(other))
 
     def __rmul__(self, other):
         r"""
         >>> 2 * Irreps('0e + 1e')
         1x0e+1x1e+1x0e+1x1e
         """
-        return Irreps(super().__rmul__(other))
+        return type(self)(super().__rmul__(other))
 
     def simplify(self):
         """Simplify the representations.
@@ -648,65 +648,3 @@ class Irreps(tuple):
         R = d[..., None, None] * R
         k = (1 - d) / 2
         return self.D_from_angles(*o3.matrix_to_angles(R), k)
-
-
-class StridedIrreps(Irreps):
-    def __new__(cls, irreps=None):
-        self = super().__new__(cls, irreps=irreps)
-        mul = self[0].mul
-        # TODO: this could technically be anything with a common divisor... just use gcd?
-        assert all(this_mul == mul for this_mul, _ in self)
-        return self
-
-    @property
-    def base_irreps(self) -> Irreps:
-        return Irreps([(1, ir) for _, ir in self])
-
-    @property
-    def mul(self) -> int:
-        if len(self) == 0:
-            return 0
-        else:
-            return self[0].mul
-
-    @property
-    def base_dim(self) -> int:
-        return self.base_irreps.dim
-
-    def simplify(self):
-        # Can't simplify, since that would make the multiplicities inconsistant
-        return self
-
-    def randn(self, *size, normalization='component', requires_grad=False, dtype=None, device=None):
-        r"""Random tensor.
-
-        Parameters
-        ----------
-        *size : list of int
-            size of the output tensor, needs to contains a ``-1``
-
-        normalization : {'component', 'norm'}
-
-        Returns
-        -------
-        `torch.Tensor`
-            tensor of shape ``size`` where ``-1`` is replaced by ``self.dim``
-
-        Examples
-        --------
-
-        >>> Irreps("5x0e + 10x1o").randn(5, -1, 5, normalization='norm').shape
-        torch.Size([5, 35, 5])
-
-        >>> random_tensor = Irreps("2o").randn(2, -1, 3, normalization='norm')
-        >>> random_tensor.norm(dim=1).sub(1).abs().max().item() < 1e-5
-        True
-        """
-        assert size[-1] == -1
-
-        if normalization == 'component':
-            return torch.randn(size[:-1] + (self.dim,), requires_grad=requires_grad, dtype=dtype, device=device)
-        elif normalization == 'norm':
-            raise NotImplementedError
-        else:
-            raise ValueError("Normalization needs to be 'norm' or 'component'")
