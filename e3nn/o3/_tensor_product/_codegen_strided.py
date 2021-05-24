@@ -215,7 +215,7 @@ def codegen_tensor_product_strided(
                 irreps_in2.randn(batchdim, -1),
                 torch.zeros(
                     1 if shared_weights else batchdim,
-                    len(instructions) * prod(path_shape) * has_weight
+                    len(instructions) * prod(path_shape) * int(has_weight)
                 ),
             )
 

@@ -259,7 +259,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # Generate the actual tensor product code
         are_strided = tuple(isinstance(e, o3.StridedIrreps) for e in (irreps_in1, irreps_in2, irreps_out))
-        breakpoint()
         if any(are_strided):
             assert all(are_strided)
             codegen_func = codegen_tensor_product_strided
