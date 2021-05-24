@@ -6,6 +6,8 @@ User Guide
 .. rubric:: Beginner
 
 .. toctree::
+    :maxdepth: 1
+
     installation
     irreps
     convolution
@@ -14,6 +16,7 @@ User Guide
 .. rubric:: Advanced
 
 .. toctree::
+    :maxdepth: 1
 
     transformer
     equivar_testing

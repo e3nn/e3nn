@@ -110,7 +110,14 @@ Let's create that embedding. Here is the base functions we will use:
     num_basis = 10
 
     x = torch.linspace(0.0, 2.0, 1000)
-    y = soft_one_hot_linspace(x, 0.0, max_radius, num_basis, 'smooth_finite', False)
+    y = soft_one_hot_linspace(
+        x,
+        start=0.0,
+        end=max_radius,
+        number=num_basis,
+        basis='smooth_finite',
+        cutoff=True,
+    )
 
     plt.plot(x, y);
 
@@ -121,7 +128,14 @@ Let's use this embedding for the edge distances and normalize it properly (``com
 
 .. jupyter-execute::
 
-    edge_length_embedding = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, 'smooth_finite', False)
+    edge_length_embedding = soft_one_hot_linspace(
+        edge_vec.norm(dim=1),
+        start=0.0,
+        end=max_radius,
+        number=num_basis,
+        basis='smooth_finite',
+        cutoff=True,
+    )
     edge_length_embedding = edge_length_embedding.mul(num_basis**0.5)
 
     print(edge_length_embedding.shape)

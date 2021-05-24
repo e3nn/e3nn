@@ -5,7 +5,6 @@ sphinx-rtd-theme
 sympy
 
 ipykernel
-nbsphinx
 plotly
 jupyter-sphinx
 

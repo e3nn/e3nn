@@ -8,7 +8,7 @@ All tensor products --- denoted :math:`\otimes` --- share two key characteristic
 
 The class `TensorProduct` implements all possible tensor products between finite direct sums of irreducible representations (`Irreps`). While `TensorProduct` provides maximum flexibility, a number of sublcasses provide various typical special cases of the tensor product:
 
-* `FullTensorProduct`: 
+* `FullTensorProduct`:
 
 .. jupyter-execute::
     :hide-code:
@@ -35,9 +35,9 @@ The full tensor product is the "natural" one. Every possible output --- each out
         irreps_out='15x0e + 3x1e'
     ).visualize()
 
-In a fully connected tensor product, all paths that lead to any of the irreps specified in `irreps_out` are created. Unlike `FullTensorProduct`, each output is a learned weighted sum of compatible paths. This allows `FullyConnectedTensorProduct` to produce outputs with any multiplicity; note that the example above has :math:`5 \times 6 + 5 \times 4 = 50` ways of creating scalars (``0e``), but the specified ``irreps_out`` has only 15 scalars, each of which is a learned weighted combination of those 50 possible scalars. The blue color in the visualization indicates that the path has these learnable weights.
+In a fully connected tensor product, all paths that lead to any of the irreps specified in ``irreps_out`` are created. Unlike `FullTensorProduct`, each output is a learned weighted sum of compatible paths. This allows `FullyConnectedTensorProduct` to produce outputs with any multiplicity; note that the example above has :math:`5 \times 6 + 5 \times 4 = 50` ways of creating scalars (``0e``), but the specified ``irreps_out`` has only 15 scalars, each of which is a learned weighted combination of those 50 possible scalars. The blue color in the visualization indicates that the path has these learnable weights.
 
-All possible output irreps do **not** need to be included in ``irreps_out`` of a `FullyConnectedTensorProduct`: ``o3.FullyConnectedTensorProduct(irreps_in1='5x1o', irreps_in2='3x1o', irreps_out='20x0e')`` will only compute inner products between its inputs, since ``1e``, the output irrep of a vector cross product, is not present in ``irreps_out``. Note also in this example that there are 20 output scalars, even though the given inputs can produce only 15 unique scalars --- this is again allowed because each output is a learned linear combination of those 15 scalars, placing no restrictions on how many or how few outputs can be requested. 
+All possible output irreps do **not** need to be included in ``irreps_out`` of a `FullyConnectedTensorProduct`: ``o3.FullyConnectedTensorProduct(irreps_in1='5x1o', irreps_in2='3x1o', irreps_out='20x0e')`` will only compute inner products between its inputs, since ``1e``, the output irrep of a vector cross product, is not present in ``irreps_out``. Note also in this example that there are 20 output scalars, even though the given inputs can produce only 15 unique scalars --- this is again allowed because each output is a learned linear combination of those 15 scalars, placing no restrictions on how many or how few outputs can be requested.
 
 * `ElementwiseTensorProduct`
 

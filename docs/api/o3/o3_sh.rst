@@ -190,4 +190,4 @@ The functions below are more efficient versions not using `ElementwiseTensorProd
 
 .. autofunction:: e3nn.o3.spherical_harmonics_alpha_beta
 
-.. autofunction:: e3nn.o3.legendre
+.. autofunction:: e3nn.o3.Legendre
