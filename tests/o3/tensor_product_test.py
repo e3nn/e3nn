@@ -4,36 +4,55 @@ import tempfile
 
 import pytest
 import torch
-from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
+from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps, StridedIrreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
 
 
 def make_tp(
-    l1, p1, l2, p2, lo, po, mode, weight,
+    l1, p1, l2, p2, lo, po, mode, weight, strided,
     mul: int = 25,
     path_weights: bool = True,
+    error_as_none: bool = False,
     **kwargs
 ):
-    def mul_out(mul):
-        if mode == "uvuv":
-            return mul**2
-        return mul
-
     try:
-        return TensorProduct(
-            [(mul, (l1, p1)), (19, (l1, p1))],
-            [(mul, (l2, p2)), (19, (l2, p2))],
-            [(mul_out(mul), (lo, po)), (mul_out(19), (lo, po))],
-            [
-                (0, 0, 0, mode, weight),
-                (1, 1, 1, mode, weight),
-                (0, 0, 1, 'uvw', True, 0.5 if path_weights else 1.0),
-                (0, 1, 1, 'uvw', True, 0.2 if path_weights else 1.0),
-            ],
-            **kwargs
-        )
+        if strided:
+            assert mode != "uvuv"
+            return TensorProduct(
+                StridedIrreps([(mul, (l1, p1)), (mul, (l1, p1))]),
+                StridedIrreps([(mul, (l2, p2)), (mul, (l2, p2))]),
+                StridedIrreps([(mul, (lo, po)), (mul, (lo, po))]),
+                # you can't mix modes or has_weights in strided mode
+                [
+                    (0, 0, 0, mode, weight),
+                    (1, 1, 1, mode, weight),
+                    (0, 0, 1, mode, weight, 0.5 if path_weights else 1.0),
+                    (0, 1, 1, mode, weight, 0.2 if path_weights else 1.0),
+                ],
+                **kwargs
+            )
+        else:
+            def mul_out(mul):
+                if mode == "uvuv":
+                    return mul**2
+                return mul
+            return TensorProduct(
+                Irreps([(mul, (l1, p1)), (19, (l1, p1))]),
+                Irreps([(mul, (l2, p2)), (19, (l2, p2))]),
+                Irreps([(mul_out(mul), (lo, po)), (mul_out(19), (lo, po))]),
+                [
+                    (0, 0, 0, mode, weight),
+                    (1, 1, 1, mode, weight),
+                    (0, 0, 1, 'uvw', True, 0.5 if path_weights else 1.0),
+                    (0, 1, 1, 'uvw', True, 0.2 if path_weights else 1.0),
+                ],
+                **kwargs
+            )
     except AssertionError:
-        return None
+        if error_as_none:
+            return None
+        else:
+            raise
 
 
 def random_params(n=25):
@@ -47,18 +66,19 @@ def random_params(n=25):
         po = random.choice([-1, 1])
         mode = random.choice(['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv'])
         weight = random.choice([True, False])
-        if make_tp(l1, p1, l2, p2, lo, po, mode, weight) is not None:
-            params.add((l1, p1, l2, p2, lo, po, mode, weight))
+        for strided in (True, False):
+            if make_tp(l1, p1, l2, p2, lo, po, mode, weight, strided, error_as_none=True) is not None:
+                params.add((l1, p1, l2, p2, lo, po, mode, weight, strided))
     return params
 
 
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params())
-def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
+@pytest.mark.parametrize('tp_params', random_params())
+def test(float_tolerance, tp_params):
     eps = float_tolerance
     n = 1_500
     tol = 3.0
 
-    m = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+    m = make_tp(*tp_params)
 
     # bilinear
     x1 = torch.randn(2, m.irreps_in1.dim)
@@ -73,9 +93,10 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     assert (z1 - z3).abs().max() < eps
 
     # right
-    z1 = m(x1, y1)
-    z2 = torch.einsum('zi,zij->zj', x1, m.right(y1))
-    assert (z1 - z2).abs().max() < eps
+    if m.supports_right:
+        z1 = m(x1, y1)
+        z2 = torch.einsum('zi,zij->zj', x1, m.right(y1))
+        assert (z1 - z2).abs().max() < eps
 
     # variance
     x1 = torch.randn(n, m.irreps_in1.dim)
@@ -88,21 +109,21 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
 
 # This is a fairly expensive test, so we don't run too many configs
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=8))
-def test_normalized(l1, p1, l2, p2, lo, po, mode, weight):
+@pytest.mark.parametrize('tp_params', random_params(n=8))
+def test_normalized(tp_params):
     if torch.get_default_dtype() != torch.float32:
         pytest.skip(
             "No reason to run expensive normalization tests again at float64 expense."
         )
     # Explicit fixed path weights screw with the output normalization,
     # so don't use them
-    m = make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul=5, path_weights=False)
+    m = make_tp(*tp_params, mul=5, path_weights=False)
     # normalization
     # n_weight, n_input has to be decently high to ensure statistical convergence
     # especially for uvuv
     assert_normalized(
         m,
-        n_weight=100,
+        n_weight=100 if m.weight_numel > 0 else 1,
         n_input=10_000,
         atol=0.5
     )
@@ -189,7 +210,8 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     x = irreps_in1.randn(3, -1)
     y = irreps_in2.randn(3, -1)
     assert (tp1(x, y) - tp2(x, y)).abs().max() < float_tolerance
-    assert (tp1.right(y) - tp2.right(y)).abs().max() < float_tolerance
+    if tp1.supports_right:
+        assert (tp1.right(y) - tp2.right(y)).abs().max() < float_tolerance
 
 
 def test_empty_irreps():
@@ -223,20 +245,21 @@ def test_empty_inputs():
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
     assert out.shape == (2, 2, 0, 3, 4)
 
-    out = tp.right(torch.randn(1, 2, 0, 3, 4))
-    assert out.shape == (1, 2, 0, 3, 4, 4)
+    if tp.supports_right:
+        out = tp.right(torch.randn(1, 2, 0, 3, 4))
+        assert out.shape == (1, 2, 0, 3, 4, 4)
 
 
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=2))
+@pytest.mark.parametrize('tp_params', random_params(n=2))
 @pytest.mark.parametrize('special_code', [True, False])
 @pytest.mark.parametrize('opt_ein', [True, False])
-def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
+def test_jit(tp_params, special_code, opt_ein):
     """Test the JIT.
 
     This test is seperate from test_optimizations to ensure that just jitting a model has minimal error if any.
     """
     orig_tp = make_tp(
-        l1, p1, l2, p2, lo, po, mode, weight,
+        *tp_params,
         _specialized_code=special_code,
         _optimize_einsums=opt_ein
     )
@@ -257,24 +280,25 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
         orig_tp(x1, x2),
         opt_tp(x1, x2),
     )
-    assert torch.allclose(
-        orig_tp.right(x2),
-        opt_tp.right(x2),
-    )
+    if orig_tp.supports_right:
+        assert torch.allclose(
+            orig_tp.right(x2),
+            opt_tp.right(x2),
+        )
 
 
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=4))
+@pytest.mark.parametrize('tp_params', random_params(n=4))
 @pytest.mark.parametrize('special_code', [True, False])
 @pytest.mark.parametrize('opt_ein', [True, False])
 @pytest.mark.parametrize('jit', [True, False])
-def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
+def test_optimizations(tp_params, special_code, opt_ein, jit, float_tolerance):
     orig_tp = make_tp(
-        l1, p1, l2, p2, lo, po, mode, weight,
+        *tp_params,
         _specialized_code=False,
         _optimize_einsums=False
     )
     opt_tp = make_tp(
-        l1, p1, l2, p2, lo, po, mode, weight,
+        *tp_params,
         _specialized_code=special_code,
         _optimize_einsums=opt_ein
     )
@@ -302,11 +326,12 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
         opt_tp(x1, x2),
         atol=float_tolerance  # numerical optimizations can cause meaningful numerical error by changing operations
     )
-    assert torch.allclose(
-        orig_tp.right(x2),
-        opt_tp.right(x2),
-        atol=float_tolerance
-    )
+    if orig_tp.supports_right:
+        assert torch.allclose(
+            orig_tp.right(x2),
+            opt_tp.right(x2),
+            atol=float_tolerance
+        )
 
 
 def test_input_weights_python():
@@ -448,9 +473,9 @@ def test_weight_views():
     assert torch.all(m(x1, x2, weights) == 0.0)
 
 
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
-def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
-    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+@pytest.mark.parametrize('tp_params', random_params(n=1))
+def test_deepcopy(tp_params):
+    tp = make_tp(*tp_params)
     x1 = torch.randn(2, tp.irreps_in1.dim)
     x2 = torch.randn(2, tp.irreps_in2.dim)
     res1 = tp(x1, x2)
@@ -459,9 +484,9 @@ def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
     assert torch.allclose(res1, res2)
 
 
-@pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=1))
-def test_save(l1, p1, l2, p2, lo, po, mode, weight):
-    tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+@pytest.mark.parametrize('tp_params', random_params(n=1))
+def test_save(tp_params):
+    tp = make_tp(*tp_params)
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp, tmp.name)
