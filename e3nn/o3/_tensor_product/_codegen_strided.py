@@ -132,7 +132,7 @@ def codegen_tensor_product_strided(
         this_w3j *= alpha
         # ^ ijk
         this_index = this_w3j.nonzero()
-        this_value = this_w3j[this_index[:, 0], this_index[:, 1], this_index[:,2]]
+        this_value = this_w3j[this_index[:, 0], this_index[:, 1], this_index[:, 2]]
         # now, we need to make the indexes flat
         this_k_index = this_index[:, 2] + irreps_out.base_irreps[:ins.i_out].dim
         # Flattened ij:

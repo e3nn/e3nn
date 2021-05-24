@@ -90,6 +90,7 @@ __all__ = [
     "wigner_3j",
     "Irrep",
     "Irreps",
+    "StridedIrreps",
     "Instruction",
     "TensorProduct",
     "FullyConnectedTensorProduct",
