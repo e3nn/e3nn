@@ -29,7 +29,7 @@ from ._rotation import (
     xyz_to_angles,
 )
 from ._wigner import wigner_D, wigner_3j
-from ._irreps import Irrep, Irreps
+from ._irreps import Irrep, Irreps, StridedIrreps
 from ._tensor_product import (
     Instruction,
     TensorProduct,
