@@ -11,6 +11,7 @@ from e3nn.util import prod
 
 from ._instruction import Instruction
 from ._codegen import codegen_tensor_product
+from ._codegen_strided import codegen_tensor_product_strided
 
 
 @compile_mode('script')
@@ -257,7 +258,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # Generate the actual tensor product code
-        graphmod_out, graphmod_right = codegen_tensor_product(
+        are_strided = tuple(isinstance(e, o3.StridedIrreps) for e in (irreps_in1, irreps_in2, irreps_out))
+        breakpoint()
+        if any(are_strided):
+            assert all(are_strided)
+            codegen_func = codegen_tensor_product_strided
+        else:
+            codegen_func = codegen_tensor_product
+
+        graphmod_out, graphmod_right = codegen_func(
             self.irreps_in1,
             self.in1_var,
             self.irreps_in2,
@@ -285,19 +294,20 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer('weight', torch.Tensor())
 
-        if self.irreps_out.dim > 0:
-            output_mask = torch.cat([
-                torch.ones(mul * ir.dim)
-                if any(
-                    (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
-                    for ins in self.instructions
-                )
-                else torch.zeros(mul * ir.dim)
-                for i_out, (mul, ir) in enumerate(self.irreps_out)
-            ])
-        else:
-            output_mask = torch.ones(0)
-        self.register_buffer('output_mask', output_mask)
+        # TODO; strided
+        # if self.irreps_out.dim > 0:
+        #     output_mask = torch.cat([
+        #         torch.ones(mul * ir.dim)
+        #         if any(
+        #             (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
+        #             for ins in self.instructions
+        #         )
+        #         else torch.zeros(mul * ir.dim)
+        #         for i_out, (mul, ir) in enumerate(self.irreps_out)
+        #     ])
+        # else:
+        #     output_mask = torch.ones(0)
+        # self.register_buffer('output_mask', output_mask)
 
         # For TorchScript, this needs to be done in advance:
         self._profiling_str = str(self)
