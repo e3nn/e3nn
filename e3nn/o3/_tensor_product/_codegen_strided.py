@@ -147,6 +147,13 @@ def codegen_tensor_product_strided(
     # Build the sparse matrix
     big_w3j_indexes = torch.cat(big_w3j_indexes, dim=1)
     big_w3j_values = torch.cat(big_w3j_values, dim=0)
+    big_w3j = torch.sparse_coo_tensor(
+        indices=big_w3j_indexes,
+        values=big_w3j_values,
+        size=big_w3j_shape
+    ).coalesce()
+    del big_w3j_indexes
+    del big_w3j_values
 
     # - Run actual einsum -
     big_w3j_proxy = fx.Proxy(graph_out.call_function(
@@ -183,10 +190,15 @@ def codegen_tensor_product_strided(
     graph_out.lint()
 
     graphmod_out = fx.GraphModule(
-        {"big_w3j_index": big_w3j_indexes, "big_w3j_value": big_w3j_values},
+        {"big_w3j_index": None, "big_w3j_value": None},  # needed for name resolution
         graph_out,
         class_name="tp_forward"
     )
+    # Properly register big_w3j as a buffer:
+    delattr(graphmod_out, "big_w3j_index")
+    delattr(graphmod_out, "big_w3j_value")
+    graphmod_out.register_buffer("big_w3j_index", big_w3j.indices())
+    graphmod_out.register_buffer("big_w3j_value", big_w3j.values())
 
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that

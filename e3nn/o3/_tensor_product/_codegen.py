@@ -428,8 +428,21 @@ def codegen_tensor_product(
 
         wigner_mats[f"_w3j_{l_1}_{l_2}_{l_out}"] = wig
 
-    graphmod_out = fx.GraphModule(wigner_mats, graph_out, class_name="tp_forward")
-    graphmod_right = fx.GraphModule(wigner_mats, graph_right, class_name="tp_right")
+    graphmod_out = fx.GraphModule(
+        {k: None for k in wigner_mats},  # needed for name resolution
+        graph_out,
+        class_name="tp_forward"
+    )
+    graphmod_right = fx.GraphModule(
+        {k: None for k in wigner_mats},  # needed for name resolution
+        graph_right,
+        class_name="tp_right"
+    )
+    # Property register the wigners as buffers, not attributes:
+    for gmod in (graphmod_out, graphmod_right):
+        for k, v in wigner_mats.items():
+            delattr(gmod, k)
+            gmod.register_buffer(k, v)
 
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
