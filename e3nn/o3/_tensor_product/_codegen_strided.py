@@ -1,5 +1,5 @@
 from math import sqrt
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import torch
 from torch import fx
@@ -22,19 +22,8 @@ def codegen_tensor_product_strided(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[fx.GraphModule, fx.GraphModule]:
+) -> Tuple[fx.GraphModule, Optional[fx.GraphModule]]:
     graph_out = fx.Graph()
-
-    # Make a placeholder graph for right()
-    graph_right = fx.Graph()
-    graph_right.placeholder('x2', torch.Tensor)
-    graph_right.placeholder('w', torch.Tensor)
-    graph_right.call_function(
-        torch._assert,
-        args=(False, "Strided does not support right()")
-    )
-    graphmod_right = fx.GraphModule({}, graph_right, "tp_right")
-    del graph_right
 
     # = Function definitions =
     # z u i
@@ -57,7 +46,7 @@ def codegen_tensor_product_strided(
         # Short circut
         return (
             fx.GraphModule({}, graph_out, "tp_forward"),
-            graphmod_right
+            None
         )
 
     # = Determine number of weights and reshape weights ==
@@ -67,6 +56,35 @@ def codegen_tensor_product_strided(
     assert all(ins.path_shape == path_shape for ins in instructions)
     assert all(ins.connection_mode == connection_mode for ins in instructions)
     assert all(ins.has_weight == has_weight for ins in instructions)
+
+    # check correctness of inputs
+    if connection_mode == 'uvw':
+        assert has_weight
+    elif connection_mode == 'uvu':
+        assert irreps_in1.mul == irreps_out.mul
+    elif connection_mode == 'uvv':
+        assert irreps_in2.mul == irreps_out.mul
+    elif connection_mode == 'uuw':
+        assert irreps_in1.mul == irreps_in2.mul
+        assert has_weight
+    elif connection_mode == 'uuu':
+        assert irreps_in1.mul == irreps_in2.mul == irreps_out.mul
+    elif connection_mode == 'uvuv':
+        assert False
+
+    # The einsum string index to prepend to the weights if the weights are not shared and have a batch dimension
+    z = '' if shared_weights else 'z'
+    u = connection_mode[0]
+    v = connection_mode[1]
+    w = connection_mode[2]
+    weight_label = {
+        "uvw": "uvw",
+        "uuu": "u",
+        "uuv": "uv",
+        "uvu": "uv",
+        "uvv": "uv",
+        "uuw": "uw"
+    }[connection_mode]
 
     # all paths have the same shape:
     if has_weight:
@@ -127,27 +145,15 @@ def codegen_tensor_product_strided(
         big_w3j_values.append(this_value)
 
     # Build the sparse matrix
-    big_w3j = torch.sparse_coo_tensor(
-        indices=torch.cat(big_w3j_indexes, dim=1),
-        values=torch.cat(big_w3j_values, dim=0),
-        size=big_w3j_shape
-    )
-    del big_w3j_indexes
-    del big_w3j_values
+    big_w3j_indexes = torch.cat(big_w3j_indexes, dim=1)
+    big_w3j_values = torch.cat(big_w3j_values, dim=0)
 
     # - Run actual einsum -
-    big_w3j_proxy = fx.Proxy(graph_out.get_attr("big_w3j"))
-    # The einsum string index to prepend to the weights if the weights are not shared and have a batch dimension
-    z = '' if shared_weights else 'z'
-    u = connection_mode[0]
-    v = connection_mode[1]
-    w = connection_mode[2]
-    weight_label = {
-        "uvw": "uvw",
-        "uuu": "u",
-        "uuv": "uv",
-        "uvu": "uv",
-    }[connection_mode]
+    big_w3j_proxy = fx.Proxy(graph_out.call_function(
+        torch.sparse_coo_tensor,
+        args=(graph_out.get_attr("big_w3j_index"), graph_out.get_attr("big_w3j_value"), big_w3j_shape)
+    ))
+
     if has_weight:
         weighted_outer_product = torch.einsum(
             f"z{u}i,{z}p{weight_label},z{v}j->pij{w}z",
@@ -177,7 +183,7 @@ def codegen_tensor_product_strided(
     graph_out.lint()
 
     graphmod_out = fx.GraphModule(
-        {"big_w3j": big_w3j},
+        {"big_w3j_index": big_w3j_indexes, "big_w3j_value": big_w3j_values},
         graph_out,
         class_name="tp_forward"
     )
@@ -218,7 +224,6 @@ def codegen_tensor_product_strided(
                     len(instructions) * prod(path_shape) * int(has_weight)
                 ),
             )
-
             graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
 
-    return graphmod_out, graphmod_right
+    return graphmod_out, None

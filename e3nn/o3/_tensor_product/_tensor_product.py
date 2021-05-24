@@ -173,6 +173,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     out_var: List[float]
     _in1_dim: int
     _in2_dim: int
+    supports_right: bool
 
     def __init__(
         self,
@@ -278,6 +279,20 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self._specialized_code,
             self._optimize_einsums
         )
+        if graphmod_right is None:
+            # Make a placeholder graph for right()
+            graph_right = torch.fx.Graph()
+            graph_right.placeholder('x2', torch.Tensor)
+            graph_right.placeholder('w', torch.Tensor)
+            graph_right.call_function(
+                torch._assert,
+                args=(False, "Strided does not support right()")
+            )
+            graphmod_right = torch.fx.GraphModule({}, graph_right, "tp_right")
+            del graph_right
+            self.supports_right = False
+        else:
+            self.supports_right = True
         self._codegen_register({
             "_compiled_main_out": graphmod_out,
             "_compiled_main_right": graphmod_right
