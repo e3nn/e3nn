@@ -180,7 +180,8 @@ def codegen_tensor_product_strided(
         big_w3j_shape[-1], -1
     )
     # [k][wz]:
-    result = torch.mm(big_w3j_proxy, weighted_outer_product)
+    # skip control flow on sparseness by going straight to _sparse_mm
+    result = torch._sparse_mm(big_w3j_proxy, weighted_outer_product)
     # z[wk]
     result = result.reshape(irreps_out.base_dim, irreps_out.mul, -1).transpose(0, 2).reshape(-1, irreps_out.dim)
 
