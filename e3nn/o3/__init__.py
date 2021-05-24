@@ -30,6 +30,7 @@ from ._rotation import (
 )
 from ._wigner import wigner_D, wigner_3j
 from ._irreps import Irrep, Irreps
+from ._strided_irreps import StridedIrreps
 from ._tensor_product import (
     Instruction,
     TensorProduct,
@@ -90,6 +91,7 @@ __all__ = [
     "wigner_3j",
     "Irrep",
     "Irreps",
+    "StridedIrreps",
     "Instruction",
     "TensorProduct",
     "FullyConnectedTensorProduct",

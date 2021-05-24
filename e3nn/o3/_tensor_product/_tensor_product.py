@@ -11,6 +11,7 @@ from e3nn.util import prod
 
 from ._instruction import Instruction
 from ._codegen import codegen_tensor_product
+from ._codegen_strided import codegen_tensor_product_strided
 
 
 @compile_mode('script')
@@ -172,6 +173,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     out_var: List[float]
     _in1_dim: int
     _in2_dim: int
+    supports_right: bool
 
     def __init__(
         self,
@@ -257,7 +259,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # Generate the actual tensor product code
-        graph_out, graph_right, wigners = codegen_tensor_product(
+        are_strided = tuple(isinstance(e, o3.StridedIrreps) for e in (irreps_in1, irreps_in2, irreps_out))
+        if any(are_strided):
+            assert all(are_strided)
+            codegen_func = codegen_tensor_product_strided
+        else:
+            codegen_func = codegen_tensor_product
+
+        graphmod_out, graphmod_right = codegen_func(
             self.irreps_in1,
             self.in1_var,
             self.irreps_in2,
@@ -270,12 +279,24 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self._specialized_code,
             self._optimize_einsums
         )
+        if graphmod_right is None:
+            # Make a placeholder graph for right()
+            graph_right = torch.fx.Graph()
+            graph_right.placeholder('x2', torch.Tensor)
+            graph_right.placeholder('w', torch.Tensor)
+            graph_right.call_function(
+                torch._assert,
+                args=(False, "Strided does not support right()")
+            )
+            graphmod_right = torch.fx.GraphModule({}, graph_right, "tp_right")
+            del graph_right
+            self.supports_right = False
+        else:
+            self.supports_right = True
         self._codegen_register({
-            "_compiled_main_out": graph_out,
-            "_compiled_main_right": graph_right
+            "_compiled_main_out": graphmod_out,
+            "_compiled_main_right": graphmod_right
         })
-
-        self._wigners = wigners
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
@@ -287,37 +308,20 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer('weight', torch.Tensor())
 
-        # w3j
-        wigner_mats = []
-        for l_1, l_2, l_out in wigners:
-            wig = o3.wigner_3j(l_1, l_2, l_out)
-
-            if normalization == 'component':
-                wig *= (2 * l_out + 1) ** 0.5
-            if normalization == 'norm':
-                wig *= (2 * l_1 + 1) ** 0.5 * (2 * l_2 + 1) ** 0.5
-
-            wigner_mats.append(wig)
-
-        if len(wigner_mats) > 0:
-            self.register_buffer('_wigner_buf', torch.cat([w.reshape(-1) for w in wigner_mats]))
-        else:
-            # We register an empty buffer so that call signatures don't have to change
-            self.register_buffer('_wigner_buf', torch.Tensor())
-
-        if self.irreps_out.dim > 0:
-            output_mask = torch.cat([
-                torch.ones(mul * ir.dim)
-                if any(
-                    (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
-                    for ins in self.instructions
-                )
-                else torch.zeros(mul * ir.dim)
-                for i_out, (mul, ir) in enumerate(self.irreps_out)
-            ])
-        else:
-            output_mask = torch.ones(0)
-        self.register_buffer('output_mask', output_mask)
+        # TODO; strided
+        # if self.irreps_out.dim > 0:
+        #     output_mask = torch.cat([
+        #         torch.ones(mul * ir.dim)
+        #         if any(
+        #             (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
+        #             for ins in self.instructions
+        #         )
+        #         else torch.zeros(mul * ir.dim)
+        #         for i_out, (mul, ir) in enumerate(self.irreps_out)
+        #     ])
+        # else:
+        #     output_mask = torch.ones(0)
+        # self.register_buffer('output_mask', output_mask)
 
         # For TorchScript, this needs to be done in advance:
         self._profiling_str = str(self)
@@ -405,7 +409,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_right(y, real_weight, self._wigner_buf)
+            return self._compiled_main_right(y, real_weight)
 
     def forward(self, x, y, weight: Optional[torch.Tensor] = None):
         r"""Evaluate :math:`w x \otimes y`.
@@ -435,7 +439,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         with torch.autograd.profiler.record_function(self._profiling_str):
             real_weight = self._get_weights(weight)
-            return self._compiled_main_out(x, y, real_weight, self._wigner_buf)
+            return self._compiled_main_out(x, y, real_weight)
 
     def weight_view_for_instruction(
         self,

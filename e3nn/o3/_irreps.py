@@ -316,7 +316,7 @@ class Irreps(tuple):
     """
     def __new__(cls, irreps=None):
         if isinstance(irreps, Irreps):
-            return super().__new__(cls, irreps)
+            return tuple.__new__(type(irreps) if cls == Irreps else cls, irreps)
 
         out = []
         if isinstance(irreps, Irrep):
@@ -475,8 +475,8 @@ class Irreps(tuple):
         raise NotImplementedError
 
     def __add__(self, irreps):
-        irreps = Irreps(irreps)
-        return Irreps(super().__add__(irreps))
+        irreps = type(self)(irreps)
+        return type(self)(super().__add__(irreps))
 
     def __mul__(self, other):
         r"""
@@ -485,14 +485,14 @@ class Irreps(tuple):
         """
         if isinstance(other, Irreps):
             raise NotImplementedError("Use o3.TensorProduct for this, see the documentation")
-        return Irreps(super().__mul__(other))
+        return type(self)(super().__mul__(other))
 
     def __rmul__(self, other):
         r"""
         >>> 2 * Irreps('0e + 1e')
         1x0e+1x1e+1x0e+1x1e
         """
-        return Irreps(super().__rmul__(other))
+        return type(self)(super().__rmul__(other))
 
     def simplify(self):
         """Simplify the representations.

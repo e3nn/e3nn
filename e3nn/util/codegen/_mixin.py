@@ -15,30 +15,23 @@ class CodeGenMixin:
     """
     def _codegen_register(
         self,
-        funcs: Dict[str, fx.Graph],
-        compile: bool = True
+        funcs: Dict[str, fx.GraphModule],
     ) -> None:
-        """Register ``fx.Graph``s as TorchScript submodules.
-
-        ``fx.GraphModule``s will be built with the current module as their ``root``.
+        """Register ``fx.GraphModule``s as TorchScript submodules.
 
         Parameters
         ----------
-            funcs : Dict[str, fx.Graph]
-                Dictionary mapping submodule names to graphs.
+            funcs : Dict[str, fx.GraphModule]
+                Dictionary mapping submodule names to graph modules.
         """
         if not hasattr(self, "__codegen__"):
             # list of submodule names that are managed by this object
             self.__codegen__ = []
         self.__codegen__.extend(funcs.keys())
 
-        for fname, graph in funcs.items():
-            assert isinstance(graph, fx.Graph)
-            scriptmod = torch.jit.script(fx.GraphModule(
-                root=self,
-                graph=graph,
-                class_name=fname
-            ))
+        for fname, graphmod in funcs.items():
+            assert isinstance(graphmod, fx.GraphModule)
+            scriptmod = torch.jit.script(graphmod)
             assert isinstance(scriptmod, torch.jit.ScriptModule)
             # Add the ScriptModule as a submodule so it can be called
             setattr(self, fname, scriptmod)
