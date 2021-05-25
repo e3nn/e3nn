@@ -80,6 +80,7 @@ html_theme = 'sphinx_rtd_theme'
 
 myst_update_mathjax = False
 
+
 # Resolve function for the linkcode extension.
 # Thanks to https://github.com/Lasagne/Lasagne/blob/master/docs/conf.py
 def linkcode_resolve(domain, info):
@@ -109,4 +110,4 @@ def linkcode_resolve(domain, info):
         filename = info["module"].replace(".", "/") + ".py"
 
     tag = __version__
-    return	 f"https://github.com/e3nn/e3nn/blob/{tag}/{filename}"
+    return f"https://github.com/e3nn/e3nn/blob/{tag}/{filename}"
