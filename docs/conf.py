@@ -11,6 +11,7 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 import os
 import sys
+from e3nn import __version__, __file__
 sys.path.insert(0, os.path.abspath('../'))
 
 
@@ -22,8 +23,6 @@ author = 'e3nn Developers'
 
 # The full version, including alpha/beta/rc tags
 release = '0.3.0'
-
-from e3nn import __version__, __file__
 
 # -- General configuration ---------------------------------------------------
 
