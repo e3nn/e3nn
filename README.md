@@ -39,7 +39,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
 
 ## Citing
 ```
-@software{mario_geiger_2021_4735637,
+@software{mario_geiger_2021_4745784,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Alby M. and
@@ -55,13 +55,13 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Sophia Sanborn and
                   Josh Rackers and
                   Michael Bailey},
-  title        = {e3nn/e3nn: 2021-05-04},
+  title        = {e3nn/e3nn: 2021-05-10},
   month        = may,
   year         = 2021,
   publisher    = {Zenodo},
-  version      = {0.2.9},
-  doi          = {10.5281/zenodo.4735637},
-  url          = {https://doi.org/10.5281/zenodo.4735637}
+  version      = {0.3.0},
+  doi          = {10.5281/zenodo.4745784},
+  url          = {https://doi.org/10.5281/zenodo.4745784}
 }
 ```
 

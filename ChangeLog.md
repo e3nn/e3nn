@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.1] - 2021-05-26
 ### Added
 - `preprocess` function in `e3nn.nn.models.v2103.gate_points_networks.SimpleNetwork`
 - Specialized code for `mode="uuw"`
