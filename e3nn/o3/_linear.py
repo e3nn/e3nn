@@ -1,14 +1,15 @@
-from typing import Optional, Tuple, NamedTuple, List
 import math
-
-import torch
-from torch import fx
+from typing import List, NamedTuple, Optional, Tuple
 
 import e3nn
+import torch
 from e3nn import o3
-from e3nn.util.jit import compile_mode
-from e3nn.util.codegen import CodeGenMixin
 from e3nn.util import prod
+from e3nn.util.codegen import CodeGenMixin
+from e3nn.util.jit import compile_mode
+from opt_einsum_fx import jitable, optimize_einsums_full
+from torch import fx
+
 from ._tensor_product._codegen import _sum_tensors
 
 
@@ -385,22 +386,16 @@ def _codegen_linear(
 
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
     if optimize_einsums:
-        try:
-            from opt_einsum_fx import optimize_einsums_full, jitable
-        except ImportError:
-            # opt_einsum_fx is not installed
-            pass
-        else:
-            # See _tensor_product/_codegen.py for notes
-            batchdim = 4
-            example_inputs = (
-                torch.zeros((batchdim, irreps_in.dim), dtype=torch.float32),
-                torch.zeros(
-                    1 if shared_weights else batchdim,
-                    flat_weight_index,
-                    dtype=torch.float32
-                ),
-            )
-            graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+        # See _tensor_product/_codegen.py for notes
+        batchdim = 4
+        example_inputs = (
+            torch.zeros((batchdim, irreps_in.dim), dtype=torch.float32),
+            torch.zeros(
+                1 if shared_weights else batchdim,
+                flat_weight_index,
+                dtype=torch.float32
+            ),
+        )
+        graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
 
     return graph_out, weight_numel

@@ -37,6 +37,7 @@ setup(
         'sympy',
         'scipy',   # only for SphericalTensor.find_peaks
         'torch>=1.8.0',  # >= 1.8 is required for FX
+        'opt_einsum_fx',  # optimization of TensorProduct FX code
     ],
     include_package_data=True,
     classifiers=[
