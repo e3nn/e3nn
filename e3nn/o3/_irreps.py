@@ -367,7 +367,7 @@ class Irreps(tuple):
         return super().__new__(cls, out)
 
     @staticmethod
-    def spherical_harmonics(lmax,p=-1):
+    def spherical_harmonics(lmax, p=-1):
         r"""representation of the spherical harmonics
 
         Parameters
@@ -388,10 +388,11 @@ class Irreps(tuple):
 
         >>> Irreps.spherical_harmonics(3)
         1x0e+1x1o+1x2e+1x3o
+
         >>> Irreps.spherical_harmonics(4,1)
         1x0e+1x1e+1x2e+1x3e+1x4e 
         """
-        return Irreps([(1, (l, (p)**l)) for l in range(lmax + 1)])
+        return Irreps([(1, (l, p**l)) for l in range(lmax + 1)])
 
     def slices(self):
         r"""List of slices corresponding to indices for each irrep.
