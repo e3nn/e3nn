@@ -96,7 +96,7 @@ Let's create the tensor product first, it will tell us how many weights it needs
 
     print(f"{tp} needs {tp.weight_numel} weights")
 
-    tp.visualize()
+    tp.visualize();
 
 in this particual choice of irreps we can see that the l=1 component of the spherical harmonics cannot be used in the tensor product.
 In this example it's the equivariance to inversion that prohibit the use of l=1.
