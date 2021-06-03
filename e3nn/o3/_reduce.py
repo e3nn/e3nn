@@ -262,9 +262,14 @@ class ReducedTensorProducts(fx.GraphModule):
         outs = []
         for vp_list in outputs:
             v, p = vp_list[0]
-            out = v * evaluate(p)
+            out = evaluate(p)
+            if abs(v - 1.0) > eps:
+                out = v * out
             for v, p in vp_list[1:]:
-                out = out + v * evaluate(p)
+                t = evaluate(p)
+                if abs(v - 1.0) > eps:
+                    t = v * t
+                out = out + t
             outs.append(out)
 
         out = torch.cat(outs, dim=-1)
