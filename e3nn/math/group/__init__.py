@@ -8,7 +8,7 @@ from ._groups import (
     is_representation,
     is_group,
 )
-from ._linalg import intertwiners, has_rep_in_rep
+from ._linalg import intertwiners
 from ._reduce import germinate_formulas, reduce_permutation
 
 
@@ -22,7 +22,6 @@ __all__ = [
     "is_representation",
     "is_group",
     "intertwiners",
-    "has_rep_in_rep",
     "germinate_formulas",
     "reduce_permutation",
 ]

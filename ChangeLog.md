@@ -10,6 +10,9 @@ Most recent change on the bottom.
 ### Added
 - [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) as a dependency
 
+### Removed
+- Removed `has_rep_in_rep` (not stable enough, should use `equivariant-MLP` instead)
+
 ## [0.3.1] - 2021-05-26
 ### Added
 - `preprocess` function in `e3nn.nn.models.v2103.gate_points_networks.SimpleNetwork`
