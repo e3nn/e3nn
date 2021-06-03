@@ -8,7 +8,6 @@ from ._groups import (
     is_representation,
     is_group,
 )
-from ._linalg import intertwiners
 from ._reduce import germinate_formulas, reduce_permutation
 
 
@@ -21,7 +20,6 @@ __all__ = [
     "O3",
     "is_representation",
     "is_group",
-    "intertwiners",
     "germinate_formulas",
     "reduce_permutation",
 ]

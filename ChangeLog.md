@@ -11,7 +11,7 @@ Most recent change on the bottom.
 - [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) as a dependency
 
 ### Removed
-- Removed `has_rep_in_rep` (not stable enough, should use `equivariant-MLP` instead)
+- Removed `group/_linalg` (`has_rep_in_rep` and `intertwiners`) (should use `equivariant-MLP` instead)
 
 ## [0.3.1] - 2021-05-26
 ### Added
