@@ -9,6 +9,7 @@ Most recent change on the bottom.
 ## [Unreleased]
 ### Added
 - [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) as a dependency
+- `p=-1` option for `Irreps.spherical_harmonics(lmax, p)`
 
 ### Removed
 - Removed `group/_linalg` (`has_rep_in_rep` and `intertwiners`) (should use `equivariant-MLP` instead)
