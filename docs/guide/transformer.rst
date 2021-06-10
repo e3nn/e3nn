@@ -81,7 +81,14 @@ In order to generate weights that depends on the radii, we project the edges len
 .. jupyter-execute::
 
     number_of_basis = 10
-    edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, max_radius, number_of_basis, 'smooth_finite', False)
+    edge_length_embedded = soft_one_hot_linspace(
+        edge_length,
+        start=0.0,
+        end=max_radius,
+        number=number_of_basis,
+        basis='smooth_finite',
+        cutoff=True  # goes (smoothly) to zero at `start` and `end`
+    )
     edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
 
 We will also need a number between 0 and 1 that indicates smoothly if the length of the edge is smaller than ``max_radius``.
@@ -180,7 +187,14 @@ Let's put eveything into a function to check the smoothness and the equivariance
         edge_vec = pos[edge_src] - pos[edge_dst]
         edge_length = edge_vec.norm(dim=1)
 
-        edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, max_radius, number_of_basis, 'smooth_finite', False)
+        edge_length_embedded = soft_one_hot_linspace(
+            edge_length,
+            start=0.0,
+            end=max_radius,
+            number=number_of_basis,
+            basis='smooth_finite',
+            cutoff=True
+        )
         edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
         edge_weight_cutoff = soft_unit_step(10 * (1 - edge_length / max_radius))
 

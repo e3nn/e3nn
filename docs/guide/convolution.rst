@@ -193,7 +193,7 @@ Now we can put everything into a function
         edge_src, edge_dst = radius_graph(pos, max_radius, max_num_neighbors=len(pos) - 1)
         edge_vec = pos[edge_dst] - pos[edge_src]
         sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
-        emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, 'smooth_finite', False).mul(num_basis**0.5)
+        emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
         return scatter(tp(f_in[edge_src], sh, fc(emb)), edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
 
 Now we can check the equivariance
@@ -226,7 +226,7 @@ The tensor product dominates the execution time:
     sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
     print(time.perf_counter() - wall); wall = time.perf_counter()
 
-    emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, 'smooth_finite', False).mul(num_basis**0.5)
+    emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
     print(time.perf_counter() - wall); wall = time.perf_counter()
 
     weight = fc(emb)
