@@ -70,47 +70,6 @@ def test_gate_points_2102_equivariant(network):
     )
 
 
-def test_gate_points_2102_jit(network):
-    f, random_graph = network
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings('error', category=torch.jit.TracerWarning)
-        f_traced = trace(
-            f,
-            example_inputs=(random_graph(),),
-            # Check the compute graph on 3 other random inputs
-            check_inputs=[(random_graph(),) for _ in range(3)]
-        )
-
-    dat = random_graph()
-    assert torch.allclose(f(dat), f_traced(dat))
-
-    # - Try saving, loading in another process, and running -
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Save stuff
-        f_traced.save(tmpdir + "/model.pt")
-        torch.save(dat, tmpdir + '/dat.pt')
-        # Load in new process
-        with open(tmpdir + '/code.py', 'x') as code:
-            code.write(f"""
-import torch
-# Needed for the TorchScript kernels for scatter and radius_graph
-import torch_scatter
-import torch_cluster
-f = torch.jit.load('{tmpdir}/model.pt')
-d = torch.load('{tmpdir}/dat.pt')
-out = f(d)
-torch.save(out, '{tmpdir}/out.pt')
-""")
-        # Run
-        # sys.executable gives the path to the current python interpreter
-        proc_res = subprocess.run([sys.executable, tmpdir + '/code.py'])
-        proc_res.check_returncode()
-        # Check
-        out = torch.load(tmpdir + '/out.pt')
-        assert torch.allclose(f(dat), out)
-
-
 def test_copy(network):
     f, random_graph = network
     fcopy = copy.deepcopy(f)
