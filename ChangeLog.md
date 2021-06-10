@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.2] - 2021-06-10
 ### Added
 - [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) as a dependency
 - `p=-1` option for `Irreps.spherical_harmonics(lmax, p)`
