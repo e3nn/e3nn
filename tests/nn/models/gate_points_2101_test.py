@@ -1,12 +1,8 @@
 import pytest
 
-import warnings
 import random
-import sys
 import tempfile
-import subprocess
 import copy
-import textwrap
 
 import torch
 from torch_geometric.data import Data
@@ -14,7 +10,6 @@ from torch_geometric.data import Data
 from e3nn import o3
 from e3nn.nn.models.gate_points_2101 import Network
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
-from e3nn.util.jit import trace
 
 
 @pytest.fixture
