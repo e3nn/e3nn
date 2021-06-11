@@ -6,8 +6,13 @@ import pytest
 
 
 def test_equivariant():
-    irreps = o3.Irreps("3x0e + 4x1e")
+    irreps = o3.Irreps("3x0e + 3x0o + 4x1e")
     m = BatchNorm(irreps)
+    m(irreps.randn(16, -1))
+    m(irreps.randn(16, -1))
+    m.train()
+    assert_equivariant(m, irreps_in=[irreps], irreps_out=[irreps])
+    m.eval()
     assert_equivariant(m, irreps_in=[irreps], irreps_out=[irreps])
 
 
