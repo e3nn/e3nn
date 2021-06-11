@@ -83,23 +83,28 @@ As a consequence, the spherical harmonics are equivariant,
     cmap_bwr = [[0, 'rgb(0,50,255)'], [0.5, 'rgb(200,200,200)'], [1, 'rgb(255,50,0)']]
 
     def s2_grid():
-        betas = torch.linspace(0, math.pi, 50)
-        alphas = torch.linspace(0, 2 * math.pi, 100)
+        betas = torch.linspace(0, math.pi, 40)
+        alphas = torch.linspace(0, 2 * math.pi, 80)
         beta, alpha = torch.meshgrid(betas, alphas)
         return o3.angles_to_xyz(alpha, beta)
 
-    def trace(r, f, c):
+    def trace(r, f, c, radial_abs=True):
+        if radial_abs:
+            a = f.abs()
+        else:
+            a = 1
         return dict(
-            x=f.abs() * r[..., 0] + c[0],
-            y=f.abs() * r[..., 1] + c[1],
-            z=f.abs() * r[..., 2] + c[2],
+            x=a * r[..., 0] + c[0],
+            y=a * r[..., 1] + c[1],
+            z=a * r[..., 2] + c[2],
             surfacecolor=f
         )
 
-    def plot(data):
+    def plot(data, radial_abs=True):
+        r = s2_grid()
         n = data.shape[-1]
         traces = [
-            trace(r, data[..., i], torch.tensor([2.0 * i - (n - 1.0), 0.0, 0.0]))
+            trace(r, data[..., i], torch.tensor([2.0 * i - (n - 1.0), 0.0, 0.0]), radial_abs=radial_abs)
             for i in range(n)
         ]
         cmax = max(d['surfacecolor'].abs().max().item() for d in traces)
@@ -161,6 +166,13 @@ As a consequence, the spherical harmonics are equivariant,
     fig.show()
 
 Each point on the sphere has 3 components. If we plot the value of each of the 3 component separately we obtain the following figure:
+
+.. jupyter-execute::
+
+    plot(r, radial_abs=False)
+
+x, y and z are represented as 3 scalar fields on 3 different spheres.
+To obtain a nicer figure (that looks like the spherical harmonics shown on Wikipedia) we can deform the spheres into a shape that has its radius equal to the absolute value of the plotted quantity:
 
 .. jupyter-execute::
 
