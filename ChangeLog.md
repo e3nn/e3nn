@@ -15,6 +15,8 @@ Most recent change on the bottom.
 
 ### Added
 - `biases` argument to `o3.Linear`
+- `nn.models.v2106`: `MessagePassing` takes a sequence of irreps
+- `nn.models.v2106`: `Convolution` inpired from [Batch Normalization Biases Residual Blocks Towards the Identity Function in Deep Networks](`https://arxiv.org/pdf/2002.10444.pdf`)
 
 ## [0.3.2] - 2021-06-10
 ### Added
