@@ -10,6 +10,9 @@ Most recent change on the bottom.
 ### Changed
 - `FullyConnectedNet` is now a `torch.nn.Sequential`
 
+### Fixed
+- `BatchNorm` was not equivariant for pseudo-scalars
+
 ## [0.3.2] - 2021-06-10
 ### Added
 - [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) as a dependency

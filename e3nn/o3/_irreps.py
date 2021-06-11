@@ -195,6 +195,10 @@ class Irrep(tuple):
         """The dimension of the representation, :math:`2 l + 1`."""
         return 2 * self.l + 1
 
+    def is_scalar(self) -> bool:
+        """Equivalent to ``l == 0 and p == 1``"""
+        return self.l == 0 and self.p == 1
+
     def __mul__(self, other):
         r"""Generate the irreps from the product of two irreps.
 

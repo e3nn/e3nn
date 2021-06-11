@@ -41,7 +41,7 @@ class BatchNorm(nn.Module):
         self.affine = affine
         self.instance = instance
 
-        num_scalar = sum(mul for mul, ir in self.irreps if ir.l == 0)
+        num_scalar = sum(mul for mul, ir in self.irreps if ir.is_scalar())
         num_features = self.irreps.num_irreps
 
         if self.instance:
@@ -106,7 +106,7 @@ class BatchNorm(nn.Module):
             # [batch, sample, mul, repr]
             field = field.reshape(batch, -1, mul, d)
 
-            if ir.l == 0:  # scalars
+            if ir.is_scalar():  # scalars
                 if self.training or self.instance:
                     if self.instance:
                         field_mean = field.mean(1).reshape(batch, mul)  # [batch, mul]
@@ -154,7 +154,7 @@ class BatchNorm(nn.Module):
 
             field = field * field_norm.reshape(-1, 1, mul, 1)  # [batch, sample, mul, repr]
 
-            if self.affine and ir.l == 0:  # scalars
+            if self.affine and ir.is_scalar():  # scalars
                 bias = self.bias[ib: ib + mul]  # [mul]
                 ib += mul
                 field += bias.reshape(mul, 1)  # [batch, sample, mul, repr]
