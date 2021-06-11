@@ -66,6 +66,38 @@ def test_linear():
     )
 
 
+def test_bias():
+    irreps_in = o3.Irreps("2x0e + 1e + 2x0e + 0o")
+    irreps_out = o3.Irreps("3x0e + 1e + 3x0e + 5x0e + 0o")
+    m = o3.Linear(irreps_in, irreps_out, biases=[True, False, False, True, False])
+    with torch.no_grad():
+        m.bias[:].fill_(1.0)
+    x = m(torch.zeros(irreps_in.dim))
+
+    assert torch.allclose(x, torch.tensor([
+        1.0, 1.0, 1.0,
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+        1.0, 1.0, 1.0, 1.0, 1.0,
+        0.0
+    ]))
+
+    assert_equivariant(m)
+    assert_auto_jitable(m)
+
+    m = o3.Linear(irreps_in, irreps_out, biases=True)
+
+    assert_equivariant(m)
+    assert_auto_jitable(m)
+    assert_normalized(
+        m,
+        n_weight=100,
+        n_input=10_000,
+        atol=0.5,
+        weights=[m.weight]
+    )
+
+
 def test_single_out():
     l1 = o3.Linear("5x0e", "5x0e")
     l2 = o3.Linear("5x0e", "5x0e + 3x0o")
