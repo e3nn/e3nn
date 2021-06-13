@@ -85,7 +85,7 @@ def test_bias():
     assert_equivariant(m)
     assert_auto_jitable(m)
 
-    m = o3.Linear(irreps_in, irreps_out, biases=True)
+    m = o3.Linear("0e + 0o + 1e + 1o", "10x0e + 0o + 1e + 1o", biases=True)
 
     assert_equivariant(m)
     assert_auto_jitable(m)
@@ -214,6 +214,12 @@ def test_weight_view():
         m.weight_view_for_instruction(1).fill_(0.0)
     out = m(inp)
     assert torch.allclose(out[:, :6], torch.zeros(1))
+
+    for w in m.weight_views():
+        with torch.no_grad():
+            w.fill_(2.0)
+    for i, ins, w in m.weight_views(yield_instruction=True):
+        assert (w - 2.0).norm() == 0.0
 
 
 def test_weight_view_unshared():
