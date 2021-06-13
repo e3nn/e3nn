@@ -81,10 +81,14 @@ def test_inverse_angles(float_tolerance):
     a = o3.rand_angles()
     b = o3.inverse_angles(*a)
     c = o3.compose_angles(*a, *b)
-    e = o3.identity_angles()
+    e = o3.identity_angles(requires_grad=True)
     rc = o3.angles_to_matrix(*c)
     re = o3.angles_to_matrix(*e)
     assert (rc - re).abs().max() < float_tolerance
+
+    # test `requires_grad`
+    re.sum().backward()
+    assert e[0].grad is not None
 
 
 def test_rand_axis_angle():
