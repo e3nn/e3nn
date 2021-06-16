@@ -59,6 +59,7 @@ class Convolution(torch.nn.Module):
         z = torch.arange(-s, s + 1.0) * steps[2]
 
         lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+        self.register_buffer('lattice', lattice)
 
         if 'padding' not in kwargs:
             kwargs['padding'] = tuple(s // 2 for s in lattice.shape[:3])
@@ -86,6 +87,13 @@ class Convolution(torch.nn.Module):
 
         self.weight = torch.nn.Parameter(torch.randn(self.num_radial_basis, self.tp.weight_numel))
 
+    def kernel(self):
+        weight = self.emb @ self.weight
+        weight = weight / (self.sh.shape[0] * self.sh.shape[1] * self.sh.shape[2])
+        kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
+        kernel = torch.einsum('xyzio->oixyz', kernel)
+        return kernel
+
     def forward(self, x):
         r"""
         Parameters
@@ -100,11 +108,7 @@ class Convolution(torch.nn.Module):
         """
         sc = self.sc(x.transpose(1, 4)).transpose(1, 4)
 
-        weight = self.emb @ self.weight
-        weight = weight / (self.sh.shape[0] * self.sh.shape[1] * self.sh.shape[2])
-        kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
-        kernel = torch.einsum('xyzio->oixyz', kernel)
-        return sc + torch.nn.functional.conv3d(x, kernel, **self.kwargs)
+        return sc + torch.nn.functional.conv3d(x, self.kernel(), **self.kwargs)
 
 
 class LowPassFilter(torch.nn.Module):
