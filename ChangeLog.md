@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.3] - 2021-06-21
 ### Changed
 - `FullyConnectedNet` is now a `torch.nn.Sequential`
 
