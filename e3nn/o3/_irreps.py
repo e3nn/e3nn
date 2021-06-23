@@ -48,7 +48,7 @@ class Irrep(tuple):
     >>> Irrep("1o") + Irrep("2o")
     1x1o+1x2o
     """
-    def __new__(cls, l: Union['Irrep', str, tuple], p=None):
+    def __new__(cls, l: Union[int, 'Irrep', str, tuple], p=None):
         if p is None:
             if isinstance(l, Irrep):
                 return l
