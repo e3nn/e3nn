@@ -129,7 +129,7 @@ class SphericalTensor(o3.Irreps):
 
         return solution @ coeff
 
-    def sum_of_diracs(self, positions, values):
+    def sum_of_diracs(self, positions: torch.Tensor, values: torch.Tensor) -> torch.Tensor:
         r"""Sum (almost-) dirac deltas
 
         .. math::
@@ -183,7 +183,7 @@ class SphericalTensor(o3.Irreps):
 
         return 4 * pi / (self.lmax + 1)**2 * (y * v).sum(-2)
 
-    def from_samples_on_s2(self, positions, values, res=100):
+    def from_samples_on_s2(self, positions: torch.Tensor, values: torch.Tensor, res=100) -> torch.Tensor:
         r"""Convert a set of position on the sphere and values into a spherical tensor
 
         Parameters

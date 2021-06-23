@@ -1,4 +1,4 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Iterator
 
 import torch
 import torch.fx
@@ -833,9 +833,9 @@ class FullTensorProduct(TensorProduct):
     """
     def __init__(
         self,
-        irreps_in1,
-        irreps_in2,
-        filter_ir_out=None,
+        irreps_in1: o3.Irreps,
+        irreps_in2: o3.Irreps,
+        filter_ir_out: Iterator[o3.Irrep] = None,
         **kwargs
     ):
 
