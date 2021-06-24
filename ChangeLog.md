@@ -7,9 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Most recent change on the bottom.
 
 ## [Unreleased]
+
+## [0.3.3] - 2021-06-21
+### Changed
+- `FullyConnectedNet` is now a `torch.nn.Sequential`
+
+### Fixed
+- `BatchNorm` was not equivariant for pseudo-scalars
+
+### Added
+- `biases` argument to `o3.Linear`
+- `nn.models.v2106`: `MessagePassing` takes a sequence of irreps
+- `nn.models.v2106`: `Convolution` inpired from [Batch Normalization Biases Residual Blocks Towards the Identity Function in Deep Networks](`https://arxiv.org/pdf/2002.10444.pdf`)
+
+## [0.3.2] - 2021-06-10
+### Added
+- [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) as a dependency
+- `p=-1` option for `Irreps.spherical_harmonics(lmax, p)`
+
+### Removed
+- Removed `group/_linalg` (`has_rep_in_rep` and `intertwiners`) (should use `equivariant-MLP` instead)
+
+## [0.3.1] - 2021-05-26
 ### Added
 - `preprocess` function in `e3nn.nn.models.v2103.gate_points_networks.SimpleNetwork`
 - Specialized code for `mode="uuw"`
+- `instance` argument to `nn.BatchNorm`
 
 ## [0.3.0] - 2021-05-10
 ### Added

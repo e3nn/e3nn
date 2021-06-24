@@ -1,14 +1,15 @@
-from typing import Optional, Tuple, NamedTuple, List
 import math
-
-import torch
-from torch import fx
+from typing import List, NamedTuple, Optional, Tuple, Union
 
 import e3nn
+import torch
 from e3nn import o3
-from e3nn.util.jit import compile_mode
-from e3nn.util.codegen import CodeGenMixin
 from e3nn.util import prod
+from e3nn.util.codegen import CodeGenMixin
+from e3nn.util.jit import compile_mode
+from opt_einsum_fx import jitable, optimize_einsums_full
+from torch import fx
+
 from ._tensor_product._codegen import _sum_tensors
 
 
@@ -50,6 +51,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
     instructions : list of 2-tuples, optional
         list of tuples ``(i_in, i_out)`` indicating which irreps in ``irreps_in`` should contribute to which irreps in ``irreps_out``. If ``None`` (the default), all allowable instructions will be created: every ``(i_in, i_out)`` such that ``irreps_in[i_in].ir == irreps_out[i_out].ir``.
+
+    biases : list of bool, optional
+        indicates for each element of ``irreps_out`` if it has a bias. By default there is no bias. If ``biases=True`` it gives bias to all scalars (l=0 and p=1).
 
     Attributes
     ----------
@@ -98,6 +102,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
         instructions: Optional[List[Tuple[int, int]]] = None,
+        biases: Union[bool, List[bool]] = False,
         _optimize_einsums: Optional[bool] = None
     ):
         super().__init__()
@@ -154,11 +159,23 @@ class Linear(CodeGenMixin, torch.nn.Module):
         del instructions
         del instruction_objs
 
+        # == Biases ==
+        if biases is False:
+            self.biases = [False for mul_ir in self.irreps_out]
+        elif biases is True:
+            self.biases = [mul_ir.ir.is_scalar() for mul_ir in self.irreps_out]
+        else:
+            assert len(biases) == len(self.irreps_out)
+            self.biases = [bool(bias) for bias in biases]
+            assert all(not bias or (mul_ir.ir.is_scalar()) for bias, mul_ir in zip(self.biases, self.irreps_out))
+        del biases
+
         # == Generate code ==
-        graphmod, self.weight_numel = _codegen_linear(
+        graphmod, self.weight_numel, self.bias_numel = _codegen_linear(
             self.irreps_in,
             self.irreps_out,
             self.instructions,
+            self.biases,
             shared_weights=shared_weights,
             optimize_einsums=self._optimize_einsums
         )
@@ -174,6 +191,13 @@ class Linear(CodeGenMixin, torch.nn.Module):
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer('weight', torch.Tensor())
 
+        # == Generate biases ==
+        if internal_weights and self.bias_numel > 0:
+            assert self.shared_weights, "Having internal weights impose shared weights"
+            self.bias = torch.nn.Parameter(torch.zeros(self.bias_numel))  # see appendix C.1 and Eq.5 of https://arxiv.org/pdf/2011.14522.pdf
+        else:
+            self.register_buffer('bias', torch.Tensor())
+
         # == Compute output mask ==
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
@@ -181,9 +205,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
                 if any(
                     (ins.i_out == i_out) and (0 not in ins.path_shape)
                     for ins in self.instructions
-                )
+                ) or bias
                 else torch.zeros(mul_ir.dim)
-                for i_out, mul_ir in enumerate(self.irreps_out)
+                for i_out, (mul_ir, bias) in enumerate(zip(self.irreps_out, self.biases))
             ])
         else:
             output_mask = torch.ones(0)
@@ -192,7 +216,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"
 
-    def forward(self, features, weight: Optional[torch.Tensor] = None):
+    def forward(self, features, weight: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None):
         """evaluate
 
         Parameters
@@ -209,9 +233,14 @@ class Linear(CodeGenMixin, torch.nn.Module):
             tensor of shape ``(..., irreps_out.dim)``
         """
         if weight is None:
-            assert self.internal_weights, "Weights must be provided when internal_weights = False"
+            if self.weight_numel > 0 and not self.internal_weights:
+                raise RuntimeError("Weights must be provided when internal_weights = False")
             weight = self.weight
-        return self._compiled_main(features, weight)
+        if bias is None:
+            if self.bias_numel > 0 and not self.internal_weights:
+                raise RuntimeError("Biases must be provided when internal_weights = False")
+            bias = self.bias
+        return self._compiled_main(features, weight, bias)
 
     def weight_view_for_instruction(
         self,
@@ -281,6 +310,7 @@ def _codegen_linear(
     irreps_in: o3.Irreps,
     irreps_out: o3.Irreps,
     instructions: List[Instruction],
+    biases: List[bool],
     shared_weights: bool = False,
     optimize_einsums: bool = True,
 ) -> Tuple[fx.GraphModule, int]:
@@ -289,24 +319,42 @@ def _codegen_linear(
     # = Function definitions =
     x = fx.Proxy(graph_out.placeholder('x', torch.Tensor))
     ws = fx.Proxy(graph_out.placeholder('w', torch.Tensor))
+    bs = fx.Proxy(graph_out.placeholder('b', torch.Tensor))
 
     size = x.shape[:-1]
     outsize = size + (irreps_out.dim,)
+
+    bias_numel = sum(mul_ir.dim for bias, mul_ir in zip(biases, irreps_out) if bias)
+    if bias_numel > 0:
+        bs = bs.reshape(-1, bias_numel)
 
     # = Short-circut for nothing to do =
     # We produce no code for empty instructions
     instructions = [ins for ins in instructions if 0 not in ins.path_shape]
 
-    if len(instructions) == 0:
+    if len(instructions) == 0 and bias_numel == 0:
         out = x.new_zeros(outsize)
 
         graph_out.output(out.node, torch.Tensor)
         # Short circut
         # 0 is weight_numel
-        return fx.GraphModule({}, graph_out, "linear_forward"), 0
+        return fx.GraphModule({}, graph_out, "linear_forward"), 0, 0
 
     x = x.reshape(-1, irreps_in.dim)
     batch_out = x.shape[0]
+
+    out_bias_list = []
+    bias_index = 0
+    for bias, mul_ir_out in zip(biases, irreps_out):
+        if bias:
+            if sum(biases) == 1:
+                b = bs
+            else:
+                b = bs[:, bias_index:bias_index + mul_ir_out.dim]
+                bias_index += mul_ir_out.dim
+            out_bias_list += [[b.expand(batch_out, -1)]]
+        else:
+            out_bias_list += [[]]
 
     weight_numel = sum(prod(ins.path_shape) for ins in instructions)
     if weight_numel > 0:
@@ -364,7 +412,7 @@ def _codegen_linear(
     # = Return the result =
     out = [
         _sum_tensors(
-            [out for ins, out in zip(instructions, out_list) if ins.i_out == i_out],
+            [out for ins, out in zip(instructions, out_list) if ins.i_out == i_out] + out_bias_list[i_out],
             shape=(batch_out, mul_ir_out.dim),
             like=x
         )
@@ -387,22 +435,21 @@ def _codegen_linear(
 
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
     if optimize_einsums:
-        try:
-            from opt_einsum_fx import optimize_einsums_full, jitable
-        except ImportError:
-            # opt_einsum_fx is not installed
-            pass
-        else:
-            # See _tensor_product/_codegen.py for notes
-            batchdim = 4
-            example_inputs = (
-                torch.zeros((batchdim, irreps_in.dim), dtype=torch.float32),
-                torch.zeros(
-                    1 if shared_weights else batchdim,
-                    flat_weight_index,
-                    dtype=torch.float32
-                ),
-            )
-            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+        # See _tensor_product/_codegen.py for notes
+        batchdim = 4
+        example_inputs = (
+            torch.zeros((batchdim, irreps_in.dim), dtype=torch.float32),
+            torch.zeros(
+                1 if shared_weights else batchdim,
+                weight_numel,
+                dtype=torch.float32
+            ),
+            torch.zeros(
+                1 if shared_weights else batchdim,
+                bias_numel,
+                dtype=torch.float32
+            ),
+        )
+        graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
 
-    return graphmod_out, weight_numel
+    return graphmod_out, weight_numel, bias_numel

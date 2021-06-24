@@ -4,6 +4,8 @@ nn
 .. rubric:: Overview
 
 .. toctree::
+    :maxdepth: 1
+
     nn_gate
     nn_fc
     nn_bn

@@ -143,13 +143,12 @@ def test_unsupported():
 def test_trace_dtypes():
     # FullyConnectedNet is traced
     fc = FullyConnectedNet([8, 16, 8])
-    assert len(fc.weights) > 0
     # compile in a dtype other than the default
     target_dtype = {
         torch.float32: torch.float64,
         torch.float64: torch.float32
     }[torch.get_default_dtype()]
     fc = fc.to(dtype=target_dtype)
-    for weight in fc.weights:
+    for weight in fc.parameters():
         assert weight.dtype == target_dtype
     assert_auto_jitable(fc)

@@ -195,6 +195,10 @@ class Irrep(tuple):
         """The dimension of the representation, :math:`2 l + 1`."""
         return 2 * self.l + 1
 
+    def is_scalar(self) -> bool:
+        """Equivalent to ``l == 0 and p == 1``"""
+        return self.l == 0 and self.p == 1
+
     def __mul__(self, other):
         r"""Generate the irreps from the product of two irreps.
 
@@ -367,13 +371,16 @@ class Irreps(tuple):
         return super().__new__(cls, out)
 
     @staticmethod
-    def spherical_harmonics(lmax):
+    def spherical_harmonics(lmax, p=-1):
         r"""representation of the spherical harmonics
 
         Parameters
         ----------
         lmax : int
             maximum :math:`l`
+
+        p : {1, -1}
+            the parity of the representation
 
         Returns
         -------
@@ -385,8 +392,11 @@ class Irreps(tuple):
 
         >>> Irreps.spherical_harmonics(3)
         1x0e+1x1o+1x2e+1x3o
+
+        >>> Irreps.spherical_harmonics(4, p=1)
+        1x0e+1x1e+1x2e+1x3e+1x4e
         """
-        return Irreps([(1, (l, (-1)**l)) for l in range(lmax + 1)])
+        return Irreps([(1, (l, p**l)) for l in range(lmax + 1)])
 
     def slices(self):
         r"""List of slices corresponding to indices for each irrep.

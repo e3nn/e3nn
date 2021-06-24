@@ -2,15 +2,53 @@ import torch
 
 from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
+from typing import List
 
 
-def _identity(x):
-    return x
+@compile_mode('script')
+class _Layer(torch.nn.Module):
+    h_in: float
+    h_out: float
+    var_in: float
+    var_out: float
+    _profiling_str: str
+
+    def __init__(self, h_in, h_out, act, var_in, var_out):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.randn(h_in, h_out))
+        self.act = act
+
+        self.h_in = h_in
+        self.h_out = h_out
+        self.var_in = var_in
+        self.var_out = var_out
+
+        self._profiling_str = repr(self)
+
+    def __repr__(self):
+        act = self.act
+        if hasattr(act, '__name__'):
+            act = act.__name__
+        elif isinstance(act, torch.nn.Module):
+            act = act.__class__.__name__
+
+        return f"Layer({self.h_in}->{self.h_out}, act={act})"
+
+    def forward(self, x: torch.Tensor):
+        with torch.autograd.profiler.record_function(self._profiling_str):
+            if self.act is not None:
+                w = self.weight / (self.h_in * self.var_in)**0.5
+                x = x @ w
+                x = self.act(x)
+                x = x * self.var_out**0.5
+            else:
+                w = self.weight / (self.h_in * self.var_in / self.var_out)**0.5
+                x = x @ w
+            return x
 
 
-# This is a static network that can be traced
-@compile_mode('trace')
-class FullyConnectedNet(torch.nn.Module):
+@compile_mode('script')
+class FullyConnectedNet(torch.nn.Sequential):
     r"""Fully-connected Neural Network
 
     Parameters
@@ -25,65 +63,27 @@ class FullyConnectedNet(torch.nn.Module):
 
             \int_{-\infty}^{\infty} \phi(z)^2 \frac{e^{-z^2/2}}{\sqrt{2\pi}} dz = 1
     """
+    hs: List[int]
+
     def __init__(self, hs, act=None, variance_in=1, variance_out=1, out_act=False):
         super().__init__()
-        self.hs = tuple(hs)
-        weights = []
+        self.hs = list(hs)
+        if act is not None:
+            act = normalize2mom(act)
+        var_in = variance_in
 
-        for h1, h2 in zip(self.hs, self.hs[1:]):
-            weights.append(torch.nn.Parameter(torch.randn(h1, h2)))
+        for i, (h1, h2) in enumerate(zip(self.hs, self.hs[1:])):
+            if i == len(self.hs) - 2:
+                var_out = variance_out
+                a = act if out_act else None
+            else:
+                var_out = 1
+                a = act
 
-        self.weights = torch.nn.ParameterList(weights)
+            layer = _Layer(h1, h2, a, var_in, var_out)
+            setattr(self, f"layer{i}", layer)
 
-        if act is None:
-            act = _identity
-        self.act = normalize2mom(act)
-        self.variance_in = variance_in
-        self.variance_out = variance_out
-        self.out_act = out_act
+            var_in = var_out
 
     def __repr__(self):
         return f"{self.__class__.__name__}{self.hs}"
-
-    def forward(self, x):
-        """evaluate the network
-
-        Parameters
-        ----------
-        x : `torch.Tensor`
-            tensor of shape ``(batch, hs[0])``
-
-        Returns
-        -------
-        `torch.Tensor`
-            tensor of shape ``(batch, hs[-1])``
-        """
-        with torch.autograd.profiler.record_function(repr(self)):
-            for i, W in enumerate(self.weights):
-                h_in, _h_out = W.shape
-
-                if i == 0:  # first layer
-                    W = W / (h_in * self.variance_in)**0.5
-                if i > 0:  # not first layer
-                    W = W / h_in**0.5
-                if i == len(self.weights) - 1 and not self.out_act:  # last layer
-                    W = W * self.variance_out**0.5
-
-                x = x @ W
-
-                if i < len(self.weights) - 1:  # not last layer
-                    x = self.act(x)
-                if i == len(self.weights) - 1 and self.out_act:  # last layer
-                    x = self.act(x)
-
-                if i == len(self.weights) - 1 and self.out_act:  # last layer
-                    x = x * self.variance_out**0.5
-
-            return x
-
-    def _make_tracing_inputs(self, n: int = 1):
-        import random
-        return [
-            {'forward': (torch.randn(random.randint(1, 5), self.hs[0]),)}
-            for _ in range(n)
-        ]

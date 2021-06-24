@@ -628,7 +628,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         fontsize = 10
 
         def format_ir(mul_ir):
-            return f"{mul_ir.mul} $\\times$ {mul_ir.ir}"
+            if mul_ir.mul == 1:
+                return f"${mul_ir.ir}$"
+            return f"${mul_ir.mul} \\times {mul_ir.ir}$"
 
         for i, mul_ir in enumerate(self.irreps_in1):
             ax.annotate(

@@ -96,7 +96,7 @@ Let's create the tensor product first, it will tell us how many weights it needs
 
     print(f"{tp} needs {tp.weight_numel} weights")
 
-    tp.visualize()
+    tp.visualize();
 
 in this particual choice of irreps we can see that the l=1 component of the spherical harmonics cannot be used in the tensor product.
 In this example it's the equivariance to inversion that prohibit the use of l=1.
@@ -110,7 +110,14 @@ Let's create that embedding. Here is the base functions we will use:
     num_basis = 10
 
     x = torch.linspace(0.0, 2.0, 1000)
-    y = soft_one_hot_linspace(x, 0.0, max_radius, num_basis, 'smooth_finite', False)
+    y = soft_one_hot_linspace(
+        x,
+        start=0.0,
+        end=max_radius,
+        number=num_basis,
+        basis='smooth_finite',
+        cutoff=True,
+    )
 
     plt.plot(x, y);
 
@@ -121,7 +128,14 @@ Let's use this embedding for the edge distances and normalize it properly (``com
 
 .. jupyter-execute::
 
-    edge_length_embedding = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, 'smooth_finite', False)
+    edge_length_embedding = soft_one_hot_linspace(
+        edge_vec.norm(dim=1),
+        start=0.0,
+        end=max_radius,
+        number=num_basis,
+        basis='smooth_finite',
+        cutoff=True,
+    )
     edge_length_embedding = edge_length_embedding.mul(num_basis**0.5)
 
     print(edge_length_embedding.shape)
@@ -179,7 +193,7 @@ Now we can put everything into a function
         edge_src, edge_dst = radius_graph(pos, max_radius, max_num_neighbors=len(pos) - 1)
         edge_vec = pos[edge_dst] - pos[edge_src]
         sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
-        emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, 'smooth_finite', False).mul(num_basis**0.5)
+        emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
         return scatter(tp(f_in[edge_src], sh, fc(emb)), edge_dst, dim=0, dim_size=num_nodes).div(num_neighbors**0.5)
 
 Now we can check the equivariance
@@ -212,7 +226,7 @@ The tensor product dominates the execution time:
     sh = o3.spherical_harmonics(irreps_sh, edge_vec, normalize=True, normalization='component')
     print(time.perf_counter() - wall); wall = time.perf_counter()
 
-    emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, 'smooth_finite', False).mul(num_basis**0.5)
+    emb = soft_one_hot_linspace(edge_vec.norm(dim=1), 0.0, max_radius, num_basis, basis='smooth_finite', cutoff=True).mul(num_basis**0.5)
     print(time.perf_counter() - wall); wall = time.perf_counter()
 
     weight = fc(emb)

@@ -81,7 +81,14 @@ In order to generate weights that depends on the radii, we project the edges len
 .. jupyter-execute::
 
     number_of_basis = 10
-    edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, max_radius, number_of_basis, 'smooth_finite', False)
+    edge_length_embedded = soft_one_hot_linspace(
+        edge_length,
+        start=0.0,
+        end=max_radius,
+        number=number_of_basis,
+        basis='smooth_finite',
+        cutoff=True  # goes (smoothly) to zero at `start` and `end`
+    )
     edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
 
 We will also need a number between 0 and 1 that indicates smoothly if the length of the edge is smaller than ``max_radius``.
@@ -158,7 +165,7 @@ Finally we can just use all the modules we created to compute the attention mech
     alpha = exp / z[edge_dst]
 
     # compute the outputs (per node)
-    f_out = scatter(alpha.sqrt() * v, edge_dst, dim=0, dim_size=len(f))
+    f_out = scatter(alpha.relu().sqrt() * v, edge_dst, dim=0, dim_size=len(f))
 
 Note that this implementation has small differences with the article.
 
@@ -180,7 +187,14 @@ Let's put eveything into a function to check the smoothness and the equivariance
         edge_vec = pos[edge_src] - pos[edge_dst]
         edge_length = edge_vec.norm(dim=1)
 
-        edge_length_embedded = soft_one_hot_linspace(edge_length, 0.0, max_radius, number_of_basis, 'smooth_finite', False)
+        edge_length_embedded = soft_one_hot_linspace(
+            edge_length,
+            start=0.0,
+            end=max_radius,
+            number=number_of_basis,
+            basis='smooth_finite',
+            cutoff=True
+        )
         edge_length_embedded = edge_length_embedded.mul(number_of_basis**0.5)
         edge_weight_cutoff = soft_unit_step(10 * (1 - edge_length / max_radius))
 
@@ -195,7 +209,7 @@ Let's put eveything into a function to check the smoothness and the equivariance
         z[z == 0] = 1
         alpha = exp / z[edge_dst]
 
-        return scatter(alpha.sqrt() * v, edge_dst, dim=0, dim_size=len(f))
+        return scatter(alpha.relu().sqrt() * v, edge_dst, dim=0, dim_size=len(f))
 
 Here is a smoothness check: tow nodes are placed at a distance 1 (``max_radius > 1``) so they see each other.
 A third node coming from far away moves slowly towards them.
@@ -253,6 +267,21 @@ Finally we can check the equivariance:
     f_after = transformer(f, pos) @ D_out.T
 
     torch.allclose(f_before, f_after, atol=1e-3, rtol=1e-3)
+
+Extra sanity check of the backward pass:
+
+.. jupyter-execute::
+
+    for x in [0.0, 1e-6,  max_radius / 2, max_radius - 1e-6, max_radius, max_radius + 1e-6, 2 * max_radius]:
+        f = irreps_input.randn(2, -1, requires_grad=True)
+        pos = torch.tensor([
+            [0.0, 0.0, 0.0],
+            [x, 0.0, 0.0],
+        ], requires_grad=True)
+        transformer(f, pos).sum().backward()
+
+        assert f.grad is None or torch.isfinite(f.grad).all()
+        assert torch.isfinite(pos.grad).all()
 
 .. _SE(3)-Transformers: https://proceedings.neurips.cc/paper/2020/file/15231a7ce4ba789d13b722cc5c955834-Paper.pdf
 .. _Wikipedia: https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)

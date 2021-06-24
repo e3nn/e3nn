@@ -75,3 +75,38 @@ def test_compose(float_tolerance):
     assert (R1 - R2).abs().max().median() < float_tolerance
     assert (R1 - R3).abs().max().median() < float_tolerance
     assert (R1 - R4).abs().max().median() < float_tolerance
+
+
+def test_inverse_angles(float_tolerance):
+    a = o3.rand_angles()
+    b = o3.inverse_angles(*a)
+    c = o3.compose_angles(*a, *b)
+    e = o3.identity_angles(requires_grad=True)
+    rc = o3.angles_to_matrix(*c)
+    re = o3.angles_to_matrix(*e)
+    assert (rc - re).abs().max() < float_tolerance
+
+    # test `requires_grad`
+    re.sum().backward()
+    assert e[0].grad is not None
+
+
+def test_rand_axis_angle():
+    axis, angle = o3.rand_axis_angle(1_000_000)
+    x = o3.axis_angle_to_matrix(axis, angle) @ torch.tensor([0.2, 0.5, 0.3])
+    assert x[:, 0].mean().max() < 0.005
+    assert x[:, 1].mean().max() < 0.005
+    assert x[:, 2].mean().max() < 0.005
+
+
+def test_matrix_xyz(float_tolerance):
+    x = torch.randn(100, 3)
+
+    y = torch.einsum('zij,zj->zi', o3.matrix_x(torch.randn(100)), x)
+    assert (x[:, 0] - y[:, 0]).abs().max() < float_tolerance
+
+    y = torch.einsum('zij,zj->zi', o3.matrix_y(torch.randn(100)), x)
+    assert (x[:, 1] - y[:, 1]).abs().max() < float_tolerance
+
+    y = torch.einsum('zij,zj->zi', o3.matrix_z(torch.randn(100)), x)
+    assert (x[:, 2] - y[:, 2]).abs().max() < float_tolerance

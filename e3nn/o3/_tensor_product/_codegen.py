@@ -2,10 +2,10 @@ from math import sqrt
 from typing import List, Tuple
 
 import torch
-from torch import fx
-
 from e3nn import o3
 from e3nn.util import prod
+from opt_einsum_fx import jitable, optimize_einsums_full
+from torch import fx
 
 from ._instruction import Instruction
 
@@ -434,40 +434,36 @@ def codegen_tensor_product(
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
     if optimize_einsums:
-        try:
-            from opt_einsum_fx import optimize_einsums_full, jitable
-        except ImportError:
-            # opt_einsum_fx is not installed
-            pass
-        else:
-            # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
-            # and still get the right path for _all_ batch dimensions.
-            # This is because our einsums are essentially of the form:
-            #    zuvw,ijk,zuvij->zwk    OR     uvw,ijk,zuvij->zwk
-            # In the first case, all but one operands have the batch dimension
-            #    => The first contraction gains the batch dimension
-            #    => All following contractions have batch dimension
-            #    => All possible contraction paths have cost that scales linearly in batch size
-            #    => The optimal path is the same for all batch sizes
-            # For the second case, this logic follows as long as the first contraction is not between the first two operands. Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
-            # https://github.com/dgasmith/opt_einsum/issues/158
-            # for more details.
-            #
-            # TODO: consider the impact maximum intermediate result size on this logic
-            #         \- this is the `memory_limit` option in opt_einsum
-            # TODO: allow user to choose opt_einsum parameters?
-            #
-            batchdim = 4
-            example_inputs = (
-                torch.zeros((batchdim, irreps_in1.dim)),
-                torch.zeros((batchdim, irreps_in2.dim)),
-                torch.zeros(
-                    1 if shared_weights else batchdim,
-                    flat_weight_index
-                ),
-            )
+        # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
+        # and still get the right path for _all_ batch dimensions.
+        # This is because our einsums are essentially of the form:
+        #    zuvw,ijk,zuvij->zwk    OR     uvw,ijk,zuvij->zwk
+        # In the first case, all but one operands have the batch dimension
+        #    => The first contraction gains the batch dimension
+        #    => All following contractions have batch dimension
+        #    => All possible contraction paths have cost that scales linearly in batch size
+        #    => The optimal path is the same for all batch sizes
+        # For the second case, this logic follows as long as the first contraction is not between the first two operands. Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
+        # https://github.com/dgasmith/opt_einsum/issues/158
+        # for more details.
+        #
+        # TODO: consider the impact maximum intermediate result size on this logic
+        #         \- this is the `memory_limit` option in opt_einsum
+        # TODO: allow user to choose opt_einsum parameters?
+        #
+        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
+        batchdim = 4
+        example_inputs = (
+            torch.zeros((batchdim, irreps_in1.dim), dtype=torch.float32),
+            torch.zeros((batchdim, irreps_in2.dim), dtype=torch.float32),
+            torch.zeros(
+                1 if shared_weights else batchdim,
+                flat_weight_index,
+                dtype=torch.float32
+            ),
+        )
 
-            graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
-            graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
+        graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+        graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
 
     return graphmod_out, graphmod_right

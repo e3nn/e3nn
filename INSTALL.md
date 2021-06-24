@@ -23,17 +23,6 @@ pip install torch-geometric
 
 See [here](https://github.com/rusty1s/pytorch_geometric#installation) to get cuda support or newer versions.
 
-### Optional: opt_einsum_fx (beta)
-
-e3nn can use [`opt_einsum_fx`](https://github.com/Linux-cpp-lisp/opt_einsum_fx) to optimize the performance of `TensorProduct`s. To enable this, install `opt_einsum_fx`:
-```bash
-$ git clone https://github.com/Linux-cpp-lisp/opt_einsum_fx.git
-$ cd opt_einsum_fx/
-$ pip install .
-```
-
-`opt_einsum_fx` can be enabled/disabled using `e3nn.set_optimization_defaults(optimize_einsums=True/False)`. If you encounter any issues when `opt_einsum_fx` is enabled, please file an issue on the appropriate repository.
-
 ## e3nn
 
 ### Stable (PyPI)

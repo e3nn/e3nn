@@ -135,7 +135,12 @@ def _complete_lmax_res(lmax, res_beta, res_alpha):
     i.e. 2 * lmax + 1 == res_alpha
     """
     if res_beta is None:
-        res_beta = 2 * (lmax + 1)  # minimum req. to go on sphere and back
+        if lmax is not None:
+            res_beta = 2 * (lmax + 1)  # minimum req. to go on sphere and back
+        elif res_alpha is not None:
+            res_beta = 2 * ((res_alpha + 1) // 2)
+        else:
+            raise ValueError("All the entries are None")
 
     if res_alpha is None:
         if lmax is not None:
@@ -147,7 +152,8 @@ def _complete_lmax_res(lmax, res_beta, res_alpha):
             res_alpha = res_beta - 1
 
     if lmax is None:
-        lmax = min(res_beta // 2 - 1, res_alpha // 2)  # maximum possible to go on sphere and back
+        lmax = min(res_beta // 2 - 1, (res_alpha - 1) // 2)  # maximum possible to go on sphere and back
+        # see tests -------------------------------^
 
     assert res_beta % 2 == 0
     assert lmax + 1 <= res_beta // 2
@@ -281,7 +287,11 @@ class ToS2Grid(torch.nn.Module):
     ----------
     lmax : int
     res : int, tuple of int
+        resolution in ``beta`` and in ``alpha``
+
     normalization : {'norm', 'component', 'integral'}
+    dtype : torch.dtype or None, optional
+    device : torch.device or None, optional
 
     Examples
     --------
@@ -380,13 +390,15 @@ class ToS2Grid(torch.nn.Module):
 
 
 class FromS2Grid(torch.nn.Module):
-    """Transform signal on the sphere into spherical tensor
+    r"""Transform signal on the sphere into spherical tensor
 
     The inverse transformation of `ToS2Grid`
 
     Parameters
     ----------
-    res : int
+    res : int, tuple of int
+        resolution in ``beta`` and in ``alpha``
+
     lmax : int
     normalization : {'norm', 'component', 'integral'}
     lmax_in : int, optional

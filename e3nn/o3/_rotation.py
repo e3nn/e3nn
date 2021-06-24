@@ -42,9 +42,8 @@ def identity_angles(*shape, requires_grad=False, dtype=None, device=None):
     gamma : `torch.Tensor`
         tensor of shape :math:`(\mathrm{shape})`
     """
-    return (torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device),
-            torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device),
-            torch.zeros(*shape, requires_grad=requires_grad, dtype=dtype, device=device))
+    abc = torch.zeros(3, *shape, dtype=dtype, device=device)
+    return abc[0].requires_grad_(requires_grad), abc[1].requires_grad_(requires_grad), abc[2].requires_grad_(requires_grad)
 
 
 def rand_angles(*shape, requires_grad=False, dtype=None, device=None):

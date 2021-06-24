@@ -10,20 +10,19 @@ def test_dropout():
     c = Dropout(irreps='10x1e + 10x0e', p=0.75)
     x = c.irreps.randn(5, 2, -1)
 
-    c = assert_auto_jitable(c)
+    for c in [c, assert_auto_jitable(c)]:
+        c.eval()
+        assert c(x).eq(x).all()
 
-    c.eval()
-    assert c(x).eq(x).all()
+        c.train()
+        y = c(x)
+        assert (y.eq(x / 0.25) | y.eq(0)).all()
 
-    c.train()
-    y = c(x)
-    assert (y.eq(x / 0.25) | y.eq(0)).all()
+        def wrap(x):
+            torch.manual_seed(0)
+            return c(x)
 
-    def wrap(x):
-        torch.manual_seed(0)
-        return c(x)
-
-    assert_equivariant(wrap, args_in=[x], irreps_in=[c.irreps], irreps_out=[c.irreps])
+        assert_equivariant(wrap, args_in=[x], irreps_in=[c.irreps], irreps_out=[c.irreps])
 
 
 def test_copy():
