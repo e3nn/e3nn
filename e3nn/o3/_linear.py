@@ -313,7 +313,7 @@ def _codegen_linear(
     biases: List[bool],
     shared_weights: bool = False,
     optimize_einsums: bool = True,
-) -> Tuple[fx.GraphModule, int]:
+) -> Tuple[fx.GraphModule, int, int]:
     graph_out = fx.Graph()
 
     # = Function definitions =
