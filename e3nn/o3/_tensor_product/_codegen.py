@@ -463,7 +463,7 @@ def codegen_tensor_product(
             ),
         )
 
-        graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
-        graph_right = jitable(optimize_einsums_full(graph_right, example_inputs[1:]))
+        graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+        graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
 
     return graphmod_out, graphmod_right

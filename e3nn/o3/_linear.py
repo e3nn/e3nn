@@ -450,6 +450,6 @@ def _codegen_linear(
                 dtype=torch.float32
             ),
         )
-        graph_out = jitable(optimize_einsums_full(graph_out, example_inputs))
+        graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
 
     return graphmod_out, weight_numel, bias_numel
