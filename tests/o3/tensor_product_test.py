@@ -308,6 +308,15 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
         atol=float_tolerance
     )
 
+    # We also test .to(), even if only with a dtype, to ensure that various optimizations still always store constants in correct ways
+    other_dtype = next(
+        d for d in [torch.float32, torch.float64]
+        if d != torch.get_default_dtype()
+    )
+    x1, x2 = x1.to(other_dtype), x2.to(other_dtype)
+    opt_tp = opt_tp.to(other_dtype)
+    assert opt_tp(x1, x2).dtype == other_dtype
+
 
 def test_input_weights_python():
     irreps_in1 = Irreps("1e + 2e + 3x3o")

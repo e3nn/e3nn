@@ -428,8 +428,13 @@ def codegen_tensor_product(
 
         wigner_mats[f"_w3j_{l_1}_{l_2}_{l_out}"] = wig
 
-    graphmod_out = fx.GraphModule(wigner_mats, graph_out, class_name="tp_forward")
-    graphmod_right = fx.GraphModule(wigner_mats, graph_right, class_name="tp_right")
+    # By putting the constants in a Module rather than a dict,
+    # we force FX to copy them as buffers instead of as attributes.
+    constants_root = torch.nn.Module()
+    for wkey, wmat in wigner_mats.items():
+        constants_root.register_buffer(wkey, wmat)
+    graphmod_out = fx.GraphModule(constants_root, graph_out, class_name="tp_forward")
+    graphmod_right = fx.GraphModule(constants_root, graph_right, class_name="tp_right")
 
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
@@ -454,12 +459,11 @@ def codegen_tensor_product(
         # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
         batchdim = 4
         example_inputs = (
-            torch.zeros((batchdim, irreps_in1.dim), dtype=torch.float32),
-            torch.zeros((batchdim, irreps_in2.dim), dtype=torch.float32),
+            torch.zeros((batchdim, irreps_in1.dim)),
+            torch.zeros((batchdim, irreps_in2.dim)),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 flat_weight_index,
-                dtype=torch.float32
             ),
         )
 

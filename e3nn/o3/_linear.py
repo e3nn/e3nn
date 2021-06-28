@@ -438,16 +438,14 @@ def _codegen_linear(
         # See _tensor_product/_codegen.py for notes
         batchdim = 4
         example_inputs = (
-            torch.zeros((batchdim, irreps_in.dim), dtype=torch.float32),
+            torch.zeros((batchdim, irreps_in.dim)),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 weight_numel,
-                dtype=torch.float32
             ),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 bias_numel,
-                dtype=torch.float32
             ),
         )
         graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
