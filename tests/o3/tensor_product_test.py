@@ -218,23 +218,6 @@ def test_single_out():
     assert torch.all(out2[:, 5:] == 0)
 
 
-def test_specialized_wigners():
-    """If all paths use specialized code, there should be no wigners"""
-    tp = FullyConnectedTensorProduct(
-        "5x0e + 3x0o",
-        "4x0e", "4x0e + 1x3o",
-        _specialized_code=True
-    )
-    assert torch.numel(tp._wigner_buf) == 0
-    tp = FullyConnectedTensorProduct(
-        "5x0e + 3x0o",
-        "4x0e", "4x0e + 1x3o",
-        _specialized_code=False
-    )
-    # There should only be the 0x0->0 wigner
-    assert torch.numel(tp._wigner_buf) == 1
-
-
 def test_empty_inputs():
     tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
@@ -324,6 +307,15 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
         opt_tp.right(x2),
         atol=float_tolerance
     )
+
+    # We also test .to(), even if only with a dtype, to ensure that various optimizations still always store constants in correct ways
+    other_dtype = next(
+        d for d in [torch.float32, torch.float64]
+        if d != torch.get_default_dtype()
+    )
+    x1, x2 = x1.to(other_dtype), x2.to(other_dtype)
+    opt_tp = opt_tp.to(other_dtype)
+    assert opt_tp(x1, x2).dtype == other_dtype
 
 
 def test_input_weights_python():
