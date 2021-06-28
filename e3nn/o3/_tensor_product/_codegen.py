@@ -430,6 +430,8 @@ def codegen_tensor_product(
 
     # By putting the constants in a Module rather than a dict,
     # we force FX to copy them as buffers instead of as attributes.
+    #
+    # FX seems to have resolved this issue for dicts in 1.9, but we support all the way back to 1.8.0.
     constants_root = torch.nn.Module()
     for wkey, wmat in wigner_mats.items():
         constants_root.register_buffer(wkey, wmat)
