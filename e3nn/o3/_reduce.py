@@ -2,7 +2,7 @@ import collections
 import torch
 from torch import fx
 from e3nn import o3
-from e3nn.math import group
+from e3nn.math import germinate_formulas, reduce_permutation
 from e3nn.util import explicit_default_types
 from e3nn.util.jit import compile_mode
 
@@ -131,7 +131,7 @@ class ReducedTensorProducts(fx.GraphModule):
         if filter_ir_out is not None:
             filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
 
-        f0, formulas = group.germinate_formulas(formula)
+        f0, formulas = germinate_formulas(formula)
 
         irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
 
@@ -157,7 +157,7 @@ class ReducedTensorProducts(fx.GraphModule):
             if i not in f0:
                 raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
 
-        base_perm, _ = group.reduce_permutation(
+        base_perm, _ = reduce_permutation(
             f0,
             formulas,
             dtype=torch.float64,
