@@ -32,7 +32,7 @@ The second version number is incremented every time a breaking change is made to
 We are happy to help! The best way to get help on `e3nn` is to submit a [Question](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=question&template=question.md&title=%E2%9D%93+%5BQUESTION%5D) or [Bug Report](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=bug&template=bug-report.md&title=%F0%9F%90%9B+%5BBUG%5D).
 
 ## Want to get involved? Great!
-If you want to get involved in and contribute to the development, improvement, and application of `e3nn`, introduce yourself with [Project Wanted](https://github.com/e3nn/e3nn/issues/new?assignees=&labels=projectwanted&template=project-wanted.md&title=%F0%9F%91%8B++Hi%21+I%27m+%5BYOUR_NAME%5D+and+I%27m+interested+in+%5BYOUR_INTERESTS%5D.).
+If you want to get involved in and contribute to the development, improvement, and application of `e3nn`, introduce yourself in the [discussions](https://github.com/e3nn/e3nn/discussions/new).
 
 ## Code of conduct
 Our community abides by the [Contributor Covenant Code of Conduct](https://github.com/e3nn/e3nn/blob/main/code_of_conduct.md).
