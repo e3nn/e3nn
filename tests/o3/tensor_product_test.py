@@ -53,7 +53,7 @@ def random_params(n=25):
 
 
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params())
-def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
+def test_bilinear_right_variance_equivariance(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     eps = float_tolerance
     n = 1_500
     tol = 3.0
@@ -66,9 +66,9 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
     y1 = torch.randn(2, m.irreps_in2.dim)
     y2 = torch.randn(2, m.irreps_in2.dim)
 
-    z1 = m(x1 + x2, y1 + y2)
-    z2 = m(x1, y1 + y2) + m(x2, y1 + y2)
-    z3 = m(x1 + x2, y1) + m(x1 + x2, y2)
+    z1 = m(x1 + 1.7 * x2, y1 - y2)
+    z2 = m(x1, y1 - y2) + 1.7 * m(x2, y1 - y2)
+    z3 = m(x1 + 1.7 * x2, y1) - m(x1 + 1.7 * x2, y2)
     assert (z1 - z2).abs().max() < eps
     assert (z1 - z3).abs().max() < eps
 
@@ -85,6 +85,14 @@ def test(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
 
     # equivariance
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+    if weight:
+        # linear in weights
+        w1 = m.weight.clone().normal_()
+        w2 = m.weight.clone().normal_()
+        z1 = m(x1, y1, weight=w1) + 1.5 * m(x1, y1, weight=w2)
+        z2 = m(x1, y1, weight=w1 + 1.5 * w2)
+        assert (z1 - z2).abs().max() < eps
 
 
 # This is a fairly expensive test, so we don't run too many configs
