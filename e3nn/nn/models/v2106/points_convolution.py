@@ -7,7 +7,13 @@ from e3nn import o3
 from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import FullyConnectedTensorProduct, TensorProduct
 from e3nn.util.jit import compile_mode
-from torch_scatter import scatter
+
+
+def scatter(src, index, dim_size):
+    # special case of torch_scatter.scatter with dim=0
+    out = src.new_zeros(dim_size, src.shape[1])
+    index = index.reshape(-1, 1).expand_as(src)
+    return out.scatter_add_(0, index, src)
 
 
 @compile_mode('script')
@@ -103,7 +109,7 @@ class Convolution(torch.nn.Module):
         node_features = self.lin1(node_input, node_attr)
 
         edge_features = self.tp(node_features[edge_src], edge_attr, weight)
-        node_features = scatter(edge_features, edge_dst, dim=0, dim_size=node_input.shape[0]).div(self.num_neighbors**0.5)
+        node_features = scatter(edge_features, edge_dst, dim_size=node_input.shape[0]).div(self.num_neighbors**0.5)
 
         node_conv_out = self.lin2(node_features, node_attr)
         alpha = self.alpha(node_features, node_attr)
