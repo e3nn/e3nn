@@ -138,7 +138,7 @@ def standard_representation(
 ) -> torch.Tensor:
     r"""irrep of Sn of dimension n - 1
     """
-    A = complete_basis(torch.ones(1, len(p), dtype=dtype, device=device))
+    A = complete_basis(torch.ones(1, len(p), dtype=dtype, device=device), eps=0.1 / len(p))
     return A @ natural_representation(p) @ A.T
 
 
