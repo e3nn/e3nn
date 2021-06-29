@@ -9,7 +9,7 @@ from e3nn.o3 import FullyConnectedTensorProduct, TensorProduct
 from e3nn.util.jit import compile_mode
 
 
-def scatter(src, index, dim_size):
+def scatter(src: torch.Tensor, index: torch.Tensor, dim_size: int) -> torch.Tensor:
     # special case of torch_scatter.scatter with dim=0
     out = src.new_zeros(dim_size, src.shape[1])
     index = index.reshape(-1, 1).expand_as(src)
