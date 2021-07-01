@@ -32,7 +32,7 @@ def _wigner_nj(*irrepss, normalization='component', filter_ir_mid=None, dtype=No
 
     *irrepss_left, irreps_right = irrepss
     ret = []
-    for ir_left, path_left, C_left in _wigner_nj(*irrepss_left, dtype=dtype, device=device):
+    for ir_left, path_left, C_left in _wigner_nj(*irrepss_left, normalization=normalization, filter_ir_mid=filter_ir_mid, dtype=dtype, device=device):
         i = 0
         for mul, ir in irreps_right:
             for ir_out in ir_left * ir:

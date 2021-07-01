@@ -40,6 +40,21 @@ def germinate_formulas(formula):
 
 
 def reduce_permutation(f0, formulas, dtype=None, device=None, **dims):
+    r"""
+    Parameters
+    ----------
+    f0 : str
+
+    formulas : list of tuple (int, str)
+
+    dims : dict of str -> int
+
+    Examples
+    --------
+    >>> Q, ret = reduce_permutation(*germinate_formulas("ij=-ji"), i=2)
+    >>> Q.shape, len(ret)
+    (torch.Size([1, 2, 2]), 1)
+    """
 
     # here we check that each index has one and only one dimension
     for _s, p in formulas:
@@ -78,7 +93,6 @@ def reduce_permutation(f0, formulas, dtype=None, device=None, **dims):
             }))
 
     # len(base) is the number of degrees of freedom in the tensor.
-    # Now we want to decompose these degrees of freedom into irreps
 
     base = sorted([sorted([sorted(xs) for xs in x]) for x in base])  # requested for python 3.7 but not for 3.8 (probably a bug in 3.7)
 
