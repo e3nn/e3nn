@@ -204,6 +204,10 @@ class ReducedTensorProducts(fx.GraphModule):
                         if x[j] > eps:
                             break
 
+                X[X.abs() < eps] = 0
+                X = sorted([[x.item() for x in line] for line in X])
+                X = torch.tensor(X, dtype=torch.float64)
+
                 Xs.append(X)
 
             for X in Xs:
