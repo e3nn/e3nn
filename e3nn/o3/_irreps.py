@@ -1,6 +1,5 @@
 import itertools
 import collections
-import warnings
 from typing import List
 
 import torch
