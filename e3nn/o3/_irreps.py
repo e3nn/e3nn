@@ -345,6 +345,9 @@ class Irreps(tuple):
             pass
         else:
             for mul_ir in irreps:
+                mul = None
+                ir = None
+
                 if isinstance(mul_ir, str):
                     mul = 1
                     ir = Irrep(mul_ir)
@@ -356,13 +359,6 @@ class Irreps(tuple):
                 elif len(mul_ir) == 2:
                     mul, ir = mul_ir
                     ir = Irrep(ir)
-                elif len(mul_ir) == 3:
-                    mul, l, p = mul_ir
-                    ir = Irrep(l, p)
-                    warnings.warn("Use the argument format [(mul, (l, p)), ...] to distinguish multiplicity from irrep", DeprecationWarning, stacklevel=2)
-                else:
-                    mul = None
-                    ir = None
 
                 if not (isinstance(mul, int) and mul >= 0 and ir is not None):
                     raise ValueError(f"Unable to interpret \"{mul_ir}\" as an irrep.")
