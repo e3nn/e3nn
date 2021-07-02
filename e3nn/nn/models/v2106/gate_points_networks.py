@@ -18,6 +18,14 @@ def scatter(src: torch.Tensor, index: torch.Tensor, dim_size: int) -> torch.Tens
     return out.scatter_add_(0, index, src)
 
 
+def radius_graph(pos, r, batch):
+    # naive and inefficient version of torch_cluster.radius_graph
+    r = torch.cdist(pos, pos)
+    index = ((r < 1.0) & (r > 0)).nonzero().T
+    index = index[batch[index[0]] == batch[index[1]]]
+    return index
+
+
 class SimpleNetwork(torch.nn.Module):
     def __init__(
         self,
@@ -63,8 +71,7 @@ class SimpleNetwork(torch.nn.Module):
             batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
 
         # Create graph
-        from torch_cluster import radius_graph
-        edge_index = radius_graph(data['pos'], self.max_radius, batch, max_num_neighbors=len(data['pos']) - 1)
+        edge_index = radius_graph(data['pos'], self.max_radius, batch)
         edge_src = edge_index[0]
         edge_dst = edge_index[1]
 
@@ -154,8 +161,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             edge_src = data['edge_src']
             edge_dst = data['edge_dst']
         else:
-            from torch_cluster import radius_graph
-            edge_index = radius_graph(data['pos'], self.max_radius, batch, max_num_neighbors=len(data['pos']) - 1)
+            edge_index = radius_graph(data['pos'], self.max_radius, batch)
             edge_src = edge_index[0]
             edge_dst = edge_index[1]
 

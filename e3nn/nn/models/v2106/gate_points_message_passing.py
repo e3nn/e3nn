@@ -143,8 +143,13 @@ class MessagePassing(torch.nn.Module):
         return node_features
 
 
+def radius_graph(pos, r):
+    # naive version of torch_cluster.radius_graph
+    r = torch.cdist(pos, pos)
+    return ((r < 1.0) & (r > 0)).nonzero().T
+
+
 def test():
-    from torch_cluster import radius_graph
     from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
     mp = MessagePassing(
