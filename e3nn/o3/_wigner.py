@@ -167,7 +167,7 @@ def _generate_wigner_3j(l1, l2, l3, dtype=None, device=None):  # pragma: no cove
         D = _DxDxD(*abc) - torch.eye(n, dtype=dtype, device=device)
         B += D.T @ D
 
-    eigenvalues, eigenvectors = torch.symeig(B, eigenvectors=True)
+    eigenvalues, eigenvectors = torch.linalg.eigh(B)
     assert eigenvalues[0] < 1e-10
     Q = eigenvectors[:, 0]
     assert (B @ Q).norm() < 1e-10

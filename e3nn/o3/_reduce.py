@@ -194,7 +194,7 @@ class ReducedTensorProducts(fx.GraphModule):
                     torch.cat([RR, -RP], dim=1),
                     torch.cat([-RP.T, PP], dim=1)
                 ], dim=0)
-                eigenvalues, eigenvectors = torch.symeig(prob, eigenvectors=True)
+                eigenvalues, eigenvectors = torch.linalg.eigh(prob)
                 X = eigenvectors[:, eigenvalues < eps][:mul].T  # [solutions, multiplicity]
                 X = torch.linalg.qr(X, mode='r').R
                 for i, x in enumerate(X):

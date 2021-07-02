@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - `ReducedTensorProducts`: `normalization` and `filter_ir_mid` where not properly propagated through the recusive calls, this bug has no effects if the default values where used
+- Use `torch.linalg.eigh` instead of the deprecated `torch.symeig`
 
 ## [0.3.3] - 2021-06-21
 ### Changed
