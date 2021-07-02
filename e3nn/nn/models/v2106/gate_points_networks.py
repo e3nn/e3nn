@@ -22,7 +22,7 @@ def radius_graph(pos, r, batch):
     # naive and inefficient version of torch_cluster.radius_graph
     r = torch.cdist(pos, pos)
     index = ((r < 1.0) & (r > 0)).nonzero().T
-    index = index[batch[index[0]] == batch[index[1]]]
+    index = index[:, batch[index[0]] == batch[index[1]]]
     return index
 
 
