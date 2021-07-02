@@ -2,16 +2,20 @@
 >>> test_simple_network()
 >>> test_network_for_a_graph_with_attributes()
 """
-from typing import Dict, Union
+from typing import Dict
 
 import torch
 from e3nn import o3
 from e3nn.math import soft_one_hot_linspace
-from torch_cluster import radius_graph
-from torch_geometric.data import Data
-from torch_scatter import scatter
 
 from .gate_points_message_passing import MessagePassing
+
+
+def scatter(src: torch.Tensor, index: torch.Tensor, dim_size: int) -> torch.Tensor:
+    # special case of torch_scatter.scatter with dim=0
+    out = src.new_zeros(dim_size, src.shape[1])
+    index = index.reshape(-1, 1).expand_as(src)
+    return out.scatter_add_(0, index, src)
 
 
 class SimpleNetwork(torch.nn.Module):
@@ -52,13 +56,14 @@ class SimpleNetwork(torch.nn.Module):
         self.irreps_in = self.mp.irreps_node_input
         self.irreps_out = self.mp.irreps_node_output
 
-    def preprocess(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+    def preprocess(self, data: Dict[str, torch.Tensor]) -> torch.Tensor:
         if 'batch' in data:
             batch = data['batch']
         else:
             batch = data['pos'].new_zeros(data['pos'].shape[0], dtype=torch.long)
 
         # Create graph
+        from torch_cluster import radius_graph
         edge_index = radius_graph(data['pos'], self.max_radius, batch, max_num_neighbors=len(data['pos']) - 1)
         edge_src = edge_index[0]
         edge_dst = edge_index[1]
@@ -68,7 +73,7 @@ class SimpleNetwork(torch.nn.Module):
 
         return batch, data['x'], edge_src, edge_dst, edge_vec
 
-    def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+    def forward(self, data: Dict[str, torch.Tensor]) -> torch.Tensor:
         batch, node_inputs, edge_src, edge_dst, edge_vec = self.preprocess(data)
         del data
 
@@ -91,7 +96,7 @@ class SimpleNetwork(torch.nn.Module):
         node_outputs = self.mp(node_inputs, node_attr, edge_src, edge_dst, edge_attr, edge_length_embedding)
 
         if self.pool_nodes:
-            return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+            return scatter(node_outputs, batch, int(batch.max()) + 1).div(self.num_nodes**0.5)
         else:
             return node_outputs
 
@@ -138,7 +143,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
         self.irreps_node_attr = self.mp.irreps_node_attr
         self.irreps_node_output = self.mp.irreps_node_output
 
-    def preprocess(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+    def preprocess(self, data: Dict[str, torch.Tensor]) -> torch.Tensor:
         if 'batch' in data:
             batch = data['batch']
         else:
@@ -149,6 +154,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             edge_src = data['edge_src']
             edge_dst = data['edge_dst']
         else:
+            from torch_cluster import radius_graph
             edge_index = radius_graph(data['pos'], self.max_radius, batch, max_num_neighbors=len(data['pos']) - 1)
             edge_src = edge_index[0]
             edge_dst = edge_index[1]
@@ -166,7 +172,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
 
         return batch, node_input, node_attr, edge_attr, edge_src, edge_dst, edge_vec
 
-    def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+    def forward(self, data: Dict[str, torch.Tensor]) -> torch.Tensor:
         batch, node_input, node_attr, edge_attr, edge_src, edge_dst, edge_vec = self.preprocess(data)
         del data
 
@@ -188,7 +194,7 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
         node_outputs = self.mp(node_input, node_attr, edge_src, edge_dst, edge_attr, edge_length_embedding)
 
         if self.pool_nodes:
-            return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
+            return scatter(node_outputs, batch, int(batch.max()) + 1).div(self.num_nodes**0.5)
         else:
             return node_outputs
 
