@@ -95,10 +95,11 @@ def main():
 
     print("starting...")
 
+    # tanh() forces it to realize the grad as a full size matrix rather than expanded (stride 0) ones
     t = Timer(
         stmt=(
             "tp.zero_grad()\n"
-            "out = tp(*next(inputs))\n" + ("out.sum().backward()\n" if args.backward else '')
+            "out = tp(*next(inputs))\n" + ("out.tanh().sum().backward()\n" if args.backward else '')
         ),
         globals={'tp': tp, 'inputs': inputs}
     )
