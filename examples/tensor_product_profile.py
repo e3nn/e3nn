@@ -42,6 +42,12 @@ def main():
     device = 'cuda' if (torch.cuda.is_available() and args.cuda) else 'cpu'
     args.cuda = device == 'cuda'
 
+    if args.cuda:
+        # Workaround for CUDA driver issues
+        # See https://github.com/pytorch/pytorch/issues/60158#issuecomment-866294291
+        with torch.profiler.profile() as _:
+            pass
+
     print("======= Benchmark with settings: ======")
     for key, val in vars(args).items():
         print(f"{key:>18} : {val}")
@@ -59,16 +65,22 @@ def main():
     )
     tp = tp.to(device=device)
 
-    inputs = iter([
+    inputs = [
         (
             irreps_in1.randn(args.batch, -1).to(device=device),
             irreps_in2.randn(args.batch, -1).to(device=device)
         )
         for _ in range(1 + args.w + args.n)
-    ])
+    ]
+    if args.backward:
+        for tmp in inputs:
+            for t in tmp:
+                t.requires_grad_(True)
+    inputs = iter(inputs)
 
     # compile
     if args.jit:
+        print("JITing...")
         tp = compile(tp)
 
     print("starting...")
@@ -93,7 +105,8 @@ def main():
         for _ in range(1 + args.w + args.n):
             out = tp(*next(inputs))
             if args.backward:
-                out.sum().backward()
+                # tanh() forces it to realize the grad as a full size matrix rather than expanded (stride 0) ones
+                out.tanh().sum().backward()
             p.step()
 
 
