@@ -2,6 +2,8 @@ import torch
 
 
 class _SoftUnitStep(torch.autograd.Function):
+    # pylint: disable=arguments-differ
+
     @staticmethod
     def forward(ctx, x):
         ctx.save_for_backward(x)

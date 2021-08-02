@@ -477,7 +477,6 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     yield ins_i, ins, this_weight
                 else:
                     yield this_weight
-        return
 
     def visualize(
         self,

@@ -1,7 +1,8 @@
+from typing import Optional, Tuple
+
 import torch
 import torch.jit
 
-from typing import Optional, Tuple
 
 # Please see PR #203 for these commented out code: https://github.com/e3nn/e3nn/pull/203
 

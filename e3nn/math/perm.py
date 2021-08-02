@@ -1,9 +1,9 @@
+from typing import Tuple, Set, Optional
+
 import random
 import math
 import torch
 from e3nn.math import complete_basis
-
-from typing import Tuple, Set, Optional
 
 TY_PERM = Tuple[int]
 

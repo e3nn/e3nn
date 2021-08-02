@@ -24,7 +24,15 @@ class CartesianTensor(o3.Irreps):
     >>> x.from_vectors(torch.ones(3), torch.ones(3), torch.ones(3))
     tensor([0.])
     """
-    def __new__(cls, formula):
+    # pylint: disable=abstract-method
+
+    # These are set in __new__
+    _rtp: o3.ReducedTensorProducts
+    num_index: int
+
+    def __new__(
+            # pylint: disable=signature-differs
+            cls, formula):
         f = formula.split('=')[0].replace('-', '')
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in f})
         ret = super().__new__(cls, rtp.irreps_out)
@@ -62,7 +70,7 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             irreps tensor of shape ``(..., self.dim)``
         """
-        return self._rtp(*xs)
+        return self._rtp(*xs)  # pylint: disable=not-callable
 
     def change_of_basis(self):
         r"""change of basis from cartesian tensor to irreps

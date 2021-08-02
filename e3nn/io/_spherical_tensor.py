@@ -60,7 +60,11 @@ class SphericalTensor(o3.Irreps):
     >>> SphericalTensor(3, 1, -1)
     1x0e+1x1o+1x2e+1x3o
     """
-    def __new__(cls, lmax, p_val, p_arg):
+    # pylint: disable=abstract-method
+
+    def __new__(
+            # pylint: disable=signature-differs
+            cls, lmax, p_val, p_arg):
         return super().__new__(cls, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
 
     def with_peaks_at(self, vectors, values=None):
@@ -108,7 +112,7 @@ class SphericalTensor(o3.Irreps):
         if vectors.numel() == 0:
             return torch.zeros(vectors.shape[:-2] + (self.dim,))
 
-        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"
+        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"  # pylint: disable=no-member
 
         assert vectors.dim() == 2 and vectors.shape[1] == 3
 

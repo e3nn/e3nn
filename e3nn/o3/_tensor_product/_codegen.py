@@ -1,11 +1,12 @@
 from math import sqrt
 from typing import List, Tuple
 
+from opt_einsum_fx import jitable, optimize_einsums_full
 import torch
+from torch import fx
+
 from e3nn import o3
 from e3nn.util import prod
-from opt_einsum_fx import jitable, optimize_einsums_full
-from torch import fx
 
 from ._instruction import Instruction
 

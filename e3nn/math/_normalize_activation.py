@@ -21,7 +21,9 @@ class normalize2mom(torch.nn.Module):
     _is_id: bool
     cst: float
 
-    def __init__(self, f, dtype=None, device=None):
+    def __init__(
+            # pylint: disable=unused-argument
+            self, f, dtype=None, device=None):
         super().__init__()
 
         # Try to infer a device:
@@ -47,8 +49,11 @@ class normalize2mom(torch.nn.Module):
         else:
             return self.f(x).mul(self.cst)
 
-    def _make_tracing_inputs(self, n: int):
+    @staticmethod
+    def _make_tracing_inputs(
+            # pylint: disable=unused-argument
+            n: int):
         # No reason to trace this with more than one tiny input,
         # since f is assumed by `moment` to be an elementwise scalar
         # function
-        return [{'forward': (torch.zeros(size=(1,),),)}]
+        return [{'forward': (torch.zeros(size=(1,), ),)}]

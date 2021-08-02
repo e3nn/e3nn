@@ -1,3 +1,48 @@
+exclude: &exclude_files >
+    (?x)^(
+        docs/.*|
+        tests/.*|
+        .github/.*|
+        LICENSE|
+    )$
+
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.5.0
+    hooks:
+    -   id: mixed-line-ending
+    -   id: trailing-whitespace
+
+-   repo: https://github.com/PyCQA/pylint
+    rev: pylint-2.5.2
+    hooks:
+    -   id: pylint
+        language: system
+        args: [
+            '--disable=protected-access',
+            '--disable=no-else-return',
+            '--disable=raise-missing-from',
+            '--disable=invalid-name',
+            '--disable=duplicate-code',
+            '--disable=import-outside-toplevel',
+            '--disable=missing-docstring',
+            '--disable=bad-continuation',
+            '--disable=locally-disabled',
+            '--disable=too-few-public-methods',
+            '--disable=too-many-arguments',
+            '--disable=too-many-instance-attributes',
+            '--disable=too-many-local-variables',
+            '--disable=too-many-locals',
+            '--disable=too-many-branches',
+            '--disable=too-many-statements',
+            '--disable=too-many-return-statements',
+            '--disable=redefined-builtin',
+            '--disable=redefined-outer-name',
+            '--disable=line-too-long',
+            '--disable=fixme',
+        ]
+        exclude: *exclude_files
+
 -   repo: https://github.com/pycqa/flake8
     rev: '3.9.2'
     hooks:

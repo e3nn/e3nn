@@ -53,8 +53,8 @@ def get_compile_mode(mod: torch.nn.Module) -> str:
 def compile(
     mod: torch.nn.Module,
     n_trace_checks: int = 1,
-    script_options: dict = {},
-    trace_options: dict = {},
+    script_options: dict = None,
+    trace_options: dict = None,
     in_place: bool = True,
 ):
     """Recursively compile a module and all submodules according to their decorators.
@@ -76,6 +76,9 @@ def compile(
     -------
     Returns the compiled module.
     """
+    script_options = script_options or {}
+    trace_options = trace_options or {}
+
     mode = get_compile_mode(mod)
     if mode == 'unsupported':
         raise NotImplementedError(f"{type(mod).__name__} does not support TorchScript compilation")
@@ -176,7 +179,7 @@ def get_tracing_inputs(
 def trace_module(
     mod: torch.nn.Module,
     inputs: dict = None,
-    check_inputs: list = [],
+    check_inputs: list = None,
     in_place: bool = True
 ):
     """Trace a module.
@@ -192,6 +195,8 @@ def trace_module(
     -------
     Traced module.
     """
+    check_inputs = check_inputs or []
+
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
     if old_mode is not None and old_mode != 'trace':
@@ -222,7 +227,7 @@ def trace_module(
 def trace(
     mod: torch.nn.Module,
     example_inputs: tuple = None,
-    check_inputs: list = [],
+    check_inputs: list = None,
     in_place: bool = True
 ):
     """Trace a module.
