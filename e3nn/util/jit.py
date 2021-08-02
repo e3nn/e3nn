@@ -243,6 +243,8 @@ def trace(
     -------
     Traced module.
     """
+    check_inputs = check_inputs or []
+
     return trace_module(
         mod=mod,
         inputs=({'forward': example_inputs} if example_inputs is not None else None),

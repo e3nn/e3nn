@@ -551,7 +551,7 @@ class Irreps(tuple):
 
         Returns
         -------
-        irreps : `Irreps`
+        irreps : `e3nn.o3.Irreps`
         p : tuple of int
         inv : tuple of int
 

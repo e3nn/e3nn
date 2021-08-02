@@ -15,7 +15,7 @@ class BatchNorm(nn.Module):
 
     Parameters
     ----------
-    irreps : `Irreps`
+    irreps : `o3.Irreps`
         representation
 
     eps : float
