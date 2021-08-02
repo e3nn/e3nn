@@ -1,12 +1,12 @@
-from typing import Iterable, Optional
-
 import random
 import math
-import itertools
-import warnings
-import logging
 import inspect
+import itertools
+import logging
+from typing import Iterable, Optional
+import warnings
 
+import numpy as np
 import torch
 
 from e3nn import o3
@@ -505,3 +505,10 @@ def assert_normalized(
                 max_componentwise
             )
             assert max_componentwise <= atol, f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {max_componentwise:.6f}"
+
+
+def set_random_seeds():
+    """Set the random seeds to try to get some reproducibility"""
+    torch.manual_seed(0)
+    random.seed(0)
+    np.random.seed(0)
