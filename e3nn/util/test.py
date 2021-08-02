@@ -13,6 +13,7 @@ from e3nn import o3
 from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode, _MAKE_TRACING_INPUTS
 from ._argtools import _get_args_in, _get_io_irreps, _transform, _rand_args
 
+# pylint: disable=unused-variable
 
 # Make a logger for reporting error statistics
 logger = logging.getLogger(__name__)
@@ -265,7 +266,7 @@ def equivariance_error(
     else:
         parity_ks = torch.Tensor([0])
 
-    if ('cartesian_points' not in irreps_in):
+    if 'cartesian_points' not in irreps_in:
         # There's nothing to translate
         do_translation = False
     if do_translation:
@@ -296,12 +297,12 @@ def equivariance_error(
             x2 = func(*args_in)
 
             # Deal with output shapes
-            assert type(x1) == type(x2), f"Inconsistant return types {type(x1)} and {type(x2)}"
+            assert type(x1) == type(x2), f"Inconsistant return types {type(x1)} and {type(x2)}"  # pylint: disable=unidiomatic-typecheck
             if isinstance(x1, torch.Tensor):
                 # Make sequences
                 x1 = [x1]
                 x2 = [x2]
-            elif isinstance(x1, list) or isinstance(x1, tuple):
+            elif isinstance(x1, (list, tuple)):
                 # They're already tuples
                 x1 = list(x1)
                 x2 = list(x2)

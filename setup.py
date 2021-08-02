@@ -1,7 +1,7 @@
-from setuptools import find_packages, setup
-
 import os
 import re
+
+from setuptools import find_packages, setup
 
 
 # Recommendations from https://packaging.python.org/
@@ -39,6 +39,12 @@ setup(
         'torch>=1.8.0',  # >= 1.8 is required for FX
         'opt_einsum_fx',  # optimization of TensorProduct FX code
     ],
+    extras_require={
+        'dev': [
+            'pytest',
+            'pre-commit',
+        ],
+    },
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python",

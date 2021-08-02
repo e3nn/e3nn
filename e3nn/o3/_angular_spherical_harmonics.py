@@ -105,6 +105,8 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
 
 @compile_mode('script')
 class Legendre(fx.GraphModule):
+    # pylint: disable=abstract-method
+
     def __init__(self, ls):
         super().__init__(self, fx.Graph())
 

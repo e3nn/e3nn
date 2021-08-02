@@ -1,9 +1,10 @@
 import torch
+from torch_scatter import scatter
+
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import FullyConnectedTensorProduct, TensorProduct
 from e3nn.util.jit import compile_mode
-from torch_scatter import scatter
 
 
 @compile_mode('script')

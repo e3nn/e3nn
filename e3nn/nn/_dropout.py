@@ -21,7 +21,7 @@ class Dropout(torch.nn.Module):
 
     Parameters
     ----------
-    irreps : `Irreps`
+    irreps : `o3.Irreps`
         representation
 
     p : float

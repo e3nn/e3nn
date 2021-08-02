@@ -1,14 +1,15 @@
 import math
 from typing import List, NamedTuple, Optional, Tuple, Union
 
-import e3nn
+from opt_einsum_fx import jitable, optimize_einsums_full
 import torch
+from torch import fx
+
+import e3nn
 from e3nn import o3
 from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-from opt_einsum_fx import jitable, optimize_einsums_full
-from torch import fx
 
 from ._tensor_product._codegen import _sum_tensors
 
@@ -303,7 +304,6 @@ class Linear(CodeGenMixin, torch.nn.Module):
                 yield ins_i, ins, this_weight
             else:
                 yield this_weight
-        return
 
 
 def _codegen_linear(

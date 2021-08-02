@@ -1,6 +1,7 @@
 import torch
-from e3nn import o3
 from torch import nn
+
+from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 
@@ -14,7 +15,7 @@ class BatchNorm(nn.Module):
 
     Parameters
     ----------
-    irreps : `Irreps`
+    irreps : `o3.Irreps`
         representation
 
     eps : float

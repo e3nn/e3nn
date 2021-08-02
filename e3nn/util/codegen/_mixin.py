@@ -13,6 +13,8 @@ class CodeGenMixin:
     ``__getstate__``/``__setstate__``, they should be sure to call CodeGenMixin's
     implimentation first and use its output.
     """
+    # pylint: disable=super-with-arguments
+
     def _codegen_register(
         self,
         funcs: Dict[str, fx.GraphModule],

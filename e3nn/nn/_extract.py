@@ -9,6 +9,8 @@ from e3nn import o3
 
 @compile_mode('script')
 class Extract(fx.GraphModule):
+    # pylint: disable=abstract-method
+
     def __init__(self, irreps_in, irreps_outs, instructions, squeeze_out: bool = False):
         r"""Extract sub sets of irreps
 
@@ -78,6 +80,8 @@ class Extract(fx.GraphModule):
 
 @compile_mode('script')
 class ExtractIr(Extract):
+    # pylint: disable=abstract-method
+
     def __init__(self, irreps_in, ir):
         r"""Extract ``ir`` from irreps
 

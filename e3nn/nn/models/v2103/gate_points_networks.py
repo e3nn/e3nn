@@ -5,12 +5,12 @@
 from typing import Dict, Union
 
 import torch
-from e3nn import o3
-from e3nn.math import soft_one_hot_linspace
 from torch_cluster import radius_graph
 from torch_geometric.data import Data
 from torch_scatter import scatter
 
+from e3nn import o3
+from e3nn.math import soft_one_hot_linspace
 from .gate_points_message_passing import MessagePassing
 
 

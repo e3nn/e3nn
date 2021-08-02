@@ -1,11 +1,12 @@
 from math import sqrt
 from typing import List, Tuple
 
+from opt_einsum_fx import jitable, optimize_einsums_full
 import torch
+from torch import fx
+
 from e3nn import o3
 from e3nn.util import prod
-from opt_einsum_fx import jitable, optimize_einsums_full
-from torch import fx
 
 from ._instruction import Instruction
 
@@ -468,7 +469,6 @@ def codegen_tensor_product(
                 flat_weight_index,
             ),
         )
-
         graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
         graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
 

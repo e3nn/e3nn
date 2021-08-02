@@ -31,7 +31,9 @@ class Identity(torch.nn.Module):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out})"
 
-    def forward(self, features):
+    def forward(
+            # pylint: disable=no-self-use
+            self, features):
         """evaluate
         """
         return features

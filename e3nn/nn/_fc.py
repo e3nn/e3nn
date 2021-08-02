@@ -1,8 +1,9 @@
+from typing import List
+
 import torch
 
 from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
-from typing import List
 
 
 @compile_mode('script')

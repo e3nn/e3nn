@@ -125,6 +125,8 @@ class ReducedTensorProducts(fx.GraphModule):
     >>> b = tp(x, y)
     >>> assert torch.allclose(a, b, atol=1e-3, rtol=1e-3)
     """
+    # pylint: disable=abstract-method
+
     def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, **irreps):
         super().__init__(self, fx.Graph())
 

@@ -1,11 +1,13 @@
 import itertools
 import collections
-from typing import List
+from typing import List, Union
 
 import torch
 
-from e3nn import o3
 from e3nn.math import direct_sum, perm
+# These imports avoid cyclic reference from o3 itself
+from . import _rotation
+from . import _wigner
 
 
 class Irrep(tuple):
@@ -48,7 +50,7 @@ class Irrep(tuple):
     >>> Irrep("1o") + Irrep("2o")
     1x1o+1x2o
     """
-    def __new__(cls, l, p=None):
+    def __new__(cls, l: Union[int, 'Irrep', str, tuple], p=None):
         if p is None:
             if isinstance(l, Irrep):
                 return l
@@ -140,7 +142,7 @@ class Irrep(tuple):
             k = torch.zeros_like(alpha)
 
         alpha, beta, gamma, k = torch.broadcast_tensors(alpha, beta, gamma, k)
-        return o3.wigner_D(self.l, alpha, beta, gamma) * self.p**k[..., None, None]
+        return _wigner.wigner_D(self.l, alpha, beta, gamma) * self.p**k[..., None, None]
 
     def D_from_quaternion(self, q, k=None):
         r"""Matrix of the representation, see `Irrep.D_from_angles`
@@ -158,7 +160,7 @@ class Irrep(tuple):
         `torch.Tensor`
             tensor of shape :math:`(..., 2l+1, 2l+1)`
         """
-        return self.D_from_angles(*o3.quaternion_to_angles(q), k)
+        return self.D_from_angles(*_rotation.quaternion_to_angles(q), k)
 
     def D_from_matrix(self, R):
         r"""Matrix of the representation, see `Irrep.D_from_angles`
@@ -187,7 +189,7 @@ class Irrep(tuple):
         d = torch.det(R).sign()
         R = d[..., None, None] * R
         k = (1 - d) / 2
-        return self.D_from_angles(*o3.matrix_to_angles(R), k)
+        return self.D_from_angles(*_rotation.matrix_to_angles(R), k)
 
     @property
     def dim(self) -> int:
@@ -250,7 +252,7 @@ class _MulIr(tuple):
         return self[0]
 
     @property
-    def ir(self) -> int:
+    def ir(self) -> Irrep:
         return self[1]
 
     @property
@@ -317,7 +319,7 @@ class Irreps(tuple):
     >>> Irreps(), Irreps("")
     (, )
     """
-    def __new__(cls, irreps=None):
+    def __new__(cls, irreps=None) -> Union[_MulIr, 'Irreps']:
         if isinstance(irreps, Irreps):
             return super().__new__(cls, irreps)
 
@@ -451,7 +453,7 @@ class Irreps(tuple):
         else:
             raise ValueError("Normalization needs to be 'norm' or 'component'")
 
-    def __getitem__(self, i):
+    def __getitem__(self, i) -> Union[_MulIr, 'Irreps']:
         x = super().__getitem__(i)
         if isinstance(i, slice):
             return Irreps(x)
@@ -549,7 +551,7 @@ class Irreps(tuple):
 
         Returns
         -------
-        irreps : `Irreps`
+        irreps : `e3nn.o3.Irreps`
         p : tuple of int
         inv : tuple of int
 
@@ -634,7 +636,7 @@ class Irreps(tuple):
         `torch.Tensor`
             tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
         """
-        return self.D_from_angles(*o3.quaternion_to_angles(q), k)
+        return self.D_from_angles(*_rotation.quaternion_to_angles(q), k)
 
     def D_from_matrix(self, R):
         r"""Matrix of the representation
@@ -652,4 +654,4 @@ class Irreps(tuple):
         d = torch.det(R).sign()
         R = d[..., None, None] * R
         k = (1 - d) / 2
-        return self.D_from_angles(*o3.matrix_to_angles(R), k)
+        return self.D_from_angles(*_rotation.matrix_to_angles(R), k)

@@ -15,7 +15,7 @@ class S2Activation(torch.nn.Module):
 
     Parameters
     ----------
-    irreps : `Irreps`
+    irreps : `o3.Irreps`
         input representation of the form ``[(1, (l, p_val * (p_arg)^l)) for l in [0, ..., lmax]]``
 
     act : function
@@ -37,14 +37,14 @@ class S2Activation(torch.nn.Module):
     >>> from e3nn import io
     >>> m = S2Activation(io.SphericalTensor(5, p_val=+1, p_arg=-1), torch.tanh, 100)
     '''
-    def __init__(self, irreps, act, res, normalization='component', lmax_out=None, random_rot=False):
+    def __init__(self, irreps: o3.Irreps, act, res, normalization='component', lmax_out=None, random_rot=False):
         super().__init__()
 
         irreps = o3.Irreps(irreps).simplify()
         _, (_, p_val) = irreps[0]
         _, (lmax, _) = irreps[-1]
         assert all(mul == 1 for mul, _ in irreps)
-        assert irreps.ls == [l for l in range(lmax + 1)]
+        assert irreps.ls == list(range(lmax + 1))
         if all(p == p_val for _, (l, p) in irreps):
             p_arg = 1
         elif all(p == p_val * (-1) ** l for _, (l, p) in irreps):
@@ -57,7 +57,7 @@ class S2Activation(torch.nn.Module):
         if lmax_out is None:
             lmax_out = lmax
 
-        if p_val == +1 or p_val == 0:
+        if p_val in (0, +1):
             self.irreps_out = o3.Irreps([(1, (l, p_val * p_arg ** l)) for l in range(lmax_out + 1)])
         if p_val == -1:
             x = torch.linspace(0, 10, 256)
