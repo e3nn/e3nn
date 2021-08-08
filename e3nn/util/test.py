@@ -262,9 +262,9 @@ def equivariance_error(
     irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
 
     if do_parity:
-        parity_ks = torch.Tensor([0, 1])
+        parity_ks = [0, 1]
     else:
-        parity_ks = torch.Tensor([0])
+        parity_ks = [0]
 
     if 'cartesian_points' not in irreps_in:
         # There's nothing to translate
