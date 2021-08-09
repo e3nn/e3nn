@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - (dev only) Pre-commit hooks that run pylint and flake8.  These catch some common mistakes/style issues.
 - classes to do `SO(3)` Grid transform (not fast) and Activation function using it
+- Add `f_in` and `f_out` to `o3.Linear`
 
 ## [0.3.3] - 2021-06-21
 ### Changed
