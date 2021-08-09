@@ -4,3 +4,26 @@
 # system, and so shouldn't trigger E1101 when accessed. Python regular
 # expressions are accepted.
 generated-members=numpy.*,torch.*
+
+disable=
+    protected-access,
+    no-else-return,
+    raise-missing-from,
+    invalid-name,
+    duplicate-code,
+    import-outside-toplevel,
+    missing-docstring,
+    bad-continuation,
+    locally-disabled,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-instance-attributes,
+    too-many-local-variables,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-return-statements,
+    redefined-builtin,
+    redefined-outer-name,
+    line-too-long,
+    fixme,
