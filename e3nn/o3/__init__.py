@@ -53,6 +53,7 @@ from ._s2grid import (
     ToS2Grid,
     FromS2Grid,
 )
+from ._so3grid import SO3Grid
 from ._linear import Linear
 from ._norm import Norm
 
@@ -108,6 +109,7 @@ __all__ = [
     "irfft",
     "ToS2Grid",
     "FromS2Grid",
+    "SO3Grid",
     "Linear",
     "Norm",
 ]
