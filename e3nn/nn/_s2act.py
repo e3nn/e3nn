@@ -1,10 +1,11 @@
-# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
 
 from e3nn import o3
 from e3nn.math import normalize2mom
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('script')
 class S2Activation(torch.nn.Module):
     r'''Apply non linearity on the signal on the sphere
 

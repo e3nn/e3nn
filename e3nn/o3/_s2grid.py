@@ -32,6 +32,7 @@ import torch
 import torch.fft
 from e3nn import o3
 from e3nn.util import explicit_default_types
+from e3nn.util.jit import compile_mode
 
 
 def _quadrature_weights(b, dtype=None, device=None):
@@ -278,6 +279,7 @@ def irfft(x, res):
     return x.reshape(*size, res)
 
 
+@compile_mode('trace')
 class ToS2Grid(torch.nn.Module):
     r"""Transform spherical tensor into signal on the sphere
 
@@ -376,8 +378,7 @@ class ToS2Grid(torch.nn.Module):
             tensor of shape ``[..., beta, alpha]``
         """
         size = x.shape[:-1]
-        lmax = round(x.shape[-1] ** 0.5) - 1
-        x = x.reshape(-1, (lmax + 1) ** 2)
+        x = x.reshape(-1, x.shape[-1])
 
         x = torch.einsum('mbi,zi->zbm', self.shb, x)  # [batch, beta, m]
 
@@ -388,7 +389,11 @@ class ToS2Grid(torch.nn.Module):
             x = torch.einsum('am,zbm->zba', self.sha, x)
         return x.reshape(*size, *x.shape[1:])
 
+    def _make_tracing_inputs(self, n: int):
+        return [{'forward': (torch.randn(self.lmax**2),)} for _ in range(n)]
 
+
+@compile_mode('trace')
 class FromS2Grid(torch.nn.Module):
     r"""Transform signal on the sphere into spherical tensor
 
@@ -502,3 +507,6 @@ class FromS2Grid(torch.nn.Module):
             x = torch.einsum('am,zba->zbm', self.sha, x)
         x = torch.einsum('mbi,zbm->zi', self.shb, x)
         return x.reshape(*size, x.shape[1])
+
+    def _make_tracing_inputs(self, n: int):
+        return [{'forward': (torch.randn(self.res_beta, self.res_alpha),)} for _ in range(n)]
