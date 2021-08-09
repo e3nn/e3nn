@@ -1,10 +1,11 @@
-# pylint: disable=invalid-name, arguments-differ, missing-docstring, line-too-long, no-member
 import torch
-
 from e3nn import o3
 from e3nn.math import normalize2mom
+from e3nn.o3._s2grid import _quadrature_weights, s2_grid
+from e3nn.util.jit import compile_mode
 
 
+@compile_mode('script')
 class SO3Activation(torch.nn.Module):
     r'''Apply non linearity on the signal on SO(3)
 
@@ -16,15 +17,15 @@ class SO3Activation(torch.nn.Module):
     act : function
         activation function :math:`\phi`
 
-    samples : int
-        number of points to sample SO(3) (the higher the more accurate)
+    resolution : int
+        about ``resolution**3`` points are used to sample SO(3) (the higher the more accurate)
 
     normalization : {'norm', 'component'}
 
     lmax_out : int, optional
         maximum ``l`` of the output
     '''
-    def __init__(self, irreps: o3.Irreps, act, samples, normalization='component', lmax_out=None):
+    def __init__(self, irreps: o3.Irreps, act, resolution, normalization='component', lmax_out=None, aspect_ratio=2):
         super().__init__()
 
         irreps = o3.Irreps(irreps).simplify()
@@ -55,14 +56,23 @@ class SO3Activation(torch.nn.Module):
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")
 
-        abc = o3.rand_angles(samples)
         assert normalization == "component"
+
+        nb = 2 * resolution
+        na = round(2 * aspect_ratio * resolution)
+
+        b, a = s2_grid(nb, na)
         self.register_buffer(
             "D",
             torch.cat([
-                (2 * l + 1)**0.5 * o3.wigner_D(l, *abc).transpose(1, 2).reshape(samples, (2 * l + 1)**2) for l in range(lmax + 1)
-            ], dim=1)
+                (2 * l + 1)**0.5 * o3.wigner_D(
+                    l, a[:, None, None], b[None, :, None], a[None, None, :]
+                ).transpose(-1, -2).reshape(na, nb, na, (2 * l + 1)**2)
+                for l in range(lmax + 1)
+            ], dim=-1)
         )
+        qw = _quadrature_weights(nb // 2) * nb**2 / na**2
+        self.register_buffer('qw', qw)
         self.act = normalize2mom(act)
 
     def __repr__(self):
@@ -82,10 +92,8 @@ class SO3Activation(torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., self.irreps_out.dim)``
         '''
-        assert features.shape[-1] == self.irreps_in.dim
-
-        features = torch.einsum("...i,ni->...n", features, self.D) / self.D.shape[1]**0.5  # [..., random_points_on_SO3]
+        features = torch.einsum("...i,abci->...abc", features, self.D) / self.D.shape[-1]**0.5  # [..., random_points_on_SO3]
         features = self.act(features)
-        features = torch.einsum("...n,ni->...i", features, self.D) * (self.D.shape[1]**0.5 / self.D.shape[0])
+        features = torch.einsum("...abc,abci,b->...i", features, self.D, self.qw) * self.D.shape[-1]**0.5  # / self.D.shape[0])
 
         return features
