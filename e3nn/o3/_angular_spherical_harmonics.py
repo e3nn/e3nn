@@ -17,10 +17,11 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
 
     Parameters are identical to :meth:`e3nn.o3.spherical_harmonics_alpha_beta`.
     """
+    normalization: str
     _ls_list: List[Tuple[int, int]]
     _lmax: int
 
-    def __init__(self, l):
+    def __init__(self, l, normalization='integral'):
         super().__init__()
 
         if isinstance(l, o3.Irreps):
@@ -33,16 +34,26 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
         self._ls_list = [(1, l) for l in ls]
         self._lmax = max(ls)
         self.legendre = Legendre(ls)
+        self.normalization = normalization
 
     def forward(self, alpha: torch.Tensor, beta: torch.Tensor) -> torch.Tensor:
         y, z = beta.cos(), beta.sin()
         sha = spherical_harmonics_alpha(self._lmax, alpha.flatten())  # [z, m]
         shy = self.legendre(y.flatten(), z.flatten())  # [z, l * m]
         out = _mul_m_lm(self._ls_list, sha, shy)
+
+        if self.normalization == 'norm':
+            out.div_(torch.cat([
+                (math.sqrt(2 * l + 1) / math.sqrt(4 * math.pi)) * torch.ones(2 * l + 1, dtype=out.dtype, device=out.device)
+                for l in self._ls_list
+            ]))
+        elif self.normalization == 'component':
+            out.mul_(math.sqrt(4 * math.pi))
+
         return out.reshape(alpha.shape + (shy.shape[1],))
 
 
-def spherical_harmonics_alpha_beta(l, alpha, beta):
+def spherical_harmonics_alpha_beta(l, alpha, beta, *, normalization='integral'):
     r"""Spherical harmonics of :math:`\vec r = R_y(\alpha) R_x(\beta) e_y`
 
     .. math:: Y^l(\alpha, \beta) = S^l(\alpha) P^l(\cos(\beta))
@@ -66,7 +77,7 @@ def spherical_harmonics_alpha_beta(l, alpha, beta):
     `torch.Tensor`
         a tensor of shape ``(..., 2l+1)``
     """
-    sh = SphericalHarmonicsAlphaBeta(l)
+    sh = SphericalHarmonicsAlphaBeta(l, normalization=normalization)
     return sh(alpha, beta)
 
 
