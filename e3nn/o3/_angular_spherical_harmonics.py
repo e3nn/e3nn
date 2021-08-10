@@ -18,7 +18,7 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
     Parameters are identical to :meth:`e3nn.o3.spherical_harmonics_alpha_beta`.
     """
     normalization: str
-    _ls_list: List[Tuple[int, int]]
+    _ls_list: List[int]
     _lmax: int
 
     def __init__(self, l, normalization='integral'):
@@ -31,7 +31,7 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
         else:
             ls = list(l)
 
-        self._ls_list = [(1, l) for l in ls]
+        self._ls_list = ls
         self._lmax = max(ls)
         self.legendre = Legendre(ls)
         self.normalization = normalization
@@ -40,7 +40,7 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
         y, z = beta.cos(), beta.sin()
         sha = spherical_harmonics_alpha(self._lmax, alpha.flatten())  # [z, m]
         shy = self.legendre(y.flatten(), z.flatten())  # [z, l * m]
-        out = _mul_m_lm(self._ls_list, sha, shy)
+        out = _mul_m_lm([(1, l) for l in self._ls_list], sha, shy)
 
         if self.normalization == 'norm':
             out.div_(torch.cat([
