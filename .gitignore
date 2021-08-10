@@ -11,5 +11,8 @@ wandb
 _build
 build
 dist
+*.ipynb
 .ipynb_checkpoints
 *.so
+examples/s2cnn/mnist/MNIST_data/MNIST/raw
+examples/s2cnn/mnist/s2_mnist.gz
