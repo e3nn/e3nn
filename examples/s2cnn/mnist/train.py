@@ -209,4 +209,5 @@ def main():
         print('Test Accuracy: {0}'.format(100 * correct / total))
 
 
-main()
+if __name__ == "__main__":
+    main()
