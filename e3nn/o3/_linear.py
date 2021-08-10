@@ -367,7 +367,7 @@ def _codegen_linear(
             if sum(biases) == 1:
                 b = bs
             else:
-                b = bs[..., bias_index:bias_index + mul_ir_out.dim]
+                b = bs.narrow(-1, bias_index, mul_ir_out.dim)
                 bias_index += mul_ir_out.dim
             out_bias_list += [[b.expand(batch_out, -1) if f_out is None else b.expand(batch_out, f_out, -1)]]
         else:
@@ -382,7 +382,7 @@ def _codegen_linear(
         x_list = [x.reshape(batch_out, *(() if f_in is None else (f_in,)), irreps_in[0].mul, irreps_in[0].ir.dim)]
     else:
         x_list = [
-            x[..., i].reshape(batch_out, *(() if f_in is None else (f_in,)), mul_ir.mul, mul_ir.ir.dim)
+            x.narrow(-1, i.start, mul_ir.dim).reshape(batch_out, *(() if f_in is None else (f_in,)), mul_ir.mul, mul_ir.ir.dim)
             for i, mul_ir in zip(irreps_in.slices(), irreps_in)
         ]
 
@@ -406,10 +406,7 @@ def _codegen_linear(
             # Avoid unnecessary view when there is only one weight
             w = ws
         else:
-            w = ws[
-                ...,
-                flat_weight_index:flat_weight_index + path_nweight
-            ]
+            w = ws.narrow(-1, flat_weight_index, path_nweight)
         w = w.reshape(
             (() if shared_weights else (-1,)) + (() if f_in is None else (f_in, f_out)) + ins.path_shape
         )
