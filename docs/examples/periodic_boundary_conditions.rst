@@ -19,7 +19,7 @@ application, this code should be modified with a more tailored network design.
 
 Example crystal structures
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-First we will create some crystal structures which have periodic boundary conditions.
+First, we create some crystal structures which have periodic boundary conditions.
 
 .. jupyter-execute::
 
@@ -50,12 +50,12 @@ First we will create some crystal structures which have periodic boundary condit
 Create and store periodic graph data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use the `ase.neighborlist.neighbor_list` algorithm and a ``radial_cutoff`` 
-distance to define which edges we edges we include in our graph to represent
+distance to define which edges to include in the graph to represent
 interactions with neighboring atoms. Note that for a convolutional network, the 
 number of layers determines the receptive field, i.e. how “far out” any given atom
 can see. So even if a we use a ``radial_cutoff = 3.5``, a two layer network
 effectively sees ``2 * 3.5 = 7`` distance units (in this case Angstroms) away and a
-three layer network ``3 * 3.5 = 10.5`` distance units. We will then store our data
+three layer network ``3 * 3.5 = 10.5`` distance units. We then store our data
 in ``torch_geometric.data.Data`` objects that we will batch with 
 ``torch_geometric.data.DataLoader`` below.
 
@@ -70,7 +70,7 @@ in ``torch_geometric.data.Data`` objects that we will batch with
     dummy_energies = torch.randn(2, 1, 1)  # dummy energies for example
     
     for crystal, energy in zip([po, si], dummy_energies):
-        # edge_src and edge_dst are the indices of the central and neighboring atom
+        # edge_src and edge_dst are the indices of the central and neighboring atom, respectively
         # edge_shift indicates whether the neighbors are in different images / copies of the unit cell
         edge_src, edge_dst, edge_shift = ase.neighborlist.neighbor_list("ijS", a=crystal, cutoff=radial_cutoff, self_interaction=True)
         
@@ -98,8 +98,8 @@ lattices will have shape ``[batch_size, 3, 3]``.
 
 Graph Batches
 ~~~~~~~~~~~~~
-We use ``torch_geometric.data.DataLoader`` to create batches of 
-differently sized structures. `DataLoader` produces `Data` objects when
+``torch_geometric.data.DataLoader`` create batches of 
+differently sized structures and produces `Data` objects containing a batch when
 iterated over.
 
 .. jupyter-execute::
@@ -146,7 +146,7 @@ One Approach: Adding a Preprocessing Method to the Network
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 While ``edge_vec`` can be stored in the `Data` object, it can also be calculated
-with a preprocessing method of your Network. For this example, we will create a 
+by adding a preprocessing method to the Network. For this example, we create a 
 modified version of the example network ``SimpleNetwork`` `documented
 here <https://docs.e3nn.org/en/stable/api/nn/models/v2103.html#simple-network>`__
 with `source code
@@ -202,7 +202,7 @@ application.
                 return output
 
 
-Define and run the network.
+We define and run the network.
 
 .. jupyter-execute::
 
