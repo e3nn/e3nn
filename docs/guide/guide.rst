@@ -18,6 +18,7 @@ User Guide
 .. toctree::
     :maxdepth: 1
 
+    periodic_boundary_conditions
     transformer
     equivar_testing
     jit
