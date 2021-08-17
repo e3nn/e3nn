@@ -19,13 +19,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in1 : `Irreps`
+    irreps_in1 : `e3nn.o3.Irreps`
         Irreps for the first input.
 
-    irreps_in2 : `Irreps`
+    irreps_in2 : `e3nn.o3.Irreps`
         Irreps for the second input.
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
         Irreps for the output.
 
     instructions : list of tuple
@@ -54,7 +54,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             \| x \| = \| y \| = 1 \Longrightarrow \| x \otimes y \| = 1
 
     internal_weights : bool
-        whether the `TensorProduct` contains its learnable weights as a parameter
+        whether the `e3nn.o3.TensorProduct` contains its learnable weights as a parameter
 
     shared_weights : bool
         whether the learnable weights are shared among the input's extra dimensions
@@ -485,7 +485,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         aspect_ratio=1,
         ax=None
     ):  # pragma: no cover
-        r"""Visualize the connectivity of this `TensorProduct`
+        r"""Visualize the connectivity of this `e3nn.o3.TensorProduct`
 
         Parameters
         ----------
@@ -516,7 +516,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         import matplotlib
         import matplotlib.pyplot as plt
         from matplotlib.path import Path
-        import matplotlib.patches as patches
+        from matplotlib import patches
 
         if ax is None:
             ax = plt.gca()
@@ -685,23 +685,23 @@ class FullyConnectedTensorProduct(TensorProduct):
 
     Parameters
     ----------
-    irreps_in1 : `Irreps`
+    irreps_in1 : `e3nn.o3.Irreps`
         representation of the first input
 
-    irreps_in2 : `Irreps`
+    irreps_in2 : `e3nn.o3.Irreps`
         representation of the second input
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
         representation of the output
 
     normalization : {'component', 'norm'}
-        see `TensorProduct`
+        see `e3nn.o3.TensorProduct`
 
     internal_weights : bool
-        see `TensorProduct`
+        see `e3nn.o3.TensorProduct`
 
     shared_weights : bool
-        see `TensorProduct`
+        see `e3nn.o3.TensorProduct`
     """
     def __init__(
         self,
@@ -736,17 +736,17 @@ class ElementwiseTensorProduct(TensorProduct):
 
     Parameters
     ----------
-    irreps_in1 : `Irreps`
+    irreps_in1 : `e3nn.o3.Irreps`
         representation of the first input
 
-    irreps_in2 : `Irreps`
+    irreps_in2 : `e3nn.o3.Irreps`
         representation of the second input
 
-    filter_ir_out : iterator of `Irrep`, optional
-        filter to select only specific `Irrep` of the output
+    filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
+        filter to select only specific `e3nn.o3.Irrep` of the output
 
     normalization : {'component', 'norm'}
-        see `TensorProduct`
+        see `e3nn.o3.TensorProduct`
 
     Examples
     --------
@@ -818,17 +818,17 @@ class FullTensorProduct(TensorProduct):
 
     Parameters
     ----------
-    irreps_in1 : `Irreps`
+    irreps_in1 : `e3nn.o3.Irreps`
         representation of the first input
 
-    irreps_in2 : `Irreps`
+    irreps_in2 : `e3nn.o3.Irreps`
         representation of the second input
 
-    filter_ir_out : iterator of `Irrep`, optional
-        filter to select only specific `Irrep` of the output
+    filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
+        filter to select only specific `e3nn.o3.Irrep` of the output
 
     normalization : {'component', 'norm'}
-        see `TensorProduct`
+        see `e3nn.o3.TensorProduct`
     """
     def __init__(
         self,

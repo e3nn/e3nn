@@ -10,9 +10,9 @@ class Identity(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `Irreps`
+    irreps_in : `e3nn.o3.Irreps`
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
     """
     def __init__(self, irreps_in, irreps_out):
         super().__init__()

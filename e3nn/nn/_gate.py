@@ -54,14 +54,14 @@ class Gate(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_scalars : `Irreps`
+    irreps_scalars : `e3nn.o3.Irreps`
         Representation of the scalars that will be passed through the
         activation functions ``act_scalars``.
 
     act_scalars : list of function or None
         Activation functions acting on the scalars.
 
-    irreps_gates : `Irreps`
+    irreps_gates : `e3nn.o3.Irreps`
         Representation of the scalars that will be passed through the
         activation functions ``act_gates`` and multiplied by the
         ``irreps_gated``.
@@ -70,7 +70,7 @@ class Gate(torch.nn.Module):
         Activation functions acting on the gates. The number of functions in
         the list should match the number of irrep groups in ``irreps_gates``.
 
-    irreps_gated : `Irreps`
+    irreps_gated : `e3nn.o3.Irreps`
         Representation of the gated tensors.
         ``irreps_gates.num_irreps == irreps_gated.num_irreps``
 

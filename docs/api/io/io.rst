@@ -1,7 +1,7 @@
 io
 ==
 
-This submodule contains subclasses of `Irreps` for specialized representations.
+This submodule contains subclasses of `e3nn.o3.Irreps` for specialized representations.
 
 .. rubric:: Overview
 

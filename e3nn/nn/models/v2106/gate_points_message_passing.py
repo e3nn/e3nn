@@ -36,13 +36,13 @@ class MessagePassing(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_node_sequence : list of `Irreps`
+    irreps_node_sequence : list of `e3nn.o3.Irreps`
         representation of the input/hidden/output features
 
-    irreps_node_attr : `Irreps`
+    irreps_node_attr : `e3nn.o3.Irreps`
         representation of the nodes attributes
 
-    irreps_edge_attr : `Irreps`
+    irreps_edge_attr : `e3nn.o3.Irreps`
         representation of the edge attributes
 
     layers : int

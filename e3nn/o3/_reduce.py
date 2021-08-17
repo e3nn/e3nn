@@ -86,22 +86,22 @@ class ReducedTensorProducts(fx.GraphModule):
         For instance ``ij=ji`` means that the tensor has to indices and if they are exchanged, its value is the same.
         ``ij=-ji`` means that the tensor change its sign if the two indices are exchanged.
 
-    filter_ir_out : list of `Irrep`, optional
+    filter_ir_out : list of `e3nn.o3.Irrep`, optional
         Optional, list of allowed irrep in the output
 
-    filter_ir_mid : list of `Irrep`, optional
+    filter_ir_mid : list of `e3nn.o3.Irrep`, optional
         Optional, list of allowed irrep in the intermediary operations
 
-    **kwargs : dict of `Irreps`
+    **kwargs : dict of `e3nn.o3.Irreps`
         each letter present in the formula has to be present in the ``irreps`` dictionary, unless it can be inferred by the formula.
         For instance if the formula is ``ij=ji`` you can provide the representation of ``i`` only: ``ReducedTensorProducts('ij=ji', i='1o')``.
 
     Attributes
     ----------
-    irreps_in : list of `Irreps`
+    irreps_in : list of `e3nn.o3.Irreps`
         input representations
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
         output representation
 
     change_of_basis : `torch.Tensor`

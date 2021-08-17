@@ -3,7 +3,7 @@
 Irreducible representations
 ===========================
 
-This page is a beginner introduction to the main object of ``e3nn`` library: `Irreps`.
+This page is a beginner introduction to the main object of ``e3nn`` library: `e3nn.o3.Irreps`.
 All the core component of ``e3nn`` can be found in ``e3nn.o3``.
 ``o3`` stands for the group of 3d orthogonal matrices, which is equivalently the group of rotation and inversion.
 
@@ -12,7 +12,7 @@ All the core component of ``e3nn`` can be found in ``e3nn.o3``.
     from e3nn.o3 import Irreps
 
 
-An instance of `Irreps` describe how some data behave under rotation.
+An instance of `e3nn.o3.Irreps` describe how some data behave under rotation.
 The mathematical describtion of irreps can be found in the API :ref:`Irreducible representations`.
 
 .. jupyter-execute::

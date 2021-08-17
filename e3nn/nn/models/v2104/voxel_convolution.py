@@ -16,13 +16,13 @@ class Convolution(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `Irreps`
+    irreps_in : `e3nn.o3.Irreps`
         input irreps
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
         output irreps
 
-    irreps_sh : `Irreps`
+    irreps_sh : `e3nn.o3.Irreps`
         set typically to ``o3.Irreps.spherical_harmonics(lmax)``
 
     diameter : float

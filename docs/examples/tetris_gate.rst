@@ -4,7 +4,7 @@ Tetris Gate Example
 Build on top of `tetris_polynomial`, the following is added:
 
 * `soft_one_hot_linspace`
-* `Gate`
+* `e3nn.nn.Gate`
 
 .. rubric:: code
 

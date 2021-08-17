@@ -12,7 +12,7 @@ class NormActivation(torch.nn.Module):
     Applies a scalar nonlinearity to the norm of each irrep and ouputs a (normalized) version of that irrep multiplied by the scalar output of the scalar nonlinearity.
     Parameters
     ----------
-    irreps_in : `Irreps`
+    irreps_in : `e3nn.o3.Irreps`
         representation of the input
     scalar_nonlinearity : callable
         scalar nonlinearity such as ``torch.sigmoid``

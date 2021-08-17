@@ -4,7 +4,7 @@ TorchScript JIT Support
 
 PyTorch provides two ways to compile code into TorchScript: `tracing and scripting <https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html>`_. Tracing follows the tensor operations on an example input, allowing complex Python control flow if that control flow does not depend on the data itself. Scripting compiles a subset of Python directly into TorchScript, allowing data-dependent control flow but only limited Python features.
 
-This is a problem for e3nn, where many modules --- such as ``TensorProduct`` --- use significant Python control flow based on ``Irreps`` as well as features like inheritance that are incompatible with scripting. Other modules like ``Gate``, however, contain important but simple data-dependent control flow. Thus ``Gate`` needs to be scripted, even though it contains a ``TensorProduct`` that has to be traced.
+This is a problem for e3nn, where many modules --- such as `e3nn.o3.TensorProduct` --- use significant Python control flow based on ``e3nn.o3.Irreps`` as well as features like inheritance that are incompatible with scripting. Other modules like ``e3nn.nn.Gate``, however, contain important but simple data-dependent control flow. Thus ``e3nn.nn.Gate`` needs to be scripted, even though it contains a `e3nn.o3.TensorProduct` that has to be traced.
 
 To hide this complexity from the user and prevent difficult-to-understand errors, ``e3nn`` implements a wrapper for ``torch.jit`` --- `e3nn.util.jit <../api/util/jit.rst>`_ --- that recursively and automatically compiles submodules according to directions they provide. Using the ``@compile_mode`` decorator, modules can indicate whether they should be scripted, traced, or left alone.
 
@@ -42,14 +42,14 @@ To compile it to TorchScript, we can try to use ``torch.jit.script``:
     except:
         print("Compilation failed!")
 
-This fails because ``Norm`` is a subclass of ``TensorProduct`` and TorchScript doesn't support inheritance. If we use ``e3nn.util.jit.script``, on the other hand, it works:
+This fails because ``Norm`` is a subclass of `e3nn.o3.TensorProduct` and TorchScript doesn't support inheritance. If we use ``e3nn.util.jit.script``, on the other hand, it works:
 
 .. jupyter-execute::
 
     from e3nn.util.jit import script, trace
     mod_script = script(mod)
 
-Internally, ``e3nn.util.jit.script`` recurses through the submodules of ``mod``, compiling each in accordance with its ``@e3nn.util.jit.compile_mode`` decorator if it has one. In particular, ``Norm`` and other ``TensorProduct``s are marked with ``@compile_mode('trace')``, so ``e3nn.util.jit`` constructs an example input for ``mod.norm``, traces it, and replaces it with the traced TorchScript module. Then when the parent module ``mod`` is compiled inside ``e3nn.util.jit.script`` with ``torch.jit.script``, the submodule ``mod.norm`` has already been compiled and is integrated without issue.
+Internally, ``e3nn.util.jit.script`` recurses through the submodules of ``mod``, compiling each in accordance with its ``@e3nn.util.jit.compile_mode`` decorator if it has one. In particular, ``Norm`` and other `e3nn.o3.TensorProduct` s are marked with ``@compile_mode('trace')``, so ``e3nn.util.jit`` constructs an example input for ``mod.norm``, traces it, and replaces it with the traced TorchScript module. Then when the parent module ``mod`` is compiled inside ``e3nn.util.jit.script`` with ``torch.jit.script``, the submodule ``mod.norm`` has already been compiled and is integrated without issue.
 
 As expected, the scripted module and the original give the same results:
 
@@ -159,7 +159,7 @@ Deciding between ``'script'`` and ``'trace'``
 
 The easiest way to decide on a compile mode for your module is to try both. Tracing will usually generate warnings if it encounters dynamic control flow that it cannot fully capture, and scripting will raise compiler errors for features it does not support.
 
-In general, any module that uses inheritance or control flow based on ``Irreps`` in ``forward()`` will have to be traced.
+In general, any module that uses inheritance or control flow based on ``e3nn.o3.Irreps`` in ``forward()`` will have to be traced.
 
 Testing
 =======

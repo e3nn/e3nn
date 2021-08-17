@@ -16,10 +16,10 @@ class Extract(fx.GraphModule):
 
         Parameters
         ----------
-        irreps_in : `Irreps`
+        irreps_in : `e3nn.o3.Irreps`
             representation of the input
 
-        irreps_outs : list of `Irreps`
+        irreps_outs : list of `e3nn.o3.Irreps`
             list of representation of the outputs
 
         instructions : list of tuple of int
@@ -87,10 +87,10 @@ class ExtractIr(Extract):
 
         Parameters
         ----------
-        irreps_in : `Irreps`
+        irreps_in : `e3nn.o3.Irreps`
             representation of the input
 
-        ir : `Irrep`
+        ir : `e3nn.o3.Irrep`
             representation to extract
         """
         ir = o3.Irrep(ir)

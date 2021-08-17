@@ -91,9 +91,9 @@ def random_irreps(
         len_max : int, optional
             The largest number of irreps to generate, defaults to 4.
         clean : bool, optional
-            If ``True``, only ``o3.Irreps`` objects will be returned. If ``False`` (the default), ``Irreps``-like objects like strings and lists of tuples can be returned.
+            If ``True``, only ``o3.Irreps`` objects will be returned. If ``False`` (the default), ``e3nn.o3.Irreps``-like objects like strings and lists of tuples can be returned.
         allow_empty : bool, optional
-            Whether to allow generating empty ``Irreps``.
+            Whether to allow generating empty ``e3nn.o3.Irreps``.
     Returns
     -------
         An irreps-like object if ``n == 1`` or a list of them if ``n > 1``
@@ -244,9 +244,9 @@ def equivariance_error(
         the function to test
     args_in : list
         the original inputs to pass to ``func``.
-    irreps_in : list of `Irreps` or `Irreps`
+    irreps_in : list of `e3nn.o3.Irreps` or `e3nn.o3.Irreps`
         the input irreps for each of the arguments in ``args_in``. If left as the default of ``None``, ``get_io_irreps`` will be used to try to infer them. If a sequence is provided, valid elements are also the string ``'cartesian'``, which denotes that the corresponding input should be dealt with as cartesian points in 3D, and ``None``, which indicates that the argument should not be transformed.
-    irreps_out : list of `Irreps` or `Irreps`
+    irreps_out : list of `e3nn.o3.Irreps` or `e3nn.o3.Irreps`
         the out irreps for each of the return values of ``func``. Accepts similar values to ``irreps_in``.
     ntrials : int
         run this many trials with random transforms

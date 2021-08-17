@@ -28,13 +28,13 @@ The group :math:`O(3)` is the direct_ product of :math:`SO(3)` and inversion
     g = r i, \quad r \in SO(3), i \in \text{inversion}.
 
 The irreps of :math:`O(3)` are the product of the irreps of :math:`SO(3)` and inversion.
-An instance of the class `Irreps` represent a direct sum of irreps of :math:`O(3)`:
+An instance of the class `e3nn.o3.Irreps` represent a direct sum of irreps of :math:`O(3)`:
 
 .. math::
 
     g = r i \mapsto \bigoplus_{j=1}^n m_j \times \sigma_{p_j}(i) D^{L_j}(r)
 
-where :math:`(m_j \in \mathbb{N}, p_j = \pm 1, L_j = 0,1,2,3,\dots)_{j=1}^n` defines the `Irreps`.
+where :math:`(m_j \in \mathbb{N}, p_j = \pm 1, L_j = 0,1,2,3,\dots)_{j=1}^n` defines the `e3nn.o3.Irreps`.
 
 Irreps of :math:`O(3)` are often confused with the spherical harmonics, the relation between the irreps and the spherical harmonics is explained at :ref:`Spherical Harmonics`.
 

@@ -25,16 +25,16 @@ class Convolution(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `Irreps`
+    irreps_in : `e3nn.o3.Irreps`
         representation of the input node features
 
-    irreps_node_attr : `Irreps`
+    irreps_node_attr : `e3nn.o3.Irreps`
         representation of the node attributes
 
-    irreps_edge_attr : `Irreps`
+    irreps_edge_attr : `e3nn.o3.Irreps`
         representation of the edge attributes
 
-    irreps_out : `Irreps` or None
+    irreps_out : `e3nn.o3.Irreps` or None
         representation of the output node features
 
     number_of_basis : int
@@ -158,21 +158,21 @@ class Network(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `Irreps` or None
+    irreps_in : `e3nn.o3.Irreps` or None
         representation of the input features
         can be set to ``None`` if nodes don't have input features
 
-    irreps_hidden : `Irreps`
+    irreps_hidden : `e3nn.o3.Irreps`
         representation of the hidden features
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
         representation of the output features
 
-    irreps_node_attr : `Irreps` or None
+    irreps_node_attr : `e3nn.o3.Irreps` or None
         representation of the nodes attributes
         can be set to ``None`` if nodes don't have attributes
 
-    irreps_edge_attr : `Irreps`
+    irreps_edge_attr : `e3nn.o3.Irreps`
         representation of the edge attributes
         the edge attributes are :math:`h(r) Y(\vec r / r)`
         where :math:`h` is a smooth function that goes to zero at ``max_radius``

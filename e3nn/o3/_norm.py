@@ -10,7 +10,7 @@ class Norm(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `Irreps`
+    irreps_in : `e3nn.o3.Irreps`
         representation of the input
 
     squared : bool, optional

@@ -9,7 +9,7 @@ What is ``e3nn``?
 Where to start?
 ---------------
 
-- Guide to the `Irreps`: :ref:`irreps guide`
+- Guide to the `e3nn.o3.Irreps`: :ref:`irreps guide`
 - Guide to implement a :ref:`conv guide`
 - The simplest example to start with is :ref:`tetris_poly`.
 - Guide to implement a :ref:`transformer guide`
@@ -25,8 +25,8 @@ Demonstration
 -------------
 
 All the functions to manipulate rotations (rotation matrices, Euler angles, quaternions, convertions, ...) can be found here :ref:`Rotation functions`.
-The irreducible representations of :math:`O(3)` (more info at :ref:`Irreducible representations`) are represented by the class `Irrep`.
-The direct sum of multiple irrep is described by an object `Irreps`.
+The irreducible representations of :math:`O(3)` (more info at :ref:`Irreducible representations`) are represented by the class `e3nn.o3.Irrep`.
+The direct sum of multiple irrep is described by an object `e3nn.o3.Irreps`.
 
 If two tensors :math:`x` and :math:`y` transforms as :math:`D_x = 2 \times 1_o` (two vectors) and :math:`D_y = 0_e + 1_e` (a scalar and a pseudovector) respectively, where the indices :math:`e` and :math:`o` stand for even and odd -- the representation of parity,
 
@@ -74,7 +74,7 @@ Which can be represented by
     plt.imshow(torch.kron(D_x, D_y), cmap='bwr', vmin=-1, vmax=1);
 
 
-This representation is not irreducible (is reducible). It can be decomposed into irreps by a change of basis. The outerproduct followed by the change of basis is done by the class `FullTensorProduct`.
+This representation is not irreducible (is reducible). It can be decomposed into irreps by a change of basis. The outerproduct followed by the change of basis is done by the class `e3nn.o3.FullTensorProduct`.
 
 .. jupyter-execute::
 
@@ -92,7 +92,7 @@ As a sanity check, we can verify that the representation of the tensor prodcut i
     plt.imshow(D, cmap='bwr', vmin=-1, vmax=1);
 
 
-`FullTensorProduct` is a special case of `TensorProduct`, other ones like `FullyConnectedTensorProduct` can contained weights what can be learned, very useful to create neural networks.
+`e3nn.o3.FullTensorProduct` is a special case of `e3nn.o3.TensorProduct`, other ones like `e3nn.o3.FullyConnectedTensorProduct` can contained weights what can be learned, very useful to create neural networks.
 
 
 .. _pytorch: https://pytorch.org/

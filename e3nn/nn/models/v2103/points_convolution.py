@@ -13,16 +13,16 @@ class Convolution(torch.nn.Module):
 
     Parameters
     ----------
-    irreps_node_input : `Irreps`
+    irreps_node_input : `e3nn.o3.Irreps`
         representation of the input node features
 
-    irreps_node_attr : `Irreps`
+    irreps_node_attr : `e3nn.o3.Irreps`
         representation of the node attributes
 
-    irreps_edge_attr : `Irreps`
+    irreps_edge_attr : `e3nn.o3.Irreps`
         representation of the edge attributes
 
-    irreps_node_output : `Irreps` or None
+    irreps_node_output : `e3nn.o3.Irreps` or None
         representation of the output node features
 
     fc_neurons : list of int

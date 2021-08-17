@@ -26,7 +26,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
     Notes
     -----
-        ``Linear`` objects created with different partitionings of the same irreps, such as ``Linear("10x0e", "0e")`` and ``Linear("3x0e + 7x0e", "0e")``, are *not* equivalent: the second module has more instructions, which affects normalization. In a rough sense:
+        `e3nn.o3.Linear` objects created with different partitionings of the same irreps, such as ``Linear("10x0e", "0e")`` and ``Linear("3x0e + 7x0e", "0e")``, are *not* equivalent: the second module has more instructions, which affects normalization. In a rough sense:
 
             Linear("10x0e", "0e") = normalization_coeff_0 * W_0 @ input
             Linear("3x0e + 7x0e", "0e") = normalization_coeff_1 * W_1 @ input[:3] + normalization_coeff_2 * W_2 @ input[3:]
@@ -38,17 +38,17 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
     Parameters
     ----------
-    irreps_in : `Irreps`
+    irreps_in : `e3nn.o3.Irreps`
         representation of the input
 
-    irreps_out : `Irreps`
+    irreps_out : `e3nn.o3.Irreps`
         representation of the output
 
     internal_weights : bool
-        whether the ``Linear`` should store its own weights. Defaults to ``True`` unless ``shared_weights`` is explicitly set to ``False``, for consistancy with ``TensorProduct``.
+        whether the `e3nn.o3.Linear` should store its own weights. Defaults to ``True`` unless ``shared_weights`` is explicitly set to ``False``, for consistancy with `e3nn.o3.TensorProduct`.
 
     shared_weights : bool
-        whether the ``Linear`` should be weighted individually for each input in a batch. Defaults to ``False``. Cannot be ``True`` if ``internal_weights`` is ``True``.
+        whether the `e3nn.o3.Linear` should be weighted individually for each input in a batch. Defaults to ``False``. Cannot be ``True`` if ``internal_weights`` is ``True``.
 
     instructions : list of 2-tuples, optional
         list of tuples ``(i_in, i_out)`` indicating which irreps in ``irreps_in`` should contribute to which irreps in ``irreps_out``. If ``None`` (the default), all allowable instructions will be created: every ``(i_in, i_out)`` such that ``irreps_in[i_in].ir == irreps_out[i_out].ir``.
@@ -59,7 +59,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
     Attributes
     ----------
     weight_numel : int
-        the size of the weights for this ``Linear``
+        the size of the weights for this `e3nn.o3.Linear`
 
     Examples
     --------

@@ -194,7 +194,7 @@ Similarly, the next spherical harmonic function :math:`Y^3` is the :math:`L=3` p
     y3 = tp(y2, r)
     plot(y3)
 
-The functions below are more efficient versions not using `ElementwiseTensorProduct`:
+The functions below are more efficient versions not using `e3nn.o3.ElementwiseTensorProduct`:
 
 .. rubric:: Details
 

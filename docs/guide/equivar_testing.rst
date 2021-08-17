@@ -26,9 +26,9 @@ For convenience, the wrapper function `assert_equivariant` is provided:
 
     assert_equivariant(tp)
 
-For typical e3nn operations `assert_equivariant` can optionally infer the input and output `Irreps`, generate random inputs when no inputs are provided, and check the error against a threshold appropriate to the current  ``torch.get_default_dtype()``.
+For typical e3nn operations `assert_equivariant` can optionally infer the input and output `e3nn.o3.Irreps`, generate random inputs when no inputs are provided, and check the error against a threshold appropriate to the current  ``torch.get_default_dtype()``.
 
-In addition to `Irreps`-like objects, ``irreps_in`` can also contain two special values:
+In addition to `e3nn.o3.Irreps`-like objects, ``irreps_in`` can also contain two special values:
 
  * ``'cartesian_points'``: ``(N, 3)`` tensors containing XYZ points in real space that are equivariant under rotations *and* translations
  * ``None``: any input or output that is invariant and should be left alone

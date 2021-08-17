@@ -205,7 +205,7 @@ class Irrep(tuple):
 
         Returns
         -------
-        generator of `Irrep`
+        generator of `e3nn.o3.Irrep`
         """
         other = Irrep(other)
         p = self.p * other.p
@@ -381,7 +381,7 @@ class Irreps(tuple):
 
         Returns
         -------
-        `Irreps`
+        `e3nn.o3.Irreps`
             representation of :math:`(Y^0, Y^1, \dots, Y^{\mathrm{lmax}})`
 
         Examples
@@ -468,7 +468,7 @@ class Irreps(tuple):
 
         Parameters
         ----------
-        ir : `Irrep`
+        ir : `e3nn.o3.Irrep`
 
         Returns
         -------
@@ -506,7 +506,7 @@ class Irreps(tuple):
 
         Returns
         -------
-        `Irreps`
+        `e3nn.o3.Irreps`
 
         Examples
         --------
@@ -534,7 +534,7 @@ class Irreps(tuple):
 
         Returns
         -------
-        `Irreps`
+        `e3nn.o3.Irreps`
 
         Examples
         --------
