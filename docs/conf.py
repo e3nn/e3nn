@@ -54,6 +54,7 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "pytorch": ("https://pytorch.org/docs/stable/", None),
     "torch_geometric": ("https://pytorch-geometric.readthedocs.io/en/latest/", None),
+    "ase": ("https://wiki.fysik.dtu.dk/ase/", None),
 }
 
 autodoc_default_options = {
