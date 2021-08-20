@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.4] - 2021-08-20
 ### Fixed
 - `ReducedTensorProducts`: `normalization` and `filter_ir_mid` where not properly propagated through the recusive calls, this bug has no effects if the default values where used
 - Use `torch.linalg.eigh` instead of the deprecated `torch.symeig`
