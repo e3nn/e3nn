@@ -3,12 +3,13 @@ from typing import Tuple
 import torch
 from torch import fx
 
+from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from e3nn import o3
 
 
 @compile_mode('script')
-class Extract(fx.GraphModule):
+class Extract(CodeGenMixin, torch.nn.Module):
     # pylint: disable=abstract-method
 
     def __init__(self, irreps_in, irreps_outs, instructions, squeeze_out: bool = False):
@@ -36,7 +37,7 @@ class Extract(fx.GraphModule):
         >>> c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
         (tensor([1.]), tensor([2.]))
         """
-        super().__init__(self, fx.Graph())
+        super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_outs = tuple(o3.Irreps(irreps) for irreps in irreps_outs)
         self.instructions = instructions
@@ -46,7 +47,7 @@ class Extract(fx.GraphModule):
             assert len(irreps_out) == len(ins)
 
         # == generate code ==
-        graph = self.graph
+        graph = fx.Graph()
         x = fx.Proxy(graph.placeholder('x', torch.Tensor))
         torch._assert(x.shape[-1] == self.irreps_in.dim, "invalid input shape")
 
@@ -75,7 +76,10 @@ class Extract(fx.GraphModule):
         else:
             graph.output(out, Tuple[(torch.Tensor,)*len(self.irreps_outs)])
 
-        self.recompile()
+        self._codegen_register({"_compiled_forward": fx.GraphModule({}, graph)})
+
+    def forward(self, x: torch.Tensor):
+        return self._compiled_forward(x)
 
 
 @compile_mode('script')
