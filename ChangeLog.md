@@ -5,8 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Changed
+### Fixed
 - `Extract` uses `CodeGenMixin` to avoid strange recursion errors during training
+- Add missing call to `normalize` in `axis_angle_to_quaternion`
 
 ## [0.3.4] - 2021-08-20
 ### Fixed

@@ -459,6 +459,7 @@ def axis_angle_to_quaternion(xyz, angle):
         tensor of shape :math:`(..., 4)`
     """
     xyz, angle = torch.broadcast_tensors(xyz, angle[..., None])
+    xyz = torch.nn.functional.normalize(xyz, dim=-1)
     c = torch.cos(angle[..., :1] / 2)
     s = torch.sin(angle / 2)
     return torch.cat([c, xyz * s], dim=-1)
