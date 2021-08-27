@@ -40,11 +40,13 @@ def tetris():
     # apply random rotation
     pos = torch.einsum('zij,zaj->zai', o3.rand_matrix(len(pos)), pos)
 
+    return pos, labels
+
+
+def make_batch(pos):
     # put in torch_geometric format
     dataset = [Data(pos=pos, x=torch.ones(4, 1)) for pos in pos]
-    data = next(iter(DataLoader(dataset, batch_size=len(dataset))))
-
-    return data, labels
+    return next(iter(DataLoader(dataset, batch_size=len(dataset))))
 
 
 def Network():
@@ -58,7 +60,12 @@ def Network():
 
 
 def main():
-    data, labels = tetris()
+    x, y = tetris()
+    train_x, train_y = make_batch(x[1:]), y[1:]  # dont train on both chiral shapes
+
+    x, y = tetris()
+    test_x, test_y = make_batch(x), y
+
     f = Network()
 
     print("Built a model:")
@@ -67,24 +74,25 @@ def main():
     optim = torch.optim.Adam(f.parameters(), lr=1e-3)
 
     # == Training ==
-    for step in range(200):
-        pred = f(data)
-        loss = (pred - labels).pow(2).sum()
+    for step in range(300):
+        pred = f(train_x)
+        loss = (pred - train_y).pow(2).sum()
 
         optim.zero_grad()
         loss.backward()
         optim.step()
 
         if step % 10 == 0:
-            accuracy = pred.round().eq(labels).all(dim=1).double().mean(dim=0).item()
+            accuracy = f(test_x).round().eq(test_y).all(dim=1).double().mean(dim=0).item()
             print(f"epoch {step:5d} | loss {loss:<10.1f} | {100 * accuracy:5.1f}% accuracy")
 
     # == Check equivariance ==
     # Because the model outputs (psuedo)scalars, we can easily directly
     # check its equivariance to the same data with new rotations:
     print("Testing equivariance directly...")
-    rotated_data, _ = tetris()
-    error = f(rotated_data) - f(data)
+    rotated_x, _ = tetris()
+    rotated_x = make_batch(rotated_x)
+    error = f(rotated_x) - f(test_x)
     print(f"Equivariance error = {error.abs().max().item():.1e}")
 
 
@@ -96,6 +104,7 @@ def test():
     torch.set_default_dtype(torch.float64)
 
     data, labels = tetris()
+    data = make_batch(data)
     f = Network()
 
     pred = f(data)
@@ -103,12 +112,14 @@ def test():
     loss.backward()
 
     rotated_data, _ = tetris()
+    rotated_data = make_batch(rotated_data)
     error = f(rotated_data) - f(data)
     assert error.abs().max() < 1e-10
 
 
 def profile():
     data, labels = tetris()
+    data = make_batch(data)
     data = data.to(device='cuda')
     labels = labels.to(device='cuda')
 
