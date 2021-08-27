@@ -143,10 +143,10 @@ class MessagePassing(torch.nn.Module):
         return node_features
 
 
-def radius_graph(pos, r):
+def radius_graph(pos, r_max):
     # naive version of torch_cluster.radius_graph
     r = torch.cdist(pos, pos)
-    return ((r < 1.0) & (r > 0)).nonzero().T
+    return ((r < r_max) & (r > 0)).nonzero().T
 
 
 def test():

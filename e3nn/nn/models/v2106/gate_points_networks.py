@@ -18,10 +18,10 @@ def scatter(src: torch.Tensor, index: torch.Tensor, dim_size: int) -> torch.Tens
     return out.scatter_add_(0, index, src)
 
 
-def radius_graph(pos, r, batch):
+def radius_graph(pos, r_max, batch):
     # naive and inefficient version of torch_cluster.radius_graph
     r = torch.cdist(pos, pos)
-    index = ((r < 1.0) & (r > 0)).nonzero().T
+    index = ((r < r_max) & (r > 0)).nonzero().T
     index = index[:, batch[index[0]] == batch[index[1]]]
     return index
 
