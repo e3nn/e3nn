@@ -88,7 +88,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
     Parameter containing:
     ...
     >>> x = torch.arange(10.0)
-    >>> (lin1(x) - lin2(x)).abs().item() > 0.1
+    >>> (lin1(x) - lin2(x)).abs().item() < 1e-5
     True
 
     """
