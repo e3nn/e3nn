@@ -18,6 +18,19 @@ def test_fully_connected():
     assert_auto_jitable(m)
 
 
+def test_fully_connected_normalization():
+    m = FullyConnectedTensorProduct("10x0e", "10x0e", "0e")
+    for p in m.parameters():
+        p.data.fill_(1.)
+
+    n = FullyConnectedTensorProduct("3x0e + 7x0e", "3x0e + 7x0e", "0e")
+    for p in n.parameters():
+        p.data.fill_(1.)
+
+    x1, x2 = torch.randn(2, 3, 10)
+    assert torch.allclose(m(x1, x2), n(x1, x2))
+
+
 def test_id():
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
