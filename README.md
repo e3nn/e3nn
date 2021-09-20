@@ -1,10 +1,10 @@
-# e3nn
+# Euclidean neural networks
 [![Coverage Status](https://coveralls.io/repos/github/e3nn/e3nn/badge.svg?branch=main)](https://coveralls.io/github/e3nn/e3nn?branch=main)
 [![DOI](https://zenodo.org/badge/237431920.svg)](https://zenodo.org/badge/latestdoi/237431920)
 
 **[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)** | **[Colab](https://colab.research.google.com/drive/1Gps7mMOmzLe3Rt_b012xsz4UyuexTKAf?usp=sharing)**
 
-The aim of this library is to help the developement of E3 equivariant neural networks.
+The aim of this library is to help the developement of [E(3)](https://en.wikipedia.org/wiki/Euclidean_group) equivariant neural networks.
 It contains fundamental mathematical operations such as [tensor products](https://docs.e3nn.org/en/stable/api/o3/o3_tp.html) and [spherical harmonics](https://docs.e3nn.org/en/stable/api/o3/o3_sh.html).
 
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
@@ -39,7 +39,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
 
 ## Citing
 ```
-@software{mario_geiger_2021_5006322,
+@software{e3nn,
   author       = {Mario Geiger and
                   Tess Smidt and
                   Alby M. and
@@ -50,18 +50,18 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Maurice Weiler and
                   Michał Tyszkiewicz and
                   Simon Batzner and
+                  Martin Uhrin and
                   Jes Frellsen and
                   Nuri Jung and
                   Sophia Sanborn and
                   Josh Rackers and
                   Michael Bailey},
-  title        = {e3nn/e3nn: 2021-06-21},
-  month        = jun,
-  year         = 2021,
+  title        = {Euclidean neural networks: e3nn},
+  year         = 2020,
   publisher    = {Zenodo},
-  version      = {0.3.3},
-  doi          = {10.5281/zenodo.5006322},
-  url          = {https://doi.org/10.5281/zenodo.5006322}
+  version      = {0.3.5},
+  doi          = {10.5281/zenodo.5292912},
+  url          = {https://doi.org/10.5281/zenodo.5292912}
 }
 ```
 
