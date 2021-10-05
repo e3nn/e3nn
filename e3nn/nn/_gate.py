@@ -125,17 +125,17 @@ class Gate(torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        with torch.autograd.profiler.record_function('Gate'):
-            scalars, gates, gated = self.sc(features)
+        # - PROFILER - with torch.autograd.profiler.record_function('Gate'):
+        scalars, gates, gated = self.sc(features)
 
-            scalars = self.act_scalars(scalars)
-            if gates.shape[-1]:
-                gates = self.act_gates(gates)
-                gated = self.mul(gated, gates)
-                features = torch.cat([scalars, gated], dim=-1)
-            else:
-                features = scalars
-            return features
+        scalars = self.act_scalars(scalars)
+        if gates.shape[-1]:
+            gates = self.act_gates(gates)
+            gated = self.mul(gated, gates)
+            features = torch.cat([scalars, gated], dim=-1)
+        else:
+            features = scalars
+        return features
 
     @property
     def irreps_in(self):

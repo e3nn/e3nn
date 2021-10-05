@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- remove `profiler.record_function` calls that caused troubles with torchscript
 - the home made implementation of `radius_graph` was ignoring the argument `r_max`
 
 ## [0.3.5] - 2021-08-27

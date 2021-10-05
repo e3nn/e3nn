@@ -36,16 +36,16 @@ class _Layer(torch.nn.Module):
         return f"Layer({self.h_in}->{self.h_out}, act={act})"
 
     def forward(self, x: torch.Tensor):
-        with torch.autograd.profiler.record_function(self._profiling_str):
-            if self.act is not None:
-                w = self.weight / (self.h_in * self.var_in)**0.5
-                x = x @ w
-                x = self.act(x)
-                x = x * self.var_out**0.5
-            else:
-                w = self.weight / (self.h_in * self.var_in / self.var_out)**0.5
-                x = x @ w
-            return x
+        # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
+        if self.act is not None:
+            w = self.weight / (self.h_in * self.var_in)**0.5
+            x = x @ w
+            x = self.act(x)
+            x = x * self.var_out**0.5
+        else:
+            w = self.weight / (self.h_in * self.var_in / self.var_out)**0.5
+            x = x @ w
+        return x
 
 
 @compile_mode('script')

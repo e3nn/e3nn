@@ -153,9 +153,9 @@ def codegen_tensor_product(
         alpha = ins.path_weight * out_var[ins.i_out] / sum(in1_var[i.i_in1] * in2_var[i.i_in2] for i in instructions if i.i_out == ins.i_out)
 
         # Open the profiler block
-        name = f"{mul_ir_in1} x {mul_ir_in2} = {mul_ir_out} {ins.connection_mode} {ins.has_weight}"
-        handle_out = graph_out.call_function(torch.ops.profiler._record_function_enter, (name,))
-        handle_right = graph_right.call_function(torch.ops.profiler._record_function_enter, (name,))
+        # - PROFILER - name = f"{mul_ir_in1} x {mul_ir_in2} = {mul_ir_out} {ins.connection_mode} {ins.has_weight}"
+        # - PROFILER - handle_out = graph_out.call_function(torch.ops.profiler._record_function_enter, (name,))
+        # - PROFILER - handle_right = graph_right.call_function(torch.ops.profiler._record_function_enter, (name,))
 
         x1_out = x1_list_out[ins.i_in1]
         x2_out = x2_list_out[ins.i_in2]
@@ -360,8 +360,8 @@ def codegen_tensor_product(
         out_list_right += [ein_right.reshape(batch_right, mul_ir_in1.dim, mul_ir_out.dim)]
 
         # Close the profiler block
-        graph_out.call_function(torch.ops.profiler._record_function_exit, (handle_out,))
-        graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
+        # - PROFILER - graph_out.call_function(torch.ops.profiler._record_function_exit, (handle_out,))
+        # - PROFILER - graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
 
         # Remove unused w3js:
         if len(w3j_out.node.users) == 0 and len(w3j_right.node.users) == 0:

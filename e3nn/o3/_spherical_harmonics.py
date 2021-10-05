@@ -75,30 +75,30 @@ class SphericalHarmonics(torch.nn.Module):
             raise NotImplementedError(f'spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more')
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        with torch.autograd.profiler.record_function(self._prof_str):
-            if self.normalize:
-                x = torch.nn.functional.normalize(x, dim=-1)  # forward 0's instead of nan for zero-radius
+        # - PROFILER - with torch.autograd.profiler.record_function(self._prof_str):
+        if self.normalize:
+            x = torch.nn.functional.normalize(x, dim=-1)  # forward 0's instead of nan for zero-radius
 
-            sh = _spherical_harmonics(self._lmax, x[..., 0], x[..., 1], x[..., 2])
+        sh = _spherical_harmonics(self._lmax, x[..., 0], x[..., 1], x[..., 2])
 
-            if not self._is_range_lmax:
-                sh = torch.cat([
-                    sh[..., l*l:(l+1)*(l+1)]
-                    for l in self._ls_list
-                ], dim=-1)
+        if not self._is_range_lmax:
+            sh = torch.cat([
+                sh[..., l*l:(l+1)*(l+1)]
+                for l in self._ls_list
+            ], dim=-1)
 
-            if self.normalization == 'integral':
-                sh.mul_(torch.cat([
-                    (math.sqrt(2 * l + 1) / math.sqrt(4 * math.pi)) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
-                    for l in self._ls_list
-                ]))
-            elif self.normalization == 'component':
-                sh.mul_(torch.cat([
-                    math.sqrt(2 * l + 1) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
-                    for l in self._ls_list
-                ]))
+        if self.normalization == 'integral':
+            sh.mul_(torch.cat([
+                (math.sqrt(2 * l + 1) / math.sqrt(4 * math.pi)) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
+                for l in self._ls_list
+            ]))
+        elif self.normalization == 'component':
+            sh.mul_(torch.cat([
+                math.sqrt(2 * l + 1) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
+                for l in self._ls_list
+            ]))
 
-            return sh
+        return sh
 
 
 def spherical_harmonics(

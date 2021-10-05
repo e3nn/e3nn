@@ -86,19 +86,19 @@ class Activation(torch.nn.Module):
         `torch.Tensor`
             tensor of shape the same shape as the input
         '''
-        with torch.autograd.profiler.record_function(repr(self)):
-            output = []
-            index = 0
-            for (mul, ir), act in zip(self.irreps_in, self.acts):
-                if act is not None:
-                    output.append(act(features.narrow(dim, index, mul)))
-                else:
-                    output.append(features.narrow(dim, index, mul * ir.dim))
-                index += mul * ir.dim
-
-            if len(output) > 1:
-                return torch.cat(output, dim=dim)
-            elif len(output) == 1:
-                return output[0]
+        # - PROFILER - with torch.autograd.profiler.record_function(repr(self)):
+        output = []
+        index = 0
+        for (mul, ir), act in zip(self.irreps_in, self.acts):
+            if act is not None:
+                output.append(act(features.narrow(dim, index, mul)))
             else:
-                return torch.zeros_like(features)
+                output.append(features.narrow(dim, index, mul * ir.dim))
+            index += mul * ir.dim
+
+        if len(output) > 1:
+            return torch.cat(output, dim=dim)
+        elif len(output) == 1:
+            return output[0]
+        else:
+            return torch.zeros_like(features)

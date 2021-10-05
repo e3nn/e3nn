@@ -383,9 +383,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         """
         assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
 
-        with torch.autograd.profiler.record_function(self._profiling_str):
-            real_weight = self._get_weights(weight)
-            return self._compiled_main_right(y, real_weight)
+        # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
+        real_weight = self._get_weights(weight)
+        return self._compiled_main_right(y, real_weight)
 
     def forward(self, x, y, weight: Optional[torch.Tensor] = None):
         r"""Evaluate :math:`w x \otimes y`.
@@ -413,9 +413,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
         assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
 
-        with torch.autograd.profiler.record_function(self._profiling_str):
-            real_weight = self._get_weights(weight)
-            return self._compiled_main_out(x, y, real_weight)
+        # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
+        real_weight = self._get_weights(weight)
+        return self._compiled_main_out(x, y, real_weight)
 
     def weight_view_for_instruction(
         self,
