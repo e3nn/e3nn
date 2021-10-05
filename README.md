@@ -59,7 +59,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
   title        = {Euclidean neural networks: e3nn},
   year         = 2020,
   publisher    = {Zenodo},
-  version      = {0.3.5},
+  version      = {0.4.0},
   doi          = {10.5281/zenodo.5292912},
   url          = {https://doi.org/10.5281/zenodo.5292912}
 }
