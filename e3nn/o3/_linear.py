@@ -88,7 +88,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
     Parameter containing:
     ...
     >>> x = torch.arange(10.0)
-    >>> (lin1(x) - lin2(x)).abs().item() > 0.1
+    >>> (lin1(x) - lin2(x)).abs().item() < 1e-5
     True
 
     """
@@ -417,9 +417,10 @@ def _codegen_linear(
         else:
             ein_out = torch.einsum(f"{z}xyuw,zxui->zywi", w, x_list[ins.i_in])
         alpha = 1.0 / math.sqrt(
-            (f_in or 1) * mul_ir_in.mul * sum(
-                1 if other_ins.i_out == ins.i_out else 0
-                for other_ins in instructions
+            sum(
+                (f_in or 1) * irreps_in[i.i_in].mul
+                for i in instructions
+                if i.i_out == ins.i_out
             )
         )
         ein_out = alpha * ein_out

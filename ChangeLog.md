@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Breaking change. normalization constants for `TensorProduct` and `Linear`. Now `Linear(2x0e + 7x0e, 0e)` is equivalent to `Linear(9x0e, 0e)`. Models with inhomogeneous multiplicities will be affected by this change!
+
 ### Fixed
 - remove `profiler.record_function` calls that caused troubles with torchscript
 - the home made implementation of `radius_graph` was ignoring the argument `r_max`

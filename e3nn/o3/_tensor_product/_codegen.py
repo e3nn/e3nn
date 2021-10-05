@@ -150,8 +150,6 @@ def codegen_tensor_product(
         if mul_ir_in1.dim == 0 or mul_ir_in2.dim == 0 or mul_ir_out.dim == 0:
             continue
 
-        alpha = ins.path_weight * out_var[ins.i_out] / sum(in1_var[i.i_in1] * in2_var[i.i_in2] for i in instructions if i.i_out == ins.i_out)
-
         # Open the profiler block
         # - PROFILER - name = f"{mul_ir_in1} x {mul_ir_in2} = {mul_ir_out} {ins.connection_mode} {ins.has_weight}"
         # - PROFILER - handle_out = graph_out.call_function(torch.ops.profiler._record_function_enter, (name,))
@@ -167,14 +165,18 @@ def codegen_tensor_product(
 
         assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
-        alpha = sqrt(alpha / {
-            'uvw': (mul_ir_in1.mul * mul_ir_in2.mul),
-            'uvu': mul_ir_in2.mul,
-            'uvv': mul_ir_in1.mul,
-            'uuw': mul_ir_in1.mul,
-            'uuu': 1,
-            'uvuv': 1,
-        }[ins.connection_mode])
+        alpha = ins.path_weight * out_var[ins.i_out] / sum(
+            in1_var[i.i_in1] * in2_var[i.i_in2] * {
+                'uvw': (irreps_in1[i.i_in1].mul * irreps_in2[i.i_in2].mul),
+                'uvu': irreps_in2[i.i_in2].mul,
+                'uvv': irreps_in1[i.i_in1].mul,
+                'uuw': irreps_in1[i.i_in1].mul,
+                'uuu': 1,
+                'uvuv': 1,
+            }[i.connection_mode]
+            for i in instructions if i.i_out == ins.i_out
+        )
+        alpha = sqrt(alpha)
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
