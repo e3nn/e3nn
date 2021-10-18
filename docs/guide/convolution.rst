@@ -8,11 +8,11 @@ We will implement this formula:
 
 .. math::
 
-    f'_i = \frac{1}{\sqrt{z}} \sum_{j \in \partial(i)} \; f_i \; \otimes\!(h(\|x_{ij}\|)) \; Y(x_{ij} / \|x_{ij}\|)
+    f'_i = \frac{1}{\sqrt{z}} \sum_{j \in \partial(i)} \; f_j \; \otimes\!(h(\|x_{ij}\|)) \; Y(x_{ij} / \|x_{ij}\|)
 
 where
 
-- :math:`f_i, f'_i` are the nodes input and output
+- :math:`f_j, f'_i` are the nodes input and output
 - :math:`z` is the average `degree`_ of the nodes
 - :math:`\partial(i)` is the set of neighbors of the node :math:`i`
 - :math:`x_{ij}` is the relative vector
@@ -158,7 +158,7 @@ Now we can compute the term
 
 .. math::
 
-    f_i \; \otimes\!(h(\|x_{ij}\|)) \; Y(x_{ij} / \|x_{ij}\|)
+    f_j \; \otimes\!(h(\|x_{ij}\|)) \; Y(x_{ij} / \|x_{ij}\|)
 
 The idea is to compute this quantity per edges, so we will need to "lift" the input feature to the edges.
 For that we use ``edge_src`` that contains, for each edge, the index of the source node.
@@ -174,7 +174,7 @@ Only the sum over the neighbors is remaining
 
 .. math::
 
-    f'_i = \frac{1}{\sqrt{z}} \sum_{j \in \partial(i)} \; f_i \; \otimes\!(h(\|x_{ij}\|)) \; Y(x_{ij} / \|x_{ij}\|)
+    f'_i = \frac{1}{\sqrt{z}} \sum_{j \in \partial(i)} \; f_j \; \otimes\!(h(\|x_{ij}\|)) \; Y(x_{ij} / \|x_{ij}\|)
 
 .. jupyter-execute::
 
