@@ -8,8 +8,6 @@ class CartesianTensor(o3.Irreps):
     ----------
     formula : str
 
-    p : {+1, -1}
-
     Examples
     --------
 
@@ -23,6 +21,13 @@ class CartesianTensor(o3.Irreps):
 
     >>> x.from_vectors(torch.ones(3), torch.ones(3), torch.ones(3))
     tensor([0.])
+
+    >>> x = CartesianTensor("ij=ji")
+    >>> t = torch.arange(9).to(torch.float).view(3,3)
+    >>> y = x.from_cartesian(t)
+    >>> z = x.to_cartesian(y)
+    >>> torch.allclose(z, (t + t.T)/2, atol=1e-5)
+    True
     """
     # pylint: disable=abstract-method
 
@@ -31,9 +36,11 @@ class CartesianTensor(o3.Irreps):
     num_index: int
 
     def __new__(
-            # pylint: disable=signature-differs
-            cls, formula):
-        f = formula.split('=')[0].replace('-', '')
+        # pylint: disable=signature-differs
+        cls,
+        formula,
+    ):
+        f = formula.split("=")[0].replace("-", "")
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in f})
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
@@ -71,6 +78,30 @@ class CartesianTensor(o3.Irreps):
             irreps tensor of shape ``(..., self.dim)``
         """
         return self._rtp(*xs)  # pylint: disable=not-callable
+
+    def to_cartesian(self, data):
+        r"""convert irreps tensor to cartesian tensor
+
+        This is the symmetry-aware inverse operation of ``from_cartesian()``.
+
+        Parameters
+        ----------
+        data : `torch.Tensor`
+            irreps tensor of shape ``(..., D)``, where D is the dimension of the irreps,
+            i.e. ``D=self.dim``.
+
+        Returns
+        -------
+        `torch.Tensor`
+            cartesian tensor of shape ``(..., 3, 3, 3, ...)``
+        """
+        Q = self.change_of_basis()
+        cartesian_tensor = data @ Q.flatten(-self.num_index)
+
+        shape = list(data.shape[:-1]) + list(Q.shape[1:])
+        cartesian_tensor = cartesian_tensor.view(shape)
+
+        return cartesian_tensor
 
     def change_of_basis(self):
         r"""change of basis from cartesian tensor to irreps
