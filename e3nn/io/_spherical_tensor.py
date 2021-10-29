@@ -93,8 +93,8 @@ class SphericalTensor(o3.Irreps):
         ...     [3.0, 4.0, 0.0],
         ... ])
         >>> x = s.with_peaks_at(pos)
-        >>> s.signal_xyz(x, pos)
-        tensor([1.0000, 5.0000])
+        >>> s.signal_xyz(x, pos).long()
+        tensor([1, 5])
 
         >>> val = torch.tensor([
         ...     -1.5,
