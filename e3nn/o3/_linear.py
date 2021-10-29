@@ -322,11 +322,12 @@ def _codegen_linear(
     optimize_einsums: bool = True,
 ) -> Tuple[fx.GraphModule, int, int]:
     graph_out = fx.Graph()
+    tracer_out = fx.proxy.GraphAppendingTracer(graph_out)
 
     # = Function definitions =
-    x = fx.Proxy(graph_out.placeholder('x', torch.Tensor))
-    ws = fx.Proxy(graph_out.placeholder('w', torch.Tensor))
-    bs = fx.Proxy(graph_out.placeholder('b', torch.Tensor))
+    x = fx.Proxy(graph_out.placeholder('x', torch.Tensor), tracer_out)
+    ws = fx.Proxy(graph_out.placeholder('w', torch.Tensor), tracer_out)
+    bs = fx.Proxy(graph_out.placeholder('b', torch.Tensor), tracer_out)
 
     if f_in is None:
         size = x.shape[:-1]

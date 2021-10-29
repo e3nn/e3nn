@@ -37,15 +37,18 @@ def codegen_tensor_product(
     graph_right = fx.Graph()
 
     # = Function definitions =
-    x1s_out = fx.Proxy(graph_out.placeholder('x1', torch.Tensor))
-    x2s_out = fx.Proxy(graph_out.placeholder('x2', torch.Tensor))
-    ws_out = fx.Proxy(graph_out.placeholder('w', torch.Tensor))
+    tracer_out = fx.proxy.GraphAppendingTracer(graph_out)
+    tracer_right = fx.proxy.GraphAppendingTracer(graph_right)
 
-    x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor))
-    ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor))
+    x1s_out = fx.Proxy(graph_out.placeholder('x1', torch.Tensor), tracer=tracer_out)
+    x2s_out = fx.Proxy(graph_out.placeholder('x2', torch.Tensor), tracer=tracer_out)
+    ws_out = fx.Proxy(graph_out.placeholder('w', torch.Tensor), tracer=tracer_out)
 
-    empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')))
-    empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')))
+    x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor), tracer=tracer_right)
+    ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor), tracer=tracer_right)
+
+    empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')), tracer=tracer_out)
+    empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')), tracer=tracer_right)
     if shared_weights:
         size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]))[0].shape
         size_right = x2s_right.shape[:-1]
@@ -159,9 +162,9 @@ def codegen_tensor_product(
         x2_out = x2_list_out[ins.i_in2]
         x2_right = x2_list_right[ins.i_in2]
 
-        e1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
-        e2_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
-        i1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)))
+        e1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
+        e2_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
+        i1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
 
         assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
 
@@ -198,8 +201,8 @@ def codegen_tensor_product(
         # If not used (because of specialized code), will get removed later.
         key = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
         if key not in w3j:
-            w3j_dict_out[key] = fx.Proxy(graph_out.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"))
-            w3j_dict_right[key] = fx.Proxy(graph_right.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"))
+            w3j_dict_out[key] = fx.Proxy(graph_out.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"), tracer=tracer_out)
+            w3j_dict_right[key] = fx.Proxy(graph_right.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"), tracer=tracer_right)
             w3j.append(key)
         w3j_out = w3j_dict_out[key]
         w3j_right = w3j_dict_right[key]
@@ -276,7 +279,7 @@ def codegen_tensor_product(
                     ein_out = torch.einsum("zui,zvi->zv", x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)**exp
                 else:
                     ein_out = torch.einsum("ijk,zuvij->zvk", w3j_out, xx)
-                s2ones = fx.Proxy(graph_right.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2_right.device.node, dtype=x2_right.dtype.node)))
+                s2ones = fx.Proxy(graph_right.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2_right.device.node, dtype=x2_right.dtype.node)), tracer=tracer_right)
                 ein_right = torch.einsum("u,ijk,zvj->zuivk", s2ones, w3j_right, x2_right)
         if ins.connection_mode == 'uuw':
             assert mul_ir_in1.mul == mul_ir_in2.mul

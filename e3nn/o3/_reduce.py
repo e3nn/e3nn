@@ -240,8 +240,9 @@ class ReducedTensorProducts(fx.GraphModule):
             setattr(self, f'tp{i}', tp)
 
         graph = fx.Graph()
+        tracer = torch.fx.proxy.GraphAppendingTracer(graph)
         inputs = [
-            fx.Proxy(graph.placeholder(f"x{i}", torch.Tensor))
+            fx.Proxy(graph.placeholder(f"x{i}", torch.Tensor), tracer)
             for i in f0
         ]
 
@@ -261,7 +262,7 @@ class ReducedTensorProducts(fx.GraphModule):
             if isinstance(path, _TP):
                 x1 = evaluate(path.args[0]).node
                 x2 = evaluate(path.args[1]).node
-                out = fx.Proxy(graph.call_module(f'tp{tps.index(path.op)}', (x1, x2)))
+                out = fx.Proxy(graph.call_module(f'tp{tps.index(path.op)}', (x1, x2)), tracer)
             values[path] = out
             return out
 
