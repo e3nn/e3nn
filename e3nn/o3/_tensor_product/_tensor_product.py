@@ -70,6 +70,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         where here :math:`i` denotes a *batch-like* index.
         ``shared_weights`` cannot be `False` if ``internal_weights`` is `True`.
 
+    compile_left_right : bool
+        whether to compile the forward function, true by default
+
+    compile_right : bool
+        whether to compile the ``.right`` function, false by default
+
     Examples
     --------
     Create a module that computes elementwise the cross-product of 16 vectors with 16 vectors :math:`z_u = x_u \wedge y_u`
