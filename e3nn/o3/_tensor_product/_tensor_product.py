@@ -1,16 +1,17 @@
-from typing import Optional, List, Union, Iterator
-
-import torch
-import torch.fx
+import warnings
+from math import sqrt
+from typing import Iterator, List, Optional, Union
 
 import e3nn
+import torch
+import torch.fx
 from e3nn import o3
-from e3nn.util.jit import compile_mode
-from e3nn.util.codegen import CodeGenMixin
 from e3nn.util import prod
+from e3nn.util.codegen import CodeGenMixin
+from e3nn.util.jit import compile_mode
 
-from ._instruction import Instruction
 from ._codegen import codegen_tensor_product
+from ._instruction import Instruction
 
 
 @compile_mode('script')
@@ -46,12 +47,16 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     out_var : list of float, Tensor, or None
         Variance for each irrep in ``irreps_out``. If ``None``, all default to ``1.0``.
 
-    normalization : {'component', 'norm'}
+    irrep_normalization : {'component', 'norm'}
         The assumed normalization of the input and output representations. If it is set to "norm":
 
         .. math::
 
             \| x \| = \| y \| = 1 \Longrightarrow \| x \otimes y \| = 1
+
+    path_normalization : {'element', 'path'}
+        If set to ``element``, each output is normalized by the total number of elements (independently of their paths).
+        If it is set to ``path``, each path is normalized by the total number of elements in the path, then each output is normalized by the number of paths.
 
     internal_weights : bool
         whether the `e3nn.o3.TensorProduct` contains its learnable weights as a parameter
@@ -182,42 +187,32 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         in1_var: Optional[Union[List[float], torch.Tensor]] = None,
         in2_var: Optional[Union[List[float], torch.Tensor]] = None,
         out_var: Optional[Union[List[float], torch.Tensor]] = None,
-        normalization: str = 'component',
+        irrep_normalization: str = 'component',
+        path_normalization: str = 'element',
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
+        normalization=None,  # for backward compatibility
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None
     ):
         # === Setup ===
         super().__init__()
 
-        # Determine irreps
+        if normalization is not None:
+            warnings.warn(
+                "`normalization` is deprecated. Use `irrep_normalization` instead.",
+                DeprecationWarning
+            )
+            irrep_normalization = normalization
+
+        assert irrep_normalization in ['component', 'norm']
+        assert path_normalization in ['element', 'path']
+
         self.irreps_in1 = o3.Irreps(irreps_in1)
         self.irreps_in2 = o3.Irreps(irreps_in2)
         self.irreps_out = o3.Irreps(irreps_out)
+        del irreps_in1, irreps_in2, irreps_out
 
-        self._in1_dim = self.irreps_in1.dim
-        self._in2_dim = self.irreps_in2.dim
-
-        if in1_var is None:
-            self.in1_var = [1.0 for _ in range(len(self.irreps_in1))]
-        else:
-            self.in1_var = [float(var) for var in in1_var]
-            assert len(self.in1_var) == len(self.irreps_in1), "Len of ir1_var must be equal to len(irreps_in1)"
-
-        if in2_var is None:
-            self.in2_var = [1.0 for _ in range(len(self.irreps_in2))]
-        else:
-            self.in2_var = [float(var) for var in in2_var]
-            assert len(self.in2_var) == len(self.irreps_in2), "Len of ir2_var must be equal to len(irreps_in2)"
-
-        if out_var is None:
-            self.out_var = [1.0 for _ in range(len(self.irreps_out))]
-        else:
-            self.out_var = [float(var) for var in out_var]
-            assert len(self.out_var) == len(self.irreps_out), "Len of out_var must be equal to len(irreps_out)"
-
-        # Preprocess instructions into objects
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
         instructions = [
             Instruction(
@@ -233,10 +228,76 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             )
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
         ]
-        self.instructions = instructions
 
-        assert normalization in ['component', 'norm'], normalization
-        self.normalization = normalization
+        if in1_var is None:
+            in1_var = [1.0 for _ in range(len(self.irreps_in1))]
+        else:
+            in1_var = [float(var) for var in in1_var]
+            assert len(in1_var) == len(self.irreps_in1), "Len of ir1_var must be equal to len(irreps_in1)"
+
+        if in2_var is None:
+            in2_var = [1.0 for _ in range(len(self.irreps_in2))]
+        else:
+            in2_var = [float(var) for var in in2_var]
+            assert len(in2_var) == len(self.irreps_in2), "Len of ir2_var must be equal to len(irreps_in2)"
+
+        if out_var is None:
+            out_var = [1.0 for _ in range(len(self.irreps_out))]
+        else:
+            out_var = [float(var) for var in out_var]
+            assert len(out_var) == len(self.irreps_out), "Len of out_var must be equal to len(irreps_out)"
+
+        def num_elements(ins):
+            return {
+                'uvw': (self.irreps_in1[ins.i_in1].mul * self.irreps_in2[ins.i_in2].mul),
+                'uvu': self.irreps_in2[ins.i_in2].mul,
+                'uvv': self.irreps_in1[ins.i_in1].mul,
+                'uuw': self.irreps_in1[ins.i_in1].mul,
+                'uuu': 1,
+                'uvuv': 1,
+            }[ins.connection_mode]
+
+        normalization_coefficients = []
+        for ins in instructions:
+            mul_ir_in1 = self.irreps_in1[ins.i_in1]
+            mul_ir_in2 = self.irreps_in2[ins.i_in2]
+            mul_ir_out = self.irreps_out[ins.i_out]
+            assert mul_ir_in1.ir.p * mul_ir_in2.ir.p == mul_ir_out.ir.p
+            assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
+            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
+
+            alpha = 1
+
+            if irrep_normalization == 'component':
+                alpha *= mul_ir_out.ir.dim
+            if irrep_normalization == 'norm':
+                alpha *= mul_ir_in1.ir.dim * mul_ir_in2.ir.dim
+
+            if path_normalization == 'element':
+                x = sum(
+                    in1_var[i.i_in1] * in2_var[i.i_in2] * num_elements(i)
+                    for i in instructions
+                    if i.i_out == ins.i_out
+                )
+            if path_normalization == 'path':
+                x = in1_var[ins.i_in1] * in2_var[ins.i_in2] * num_elements(ins)
+                x *= len([i for i in instructions if i.i_out == ins.i_out])
+
+            if x > 0.0:
+                alpha /= x
+
+            alpha *= out_var[ins.i_out]
+            alpha *= ins.path_weight
+
+            normalization_coefficients += [sqrt(alpha)]
+
+        self.instructions = [
+            Instruction(ins.i_in1, ins.i_in2, ins.i_out, ins.connection_mode, ins.has_weight, alpha, ins.path_shape)
+            for ins, alpha in zip(instructions, normalization_coefficients)
+        ]
+
+        self._in1_dim = self.irreps_in1.dim
+        self._in2_dim = self.irreps_in2.dim
 
         if shared_weights is False and internal_weights is None:
             internal_weights = False
@@ -259,13 +320,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         # Generate the actual tensor product code
         graphmod_out, graphmod_right = codegen_tensor_product(
             self.irreps_in1,
-            self.in1_var,
             self.irreps_in2,
-            self.in2_var,
             self.irreps_out,
-            self.out_var,
             self.instructions,
-            self.normalization,
             self.shared_weights,
             self._specialized_code,
             self._optimize_einsums
@@ -515,8 +572,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         import matplotlib
         import matplotlib.pyplot as plt
-        from matplotlib.path import Path
         from matplotlib import patches
+        from matplotlib.path import Path
 
         if ax is None:
             ax = plt.gca()

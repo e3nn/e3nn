@@ -182,7 +182,7 @@ To obtain a nicer figure (that looks like the spherical harmonics shown on Wikip
 
 .. jupyter-execute::
 
-    tp = o3.ElementwiseTensorProduct("1o", "1o", ['2e'], normalization='norm')
+    tp = o3.ElementwiseTensorProduct("1o", "1o", ['2e'], irrep_normalization='norm')
     y2 = tp(r, r)
     plot(y2)
 
@@ -190,7 +190,7 @@ Similarly, the next spherical harmonic function :math:`Y^3` is the :math:`L=3` p
 
 .. jupyter-execute::
 
-    tp = o3.ElementwiseTensorProduct("2e", "1o", ['3o'], normalization='norm')
+    tp = o3.ElementwiseTensorProduct("2e", "1o", ['3o'], irrep_normalization='norm')
     y3 = tp(y2, r)
     plot(y3)
 
