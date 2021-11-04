@@ -46,12 +46,16 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     out_var : list of float, Tensor, or None
         Variance for each irrep in ``irreps_out``. If ``None``, all default to ``1.0``.
 
-    normalization : {'component', 'norm'}
+    irrep_normalization : {'component', 'norm'}
         The assumed normalization of the input and output representations. If it is set to "norm":
 
         .. math::
 
             \| x \| = \| y \| = 1 \Longrightarrow \| x \otimes y \| = 1
+
+    path_normalization : {'element', 'path'}
+        If set to ``element``, each output is normalized by the total number of elements (independently of their paths).
+        If it is set to ``path``, each path is normalized by the total number of elements in the path, then each output is normalized by the number of paths.
 
     internal_weights : bool
         whether the `e3nn.o3.TensorProduct` contains its learnable weights as a parameter
