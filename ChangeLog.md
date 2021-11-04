@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - `irrep_normalization` and `path_normalization` for `TensorProduct`
+- `compile_right` flag to `TensorProduct`
+- Add new global flag `jit_script_fx=False` that by default turns of the `torch.jit.script` of fx code
 
 ## [0.4.1] - 2021-10-29
 ### Added
