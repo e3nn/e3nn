@@ -1,3 +1,4 @@
+import warnings
 from math import sqrt
 from typing import Iterator, List, Optional, Union
 
@@ -190,11 +191,19 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         path_normalization: str = 'element',
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
+        normalization=None,  # for backward compatibility
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None
     ):
         # === Setup ===
         super().__init__()
+
+        if normalization is not None:
+            warnings.warn(
+                "`normalization` is deprecated. Use `irrep_normalization` instead.",
+                DeprecationWarning
+            )
+            irrep_normalization = normalization
 
         assert irrep_normalization in ['component', 'norm']
         assert path_normalization in ['element', 'path']
