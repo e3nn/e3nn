@@ -10,7 +10,7 @@ from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 
-from ._codegen import codegen_tensor_product
+from ._codegen import codegen_tensor_product_left_right, codegen_tensor_product_right
 from ._instruction import Instruction
 
 
@@ -191,6 +191,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         path_normalization: str = 'element',
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
+        compile_left_right: bool = True,
+        compile_right: bool = False,
         normalization=None,  # for backward compatibility
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None
@@ -318,19 +320,45 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # Generate the actual tensor product code
-        graphmod_out, graphmod_right = codegen_tensor_product(
-            self.irreps_in1,
-            self.irreps_in2,
-            self.irreps_out,
-            self.instructions,
-            self.shared_weights,
-            self._specialized_code,
-            self._optimize_einsums
-        )
-        self._codegen_register({
-            "_compiled_main_out": graphmod_out,
-            "_compiled_main_right": graphmod_right
-        })
+        if compile_left_right:
+            graphmod_left_right = codegen_tensor_product_left_right(
+                self.irreps_in1,
+                self.irreps_in2,
+                self.irreps_out,
+                self.instructions,
+                self.shared_weights,
+                self._specialized_code,
+                self._optimize_einsums
+            )
+        else:
+            graphmod_left_right = None
+
+        if compile_right:
+            graphmod_right = codegen_tensor_product_right(
+                self.irreps_in1,
+                self.irreps_in2,
+                self.irreps_out,
+                self.instructions,
+                self.shared_weights,
+                self._specialized_code,
+                self._optimize_einsums
+            )
+        else:
+            graphmod_right = None
+
+        if graphmod_left_right is not None and graphmod_right is not None:
+            self._codegen_register({
+                "_compiled_main_left_right": graphmod_left_right,
+                "_compiled_main_right": graphmod_right
+            })
+        if graphmod_left_right is not None:
+            self._codegen_register({
+                "_compiled_main_left_right": graphmod_left_right,
+            })
+        if graphmod_right is not None:
+            self._codegen_register({
+                "_compiled_main_right": graphmod_right
+            })
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
@@ -472,7 +500,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
-        return self._compiled_main_out(x, y, real_weight)
+        return self._compiled_main_left_right(x, y, real_weight)
 
     def weight_view_for_instruction(
         self,

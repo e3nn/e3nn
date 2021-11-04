@@ -1,6 +1,7 @@
-from typing import Dict
 import io
+from typing import Dict
 
+import e3nn
 import torch
 from torch import fx
 
@@ -31,10 +32,17 @@ class CodeGenMixin:
             self.__codegen__ = []
         self.__codegen__.extend(funcs.keys())
 
+        opt_defaults = e3nn.get_optimization_defaults()
+
         for fname, graphmod in funcs.items():
             assert isinstance(graphmod, fx.GraphModule)
-            scriptmod = torch.jit.script(graphmod)
-            assert isinstance(scriptmod, torch.jit.ScriptModule)
+
+            if opt_defaults['jit_script_fx']:
+                scriptmod = torch.jit.script(graphmod)
+                assert isinstance(scriptmod, torch.jit.ScriptModule)
+            else:
+                scriptmod = graphmod
+
             # Add the ScriptModule as a submodule so it can be called
             setattr(self, fname, scriptmod)
 

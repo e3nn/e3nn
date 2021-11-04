@@ -30,6 +30,8 @@ def make_tp(
                 (0, 0, 1, 'uvw', True, 0.5 if path_weights else 1.0),
                 (0, 1, 1, 'uvw', True, 0.2 if path_weights else 1.0),
             ],
+            compile_left_right=True,
+            compile_right=True,
             **kwargs
         )
     except AssertionError:
@@ -126,6 +128,7 @@ def test_empty():
             (0, 0, 0, "uvw", True),
             (1, 1, 0, "uvw", True),
         ],
+        compile_right=True,
     )
     x1, x2 = m.irreps_in1.randn(4, -1), m.irreps_in2.randn(4, -1)
     out = m(x1, x2)
@@ -185,12 +188,14 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     tp1 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
         ins, irrep_normalization=normalization,
-        _specialized_code=False
+        compile_right=True,
+        _specialized_code=False,
     )
     tp2 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
         ins, irrep_normalization=normalization,
-        _specialized_code=True
+        compile_right=True,
+        _specialized_code=True,
     )
     with torch.no_grad():
         tp2.weight[:] = tp1.weight
@@ -228,7 +233,7 @@ def test_single_out():
 
 
 def test_empty_inputs():
-    tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e')
+    tp = FullyConnectedTensorProduct('0e + 1e', '0e + 1e', '0e + 1e', compile_right=True)
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
     assert out.shape == (2, 2, 0, 3, 4)
 
@@ -369,7 +374,8 @@ def test_input_weights_jit():
         irreps_in2,
         irreps_out,
         internal_weights=False,
-        shared_weights=False
+        shared_weights=False,
+        compile_right=True,
     )
     traced = assert_auto_jitable(m)
     x1 = irreps_in1.randn(2, -1)

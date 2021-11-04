@@ -60,7 +60,12 @@ class Convolution(torch.nn.Module):
         sh = o3.spherical_harmonics(self.irreps_sh, lattice, True, 'component')  # [x, y, z, irreps_sh.dim]
         self.register_buffer('sh', sh)
 
-        self.tp = FullyConnectedTensorProduct(self.irreps_in, self.irreps_sh, self.irreps_out, shared_weights=False)
+        self.tp = FullyConnectedTensorProduct(
+            self.irreps_in, self.irreps_sh, self.irreps_out,
+            shared_weights=False,
+            compile_left_right=False,
+            compile_right=False,
+        )
 
         self.weight = torch.nn.Parameter(torch.randn(self.num_rbfs, self.tp.weight_numel))
 
