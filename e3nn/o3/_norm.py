@@ -46,7 +46,7 @@ class Norm(torch.nn.Module):
             irreps_in,
             irreps_out,
             instr,
-            normalization='component'
+            irrep_normalization='component'
         )
 
         self.irreps_in = irreps_in
