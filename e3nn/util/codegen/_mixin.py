@@ -70,6 +70,8 @@ class CodeGenMixin:
             for fname in self.__codegen__:
                 # Get the module
                 smod = getattr(self, fname)
+                if isinstance(smod, fx.GraphModule):
+                    smod = torch.jit.script(smod)
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Save the compiled code as TorchScript IR
                 buffer = io.BytesIO()
@@ -104,6 +106,8 @@ class CodeGenMixin:
                 # Load the TorchScript IR buffer
                 buffer = io.BytesIO(buffer)
                 smod = torch.jit.load(buffer)
+                if isinstance(smod, fx.GraphModule):
+                    smod = torch.jit.script(smod)
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Add the ScriptModule as a submodule
                 setattr(self, fname, smod)
