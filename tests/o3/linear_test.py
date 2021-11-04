@@ -246,12 +246,12 @@ def test_f():
         "0e + 1e + 2e",
         "0e + 2x1e + 2e",
         f_in=44,
-        f_out=5,
+        f_out=25,
         _optimize_einsums=False
     )
     assert_equivariant(m, args_in=[torch.randn(10, 44, 9)])
     m = assert_auto_jitable(m)
     y = m(torch.randn(10, 44, 9))
     assert m.weight_numel == 4
-    assert m.weight.numel() == 44 * 5 * 4
+    assert m.weight.numel() == 44 * 25 * 4
     assert 0.7 < y.pow(2).mean() < 1.4

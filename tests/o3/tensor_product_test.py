@@ -96,15 +96,16 @@ def test_bilinear_right_variance_equivariance(float_tolerance, l1, p1, l2, p2, l
 
 
 # This is a fairly expensive test, so we don't run too many configs
+@pytest.mark.parametrize('path_normalization', ['element', 'path'])
 @pytest.mark.parametrize('l1, p1, l2, p2, lo, po, mode, weight', random_params(n=8))
-def test_normalized(l1, p1, l2, p2, lo, po, mode, weight):
+def test_normalized(l1, p1, l2, p2, lo, po, mode, weight, path_normalization):
     if torch.get_default_dtype() != torch.float32:
         pytest.skip(
             "No reason to run expensive normalization tests again at float64 expense."
         )
     # Explicit fixed path weights screw with the output normalization,
     # so don't use them
-    m = make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul=5, path_weights=False)
+    m = make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul=5, path_weights=False, path_normalization=path_normalization)
     # normalization
     # n_weight, n_input has to be decently high to ensure statistical convergence
     # especially for uvuv
@@ -183,12 +184,12 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     ]
     tp1 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
-        ins, normalization=normalization,
+        ins, irrep_normalization=normalization,
         _specialized_code=False
     )
     tp2 = TensorProduct(
         irreps_in1, irreps_in2, irreps_out,
-        ins, normalization=normalization,
+        ins, irrep_normalization=normalization,
         _specialized_code=True
     )
     with torch.no_grad():

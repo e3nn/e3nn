@@ -1,4 +1,3 @@
-import math
 from typing import List, NamedTuple, Optional, Tuple, Union
 
 from opt_einsum_fx import jitable, optimize_einsums_full
@@ -18,6 +17,7 @@ class Instruction(NamedTuple):
     i_in: int
     i_out: int
     path_shape: tuple
+    path_weight: float
 
 
 @compile_mode('script')
@@ -107,9 +107,82 @@ class Linear(CodeGenMixin, torch.nn.Module):
         shared_weights: Optional[bool] = None,
         instructions: Optional[List[Tuple[int, int]]] = None,
         biases: Union[bool, List[bool]] = False,
+        path_normalization: str = 'element',
         _optimize_einsums: Optional[bool] = None
     ):
         super().__init__()
+
+        assert path_normalization in ['element', 'path']
+
+        irreps_in = o3.Irreps(irreps_in)
+        irreps_out = o3.Irreps(irreps_out)
+
+        if instructions is None:
+            # By default, make all possible connections
+            instructions = [
+                (i_in, i_out)
+                for i_in, (_, ir_in) in enumerate(irreps_in)
+                for i_out, (_, ir_out) in enumerate(irreps_out)
+                if ir_in == ir_out
+            ]
+
+        instructions = [
+            Instruction(
+                i_in=i_in,
+                i_out=i_out,
+                path_shape=(irreps_in[i_in].mul, irreps_out[i_out].mul),
+                path_weight=1,
+            )
+            for i_in, i_out in instructions
+        ]
+
+        def alpha(ins):
+            x = sum(
+                irreps_in[i.i_in if path_normalization == 'element' else ins.i_in].mul
+                for i in instructions
+                if i.i_out == ins.i_out
+            )
+            if f_in is not None:
+                x *= f_in
+            return 1.0 if x == 0 else x
+
+        instructions = [
+            Instruction(
+                i_in=ins.i_in,
+                i_out=ins.i_out,
+                path_shape=ins.path_shape,
+                path_weight=alpha(ins)**(-0.5)
+            )
+            for ins in instructions
+        ]
+
+        for ins in instructions:
+            if not ins.i_in < len(irreps_in):
+                raise IndexError(f"{ins.i_in} is not a valid index for irreps_in")
+            if not ins.i_out < len(irreps_out):
+                raise IndexError(f"{ins.i_out} is not a valid index for irreps_out")
+            if not (ins.i_in == -1 or irreps_in[ins.i_in].ir == irreps_out[ins.i_out].ir):
+                raise ValueError(
+                    f"{ins.i_in} and {ins.i_out} do not have the same irrep"
+                )
+
+        if biases is None:
+            biases = len(irreps_out) * (False,)
+        if isinstance(biases, bool):
+            biases = [biases and ir.is_scalar() for _, ir in irreps_out]
+
+        assert len(biases) == len(irreps_out)
+        assert all(ir.is_scalar() or (not b) for b, (_, ir) in zip(biases, irreps_out))
+
+        instructions += [
+            Instruction(
+                i_in=-1,
+                i_out=i_out,
+                path_shape=(mul_ir.dim,),
+                path_weight=1.0
+            )
+            for i_out, (bias, mul_ir) in enumerate(zip(biases, irreps_out)) if bias
+        ]
 
         # == Process arguments ==
         if shared_weights is False and internal_weights is None:
@@ -125,61 +198,19 @@ class Linear(CodeGenMixin, torch.nn.Module):
         self.internal_weights = internal_weights
         self.shared_weights = shared_weights
 
-        self.irreps_in = o3.Irreps(irreps_in)
-        self.irreps_out = o3.Irreps(irreps_out)
-        del irreps_in
-        del irreps_out
+        self.irreps_in = irreps_in
+        self.irreps_out = irreps_out
+        self.instructions = instructions
 
         opt_defaults = e3nn.get_optimization_defaults()
         self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
         del opt_defaults
-
-        # == Instructions ==
-        if instructions is None:
-            # By default, make all possible connections
-            instructions = [
-                (i_in, i_out)
-                for i_in, (_, ir_in) in enumerate(self.irreps_in)
-                for i_out, (_, ir_out) in enumerate(self.irreps_out)
-                if ir_in == ir_out
-            ]
-            # note that "empty" instructions to/from empty irreps are dealt with in the codegen
-
-        instruction_objs = []
-        for i_in, i_out in instructions:
-            assert isinstance(i_in, int) and isinstance(i_out, int)
-            if self.irreps_in[i_in].ir != self.irreps_out[i_out].ir:
-                raise ValueError(
-                    f"Invalid instruction to connect irreps_in[{i_in}] = {self.irreps_in[i_in]} to different irrep irreps_out[{i_out}] = {self.irreps_out[i_out]}"
-                )
-            instruction_objs.append(
-                Instruction(
-                    i_in=i_in,
-                    i_out=i_out,
-                    path_shape=(self.irreps_in[i_in].mul, self.irreps_out[i_out].mul)
-                )
-            )
-        self.instructions = instruction_objs
-        del instructions
-        del instruction_objs
-
-        # == Biases ==
-        if biases is False:
-            self.biases = [False for mul_ir in self.irreps_out]
-        elif biases is True:
-            self.biases = [mul_ir.ir.is_scalar() for mul_ir in self.irreps_out]
-        else:
-            assert len(biases) == len(self.irreps_out)
-            self.biases = [bool(bias) for bias in biases]
-            assert all(not bias or (mul_ir.ir.is_scalar()) for bias, mul_ir in zip(self.biases, self.irreps_out))
-        del biases
 
         # == Generate code ==
         graphmod, self.weight_numel, self.bias_numel = _codegen_linear(
             self.irreps_in,
             self.irreps_out,
             self.instructions,
-            self.biases,
             f_in,
             f_out,
             shared_weights=shared_weights,
@@ -211,9 +242,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
                 if any(
                     (ins.i_out == i_out) and (0 not in ins.path_shape)
                     for ins in self.instructions
-                ) or bias
+                )
                 else torch.zeros(mul_ir.dim)
-                for i_out, (mul_ir, bias) in enumerate(zip(self.irreps_out, self.biases))
+                for i_out, mul_ir in enumerate(self.irreps_out)
             ])
         else:
             output_mask = torch.ones(0)
@@ -315,7 +346,6 @@ def _codegen_linear(
     irreps_in: o3.Irreps,
     irreps_out: o3.Irreps,
     instructions: List[Instruction],
-    biases: List[bool],
     f_in: Optional[int] = None,
     f_out: Optional[int] = None,
     shared_weights: bool = False,
@@ -336,7 +366,7 @@ def _codegen_linear(
         size = x.shape[:-2]
         outsize = size + (f_out, irreps_out.dim,)
 
-    bias_numel = sum(mul_ir.dim for bias, mul_ir in zip(biases, irreps_out) if bias)
+    bias_numel = sum(irreps_out[i.i_out].dim for i in instructions if i.i_in == -1)
     if bias_numel > 0:
         if f_out is None:
             bs = bs.reshape(-1, bias_numel)
@@ -361,20 +391,7 @@ def _codegen_linear(
         x = x.reshape(-1, f_in, irreps_in.dim)
     batch_out = x.shape[0]
 
-    out_bias_list = []
-    bias_index = 0
-    for bias, mul_ir_out in zip(biases, irreps_out):
-        if bias:
-            if sum(biases) == 1:
-                b = bs
-            else:
-                b = bs.narrow(-1, bias_index, mul_ir_out.dim)
-                bias_index += mul_ir_out.dim
-            out_bias_list += [[b.expand(batch_out, -1) if f_out is None else b.expand(batch_out, f_out, -1)]]
-        else:
-            out_bias_list += [[]]
-
-    weight_numel = sum(prod(ins.path_shape) for ins in instructions)
+    weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.i_in != -1)
     if weight_numel > 0:
         ws = ws.reshape(-1, weight_numel) if f_in is None else ws.reshape(-1, f_in, f_out, weight_numel)
 
@@ -390,48 +407,50 @@ def _codegen_linear(
     z = '' if shared_weights else 'z'
 
     flat_weight_index = 0
+    flat_bias_index = 0
 
     out_list = []
 
     for ins in instructions:
-        mul_ir_in = irreps_in[ins.i_in]
         mul_ir_out = irreps_out[ins.i_out]
 
-        # Short-circut for empty irreps
-        if mul_ir_in.dim == 0 or mul_ir_out.dim == 0:
-            continue
-
-        # Extract the weight from the flattened weight tensor
-        path_nweight = prod(ins.path_shape)
-        if len(instructions) == 1:
-            # Avoid unnecessary view when there is only one weight
-            w = ws
+        if ins.i_in == -1:
+            # = bias =
+            b = bs.narrow(-1, flat_bias_index, prod(ins.path_shape))
+            flat_bias_index += prod(ins.path_shape)
+            out_list += [(ins.path_weight * b).reshape(1, *(() if f_out is None else (f_out,)), mul_ir_out.dim)]
         else:
-            w = ws.narrow(-1, flat_weight_index, path_nweight)
-        w = w.reshape(
-            (() if shared_weights else (-1,)) + (() if f_in is None else (f_in, f_out)) + ins.path_shape
-        )
-        flat_weight_index += path_nweight
+            mul_ir_in = irreps_in[ins.i_in]
 
-        if f_in is None:
-            ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[ins.i_in])
-        else:
-            ein_out = torch.einsum(f"{z}xyuw,zxui->zywi", w, x_list[ins.i_in])
-        alpha = 1.0 / math.sqrt(
-            sum(
-                (f_in or 1) * irreps_in[i.i_in].mul
-                for i in instructions
-                if i.i_out == ins.i_out
+            # Short-circut for empty irreps
+            if mul_ir_in.dim == 0 or mul_ir_out.dim == 0:
+                continue
+
+            # Extract the weight from the flattened weight tensor
+            path_nweight = prod(ins.path_shape)
+            if len(instructions) == 1:
+                # Avoid unnecessary view when there is only one weight
+                w = ws
+            else:
+                w = ws.narrow(-1, flat_weight_index, path_nweight)
+            w = w.reshape(
+                (() if shared_weights else (-1,)) + (() if f_in is None else (f_in, f_out)) + ins.path_shape
             )
-        )
-        ein_out = alpha * ein_out
+            flat_weight_index += path_nweight
 
-        out_list += [ein_out.reshape(batch_out, *(() if f_out is None else (f_out,)), mul_ir_out.dim)]
+            if f_in is None:
+                ein_out = torch.einsum(f"{z}uw,zui->zwi", w, x_list[ins.i_in])
+            else:
+                ein_out = torch.einsum(f"{z}xyuw,zxui->zywi", w, x_list[ins.i_in])
+
+            ein_out = ins.path_weight * ein_out
+
+            out_list += [ein_out.reshape(batch_out, *(() if f_out is None else (f_out,)), mul_ir_out.dim)]
 
     # = Return the result =
     out = [
         _sum_tensors(
-            [out for ins, out in zip(instructions, out_list) if ins.i_out == i_out] + out_bias_list[i_out],
+            [out for ins, out in zip(instructions, out_list) if ins.i_out == i_out],
             shape=(batch_out, *(() if f_out is None else (f_out,)), mul_ir_out.dim),
             like=x
         )
