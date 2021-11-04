@@ -64,7 +64,7 @@ class Convolution(torch.nn.Module):
             self.irreps_in, self.irreps_sh, self.irreps_out,
             shared_weights=False,
             compile_left_right=False,
-            compile_right=False,
+            compile_right=True,
         )
 
         self.weight = torch.nn.Parameter(torch.randn(self.num_rbfs, self.tp.weight_numel))

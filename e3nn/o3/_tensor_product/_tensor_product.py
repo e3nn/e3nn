@@ -474,6 +474,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         """
         assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
 
+        if not hasattr(self, '_compiled_main_right'):
+            raise ValueError("`right` method is not compiled, set `compile_right` to True when creating the TensorProduct")
+
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
         return self._compiled_main_right(y, real_weight)
