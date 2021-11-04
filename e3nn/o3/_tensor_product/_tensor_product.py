@@ -357,11 +357,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 "_compiled_main_left_right": graphmod_left_right,
                 "_compiled_main_right": graphmod_right
             })
-        if graphmod_left_right is not None:
+        elif graphmod_left_right is not None:
             self._codegen_register({
                 "_compiled_main_left_right": graphmod_left_right,
             })
-        if graphmod_right is not None:
+        elif graphmod_right is not None:
             self._codegen_register({
                 "_compiled_main_right": graphmod_right
             })
