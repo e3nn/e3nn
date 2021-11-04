@@ -1,7 +1,7 @@
 from math import sqrt
 from typing import List, Tuple
 
-from opt_einsum_fx import jitable, optimize_einsums_full
+from opt_einsum_fx import optimize_einsums_full
 import torch
 from torch import fx
 
@@ -351,7 +351,7 @@ def codegen_tensor_product_left_right(
                 flat_weight_index,
             ),
         )
-        graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+        graphmod_out = optimize_einsums_full(graphmod_out, example_inputs)
 
     return graphmod_out
 
@@ -650,6 +650,6 @@ def codegen_tensor_product_right(
                 flat_weight_index,
             ),
         )
-        graphmod_right = jitable(optimize_einsums_full(graphmod_right, example_inputs[1:]))
+        graphmod_right = optimize_einsums_full(graphmod_right, example_inputs[1:])
 
     return graphmod_right

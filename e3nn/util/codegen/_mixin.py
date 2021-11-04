@@ -3,6 +3,7 @@ from typing import Dict
 
 import e3nn
 import torch
+from opt_einsum_fx import jitable
 from torch import fx
 
 
@@ -38,7 +39,7 @@ class CodeGenMixin:
             assert isinstance(graphmod, fx.GraphModule)
 
             if opt_defaults['jit_script_fx']:
-                scriptmod = torch.jit.script(graphmod)
+                scriptmod = torch.jit.script(jitable(graphmod))
                 assert isinstance(scriptmod, torch.jit.ScriptModule)
             else:
                 scriptmod = graphmod
@@ -71,7 +72,7 @@ class CodeGenMixin:
                 # Get the module
                 smod = getattr(self, fname)
                 if isinstance(smod, fx.GraphModule):
-                    smod = torch.jit.script(smod)
+                    smod = torch.jit.script(jitable(smod))
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Save the compiled code as TorchScript IR
                 buffer = io.BytesIO()
@@ -107,7 +108,7 @@ class CodeGenMixin:
                 buffer = io.BytesIO(buffer)
                 smod = torch.jit.load(buffer)
                 if isinstance(smod, fx.GraphModule):
-                    smod = torch.jit.script(smod)
+                    smod = torch.jit.script(jitable(smod))
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Add the ScriptModule as a submodule
                 setattr(self, fname, smod)
