@@ -47,6 +47,8 @@ def get_compile_mode(mod: torch.nn.Module) -> str:
         mode = getattr(mod, _E3NN_COMPILE_MODE)
     else:
         mode = getattr(type(mod), _E3NN_COMPILE_MODE, None)
+    if mode is None and isinstance(mod, fx.GraphModule):
+        mode = 'script'
     assert mode in _VALID_MODES, "Invalid compile mode `%r`" % mode
     return mode
 
