@@ -1,6 +1,6 @@
 from typing import List, NamedTuple, Optional, Tuple, Union
 
-from opt_einsum_fx import jitable, optimize_einsums_full
+from opt_einsum_fx import optimize_einsums_full
 import torch
 from torch import fx
 
@@ -489,6 +489,6 @@ def _codegen_linear(
                 bias_numel,
             ),
         )
-        graphmod_out = jitable(optimize_einsums_full(graphmod_out, example_inputs))
+        graphmod_out = optimize_einsums_full(graphmod_out, example_inputs)
 
     return graphmod_out, weight_numel, bias_numel

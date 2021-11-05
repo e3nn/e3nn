@@ -9,8 +9,8 @@ from e3nn import o3
 from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-
-from ._codegen import codegen_tensor_product
+from torch import fx
+from ._codegen import codegen_tensor_product_left_right, codegen_tensor_product_right
 from ._instruction import Instruction
 
 
@@ -69,6 +69,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         where here :math:`i` denotes a *batch-like* index.
         ``shared_weights`` cannot be `False` if ``internal_weights`` is `True`.
+
+    compile_left_right : bool
+        whether to compile the forward function, true by default
+
+    compile_right : bool
+        whether to compile the ``.right`` function, false by default
 
     Examples
     --------
@@ -191,6 +197,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         path_normalization: str = 'element',
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
+        compile_left_right: bool = True,
+        compile_right: bool = False,
         normalization=None,  # for backward compatibility
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None
@@ -318,17 +326,49 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         del opt_defaults
 
         # Generate the actual tensor product code
-        graphmod_out, graphmod_right = codegen_tensor_product(
-            self.irreps_in1,
-            self.irreps_in2,
-            self.irreps_out,
-            self.instructions,
-            self.shared_weights,
-            self._specialized_code,
-            self._optimize_einsums
-        )
+        if compile_left_right:
+            graphmod_left_right = codegen_tensor_product_left_right(
+                self.irreps_in1,
+                self.irreps_in2,
+                self.irreps_out,
+                self.instructions,
+                self.shared_weights,
+                self._specialized_code,
+                self._optimize_einsums
+            )
+        else:
+            graphmod_left_right = fx.Graph()
+            graphmod_left_right.placeholder('x1', torch.Tensor)
+            graphmod_left_right.placeholder('x2', torch.Tensor)
+            graphmod_left_right.placeholder('w', torch.Tensor)
+            graphmod_left_right.call_function(
+                torch._assert,
+                args=(False, "`left_right` method is not compiled, set `compile_left_right` to True when creating the TensorProduct")
+            )
+            graphmod_left_right = fx.GraphModule(torch.nn.Module(), graphmod_left_right, class_name="tp_forward")
+
+        if compile_right:
+            graphmod_right = codegen_tensor_product_right(
+                self.irreps_in1,
+                self.irreps_in2,
+                self.irreps_out,
+                self.instructions,
+                self.shared_weights,
+                self._specialized_code,
+                self._optimize_einsums
+            )
+        else:
+            graphmod_right = fx.Graph()
+            graphmod_right.placeholder('x2', torch.Tensor)
+            graphmod_right.placeholder('w', torch.Tensor)
+            graphmod_right.call_function(
+                torch._assert,
+                args=(False, "`right` method is not compiled, set `compile_right` to True when creating the TensorProduct")
+            )
+            graphmod_right = fx.GraphModule(torch.nn.Module(), graphmod_right, class_name="tp_forward")
+
         self._codegen_register({
-            "_compiled_main_out": graphmod_out,
+            "_compiled_main_left_right": graphmod_left_right,
             "_compiled_main_right": graphmod_right
         })
 
@@ -472,7 +512,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
-        return self._compiled_main_out(x, y, real_weight)
+        return self._compiled_main_left_right(x, y, real_weight)
 
     def weight_view_for_instruction(
         self,
