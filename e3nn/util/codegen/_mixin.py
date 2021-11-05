@@ -107,8 +107,6 @@ class CodeGenMixin:
                 # Load the TorchScript IR buffer
                 buffer = io.BytesIO(buffer)
                 smod = torch.jit.load(buffer)
-                if isinstance(smod, fx.GraphModule):
-                    smod = torch.jit.script(jitable(smod))
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Add the ScriptModule as a submodule
                 setattr(self, fname, smod)
