@@ -10,23 +10,18 @@ _OPT_DEFAULTS: Dict[str, bool] = dict(
 )
 
 
-def set_optimization_defaults(
-    specialized_code: bool = True,
-    optimize_einsums: bool = False,
-    jit_script_fx: bool = False,
-) -> None:
+def set_optimization_defaults(**kwargs) -> None:
     r"""Globally set the default optimization settings.
 
     Parameters
     ----------
-    specialized_code : bool, default True
-        Whether to use specialized code for (combinations of) irreps for which it exists.
-    optimize_einsums : bool, default True
-        Whether to use ``opt_einsum_fx``.
+    **kwargs
+        Keyword arguments to set the default optimization settings.
     """
-    _OPT_DEFAULTS['specialized_code'] = specialized_code
-    _OPT_DEFAULTS['optimize_einsums'] = optimize_einsums
-    _OPT_DEFAULTS['jit_script_fx'] = jit_script_fx
+    for k, v in kwargs.items():
+        if k not in _OPT_DEFAULTS:
+            raise ValueError(f"Unknown optimization option: {k}")
+        _OPT_DEFAULTS[k] = v
 
 
 def get_optimization_defaults() -> Dict[str, bool]:
