@@ -1,10 +1,11 @@
-from typing import Optional
-import warnings
-import inspect
 import copy
+import inspect
+import warnings
+from typing import Optional
 
 import torch
-
+from opt_einsum_fx import jitable
+from torch import fx
 
 _E3NN_COMPILE_MODE = "__e3nn_compile_mode__"
 _VALID_MODES = ('trace', 'script', 'unsupported', None)
@@ -103,6 +104,8 @@ def compile(
         )
     # == Compile this module now ==
     if mode == 'script':
+        if isinstance(mod, fx.GraphModule):
+            mod = jitable(mod)
         mod = torch.jit.script(mod, **script_options)
     elif mode == 'trace':
         # These are always modules, so we're always using trace_module
@@ -150,7 +153,9 @@ def get_tracing_inputs(
         Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of arguments.
     """
     # Avoid circular imports
-    from ._argtools import _get_io_irreps, _rand_args, _to_device_dtype, _get_device, _get_floating_dtype
+    from ._argtools import (_get_device, _get_floating_dtype, _get_io_irreps,
+                            _rand_args, _to_device_dtype)
+
     # - Get inputs -
     if hasattr(mod, _MAKE_TRACING_INPUTS):
         # This returns a trace_module style dict of method names to test inputs
