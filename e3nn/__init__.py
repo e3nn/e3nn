@@ -5,7 +5,7 @@ from typing import Dict
 
 _OPT_DEFAULTS: Dict[str, bool] = dict(
     specialized_code=True,
-    optimize_einsums=False,
+    optimize_einsums=True,
     jit_script_fx=True,
 )
 
