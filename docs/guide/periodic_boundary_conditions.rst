@@ -133,7 +133,7 @@ object representing a single example, we use the following expression:
 
     edge_src, edge_dst = data['edge_index'][0], data['edge_index'][1]
     edge_vec = (data['pos'][edge_dst] - data['pos'][edge_src]
-                + torch.einsum('ni,nij->j', data['edge_shift'], data['lattice']))
+                + torch.einsum('ni,nij->nj', data['edge_shift'], data['lattice']))
 
 The first line in the definition of ``edge_vec`` is simply how one normally computes
 relative distance vectors given two points. The second line adds the contribution
@@ -189,7 +189,7 @@ application.
             edge_batch = batch[edge_src]
             edge_vec = (data['pos'][edge_dst]
                         - data['pos'][edge_src]
-                        + torch.einsum('ni,nij->j', data['edge_shift'], data['lattice'][edge_batch]))
+                        + torch.einsum('ni,nij->nj', data['edge_shift'], data['lattice'][edge_batch]))
 
             return batch, data['x'], edge_src, edge_dst, edge_vec
 
