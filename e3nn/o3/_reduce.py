@@ -1,11 +1,12 @@
 import collections
+import warnings
+
 import torch
-from torch import fx
 from e3nn import o3
 from e3nn.math import germinate_formulas, reduce_permutation
 from e3nn.util import explicit_default_types
 from e3nn.util.jit import compile_mode
-
+from torch import fx
 
 _TP = collections.namedtuple('tp', 'op, args')
 _INPUT = collections.namedtuple('input', 'tensor, start, stop')
@@ -213,7 +214,12 @@ class ReducedTensorProducts(fx.GraphModule):
                 Xs.append(X)
 
             for X in Xs:
-                assert (X - Xs[0]).abs().max() < eps
+                # check that the different solution are the same vector space: check that the projectors are equal
+                assert (X.T @ X - Xs[0].T @ Xs[0]).abs().max() < eps, f"found different solutions for irrep {ir}"
+
+            for X in Xs:
+                if (X - Xs[0]).abs().max() > eps:
+                    warnings.warn("QR decomposition was not able to generate a unique basis. As a consequence this reduction is non deterministic.")
 
             X = Xs[0]
             for x in X:
