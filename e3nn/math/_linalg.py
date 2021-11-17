@@ -50,6 +50,7 @@ def orthonormalize(
     matrix = []
 
     for i, x in enumerate(original):
+        # x = sum_i cx_i original_i
         cx = x.new_zeros(len(original))
         cx[i] = 1
         for j, y in enumerate(final):

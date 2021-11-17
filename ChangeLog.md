@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-- `ReducedTensorProduct`: throws warning when the QR decomposition fails to create a unique basis.
+- `ReducedTensorProduct`: replace QR decomposition by `orthonormalize` the projector `X.T @ X`.
+  This keeps `ReducedTensorProduct` deterministic because the projectors and `orthonormalize` are both deterministic.
+  The output of `orthonormalize` apears also to be highly sparse (luckily).
 
 ## [0.4.2] - 2021-11-08
 ### Added

@@ -1,9 +1,8 @@
 import collections
-import warnings
 
 import torch
 from e3nn import o3
-from e3nn.math import germinate_formulas, reduce_permutation
+from e3nn.math import germinate_formulas, reduce_permutation, orthonormalize
 from e3nn.util import explicit_default_types
 from e3nn.util.jit import compile_mode
 from torch import fx
@@ -187,7 +186,7 @@ class ReducedTensorProducts(fx.GraphModule):
             R = base_o3.flatten(2)  # [multiplicity, ir, input basis] (u,j,omega)
             P = base_perm.flatten(1)  # [permutation basis, input basis] (a,omega)
 
-            Xs = []
+            proj_s = []  # list of projectors into vector space
             for j in range(ir.dim):
                 RR = R[:, j] @ R[:, j].T  # (u,u)
                 PP = P @ P.T  # (a,a)
@@ -199,29 +198,14 @@ class ReducedTensorProducts(fx.GraphModule):
                 ], dim=0)
                 eigenvalues, eigenvectors = torch.linalg.eigh(prob)
                 X = eigenvectors[:, eigenvalues < eps][:mul].T  # [solutions, multiplicity]
-                X = torch.linalg.qr(X, mode='r').R
-                for i, x in enumerate(X):
-                    for j in range(i, mul):
-                        if x[j] < eps:
-                            x.neg_()
-                        if x[j] > eps:
-                            break
+                proj_s.append(X.T @ X)
 
-                X[X.abs() < eps] = 0
-                X = sorted([[x.item() for x in line] for line in X])
-                X = torch.tensor(X, dtype=torch.float64)
+            for p in proj_s:
+                assert (p - proj_s[0]).abs().max() < eps, f"found different solutions for irrep {ir}"
 
-                Xs.append(X)
+            # look for an X such that X.T @ X = Projector
+            X, _ = orthonormalize(proj_s[0], eps)
 
-            for X in Xs:
-                # check that the different solution are the same vector space: check that the projectors are equal
-                assert (X.T @ X - Xs[0].T @ Xs[0]).abs().max() < eps, f"found different solutions for irrep {ir}"
-
-            for X in Xs:
-                if (X - Xs[0]).abs().max() > eps:
-                    warnings.warn("QR decomposition was not able to generate a unique basis. As a consequence this reduction is non deterministic.")
-
-            X = Xs[0]
             for x in X:
                 C = torch.einsum("u,ui...->i...", x, base_o3)
                 correction = (ir.dim / C.pow(2).sum())**0.5
