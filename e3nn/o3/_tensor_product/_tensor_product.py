@@ -1,6 +1,6 @@
 import warnings
 from math import sqrt
-from typing import Iterator, List, Optional, Union
+from typing import Iterator, List, Optional, Union, Any
 
 import e3nn
 import torch
@@ -171,7 +171,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
-    instructions: List[Instruction]
+    instructions: List[Any]
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
