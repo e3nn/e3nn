@@ -171,16 +171,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
-    _specialized_code: bool
-    _optimize_einsums: bool
-    _profiling_str: str
-    normalization: str
+    instructions: List[Instruction]
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
-    in1_var: List[float]
-    in2_var: List[float]
-    out_var: List[float]
+    _specialized_code: bool
+    _optimize_einsums: bool
+    _profiling_str: str
     _in1_dim: int
     _in2_dim: int
 
@@ -193,8 +190,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         in1_var: Optional[Union[List[float], torch.Tensor]] = None,
         in2_var: Optional[Union[List[float], torch.Tensor]] = None,
         out_var: Optional[Union[List[float], torch.Tensor]] = None,
-        irrep_normalization: str = 'component',
-        path_normalization: str = 'element',
+        irrep_normalization: str = None,
+        path_normalization: str = None,
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
         compile_left_right: bool = True,
@@ -212,6 +209,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 DeprecationWarning
             )
             irrep_normalization = normalization
+
+        if irrep_normalization is None:
+            irrep_normalization = 'component'
+
+        if path_normalization is None:
+            path_normalization = 'element'
 
         assert irrep_normalization in ['component', 'norm']
         assert path_normalization in ['element', 'path']
@@ -791,7 +794,10 @@ class FullyConnectedTensorProduct(TensorProduct):
     irreps_out : `e3nn.o3.Irreps`
         representation of the output
 
-    normalization : {'component', 'norm'}
+    irrep_normalization : {'component', 'norm'}
+        see `e3nn.o3.TensorProduct`
+
+    path_normalization : {'element', 'path'}
         see `e3nn.o3.TensorProduct`
 
     internal_weights : bool
@@ -805,6 +811,8 @@ class FullyConnectedTensorProduct(TensorProduct):
         irreps_in1,
         irreps_in2,
         irreps_out,
+        irrep_normalization: str = None,
+        path_normalization: str = None,
         **kwargs
     ):
         irreps_in1 = o3.Irreps(irreps_in1)
@@ -818,7 +826,15 @@ class FullyConnectedTensorProduct(TensorProduct):
             for i_out, (_, ir_out) in enumerate(irreps_out)
             if ir_out in ir_1 * ir_2
         ]
-        super().__init__(irreps_in1, irreps_in2, irreps_out, instr, **kwargs)
+        super().__init__(
+            irreps_in1,
+            irreps_in2,
+            irreps_out,
+            instr,
+            irrep_normalization=irrep_normalization,
+            path_normalization=path_normalization,
+            **kwargs
+        )
 
 
 class ElementwiseTensorProduct(TensorProduct):
@@ -842,7 +858,7 @@ class ElementwiseTensorProduct(TensorProduct):
     filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
         filter to select only specific `e3nn.o3.Irrep` of the output
 
-    normalization : {'component', 'norm'}
+    irrep_normalization : {'component', 'norm'}
         see `e3nn.o3.TensorProduct`
 
     Examples
@@ -858,6 +874,7 @@ class ElementwiseTensorProduct(TensorProduct):
         irreps_in1,
         irreps_in2,
         filter_ir_out=None,
+        irrep_normalization: str = None,
         **kwargs
     ):
 
@@ -900,7 +917,14 @@ class ElementwiseTensorProduct(TensorProduct):
                     (i, i, i_out, 'uuu', False)
                 ]
 
-        super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)
+        super().__init__(
+            irreps_in1,
+            irreps_in2,
+            out,
+            instr,
+            irrep_normalization=irrep_normalization,
+            **kwargs
+        )
 
 
 class FullTensorProduct(TensorProduct):
@@ -924,7 +948,7 @@ class FullTensorProduct(TensorProduct):
     filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
         filter to select only specific `e3nn.o3.Irrep` of the output
 
-    normalization : {'component', 'norm'}
+    irrep_normalization : {'component', 'norm'}
         see `e3nn.o3.TensorProduct`
     """
     def __init__(
@@ -932,6 +956,7 @@ class FullTensorProduct(TensorProduct):
         irreps_in1: o3.Irreps,
         irreps_in2: o3.Irreps,
         filter_ir_out: Iterator[o3.Irrep] = None,
+        irrep_normalization: str = None,
         **kwargs
     ):
 
@@ -963,4 +988,11 @@ class FullTensorProduct(TensorProduct):
             for i_1, i_2, i_out, mode, train in instr
         ]
 
-        super().__init__(irreps_in1, irreps_in2, out, instr, **kwargs)
+        super().__init__(
+            irreps_in1,
+            irreps_in2,
+            out,
+            instr,
+            irrep_normalization=irrep_normalization,
+            **kwargs
+        )
