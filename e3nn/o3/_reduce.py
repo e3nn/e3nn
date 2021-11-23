@@ -131,7 +131,16 @@ class ReducedTensorProducts(fx.GraphModule):
         super().__init__(self, fx.Graph())
 
         if filter_ir_out is not None:
-            filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            try:
+                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            except ValueError:
+                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
+
+        if filter_ir_mid is not None:
+            try:
+                filter_ir_mid = [o3.Irrep(ir) for ir in filter_ir_mid]
+            except ValueError:
+                raise ValueError(f"filter_ir_mid (={filter_ir_mid}) must be an iterable of e3nn.o3.Irrep")
 
         f0, formulas = germinate_formulas(formula)
 

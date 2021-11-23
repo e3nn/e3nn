@@ -881,7 +881,10 @@ class ElementwiseTensorProduct(TensorProduct):
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         if filter_ir_out is not None:
-            filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            try:
+                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            except ValueError:
+                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
 
         assert irreps_in1.num_irreps == irreps_in2.num_irreps
 
@@ -963,7 +966,10 @@ class FullTensorProduct(TensorProduct):
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         if filter_ir_out is not None:
-            filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            try:
+                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            except ValueError:
+                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
 
         out = []
         instr = []
