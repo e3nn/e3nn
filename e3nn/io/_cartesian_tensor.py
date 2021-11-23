@@ -32,20 +32,19 @@ class CartesianTensor(o3.Irreps):
     # pylint: disable=abstract-method
 
     # These are set in __new__
-    _rtp: o3.ReducedTensorProducts
-    num_index: int
+    formula: str
+    indices: str
 
     def __new__(
         # pylint: disable=signature-differs
         cls,
         formula,
     ):
-        f = formula.split("=")[0].replace("-", "")
-        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in f})
+        indices = formula.split("=")[0].replace("-", "")
+        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
-        ret.num_index = len(f)
-        ret._rtp = rtp
+        ret.indices = indices
         return ret
 
     def from_cartesian(self, data):
@@ -61,8 +60,8 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             irreps tensor of shape ``(..., self.dim)``
         """
-        Q = self.change_of_basis().flatten(-self.num_index)
-        return data.flatten(-self.num_index) @ Q.T
+        Q = self.change_of_basis().flatten(-len(self.indices))
+        return data.flatten(-len(self.indices)) @ Q.T
 
     def from_vectors(self, *xs):
         r"""convert :math:`x_1 \otimes x_2 \otimes x_3 \otimes \dots`
@@ -77,7 +76,7 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             irreps tensor of shape ``(..., self.dim)``
         """
-        return self._rtp(*xs)  # pylint: disable=not-callable
+        return self.reduced_tensor_products()(*xs)  # pylint: disable=not-callable
 
     def to_cartesian(self, data):
         r"""convert irreps tensor to cartesian tensor
@@ -96,12 +95,22 @@ class CartesianTensor(o3.Irreps):
             cartesian tensor of shape ``(..., 3, 3, 3, ...)``
         """
         Q = self.change_of_basis()
-        cartesian_tensor = data @ Q.flatten(-self.num_index)
+        cartesian_tensor = data @ Q.flatten(-len(self.indices))
 
         shape = list(data.shape[:-1]) + list(Q.shape[1:])
         cartesian_tensor = cartesian_tensor.view(shape)
 
         return cartesian_tensor
+
+    def reduced_tensor_products(self):
+        r"""reduced tensor products
+
+        Returns
+        -------
+        `e3nn.ReducedTensorProducts`
+            reduced tensor products
+        """
+        return o3.ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
 
     def change_of_basis(self):
         r"""change of basis from cartesian tensor to irreps
@@ -111,4 +120,4 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             irreps tensor of shape ``(self.dim, 3, 3, 3, ...)``
         """
-        return self._rtp.change_of_basis
+        return self.reduced_tensor_products().change_of_basis
