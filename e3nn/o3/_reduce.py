@@ -2,8 +2,9 @@ import collections
 
 import torch
 from e3nn import o3
-from e3nn.math import germinate_formulas, reduce_permutation, orthonormalize
+from e3nn.math import germinate_formulas, orthonormalize, reduce_permutation
 from e3nn.util import explicit_default_types
+from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from torch import fx
 
@@ -75,8 +76,8 @@ def _get_ops(path):
         yield op
 
 
-@compile_mode('script')
-class ReducedTensorProducts(fx.GraphModule):
+@compile_mode('trace')
+class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
     r"""reduce a tensor with symmetries into irreducible representations
 
     Parameters
@@ -128,7 +129,7 @@ class ReducedTensorProducts(fx.GraphModule):
     # pylint: disable=abstract-method
 
     def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, **irreps):
-        super().__init__(self, fx.Graph())
+        super().__init__()
 
         if filter_ir_out is not None:
             try:
@@ -233,10 +234,12 @@ class ReducedTensorProducts(fx.GraphModule):
                 for op in _get_ops(p):
                     tps.add(op)
 
+        root = torch.nn.Module()
+
         tps = list(tps)
         for i, op in enumerate(tps):
             tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
-            setattr(self, f'tp{i}', tp)
+            setattr(root, f'tp{i}', tp)
 
         graph = fx.Graph()
         tracer = torch.fx.proxy.GraphAppendingTracer(graph)
@@ -280,9 +283,11 @@ class ReducedTensorProducts(fx.GraphModule):
 
         out = torch.cat(outs, dim=-1)
         graph.output(out.node)
+        graphmod = fx.GraphModule(root, graph, "main")
 
-        self.graph = graph
-        self.recompile()
+        self._codegen_register({
+            "main": graphmod
+        })
 
     def __repr__(self):
         return (
@@ -291,3 +296,6 @@ class ReducedTensorProducts(fx.GraphModule):
             f"    out: {self.irreps_out}\n"
             ")"
         )
+
+    def forward(self, *xs):
+        return self.main(*xs)

@@ -32,23 +32,22 @@ class CartesianTensor(o3.Irreps):
     # pylint: disable=abstract-method
 
     # These are set in __new__
-    _rtp: o3.ReducedTensorProducts
-    num_index: int
+    formula: str
+    indices: str
 
     def __new__(
         # pylint: disable=signature-differs
         cls,
         formula,
     ):
-        f = formula.split("=")[0].replace("-", "")
-        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in f})
+        indices = formula.split("=")[0].replace("-", "")
+        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
-        ret.num_index = len(f)
-        ret._rtp = rtp
+        ret.indices = indices
         return ret
 
-    def from_cartesian(self, data):
+    def from_cartesian(self, data, rtp=None):
         r"""convert cartesian tensor into irreps
 
         Parameters
@@ -61,10 +60,13 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             irreps tensor of shape ``(..., self.dim)``
         """
-        Q = self.change_of_basis().flatten(-self.num_index)
-        return data.flatten(-self.num_index) @ Q.T
+        if rtp is None:
+            rtp = self.reduced_tensor_products()
 
-    def from_vectors(self, *xs):
+        Q = rtp.change_of_basis.flatten(-len(self.indices))
+        return data.flatten(-len(self.indices)) @ Q.T
+
+    def from_vectors(self, *xs, rtp=None):
         r"""convert :math:`x_1 \otimes x_2 \otimes x_3 \otimes \dots`
 
         Parameters
@@ -77,9 +79,12 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             irreps tensor of shape ``(..., self.dim)``
         """
-        return self._rtp(*xs)  # pylint: disable=not-callable
+        if rtp is None:
+            rtp = self.reduced_tensor_products()
 
-    def to_cartesian(self, data):
+        return rtp(*xs)  # pylint: disable=not-callable
+
+    def to_cartesian(self, data, rtp=None):
         r"""convert irreps tensor to cartesian tensor
 
         This is the symmetry-aware inverse operation of ``from_cartesian()``.
@@ -95,20 +100,23 @@ class CartesianTensor(o3.Irreps):
         `torch.Tensor`
             cartesian tensor of shape ``(..., 3, 3, 3, ...)``
         """
-        Q = self.change_of_basis()
-        cartesian_tensor = data @ Q.flatten(-self.num_index)
+        if rtp is None:
+            rtp = self.reduced_tensor_products()
+
+        Q = rtp.change_of_basis
+        cartesian_tensor = data @ Q.flatten(-len(self.indices))
 
         shape = list(data.shape[:-1]) + list(Q.shape[1:])
         cartesian_tensor = cartesian_tensor.view(shape)
 
         return cartesian_tensor
 
-    def change_of_basis(self):
-        r"""change of basis from cartesian tensor to irreps
+    def reduced_tensor_products(self) -> o3.ReducedTensorProducts:
+        r"""reduced tensor products
 
         Returns
         -------
-        `torch.Tensor`
-            irreps tensor of shape ``(self.dim, 3, 3, 3, ...)``
+        `e3nn.ReducedTensorProducts`
+            reduced tensor products
         """
-        return self._rtp.change_of_basis
+        return o3.ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
