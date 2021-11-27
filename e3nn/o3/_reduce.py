@@ -180,13 +180,16 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         for ir, path, base_o3 in _wigner_nj(*[irreps[i] for i in f0], filter_ir_mid=filter_ir_mid, dtype=torch.float64):
             if filter_ir_out is None or ir in filter_ir_out:
-                P = base_o3.flatten(1) @ base_perm.flatten(1).T
-                if P.norm() > eps:  # if this Irrep is present in the premutation basis we keep it
-                    Ps[ir].append((path, base_o3))
+                # P = base_o3.flatten(1) @ base_perm.flatten(1).T
+                # if P.norm() > eps:  # if this Irrep is present in the premutation basis we keep it
+                Ps[ir].append((path, base_o3))
 
         outputs = []
         change_of_basis = []
         irreps_out = []
+
+        P = base_perm.flatten(1)  # [permutation basis, input basis] (a,omega)
+        PP = P @ P.T  # (a,a)
 
         for ir in Ps:
             mul = len(Ps[ir])
@@ -194,12 +197,11 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
             base_o3 = torch.stack([R for _, R in Ps[ir]])
 
             R = base_o3.flatten(2)  # [multiplicity, ir, input basis] (u,j,omega)
-            P = base_perm.flatten(1)  # [permutation basis, input basis] (a,omega)
 
             proj_s = []  # list of projectors into vector space
             for j in range(ir.dim):
+                # Solve X @ R[:, j] = Y @ P, but keep only X
                 RR = R[:, j] @ R[:, j].T  # (u,u)
-                PP = P @ P.T  # (a,a)
                 RP = R[:, j] @ P.T  # (u,a)
 
                 prob = torch.cat([
@@ -209,6 +211,8 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
                 eigenvalues, eigenvectors = torch.linalg.eigh(prob)
                 X = eigenvectors[:, eigenvalues < eps][:mul].T  # [solutions, multiplicity]
                 proj_s.append(X.T @ X)
+
+                break  # do not check all components because too time expensive
 
             for p in proj_s:
                 assert (p - proj_s[0]).abs().max() < eps, f"found different solutions for irrep {ir}"
