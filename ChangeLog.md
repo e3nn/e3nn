@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Remove `CartesianTensor._rtp`. Instead recompute the `ReducedTensorProduct` everytime. The user can save the `ReducedTensorProduct` to avoid creating it each time.
+### Changed
+- Give up the support of python 3.6, set `python_requires='>=3.7'` in setup
 
 ## [0.4.3] - 2021-11-18
 ### Fixed
