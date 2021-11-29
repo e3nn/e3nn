@@ -8,7 +8,7 @@ Create a scalar representation (:math:`l=0`) of even parity.
 >>> assert irreps.l1y == Irrep("1y")
 True
 
->>> from e3nn.o3.irreps import l1o, l2o 
+>>> from e3nn.o3.irreps import l1o, l2o
 >>> assert l1o + l2o == Irrep("1o") + Irrep("2o")
 True
 """

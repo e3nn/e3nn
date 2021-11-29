@@ -21,7 +21,6 @@ def test_creation():
     assert o3.irreps.l3e == ir
 
 
-
 def test_properties():
     irrep = o3.Irrep("3e")
     assert irrep.l == 3
