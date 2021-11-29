@@ -16,7 +16,7 @@ True
 from .._irreps import Irrep
 
 
-def __getattr__(l: str):
+def __getattribute__(l: str):
     r"""Creates an Irreps obeject by reflection
 
         Parameters
@@ -29,7 +29,8 @@ def __getattr__(l: str):
         `e3nn.o3.Irreps`
             representation of :math:`(Y^0, Y^1, \dots, Y^{\mathrm{lmax}})`
     """
+
     prefix, *name = l
     if prefix != "l" or not name:
-        raise AssertionError("Attribute should match 'l.+'")
+        raise AssertionError(f"Attribute should match 'l.+'")
     return Irrep("".join(name))

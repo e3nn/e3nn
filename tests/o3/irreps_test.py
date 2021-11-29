@@ -17,6 +17,7 @@ def test_creation():
     assert o3.Irreps("16x1e + 32 x 2o") == o3.Irreps([(16, (1, 1)), (32, (2, -1))])
     o3.Irreps(["1e", '2o'])
     o3.Irreps([(16, "3e"), '1e'])
+    o3.Irreps([(16, "3e"), '1e', (256, (1, -1))])
 
     assert o3.irreps.l3e == ir
 
