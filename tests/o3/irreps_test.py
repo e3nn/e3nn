@@ -19,7 +19,7 @@ def test_creation():
     o3.Irreps([(16, "3e"), '1e'])
     o3.Irreps([(16, "3e"), '1e', (256, (1, -1))])
 
-    assert o3.irreps.l3e == ir
+    assert o3.irrep.l3e == ir
 
 
 def test_properties():

@@ -32,5 +32,5 @@ def __getattribute__(l: str):
 
     prefix, *name = l
     if prefix != "l" or not name:
-        raise AssertionError(f"Attribute should match 'l.+'")
+        raise AssertionError("Attribute should match 'l.+'")
     return Irrep("".join(name))
