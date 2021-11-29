@@ -16,7 +16,12 @@ True
 from .._irreps import Irrep
 
 
-def __getattribute__(l: str):
+# Set attributes found in default modules for compatibility.
+__test__ = {}
+__wrapped__ = {}
+
+
+def __getattr__(l: str):
     r"""Creates an Irreps obeject by reflection
 
         Parameters
