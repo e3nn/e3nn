@@ -5,7 +5,7 @@ Examples
 Create a scalar representation (:math:`l=0`) of even parity.
 
 >>> from e3nn.o3 import irrep
->>> assert irreps.l1y == Irrep("1y")
+>>> assert irrep.l0e == Irrep("0e")
 True
 
 >>> from e3nn.o3.irrep import l1o, l2o
