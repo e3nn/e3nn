@@ -1,6 +1,7 @@
 import pytest
 
 from e3nn import o3
+from e3nn.o3 import irrep
 
 
 def test_creation():
@@ -18,6 +19,10 @@ def test_creation():
     o3.Irreps(["1e", '2o'])
     o3.Irreps([(16, "3e"), '1e'])
     o3.Irreps([(16, "3e"), '1e', (256, (1, -1))])
+
+    assert irrep.l0e == o3.Irrep("0e")
+    from e3nn.o3.irrep import l1y
+    assert l1y == o3.Irrep("1y")
 
 
 def test_properties():
