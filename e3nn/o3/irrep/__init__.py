@@ -16,26 +16,25 @@ True
 from .._irreps import Irrep
 
 
-# Set attributes found in default modules for compatibility.
-__test__ = {}
-__wrapped__ = {}
-
-
-def __getattr__(l: str):
+def __getattr__(name: str):
     r"""Creates an Irreps obeject by reflection
 
         Parameters
         ----------
-        l : string
+        name : string
             the o3 object name prefixed by l. Example: l1o == Irrep("1o")
 
         Returns
         -------
-        `e3nn.o3.Irreps`
-            representation of :math:`(Y^0, Y^1, \dots, Y^{\mathrm{lmax}})`
+        `e3nn.o3.Irrep`
+            irreducible representation of :math:`O(3)`
     """
 
-    prefix, *name = l
-    if prefix != "l" or not name:
-        raise AssertionError("Attribute should match 'l.+'")
-    return Irrep("".join(name))
+    prefix, *ir = name
+    if prefix != "l" or not ir:
+        raise AttributeError(f"'e3nn.o3.irrep' module has no attribute '{name}'")
+
+    try:
+        return Irrep("".join(ir))
+    except (ValueError, AssertionError):
+        raise AttributeError(f"'e3nn.o3.irrep' module has no attribute '{name}'")
