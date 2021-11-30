@@ -5,11 +5,11 @@ Examples
 Create a scalar representation (:math:`l=0`) of even parity.
 
 >>> from e3nn.o3 import irrep
->>> assert irrep.l0e == Irrep("0e")
+>>> irrep.l0e == Irrep("0e")
 True
 
 >>> from e3nn.o3.irrep import l1o, l2o
->>> assert l1o + l2o == Irrep("1o") + Irrep("2o")
+>>> l1o + l2o == Irrep("1o") + Irrep("2o")
 True
 """
 
