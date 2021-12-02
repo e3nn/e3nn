@@ -29,72 +29,73 @@ def codegen_tensor_product_left_right(
     specialized_code: bool = True,
     optimize_einsums: bool = True,
 ) -> Tuple[fx.GraphModule, fx.GraphModule]:
-    graph_out = fx.Graph()
+    graph = fx.Graph()
 
     # = Function definitions =
-    tracer_out = fx.proxy.GraphAppendingTracer(graph_out)
-    constants_out = OrderedDict()
+    tracer = fx.proxy.GraphAppendingTracer(graph)
+    constants = OrderedDict()
 
-    x1s_out = fx.Proxy(graph_out.placeholder('x1', torch.Tensor), tracer=tracer_out)
-    x2s_out = fx.Proxy(graph_out.placeholder('x2', torch.Tensor), tracer=tracer_out)
-    ws_out = fx.Proxy(graph_out.placeholder('w', torch.Tensor), tracer=tracer_out)
+    x1s = fx.Proxy(graph.placeholder('x1', torch.Tensor), tracer=tracer)
+    x2s = fx.Proxy(graph.placeholder('x2', torch.Tensor), tracer=tracer)
+    weights = fx.Proxy(graph.placeholder('w', torch.Tensor), tracer=tracer)
 
-    empty_out = fx.Proxy(graph_out.call_function(torch.empty, ((),), dict(device='cpu')), tracer=tracer_out)
+    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device='cpu')), tracer=tracer)
     if shared_weights:
-        size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]))[0].shape
+        output_shape = torch.broadcast_tensors(empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]))[0].shape
     else:
-        size_out = torch.broadcast_tensors(empty_out.expand(x1s_out.shape[:-1]), empty_out.expand(x2s_out.shape[:-1]), empty_out.expand(ws_out.shape[:-1]))[0].shape
+        output_shape = torch.broadcast_tensors(empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1]))[0].shape
+    del empty
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
     instructions = [ins for ins in instructions if 0 not in ins.path_shape]
 
     if len(instructions) == 0:
-        out_out = x1s_out.new_zeros(size_out + (irreps_out.dim,))
+        outputs = x1s.new_zeros(output_shape + (irreps_out.dim,))
 
-        graph_out.output(out_out.node, torch.Tensor)
+        graph.output(outputs.node, torch.Tensor)
         # Short circut
-        return fx.GraphModule({}, graph_out, "tp_forward")
+        return fx.GraphModule({}, graph, "tp_forward")
 
     # = Broadcast inputs =
     if shared_weights:
-        x1s_out, x2s_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,))
+        x1s, x2s = x1s.broadcast_to(output_shape + (-1,)), x2s.broadcast_to(output_shape + (-1,))
     else:
-        x1s_out, x2s_out, ws_out = x1s_out.broadcast_to(size_out + (-1,)), x2s_out.broadcast_to(size_out + (-1,)), ws_out.broadcast_to(size_out + (-1,))
+        x1s, x2s, weights = x1s.broadcast_to(output_shape + (-1,)), x2s.broadcast_to(output_shape + (-1,)), weights.broadcast_to(output_shape + (-1,))
 
-    outsize_out = size_out + (irreps_out.dim,)
+    output_shape = output_shape + (irreps_out.dim,)
 
-    x1s_out = x1s_out.reshape(-1, irreps_in1.dim)
-    x2s_out = x2s_out.reshape(-1, irreps_in2.dim)
+    x1s = x1s.reshape(-1, irreps_in1.dim)
+    x2s = x2s.reshape(-1, irreps_in2.dim)
 
-    batch_out = x1s_out.shape[0]
+    batch_numel = x1s.shape[0]
 
     # = Determine number of weights and reshape weights ==
     weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.has_weight)
     if weight_numel > 0:
-        ws_out = ws_out.reshape(-1, weight_numel)
+        weights = weights.reshape(-1, weight_numel)
     del weight_numel
 
     # = extract individual input irreps =
     # If only one input irrep, can avoid creating a view
     if len(irreps_in1) == 1:
-        x1_list_out = [x1s_out.reshape(batch_out, irreps_in1[0].mul, irreps_in1[0].ir.dim)]
+        x1_list = [x1s.reshape(batch_numel, irreps_in1[0].mul, irreps_in1[0].ir.dim)]
     else:
-        x1_list_out = [
-            x1s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
+        x1_list = [
+            x1s[:, i].reshape(batch_numel, mul_ir.mul, mul_ir.ir.dim)
             for i, mul_ir in zip(irreps_in1.slices(), irreps_in1)
         ]
 
-    x2_list_out = []
+    x2_list = []
     # If only one input irrep, can avoid creating a view
     if len(irreps_in2) == 1:
-        x2_list_out.append(
-            x2s_out.reshape(batch_out, irreps_in2[0].mul, irreps_in2[0].ir.dim)
+        x2_list.append(
+            x2s.reshape(batch_numel, irreps_in2[0].mul, irreps_in2[0].ir.dim)
         )
     else:
         for i, mul_ir in zip(irreps_in2.slices(), irreps_in2):
-            x2_list_out.append(
-                x2s_out[:, i].reshape(batch_out, mul_ir.mul, mul_ir.ir.dim)
+            x2_list.append(
+                x2s[:, i].reshape(batch_numel, mul_ir.mul, mul_ir.ir.dim)
             )
 
     # The einsum string index to prepend to the weights if the weights are not shared and have a batch dimension
@@ -106,7 +107,7 @@ def codegen_tensor_product_left_right(
     # Current index in the flat weight tensor
     flat_weight_index = 0
 
-    out_list_out = []
+    outputs = []
 
     for ins in instructions:
         mul_ir_in1 = irreps_in1[ins.i_in1]
@@ -119,19 +120,14 @@ def codegen_tensor_product_left_right(
         if mul_ir_in1.dim == 0 or mul_ir_in2.dim == 0 or mul_ir_out.dim == 0:
             continue
 
-        # Open the profiler block
-        # - PROFILER - name = f"{mul_ir_in1} x {mul_ir_in2} = {mul_ir_out} {ins.connection_mode} {ins.has_weight}"
-        # - PROFILER - handle_out = graph_out.call_function(torch.ops.profiler._record_function_enter, (name,))
-        # - PROFILER - handle_right = graph_right.call_function(torch.ops.profiler._record_function_enter, (name,))
-
-        x1_out = x1_list_out[ins.i_in1]
-        x2_out = x2_list_out[ins.i_in2]
+        x1 = x1_list[ins.i_in1]
+        x2 = x2_list[ins.i_in2]
 
         assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
-            w_out = ws_out[:, flat_weight_index:flat_weight_index + prod(ins.path_shape)].reshape((() if shared_weights else (-1,)) + tuple(ins.path_shape))
+            w = weights[:, flat_weight_index:flat_weight_index + prod(ins.path_shape)].reshape((() if shared_weights else (-1,)) + tuple(ins.path_shape))
             flat_weight_index += prod(ins.path_shape)
 
         # Construct the general xx in case this instruction isn't specialized
@@ -139,185 +135,181 @@ def codegen_tensor_product_left_right(
         key = (ins.i_in1, ins.i_in2, ins.connection_mode[:2])
         if key not in xx_dict:
             if ins.connection_mode[:2] == 'uv':
-                xx_dict[key] = torch.einsum('zui,zvj->zuvij', x1_out, x2_out)
+                xx_dict[key] = torch.einsum('zui,zvj->zuvij', x1, x2)
             if ins.connection_mode[:2] == 'uu':
-                xx_dict[key] = torch.einsum('zui,zuj->zuij', x1_out, x2_out)
+                xx_dict[key] = torch.einsum('zui,zuj->zuij', x1, x2)
         xx = xx_dict[key]
         del key
 
         # Create a proxy & request for the relevant wigner w3j
         # If not used (because of specialized code), will get removed later.
         w3j_name = f"_w3j_{mul_ir_in1.ir.l}_{mul_ir_in2.ir.l}_{mul_ir_out.ir.l}"
-        w3j_out = fx.Proxy(graph_out.get_attr(w3j_name), tracer=tracer_out)
+        w3j = fx.Proxy(graph.get_attr(w3j_name), tracer=tracer)
 
         l1l2l3 = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
         if ins.connection_mode == 'uvw':
             assert ins.has_weight
             if specialized_code and l1l2l3 == (0, 0, 0):
-                ein_out = torch.einsum(f"{z}uvw,zu,zv->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                result = torch.einsum(f"{z}uvw,zu,zv->zw", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
             elif specialized_code and mul_ir_in1.ir.l == 0:
-                ein_out = torch.einsum(f"{z}uvw,zu,zvj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                result = torch.einsum(f"{z}uvw,zu,zvj->zwj", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
             elif specialized_code and mul_ir_in2.ir.l == 0:
-                ein_out = torch.einsum(f"{z}uvw,zui,zv->zwi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                result = torch.einsum(f"{z}uvw,zui,zv->zwi", w, x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
             elif specialized_code and mul_ir_out.ir.l == 0:
-                ein_out = torch.einsum(f"{z}uvw,zui,zvi->zw", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                result = torch.einsum(f"{z}uvw,zui,zvi->zw", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
             else:
-                ein_out = torch.einsum(f"{z}uvw,ijk,zuvij->zwk", w_out, w3j_out, xx)
+                result = torch.einsum(f"{z}uvw,ijk,zuvij->zwk", w, w3j, xx)
         if ins.connection_mode == 'uvu':
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
                 if specialized_code and l1l2l3 == (0, 0, 0):
-                    ein_out = torch.einsum(f"{z}uv,zu,zv->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}uv,zu,zv->zu", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uv,zu,zvj->zuj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,zu,zvj->zuj", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uv,zui,zv->zui", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,zui,zv->zui", w, x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uv,zui,zvi->zu", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}uv,zui,zvi->zu", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zuk", w_out, w3j_out, xx)
+                    result = torch.einsum(f"{z}uv,ijk,zuvij->zuk", w, w3j, xx)
             else:
                 # not so useful operation because v is summed
-                ein_out = torch.einsum("ijk,zuvij->zuk", w3j_out, xx)
+                result = torch.einsum("ijk,zuvij->zuk", w3j, xx)
         if ins.connection_mode == 'uvv':
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 if specialized_code and l1l2l3 == (0, 0, 0):
-                    ein_out = torch.einsum(f"{z}uv,zu,zv->zv", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}uv,zu,zv->zv", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uv,zu,zvj->zvj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,zu,zvj->zvj", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uv,zui,zv->zvi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,zui,zv->zvi", w, x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uv,zui,zvi->zv", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}uv,zui,zvi->zv", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w_out, w3j_out, xx)
+                    result = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w, w3j, xx)
             else:
                 # not so useful operation because u is summed
                 # only specialize out for this path
                 if specialized_code and l1l2l3 == (0, 0, 0):
-                    ein_out = torch.einsum("zu,zv->zv", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    result = torch.einsum("zu,zv->zv", x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_out = torch.einsum("zu,zvj->zvj", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum("zu,zvj->zvj", x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_out = torch.einsum("zui,zv->zvi", x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum("zui,zv->zvi", x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_out = torch.einsum("zui,zvi->zv", x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum("zui,zvi->zv", x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_out = torch.einsum("ijk,zuvij->zvk", w3j_out, xx)
+                    result = torch.einsum("ijk,zuvij->zvk", w3j, xx)
         if ins.connection_mode == 'uuw':
             assert mul_ir_in1.mul == mul_ir_in2.mul
             if ins.has_weight:
                 if specialized_code and l1l2l3 == (0, 0, 0):
-                    ein_out = torch.einsum(f"{z}uw,zu,zu->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}uw,zu,zu->zw", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uw,zu,zuj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uw,zu,zuj->zwj", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uw,zui,zu->zwi", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uw,zui,zu->zwi", w, x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}uw,zui,zui->zw", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}uw,zui,zui->zw", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_out = torch.einsum(f"{z}uw,ijk,zuij->zwk", w_out, w3j_out, xx)
+                    result = torch.einsum(f"{z}uw,ijk,zuij->zwk", w, w3j, xx)
             else:
                 # equivalent to tp(x, y, 'uuu').sum('u')
                 assert mul_ir_out.mul == 1
-                ein_out = torch.einsum("ijk,zuij->zk", w3j_out, xx)
+                result = torch.einsum("ijk,zuij->zk", w3j, xx)
         if ins.connection_mode == 'uuu':
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 if specialized_code and l1l2l3 == (0, 0, 0):
-                    ein_out = torch.einsum(f"{z}u,zu,zu->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}u,zu,zu->zu", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and l1l2l3 == (1, 1, 1):
-                    ein_out = torch.einsum(
+                    result = torch.einsum(
                         f"{z}u,zui->zui",
-                        w_out,
-                        torch.cross(x1_out, x2_out, dim=2)
+                        w,
+                        torch.cross(x1, x2, dim=2)
                     ) / sqrt(2*3)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}u,zu,zuj->zuj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}u,zu,zuj->zuj", w, x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}u,zui,zu->zui", w_out, x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}u,zui,zu->zui", w, x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_out = torch.einsum(f"{z}u,zui,zui->zu", w_out, x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}u,zui,zui->zu", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_out = torch.einsum(f"{z}u,ijk,zuij->zuk", w_out, w3j_out, xx)
+                    result = torch.einsum(f"{z}u,ijk,zuij->zuk", w, w3j, xx)
             else:
                 if specialized_code and l1l2l3 == (0, 0, 0):
-                    ein_out = torch.einsum("zu,zu->zu", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
+                    result = torch.einsum("zu,zu->zu", x1.reshape(batch_numel, mul_ir_in1.dim), x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and l1l2l3 == (1, 1, 1):
-                    ein_out = torch.cross(x1_out, x2_out, dim=2) * (1.0 / sqrt(2*3))
+                    result = torch.cross(x1, x2, dim=2) * (1.0 / sqrt(2*3))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_out = torch.einsum("zu,zuj->zuj", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum("zu,zuj->zuj", x1.reshape(batch_numel, mul_ir_in1.dim), x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_out = torch.einsum("zui,zu->zui", x1_out, x2_out.reshape(batch_out, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum("zui,zu->zui", x1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_out = torch.einsum("zui,zui->zu", x1_out, x2_out) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum("zui,zui->zu", x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_out = torch.einsum("ijk,zuij->zuk", w3j_out, xx)
+                    result = torch.einsum("ijk,zuij->zuk", w3j, xx)
         if ins.connection_mode == 'uvuv':
             assert mul_ir_in1.mul * mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 # TODO implement specialized code
-                ein_out = torch.einsum(f"{z}uv,ijk,zuvij->zuvk", w_out, w3j_out, xx)
+                result = torch.einsum(f"{z}uv,ijk,zuvij->zuvk", w, w3j, xx)
             else:
                 # TODO implement specialized code
-                ein_out = torch.einsum("ijk,zuvij->zuvk", w3j_out, xx)
+                result = torch.einsum("ijk,zuvij->zuvk", w3j, xx)
         if ins.connection_mode == 'uvu<v':
             assert mul_ir_in1.mul == mul_ir_in2.mul
             assert mul_ir_in1.mul * (mul_ir_in1.mul - 1) // 2 == mul_ir_out.mul
             name = f"_triu_indices_{mul_ir_in1.mul}"
-            constants_out[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
-            i = fx.Proxy(graph_out.get_attr(name), tracer=tracer_out)
+            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
+            i = fx.Proxy(graph.get_attr(name), tracer=tracer)
             xx = xx[:, i[0], i[1]]  # zuvij -> zwij
             if ins.has_weight:
                 # TODO implement specialized code
-                ein_out = torch.einsum(f"{z}w,ijk,zwij->zwk", w_out, w3j_out, xx)
+                result = torch.einsum(f"{z}w,ijk,zwij->zwk", w, w3j, xx)
             else:
                 # TODO implement specialized code
-                ein_out = torch.einsum("ijk,zwij->zwk", w3j_out, xx)
+                result = torch.einsum("ijk,zwij->zwk", w3j, xx)
 
-        ein_out = ins.path_weight * ein_out
+        result = ins.path_weight * result
 
-        out_list_out += [ein_out.reshape(batch_out, mul_ir_out.dim)]
-
-        # Close the profiler block
-        # - PROFILER - graph_out.call_function(torch.ops.profiler._record_function_exit, (handle_out,))
-        # - PROFILER - graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
+        outputs += [result.reshape(batch_numel, mul_ir_out.dim)]
 
         # Remove unused w3js:
-        if len(w3j_out.node.users) == 0:
+        if len(w3j.node.users) == 0:
             # The w3j nodes are reshapes, so we have to remove them from the graph
             # Although they are dead code, they try to reshape to dimensions that don't exist
             # (since the corresponding w3js are not in w3j)
             # so they screw up the shape propagation, even though they would be removed later as dead code by TorchScript.
-            graph_out.erase_node(w3j_out.node)
+            graph.erase_node(w3j.node)
         else:
-            if w3j_name not in constants_out:
-                constants_out[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+            if w3j_name not in constants:
+                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
     # = Return the result =
-    out_out = [
+    outputs = [
         _sum_tensors(
-            [out for ins, out in zip(instructions, out_list_out) if ins.i_out == i_out],
-            shape=(batch_out, mul_ir_out.dim),
-            like=x1s_out
+            [out for ins, out in zip(instructions, outputs) if ins.i_out == i_out],
+            shape=(batch_numel, mul_ir_out.dim),
+            like=x1s
         )
         for i_out, mul_ir_out in enumerate(irreps_out)
         if mul_ir_out.mul > 0
     ]
-    if len(out_out) > 1:
-        out_out = torch.cat(out_out, dim=1)
+    if len(outputs) > 1:
+        outputs = torch.cat(outputs, dim=1)
     else:
         # Avoid an unnecessary copy in a size one torch.cat
-        out_out = out_out[0]
+        outputs = outputs[0]
 
-    out_out = out_out.reshape(outsize_out)
+    outputs = outputs.reshape(output_shape)
 
-    graph_out.output(out_out.node, torch.Tensor)
+    graph.output(outputs.node, torch.Tensor)
 
     # check graphs
-    graph_out.lint()
+    graph.lint()
 
     # Make GraphModules
 
@@ -326,9 +318,9 @@ def codegen_tensor_product_left_right(
     #
     # FX seems to have resolved this issue for dicts in 1.9, but we support all the way back to 1.8.0.
     constants_root = torch.nn.Module()
-    for key, value in constants_out.items():
+    for key, value in constants.items():
         constants_root.register_buffer(key, value)
-    graphmod_out = fx.GraphModule(constants_root, graph_out, class_name="tp_forward")
+    graphmod = fx.GraphModule(constants_root, graph, class_name="tp_forward")
 
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
@@ -360,9 +352,9 @@ def codegen_tensor_product_left_right(
                 flat_weight_index,
             ),
         )
-        graphmod_out = optimize_einsums_full(graphmod_out, example_inputs)
+        graphmod = optimize_einsums_full(graphmod, example_inputs)
 
-    return graphmod_out
+    return graphmod
 
 
 def codegen_tensor_product_right(
@@ -374,62 +366,63 @@ def codegen_tensor_product_right(
     specialized_code: bool = True,
     optimize_einsums: bool = True,
 ) -> Tuple[fx.GraphModule, fx.GraphModule]:
-    graph_right = fx.Graph()
+    graph = fx.Graph()
 
     # = Function definitions =
-    tracer_right = fx.proxy.GraphAppendingTracer(graph_right)
-    constants_right = OrderedDict()
+    tracer = fx.proxy.GraphAppendingTracer(graph)
+    constants = OrderedDict()
 
-    x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor), tracer=tracer_right)
-    ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor), tracer=tracer_right)
+    x2s = fx.Proxy(graph.placeholder('x2', torch.Tensor), tracer=tracer)
+    weights = fx.Proxy(graph.placeholder('w', torch.Tensor), tracer=tracer)
 
-    empty_right = fx.Proxy(graph_right.call_function(torch.empty, ((),), dict(device='cpu')), tracer=tracer_right)
+    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device='cpu')), tracer=tracer)
     if shared_weights:
-        size_right = x2s_right.shape[:-1]
+        output_shape = x2s.shape[:-1]
     else:
-        size_right = torch.broadcast_tensors(empty_right.expand(x2s_right.shape[:-1]), empty_right.expand(ws_right.shape[:-1]))[0].shape
+        output_shape = torch.broadcast_tensors(empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1]))[0].shape
+    del empty
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
     instructions = [ins for ins in instructions if 0 not in ins.path_shape]
 
     if len(instructions) == 0:
-        out_right = x2s_right.new_zeros(size_right + (irreps_in1.dim, irreps_out.dim,))
+        outputs = x2s.new_zeros(output_shape + (irreps_in1.dim, irreps_out.dim,))
 
-        graph_right.output(out_right.node, torch.Tensor)
+        graph.output(outputs.node, torch.Tensor)
         # Short circut
-        return fx.GraphModule({}, graph_right, "tp_right")
+        return fx.GraphModule({}, graph, "tp_right")
 
     # = Broadcast inputs =
     if not shared_weights:
-        x2s_right, ws_right = x2s_right.broadcast_to(size_right + (-1,)), ws_right.broadcast_to(size_right + (-1,))
+        x2s, weights = x2s.broadcast_to(output_shape + (-1,)), weights.broadcast_to(output_shape + (-1,))
 
-    outsize_right = size_right + (irreps_in1.dim, irreps_out.dim,)
+    output_shape = output_shape + (irreps_in1.dim, irreps_out.dim,)
 
-    x2s_right = x2s_right.reshape(-1, irreps_in2.dim)
+    x2s = x2s.reshape(-1, irreps_in2.dim)
 
-    batch_right = x2s_right.shape[0]
+    batch_numel = x2s.shape[0]
 
     # = Determine number of weights and reshape weights ==
     weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.has_weight)
     if weight_numel > 0:
-        ws_right = ws_right.reshape(-1, weight_numel)
+        weights = weights.reshape(-1, weight_numel)
     del weight_numel
 
     # = book-keeping for wigners =
 
     # = extract individual input irreps =
     # If only one input irrep, can avoid creating a view
-    x2_list_right = []
+    x2_list = []
     # If only one input irrep, can avoid creating a view
     if len(irreps_in2) == 1:
-        x2_list_right.append(
-            x2s_right.reshape(batch_right, irreps_in2[0].mul, irreps_in2[0].ir.dim)
+        x2_list.append(
+            x2s.reshape(batch_numel, irreps_in2[0].mul, irreps_in2[0].ir.dim)
         )
     else:
         for i, mul_ir in zip(irreps_in2.slices(), irreps_in2):
-            x2_list_right.append(
-                x2s_right[:, i].reshape(batch_right, mul_ir.mul, mul_ir.ir.dim)
+            x2_list.append(
+                x2s[:, i].reshape(batch_numel, mul_ir.mul, mul_ir.ir.dim)
             )
 
     # The einsum string index to prepend to the weights if the weights are not shared and have a batch dimension
@@ -438,7 +431,7 @@ def codegen_tensor_product_right(
     # Current index in the flat weight tensor
     flat_weight_index = 0
 
-    out_list_right = []
+    outputs = []
 
     for ins in instructions:
         mul_ir_in1 = irreps_in1[ins.i_in1]
@@ -451,151 +444,142 @@ def codegen_tensor_product_right(
         if mul_ir_in1.dim == 0 or mul_ir_in2.dim == 0 or mul_ir_out.dim == 0:
             continue
 
-        # Open the profiler block
-        # - PROFILER - name = f"{mul_ir_in1} x {mul_ir_in2} = {mul_ir_out} {ins.connection_mode} {ins.has_weight}"
-        # - PROFILER - handle_out = graph_out.call_function(torch.ops.profiler._record_function_enter, (name,))
-        # - PROFILER - handle_right = graph_right.call_function(torch.ops.profiler._record_function_enter, (name,))
+        x2 = x2_list[ins.i_in2]
 
-        x2_right = x2_list_right[ins.i_in2]
-
-        e1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
-        e2_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
-        i1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
+        e1 = fx.Proxy(graph.call_function(torch.eye, (mul_ir_in1.mul,), dict(dtype=x2s.dtype.node, device=x2s.device.node)), tracer=tracer)
+        e2 = fx.Proxy(graph.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s.dtype.node, device=x2s.device.node)), tracer=tracer)
+        i1 = fx.Proxy(graph.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s.dtype.node, device=x2s.device.node)), tracer=tracer)
 
         assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
-            w_right = ws_right[:, flat_weight_index:flat_weight_index + prod(ins.path_shape)].reshape((() if shared_weights else (-1,)) + tuple(ins.path_shape))
+            w = weights[:, flat_weight_index:flat_weight_index + prod(ins.path_shape)].reshape((() if shared_weights else (-1,)) + tuple(ins.path_shape))
             flat_weight_index += prod(ins.path_shape)
 
         # Create a proxy & request for the relevant wigner w3j
         # If not used (because of specialized code), will get removed later.
         w3j_name = f"_w3j_{mul_ir_in1.ir.l}_{mul_ir_in2.ir.l}_{mul_ir_out.ir.l}"
-        w3j_right = fx.Proxy(graph_right.get_attr(w3j_name), tracer=tracer_right)
+        w3j = fx.Proxy(graph.get_attr(w3j_name), tracer=tracer)
 
         if ins.connection_mode == 'uvw':
             assert ins.has_weight
             if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
-                ein_right = torch.einsum(f"{z}uvw,zv->zuw", w_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                result = torch.einsum(f"{z}uvw,zv->zuw", w, x2.reshape(batch_numel, mul_ir_in2.dim))
             elif specialized_code and mul_ir_in1.ir.l == 0:
-                ein_right = torch.einsum(f"{z}uvw,zvi->zuwi", w_right, x2_right) / sqrt(mul_ir_out.ir.dim)
+                result = torch.einsum(f"{z}uvw,zvi->zuwi", w, x2) / sqrt(mul_ir_out.ir.dim)
             elif specialized_code and mul_ir_in2.ir.l == 0:
-                ein_right = torch.einsum(f"{z}uvw,ij,zv->zuiwj", w_right, i1_right, x2_right.reshape(batch_right, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                result = torch.einsum(f"{z}uvw,ij,zv->zuiwj", w, i1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
             elif specialized_code and mul_ir_out.ir.l == 0:
-                ein_right = torch.einsum(f"{z}uvw,zvi->zuiw", w_right, x2_right) / sqrt(mul_ir_in1.ir.dim)
+                result = torch.einsum(f"{z}uvw,zvi->zuiw", w, x2) / sqrt(mul_ir_in1.ir.dim)
             else:
-                ein_right = torch.einsum(f"{z}uvw,ijk,zvj->zuiwk", w_right, w3j_right, x2_right)
+                result = torch.einsum(f"{z}uvw,ijk,zvj->zuiwk", w, w3j, x2)
         if ins.connection_mode == 'uvu':
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
                 if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
-                    ein_right = torch.einsum(f"{z}uv,uw,zv->zuw", w_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}uv,uw,zv->zuw", w, e1, x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}uv,uw,zvi->zuwi", w_right, e1_right, x2_right) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,uw,zvi->zuwi", w, e1, x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}uv,ij,uw,zv->zuiwj", w_right, i1_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,ij,uw,zv->zuiwj", w, i1, e1, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}uv,uw,zvi->zuiw", w_right, e1_right, x2_right) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}uv,uw,zvi->zuiw", w, e1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", w_right, w3j_right, e1_right, x2_right)
+                    result = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwk", w, w3j, e1, x2)
             else:
                 # not so useful operation because v is summed
-                ein_right = torch.einsum("ijk,uw,zvj->zuiwk", w3j_right, e1_right, x2_right)
+                result = torch.einsum("ijk,uw,zvj->zuiwk", w3j, e1, x2)
         if ins.connection_mode == 'uvv':
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
-                    ein_right = torch.einsum(f"{z}uv,vw,zv->zuw", w_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}uv,vw,zv->zuw", w, e2, x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuwi", w_right, e2_right, x2_right) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,vw,zvi->zuwi", w, e2, x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}uv,ij,vw,zv->zuiwj", w_right, i1_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}uv,ij,vw,zv->zuiwj", w, i1, e2, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}uv,vw,zvi->zuiw", w_right, e2_right, x2_right) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}uv,vw,zvi->zuiw", w, e2, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_right = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w_right, w3j_right, x2_right)
+                    result = torch.einsum(f"{z}uv,ijk,zvj->zuivk", w, w3j, x2)
             else:
                 # not so useful operation because u is summed
                 # only specialize out for this path
-                s2ones = fx.Proxy(graph_right.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2_right.device.node, dtype=x2_right.dtype.node)), tracer=tracer_right)
-                ein_right = torch.einsum("u,ijk,zvj->zuivk", s2ones, w3j_right, x2_right)
+                s2ones = fx.Proxy(graph.call_function(torch.ones, (mul_ir_in1.mul,), dict(device=x2.device.node, dtype=x2.dtype.node)), tracer=tracer)
+                result = torch.einsum("u,ijk,zvj->zuivk", s2ones, w3j, x2)
         if ins.connection_mode == 'uuw':
             assert mul_ir_in1.mul == mul_ir_in2.mul
             if ins.has_weight:
                 # TODO: specialize right()
-                ein_right = torch.einsum(f"{z}uw,ijk,zuj->zuiwk", w_right, w3j_right, x2_right)
+                result = torch.einsum(f"{z}uw,ijk,zuj->zuiwk", w, w3j, x2)
             else:
                 # equivalent to tp(x, y, 'uuu').sum('u')
                 assert mul_ir_out.mul == 1
-                ein_right = torch.einsum("ijk,zuj->zuik", w3j_right, x2_right)
+                result = torch.einsum("ijk,zuj->zuik", w3j, x2)
         if ins.connection_mode == 'uuu':
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
-                    ein_right = torch.einsum(f"{z}u,uw,zu->zuw", w_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                    result = torch.einsum(f"{z}u,uw,zu->zuw", w, e2, x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (1, 1, 1):
                     # For cross product, use the general case right()
-                    ein_right = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w_right, w3j_right, e1_right, x2_right)
+                    result = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w, w3j, e1, x2)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}u,uw,zui->zuwi", w_right, e2_right, x2_right) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}u,uw,zui->zuwi", w, e2, x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}u,ij,uw,zu->zuiwj", w_right, i1_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum(f"{z}u,ij,uw,zu->zuiwj", w, i1, e2, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_right = torch.einsum(f"{z}u,uw,zui->zuiw", w_right, e2_right, x2_right) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum(f"{z}u,uw,zui->zuiw", w, e2, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_right = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w_right, w3j_right, e1_right, x2_right)
+                    result = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w, w3j, e1, x2)
             else:
                 if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
-                    ein_right = torch.einsum("uw,zu->zuw", e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
+                    result = torch.einsum("uw,zu->zuw", e2, x2.reshape(batch_numel, mul_ir_in2.dim))
                 elif specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (1, 1, 1):
                     # For cross product, use the general case right()
-                    ein_right = torch.einsum("ijk,uw,zuj->zuiwk", w3j_right, e1_right, x2_right)
+                    result = torch.einsum("ijk,uw,zuj->zuiwk", w3j, e1, x2)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
-                    ein_right = torch.einsum("uw,zui->zuwi", e2_right, x2_right) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum("uw,zui->zuwi", e2, x2) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_in2.ir.l == 0:
-                    ein_right = torch.einsum("ij,uw,zu->zuiwj", i1_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
+                    result = torch.einsum("ij,uw,zu->zuiwj", i1, e2, x2.reshape(batch_numel, mul_ir_in2.dim)) / sqrt(mul_ir_out.ir.dim)
                 elif specialized_code and mul_ir_out.ir.l == 0:
-                    ein_right = torch.einsum("uw,zui->zuiw", e2_right, x2_right) / sqrt(mul_ir_in1.ir.dim)
+                    result = torch.einsum("uw,zui->zuiw", e2, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    ein_right = torch.einsum("ijk,uw,zuj->zuiwk", w3j_right, e1_right, x2_right)
+                    result = torch.einsum("ijk,uw,zuj->zuiwk", w3j, e1, x2)
         if ins.connection_mode == 'uvuv':
             assert mul_ir_in1.mul * mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 # TODO implement specialized code
-                ein_right = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwvk", w_right, w3j_right, e1_right, x2_right)
+                result = torch.einsum(f"{z}uv,ijk,uw,zvj->zuiwvk", w, w3j, e1, x2)
             else:
                 # TODO implement specialized code
-                ein_right = torch.einsum("ijk,uw,zvj->zuiwvk", w3j_right, e1_right, x2_right)
+                result = torch.einsum("ijk,uw,zvj->zuiwvk", w3j, e1, x2)
         if ins.connection_mode == 'uvu<v':
             raise NotImplementedError
 
-        ein_right = ins.path_weight * ein_right
+        result = ins.path_weight * result
 
-        out_list_right += [ein_right.reshape(batch_right, mul_ir_in1.dim, mul_ir_out.dim)]
-
-        # Close the profiler block
-        # - PROFILER - graph_out.call_function(torch.ops.profiler._record_function_exit, (handle_out,))
-        # - PROFILER - graph_right.call_function(torch.ops.profiler._record_function_exit, (handle_right,))
+        outputs += [result.reshape(batch_numel, mul_ir_in1.dim, mul_ir_out.dim)]
 
         # Remove unused w3js:
-        if len(w3j_right.node.users) == 0:
+        if len(w3j.node.users) == 0:
             # The w3j nodes are reshapes, so we have to remove them from the graph
             # Although they are dead code, they try to reshape to dimensions that don't exist
             # (since the corresponding w3js are not in w3j)
             # so they screw up the shape propagation, even though they would be removed later as dead code by TorchScript.
-            graph_right.erase_node(w3j_right.node)
+            graph.erase_node(w3j.node)
         else:
-            if w3j_name not in constants_right:
-                constants_right[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+            if w3j_name not in constants:
+                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
     # = Return the result =
-    out_right = [
+    outputs = [
         torch.cat([
             _sum_tensors(
-                [out for ins, out in zip(instructions, out_list_right) if (ins.i_in1, ins.i_out) == (i_in1, i_out)],
-                shape=(batch_right, mul_ir_in1.dim, mul_ir_out.dim),
-                like=x2s_right
+                [out for ins, out in zip(instructions, outputs) if (ins.i_in1, ins.i_out) == (i_in1, i_out)],
+                shape=(batch_numel, mul_ir_in1.dim, mul_ir_out.dim),
+                like=x2s
             )
             for i_out, mul_ir_out in enumerate(irreps_out)
             if mul_ir_out.mul > 0
@@ -603,17 +587,17 @@ def codegen_tensor_product_right(
         for i_in1, mul_ir_in1 in enumerate(irreps_in1)
         if mul_ir_in1.mul > 0
     ]
-    if len(out_right) > 1:
-        out_right = torch.cat(out_right, dim=1)
+    if len(outputs) > 1:
+        outputs = torch.cat(outputs, dim=1)
     else:
-        out_right = out_right[0]
+        outputs = outputs[0]
 
-    out_right = out_right.reshape(outsize_right)
+    outputs = outputs.reshape(output_shape)
 
-    graph_right.output(out_right.node, torch.Tensor)
+    graph.output(outputs.node, torch.Tensor)
 
     # check graphs
-    graph_right.lint()
+    graph.lint()
 
     # Make GraphModules
 
@@ -622,9 +606,9 @@ def codegen_tensor_product_right(
     #
     # FX seems to have resolved this issue for dicts in 1.9, but we support all the way back to 1.8.0.
     constants_root = torch.nn.Module()
-    for key, value in constants_right.items():
+    for key, value in constants.items():
         constants_root.register_buffer(key, value)
-    graphmod_right = fx.GraphModule(constants_root, graph_right, class_name="tp_right")
+    graphmod = fx.GraphModule(constants_root, graph, class_name="tp_right")
 
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
@@ -656,6 +640,6 @@ def codegen_tensor_product_right(
                 flat_weight_index,
             ),
         )
-        graphmod_right = optimize_einsums_full(graphmod_right, example_inputs[1:])
+        graphmod = optimize_einsums_full(graphmod, example_inputs[1:])
 
-    return graphmod_right
+    return graphmod
