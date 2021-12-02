@@ -1096,3 +1096,6 @@ class TensorSquare(TensorProduct):
             irrep_normalization=irrep_normalization,
             **kwargs
         )
+
+    def forward(self, x, weight: Optional[torch.Tensor] = None):
+        return super().forward(x, x, weight)
