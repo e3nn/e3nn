@@ -1014,13 +1014,9 @@ class FullTensorProduct(TensorProduct):
 
 
 class TensorSquare(TensorProduct):
-    r"""Full tensor product between twice the same tensor.
+    r"""Compute the square tensor product of a tensor and reduce it in irreps
 
-    .. math::
-
-        z_{uv} = x_u \otimes x_v
-
-    where :math:`u` and :math:`v` run over the irreps. Note that there are no weights.
+    This module contains no parameters.
     The output representation is determined by the input representation.
 
     Parameters

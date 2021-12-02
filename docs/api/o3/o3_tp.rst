@@ -72,3 +72,7 @@ In the elementwise tensor product, the irreps are multiplied one-by-one. Note in
 .. autoclass:: e3nn.o3.ElementwiseTensorProduct
     :members:
     :show-inheritance:
+
+.. autoclass:: e3nn.o3.TensorSquare
+    :members:
+    :show-inheritance:
