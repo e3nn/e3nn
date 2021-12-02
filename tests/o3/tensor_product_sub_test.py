@@ -2,7 +2,7 @@ import torch
 
 from e3nn import o3
 from e3nn.nn import Identity
-from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm
+from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, TensorSquare
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
@@ -69,3 +69,25 @@ def test_norm():
 
     assert_equivariant(norm)
     assert_auto_jitable(norm)
+
+
+def test_square_normalization():
+    irreps = o3.Irreps("0e + 1e + 2e")
+    tp = TensorSquare(irreps, irrep_normalization='norm')
+    x = irreps.randn(1_000_000, -1, normalization='norm')
+    y = tp(x)
+    n = Norm(tp.irreps_out, squared=True)(y)
+
+    assert (n.mean(0).log().abs().exp() < 1.1).all()
+
+    irreps = o3.Irreps("0e + 1e + 3e")
+    tp = o3.TensorSquare(irreps, irrep_normalization='component')
+    x = irreps.randn(1_000_000, -1, normalization='component')
+    y = tp(x)
+
+    assert (y.pow(2).mean(0).log().abs().exp() < 1.1).all()
+
+    tp = TensorSquare(irreps, irrep_normalization='none')
+    y = tp(x)
+
+    assert not (y.pow(2).mean(0).log().abs().exp() < 1.1).all()
