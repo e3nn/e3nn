@@ -1009,3 +1009,90 @@ class FullTensorProduct(TensorProduct):
             irrep_normalization=irrep_normalization,
             **kwargs
         )
+
+
+class TensorSquare(TensorProduct):
+    r"""Full tensor product between twice the same tensor.
+
+    .. math::
+
+        z_{uv} = x_u \otimes x_v
+
+    where :math:`u` and :math:`v` run over the irreps. Note that there are no weights.
+    The output representation is determined by the input representation.
+
+    Parameters
+    ----------
+    irreps_in : `e3nn.o3.Irreps`
+        representation of the input
+
+    filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
+        filter to select only specific `e3nn.o3.Irrep` of the output
+
+    irrep_normalization : {'component', 'norm'}
+        see `e3nn.o3.TensorProduct`
+    """
+    def __init__(
+        self,
+        irreps_in: o3.Irreps,
+        filter_ir_out: Iterator[o3.Irrep] = None,
+        irrep_normalization: str = None,
+        **kwargs
+    ):
+
+        irreps_in = o3.Irreps(irreps_in).simplify()
+        if filter_ir_out is not None:
+            try:
+                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            except ValueError:
+                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
+
+        irreps_out = []
+        instr = []
+        for i_1, (mul_1, ir_1) in enumerate(irreps_in):
+            for i_2, (mul_2, ir_2) in enumerate(irreps_in):
+                for ir_out in ir_1 * ir_2:
+
+                    if filter_ir_out is not None and ir_out not in filter_ir_out:
+                        continue
+
+                    if i_1 < i_2:
+                        i_out = len(irreps_out)
+                        irreps_out.append((mul_1 * mul_2, ir_out))
+                        instr += [
+                            (i_1, i_2, i_out, 'uvuv', False)
+                        ]
+                    elif i_1 == i_2:
+                        i = i_1
+                        mul = mul_1
+
+                        if mul > 1:
+                            i_out = len(irreps_out)
+                            irreps_out.append((mul * (mul - 1) // 2, ir_out))
+                            instr += [
+                                (i, i, i_out, 'uvu<v', False)
+                            ]
+
+                        if ir_out.l % 2 == 0:
+                            i_out = len(irreps_out)
+                            irreps_out.append((mul, ir_out))
+                            instr += [
+                                (i, i, i_out, 'uuu', False)
+                            ]
+
+        irreps_out = o3.Irreps(irreps_out)
+        irreps_out, p, _ = irreps_out.sort()
+
+        instr = [
+            (i_1, i_2, p[i_out], mode, train)
+            for i_1, i_2, i_out, mode, train in instr
+        ]
+
+        super().__init__(
+            irreps_in,
+            irreps_in,
+            irreps_out,
+            instr,
+            irrep_normalization=irrep_normalization,
+            **kwargs
+        )
