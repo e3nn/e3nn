@@ -227,14 +227,20 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
         instructions = [
             Instruction(
-                i_in1, i_in2, i_out, connection_mode, has_weight, path_weight,
-                {
+                i_in1=i_in1,
+                i_in2=i_in2,
+                i_out=i_out,
+                connection_mode=connection_mode,
+                has_weight=has_weight,
+                path_weight=path_weight,
+                path_shape={
                     'uvw': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
                     'uvu': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
                     'uvv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
                     'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
                     'uuu': (self.irreps_in1[i_in1].mul,),
                     'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    'uvu<v': (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2,),
                 }[connection_mode],
             )
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
@@ -266,6 +272,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 'uuw': self.irreps_in1[ins.i_in1].mul,
                 'uuu': 1,
                 'uvuv': 1,
+                'uvu<v': 1,
             }[ins.connection_mode]
 
         normalization_coefficients = []
@@ -275,7 +282,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             mul_ir_out = self.irreps_out[ins.i_out]
             assert mul_ir_in1.ir.p * mul_ir_in2.ir.p == mul_ir_out.ir.p
             assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
-            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
+            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
 
             alpha = 1
 

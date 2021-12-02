@@ -1,12 +1,12 @@
+from collections import OrderedDict
 from math import sqrt
 from typing import List, Tuple
 
-from opt_einsum_fx import optimize_einsums_full
 import torch
-from torch import fx
-
 from e3nn import o3
 from e3nn.util import prod
+from opt_einsum_fx import optimize_einsums_full
+from torch import fx
 
 from ._instruction import Instruction
 
@@ -33,6 +33,7 @@ def codegen_tensor_product_left_right(
 
     # = Function definitions =
     tracer_out = fx.proxy.GraphAppendingTracer(graph_out)
+    constants_out = OrderedDict()
 
     x1s_out = fx.Proxy(graph_out.placeholder('x1', torch.Tensor), tracer=tracer_out)
     x2s_out = fx.Proxy(graph_out.placeholder('x2', torch.Tensor), tracer=tracer_out)
@@ -73,10 +74,6 @@ def codegen_tensor_product_left_right(
     if weight_numel > 0:
         ws_out = ws_out.reshape(-1, weight_numel)
     del weight_numel
-
-    # = book-keeping for wigners =
-    w3j = []
-    w3j_dict_out = dict()
 
     # = extract individual input irreps =
     # If only one input irrep, can avoid creating a view
@@ -130,7 +127,7 @@ def codegen_tensor_product_left_right(
         x1_out = x1_list_out[ins.i_in1]
         x2_out = x2_list_out[ins.i_in2]
 
-        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
+        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
@@ -146,18 +143,18 @@ def codegen_tensor_product_left_right(
             if ins.connection_mode[:2] == 'uu':
                 xx_dict[key] = torch.einsum('zui,zuj->zuij', x1_out, x2_out)
         xx = xx_dict[key]
+        del key
 
         # Create a proxy & request for the relevant wigner w3j
         # If not used (because of specialized code), will get removed later.
-        key = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
-        if key not in w3j:
-            w3j_dict_out[key] = fx.Proxy(graph_out.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"), tracer=tracer_out)
-            w3j.append(key)
-        w3j_out = w3j_dict_out[key]
+        w3j_name = f"_w3j_{mul_ir_in1.ir.l}_{mul_ir_in2.ir.l}_{mul_ir_out.ir.l}"
+        w3j_out = fx.Proxy(graph_out.get_attr(w3j_name), tracer=tracer_out)
+
+        l1l2l3 = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
         if ins.connection_mode == 'uvw':
             assert ins.has_weight
-            if specialized_code and key == (0, 0, 0):
+            if specialized_code and l1l2l3 == (0, 0, 0):
                 ein_out = torch.einsum(f"{z}uvw,zu,zv->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
             elif specialized_code and mul_ir_in1.ir.l == 0:
                 ein_out = torch.einsum(f"{z}uvw,zu,zvj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
@@ -170,7 +167,7 @@ def codegen_tensor_product_left_right(
         if ins.connection_mode == 'uvu':
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and l1l2l3 == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}uv,zu,zv->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uv,zu,zvj->zuj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
@@ -186,7 +183,7 @@ def codegen_tensor_product_left_right(
         if ins.connection_mode == 'uvv':
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and l1l2l3 == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}uv,zu,zv->zv", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uv,zu,zvj->zvj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
@@ -199,7 +196,7 @@ def codegen_tensor_product_left_right(
             else:
                 # not so useful operation because u is summed
                 # only specialize out for this path
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and l1l2l3 == (0, 0, 0):
                     ein_out = torch.einsum("zu,zv->zv", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum("zu,zvj->zvj", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
@@ -212,7 +209,7 @@ def codegen_tensor_product_left_right(
         if ins.connection_mode == 'uuw':
             assert mul_ir_in1.mul == mul_ir_in2.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and l1l2l3 == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}uw,zu,zu->zw", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum(f"{z}uw,zu,zuj->zwj", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
@@ -229,9 +226,9 @@ def codegen_tensor_product_left_right(
         if ins.connection_mode == 'uuu':
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and l1l2l3 == (0, 0, 0):
                     ein_out = torch.einsum(f"{z}u,zu,zu->zu", w_out, x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
-                elif specialized_code and key == (1, 1, 1):
+                elif specialized_code and l1l2l3 == (1, 1, 1):
                     ein_out = torch.einsum(
                         f"{z}u,zui->zui",
                         w_out,
@@ -246,9 +243,9 @@ def codegen_tensor_product_left_right(
                 else:
                     ein_out = torch.einsum(f"{z}u,ijk,zuij->zuk", w_out, w3j_out, xx)
             else:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and l1l2l3 == (0, 0, 0):
                     ein_out = torch.einsum("zu,zu->zu", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out.reshape(batch_out, mul_ir_in2.dim))
-                elif specialized_code and key == (1, 1, 1):
+                elif specialized_code and l1l2l3 == (1, 1, 1):
                     ein_out = torch.cross(x1_out, x2_out, dim=2) * (1.0 / sqrt(2*3))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_out = torch.einsum("zu,zuj->zuj", x1_out.reshape(batch_out, mul_ir_in1.dim), x2_out) / sqrt(mul_ir_out.ir.dim)
@@ -266,6 +263,19 @@ def codegen_tensor_product_left_right(
             else:
                 # TODO implement specialized code
                 ein_out = torch.einsum("ijk,zuvij->zuvk", w3j_out, xx)
+        if ins.connection_mode == 'uvu<v':
+            assert mul_ir_in1.mul == mul_ir_in2.mul
+            assert mul_ir_in1.mul * (mul_ir_in1.mul - 1) // 2 == mul_ir_out.mul
+            name = f"_triu_indices_{mul_ir_in1.mul}"
+            constants_out[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
+            i = fx.Proxy(graph_out.get_attr(name), tracer=tracer_out)
+            xx = xx[:, i[0], i[1]]  # zuvij -> zwij
+            if ins.has_weight:
+                # TODO implement specialized code
+                ein_out = torch.einsum(f"{z}w,ijk,zwij->zwk", w_out, w3j_out, xx)
+            else:
+                # TODO implement specialized code
+                ein_out = torch.einsum("ijk,zwij->zwk", w3j_out, xx)
 
         ein_out = ins.path_weight * ein_out
 
@@ -277,12 +287,14 @@ def codegen_tensor_product_left_right(
 
         # Remove unused w3js:
         if len(w3j_out.node.users) == 0:
-            del w3j[-1]
             # The w3j nodes are reshapes, so we have to remove them from the graph
             # Although they are dead code, they try to reshape to dimensions that don't exist
             # (since the corresponding w3js are not in w3j)
             # so they screw up the shape propagation, even though they would be removed later as dead code by TorchScript.
-            graph_out.erase_node(w3j_dict_out.pop(key).node)
+            graph_out.erase_node(w3j_out.node)
+        else:
+            if w3j_name not in constants_out:
+                constants_out[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
     # = Return the result =
     out_out = [
@@ -308,17 +320,14 @@ def codegen_tensor_product_left_right(
     graph_out.lint()
 
     # Make GraphModules
-    wigner_mats = {}
-    for l_1, l_2, l_out in w3j:
-        wigner_mats[f"_w3j_{l_1}_{l_2}_{l_out}"] = o3.wigner_3j(l_1, l_2, l_out)
 
     # By putting the constants in a Module rather than a dict,
     # we force FX to copy them as buffers instead of as attributes.
     #
     # FX seems to have resolved this issue for dicts in 1.9, but we support all the way back to 1.8.0.
     constants_root = torch.nn.Module()
-    for wkey, wmat in wigner_mats.items():
-        constants_root.register_buffer(wkey, wmat)
+    for key, value in constants_out.items():
+        constants_root.register_buffer(key, value)
     graphmod_out = fx.GraphModule(constants_root, graph_out, class_name="tp_forward")
 
     # == Optimize ==
@@ -369,6 +378,7 @@ def codegen_tensor_product_right(
 
     # = Function definitions =
     tracer_right = fx.proxy.GraphAppendingTracer(graph_right)
+    constants_right = OrderedDict()
 
     x2s_right = fx.Proxy(graph_right.placeholder('x2', torch.Tensor), tracer=tracer_right)
     ws_right = fx.Proxy(graph_right.placeholder('w', torch.Tensor), tracer=tracer_right)
@@ -407,8 +417,6 @@ def codegen_tensor_product_right(
     del weight_numel
 
     # = book-keeping for wigners =
-    w3j = []
-    w3j_dict_right = dict()
 
     # = extract individual input irreps =
     # If only one input irrep, can avoid creating a view
@@ -454,7 +462,7 @@ def codegen_tensor_product_right(
         e2_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
         i1_right = fx.Proxy(graph_right.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s_right.dtype.node, device=x2s_right.device.node)), tracer=tracer_right)
 
-        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv']
+        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
@@ -463,15 +471,12 @@ def codegen_tensor_product_right(
 
         # Create a proxy & request for the relevant wigner w3j
         # If not used (because of specialized code), will get removed later.
-        key = (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
-        if key not in w3j:
-            w3j_dict_right[key] = fx.Proxy(graph_right.get_attr(f"_w3j_{key[0]}_{key[1]}_{key[2]}"), tracer=tracer_right)
-            w3j.append(key)
-        w3j_right = w3j_dict_right[key]
+        w3j_name = f"_w3j_{mul_ir_in1.ir.l}_{mul_ir_in2.ir.l}_{mul_ir_out.ir.l}"
+        w3j_right = fx.Proxy(graph_right.get_attr(w3j_name), tracer=tracer_right)
 
         if ins.connection_mode == 'uvw':
             assert ins.has_weight
-            if specialized_code and key == (0, 0, 0):
+            if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
                 ein_right = torch.einsum(f"{z}uvw,zv->zuw", w_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
             elif specialized_code and mul_ir_in1.ir.l == 0:
                 ein_right = torch.einsum(f"{z}uvw,zvi->zuwi", w_right, x2_right) / sqrt(mul_ir_out.ir.dim)
@@ -484,7 +489,7 @@ def codegen_tensor_product_right(
         if ins.connection_mode == 'uvu':
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
                     ein_right = torch.einsum(f"{z}uv,uw,zv->zuw", w_right, e1_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_right = torch.einsum(f"{z}uv,uw,zvi->zuwi", w_right, e1_right, x2_right) / sqrt(mul_ir_out.ir.dim)
@@ -500,7 +505,7 @@ def codegen_tensor_product_right(
         if ins.connection_mode == 'uvv':
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
                     ein_right = torch.einsum(f"{z}uv,vw,zv->zuw", w_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
                 elif specialized_code and mul_ir_in1.ir.l == 0:
                     ein_right = torch.einsum(f"{z}uv,vw,zvi->zuwi", w_right, e2_right, x2_right) / sqrt(mul_ir_out.ir.dim)
@@ -527,9 +532,9 @@ def codegen_tensor_product_right(
         if ins.connection_mode == 'uuu':
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
                     ein_right = torch.einsum(f"{z}u,uw,zu->zuw", w_right, e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
-                elif specialized_code and key == (1, 1, 1):
+                elif specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (1, 1, 1):
                     # For cross product, use the general case right()
                     ein_right = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w_right, w3j_right, e1_right, x2_right)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
@@ -541,9 +546,9 @@ def codegen_tensor_product_right(
                 else:
                     ein_right = torch.einsum(f"{z}u,ijk,uw,zuj->zuiwk", w_right, w3j_right, e1_right, x2_right)
             else:
-                if specialized_code and key == (0, 0, 0):
+                if specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (0, 0, 0):
                     ein_right = torch.einsum("uw,zu->zuw", e2_right, x2_right.reshape(batch_right, mul_ir_in2.dim))
-                elif specialized_code and key == (1, 1, 1):
+                elif specialized_code and (mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l) == (1, 1, 1):
                     # For cross product, use the general case right()
                     ein_right = torch.einsum("ijk,uw,zuj->zuiwk", w3j_right, e1_right, x2_right)
                 elif specialized_code and mul_ir_in1.ir.l == 0:
@@ -562,6 +567,8 @@ def codegen_tensor_product_right(
             else:
                 # TODO implement specialized code
                 ein_right = torch.einsum("ijk,uw,zvj->zuiwvk", w3j_right, e1_right, x2_right)
+        if ins.connection_mode == 'uvu<v':
+            raise NotImplementedError
 
         ein_right = ins.path_weight * ein_right
 
@@ -573,12 +580,14 @@ def codegen_tensor_product_right(
 
         # Remove unused w3js:
         if len(w3j_right.node.users) == 0:
-            del w3j[-1]
             # The w3j nodes are reshapes, so we have to remove them from the graph
             # Although they are dead code, they try to reshape to dimensions that don't exist
             # (since the corresponding w3js are not in w3j)
             # so they screw up the shape propagation, even though they would be removed later as dead code by TorchScript.
-            graph_right.erase_node(w3j_dict_right.pop(key).node)
+            graph_right.erase_node(w3j_right.node)
+        else:
+            if w3j_name not in constants_right:
+                constants_right[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
     # = Return the result =
     out_right = [
@@ -607,17 +616,14 @@ def codegen_tensor_product_right(
     graph_right.lint()
 
     # Make GraphModules
-    wigner_mats = {}
-    for l_1, l_2, l_out in w3j:
-        wigner_mats[f"_w3j_{l_1}_{l_2}_{l_out}"] = o3.wigner_3j(l_1, l_2, l_out)
 
     # By putting the constants in a Module rather than a dict,
     # we force FX to copy them as buffers instead of as attributes.
     #
     # FX seems to have resolved this issue for dicts in 1.9, but we support all the way back to 1.8.0.
     constants_root = torch.nn.Module()
-    for wkey, wmat in wigner_mats.items():
-        constants_root.register_buffer(wkey, wmat)
+    for key, value in constants_right.items():
+        constants_root.register_buffer(key, value)
     graphmod_right = fx.GraphModule(constants_root, graph_right, class_name="tp_right")
 
     # == Optimize ==

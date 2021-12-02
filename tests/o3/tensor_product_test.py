@@ -17,6 +17,8 @@ def make_tp(
     def mul_out(mul):
         if mode == "uvuv":
             return mul**2
+        if mode == "uvu<v":
+            return mul * (mul - 1) // 2
         return mul
 
     try:
@@ -508,3 +510,12 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight):
     assert torch.allclose(res1, res2)
     assert torch.allclose(res1, res3)
     assert torch.allclose(res1, res4)
+
+
+def test_triu_mode():
+    tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+    tp(torch.randn(2, 10), torch.randn(2, 10))
+
+    m = assert_auto_jitable(tp)
+
+    assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
