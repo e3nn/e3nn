@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Give up the support of python 3.6, set `python_requires='>=3.7'` in setup
 - Optimize a little bit `ReducedTensorProduct`: solve linear system only once per irrep instead of 2L+1 times.
+- Do not scale line width by `path_weight` in `TensorProduct.visualize`
 
 ## [0.4.3] - 2021-11-18
 ### Fixed
