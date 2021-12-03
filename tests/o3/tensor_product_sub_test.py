@@ -91,3 +91,9 @@ def test_square_normalization():
     y = tp(x)
 
     assert not (y.pow(2).mean(0).log().abs().exp() < 1.1).all()
+
+
+def test_square_elasticity_tensor():
+    tp = TensorSquare("1o")
+    tp = TensorSquare(tp.irreps_out)
+    assert tp.irreps_out.simplify() == o3.Irreps("2x0e + 2x2e + 4e")

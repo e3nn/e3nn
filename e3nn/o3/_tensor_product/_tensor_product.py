@@ -1109,6 +1109,8 @@ class TensorSquare(TensorProduct):
             for i_1, i_2, i_out, mode, train, alpha in instr
         ]
 
+        self.irreps_in = irreps_in
+
         super().__init__(
             irreps_in,
             irreps_in,
@@ -1116,6 +1118,14 @@ class TensorSquare(TensorProduct):
             instr,
             irrep_normalization='none',
             **kwargs
+        )
+
+    def __repr__(self):
+        npath = sum(prod(i.path_shape) for i in self.instructions)
+        return (
+            f"{self.__class__.__name__}"
+            f"({self.irreps_in} "
+            f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
 
     def forward(self, x, weight: Optional[torch.Tensor] = None):
