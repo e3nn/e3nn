@@ -726,7 +726,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 edgecolor=color,
                 alpha=0.5,
                 ls='-',
-                lw=1.5 * ins.path_weight / min(i.path_weight for i in self.instructions),
+                lw=1.5,
             ))
 
         # add labels
