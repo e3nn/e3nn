@@ -216,8 +216,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if path_normalization is None:
             path_normalization = 'element'
 
-        assert irrep_normalization in ['component', 'norm']
-        assert path_normalization in ['element', 'path']
+        assert irrep_normalization in ['component', 'norm', 'none']
+        assert path_normalization in ['element', 'path', 'none']
 
         self.irreps_in1 = o3.Irreps(irreps_in1)
         self.irreps_in2 = o3.Irreps(irreps_in2)
@@ -284,12 +284,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
             assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
 
-            alpha = 1
-
             if irrep_normalization == 'component':
-                alpha *= mul_ir_out.ir.dim
+                alpha = mul_ir_out.ir.dim
             if irrep_normalization == 'norm':
-                alpha *= mul_ir_in1.ir.dim * mul_ir_in2.ir.dim
+                alpha = mul_ir_in1.ir.dim * mul_ir_in2.ir.dim
+            if irrep_normalization == 'none':
+                alpha = 1
 
             if path_normalization == 'element':
                 x = sum(
@@ -300,6 +300,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             if path_normalization == 'path':
                 x = in1_var[ins.i_in1] * in2_var[ins.i_in2] * num_elements(ins)
                 x *= len([i for i in instructions if i.i_out == ins.i_out])
+            if path_normalization == 'none':
+                x = 1
 
             if x > 0.0:
                 alpha /= x
@@ -1009,3 +1011,122 @@ class FullTensorProduct(TensorProduct):
             irrep_normalization=irrep_normalization,
             **kwargs
         )
+
+
+class TensorSquare(TensorProduct):
+    r"""Compute the square tensor product of a tensor and reduce it in irreps
+
+    This module contains no parameters.
+    The output representation is determined by the input representation.
+
+    Parameters
+    ----------
+    irreps_in : `e3nn.o3.Irreps`
+        representation of the input
+
+    filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
+        filter to select only specific `e3nn.o3.Irrep` of the output
+
+    irrep_normalization : {'component', 'norm'}
+        see `e3nn.o3.TensorProduct`
+    """
+    def __init__(
+        self,
+        irreps_in: o3.Irreps,
+        filter_ir_out: Iterator[o3.Irrep] = None,
+        irrep_normalization: str = None,
+        **kwargs
+    ):
+
+        if irrep_normalization is None:
+            irrep_normalization = 'component'
+
+        assert irrep_normalization in ['component', 'norm', 'none']
+
+        irreps_in = o3.Irreps(irreps_in).simplify()
+        if filter_ir_out is not None:
+            try:
+                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+            except ValueError:
+                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
+
+        irreps_out = []
+        instr = []
+        for i_1, (mul_1, ir_1) in enumerate(irreps_in):
+            for i_2, (mul_2, ir_2) in enumerate(irreps_in):
+                for ir_out in ir_1 * ir_2:
+
+                    if filter_ir_out is not None and ir_out not in filter_ir_out:
+                        continue
+
+                    if irrep_normalization == 'component':
+                        alpha = ir_out.dim
+                    if irrep_normalization == 'norm':
+                        alpha = ir_1.dim * ir_2.dim
+                    if irrep_normalization == 'none':
+                        alpha = 1
+
+                    if i_1 < i_2:
+                        i_out = len(irreps_out)
+                        irreps_out.append((mul_1 * mul_2, ir_out))
+                        instr += [
+                            (i_1, i_2, i_out, 'uvuv', False, alpha)
+                        ]
+                    elif i_1 == i_2:
+                        i = i_1
+                        mul = mul_1
+
+                        if mul > 1:
+                            i_out = len(irreps_out)
+                            irreps_out.append((mul * (mul - 1) // 2, ir_out))
+                            instr += [
+                                (i, i, i_out, 'uvu<v', False, alpha)
+                            ]
+
+                        if ir_out.l % 2 == 0:
+                            if irrep_normalization == 'component':
+                                if ir_out.l == 0:
+                                    alpha = ir_out.dim / (ir_1.dim + 2)
+                                else:
+                                    alpha = ir_out.dim / 2
+                            if irrep_normalization == 'norm':
+                                if ir_out.l == 0:
+                                    alpha = ir_out.dim * ir_1.dim
+                                else:
+                                    alpha = ir_1.dim * (ir_1.dim + 2) / 2
+
+                            i_out = len(irreps_out)
+                            irreps_out.append((mul, ir_out))
+                            instr += [
+                                (i, i, i_out, 'uuu', False, alpha)
+                            ]
+
+        irreps_out = o3.Irreps(irreps_out)
+        irreps_out, p, _ = irreps_out.sort()
+
+        instr = [
+            (i_1, i_2, p[i_out], mode, train, alpha)
+            for i_1, i_2, i_out, mode, train, alpha in instr
+        ]
+
+        self.irreps_in = irreps_in
+
+        super().__init__(
+            irreps_in,
+            irreps_in,
+            irreps_out,
+            instr,
+            irrep_normalization='none',
+            **kwargs
+        )
+
+    def __repr__(self):
+        npath = sum(prod(i.path_shape) for i in self.instructions)
+        return (
+            f"{self.__class__.__name__}"
+            f"({self.irreps_in} "
+            f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
+        )
+
+    def forward(self, x, weight: Optional[torch.Tensor] = None):
+        return super().forward(x, x, weight)

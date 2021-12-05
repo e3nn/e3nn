@@ -56,6 +56,17 @@ All possible output irreps do **not** need to be included in ``irreps_out`` of a
 
 In the elementwise tensor product, the irreps are multiplied one-by-one. Note in the visualization how the inputs have been split and that the multiplicities of the outputs match with the multiplicities of the input.
 
+* `e3nn.o3.TensorSquare`
+
+.. jupyter-execute::
+
+    tp = o3.TensorSquare("5x1e + 2e")
+    print(tp)
+    tp.visualize();
+
+The tensor square operation only computes the non-zero entries of a tensor times itself.
+It also applies different normalization rules taking into account that a tensor time itself is statistically different from the product of two independent tensors.
+
 
 .. autoclass:: e3nn.o3.TensorProduct
     :members:
@@ -70,5 +81,9 @@ In the elementwise tensor product, the irreps are multiplied one-by-one. Note in
     :show-inheritance:
 
 .. autoclass:: e3nn.o3.ElementwiseTensorProduct
+    :members:
+    :show-inheritance:
+
+.. autoclass:: e3nn.o3.TensorSquare
     :members:
     :show-inheritance:
