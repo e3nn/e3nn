@@ -240,6 +240,155 @@ class FullTensorProduct(TensorProduct):
         )
 
 
+def _square_instructions_full(irreps_in, filter_ir_out=None, irrep_normalization=None):
+    """Generate instructions for square tensor product.
+
+    Parameters
+    ----------
+    irreps_in : `e3nn.o3.Irreps`
+        representation of the input
+
+    filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
+        filter to select only specific `e3nn.o3.Irrep` of the output
+
+    irrep_normalization : {'component', 'norm', 'none'}
+        see `e3nn.o3.TensorProduct`
+
+    Returns
+    -------
+    irreps_out : `e3nn.o3.Irreps`
+        representation of the output
+
+    instr : list of tuple
+        list of instructions
+
+    """
+    irreps_out = []
+    instr = []
+    for i_1, (mul_1, ir_1) in enumerate(irreps_in):
+        for i_2, (mul_2, ir_2) in enumerate(irreps_in):
+            for ir_out in ir_1 * ir_2:
+
+                if filter_ir_out is not None and ir_out not in filter_ir_out:
+                    continue
+
+                if irrep_normalization == 'component':
+                    alpha = ir_out.dim
+                if irrep_normalization == 'norm':
+                    alpha = ir_1.dim * ir_2.dim
+                if irrep_normalization == 'none':
+                    alpha = 1
+
+                if i_1 < i_2:
+                    i_out = len(irreps_out)
+                    irreps_out.append((mul_1 * mul_2, ir_out))
+                    instr += [
+                        (i_1, i_2, i_out, 'uvuv', False, alpha)
+                    ]
+                elif i_1 == i_2:
+                    i = i_1
+                    mul = mul_1
+
+                    if mul > 1:
+                        i_out = len(irreps_out)
+                        irreps_out.append((mul * (mul - 1) // 2, ir_out))
+                        instr += [
+                            (i, i, i_out, 'uvu<v', False, alpha)
+                        ]
+
+                    if ir_out.l % 2 == 0:
+                        if irrep_normalization == 'component':
+                            if ir_out.l == 0:
+                                alpha = ir_out.dim / (ir_1.dim + 2)
+                            else:
+                                alpha = ir_out.dim / 2
+                        if irrep_normalization == 'norm':
+                            if ir_out.l == 0:
+                                alpha = ir_out.dim * ir_1.dim
+                            else:
+                                alpha = ir_1.dim * (ir_1.dim + 2) / 2
+
+                        i_out = len(irreps_out)
+                        irreps_out.append((mul, ir_out))
+                        instr += [
+                            (i, i, i_out, 'uuu', False, alpha)
+                        ]
+
+    irreps_out = o3.Irreps(irreps_out)
+    irreps_out, p, _ = irreps_out.sort()
+
+    instr = [
+        (i_1, i_2, p[i_out], mode, train, alpha)
+        for i_1, i_2, i_out, mode, train, alpha in instr
+    ]
+
+    return irreps_out, instr
+
+
+def _square_instructions_fully_connected(irreps_in, irreps_out, irrep_normalization=None):
+    """Generate instructions for square tensor product.
+
+    Parameters
+    ----------
+    irreps_in : `e3nn.o3.Irreps`
+        representation of the input
+
+    irreps_out : `e3nn.o3.Irreps`
+        representation of the output
+
+    irrep_normalization : {'component', 'norm', 'none'}
+        see `e3nn.o3.TensorProduct`
+
+    Returns
+    -------
+    instr : list of tuple
+        list of instructions
+    """
+    instr = []
+    for i_1, (mul_1, ir_1) in enumerate(irreps_in):
+        for i_2, (mul_2, ir_2) in enumerate(irreps_in):
+            for i_out, (mul_out, ir_out) in enumerate(irreps_out):
+                if ir_out in ir_1 * ir_2:
+
+                    if irrep_normalization == 'component':
+                        alpha = ir_out.dim
+                    if irrep_normalization == 'norm':
+                        alpha = ir_1.dim * ir_2.dim
+                    if irrep_normalization == 'none':
+                        alpha = 1
+
+                    if i_1 < i_2:
+                        instr += [
+                            (i_1, i_2, i_out, 'uvw', True, alpha)
+                        ]
+                    elif i_1 == i_2:
+                        i = i_1
+                        mul = mul_1
+
+                        if mul > 1:
+                            instr += [
+                                (i, i, i_out, 'u<vw', True, alpha)
+                            ]
+
+                        if ir_out.l % 2 == 0:
+                            if irrep_normalization == 'component':
+                                if ir_out.l == 0:
+                                    alpha = ir_out.dim / (ir_1.dim + 2)
+                                else:
+                                    alpha = ir_out.dim / 2
+                            if irrep_normalization == 'norm':
+                                if ir_out.l == 0:
+                                    alpha = ir_out.dim * ir_1.dim
+                                else:
+                                    alpha = ir_1.dim * (ir_1.dim + 2) / 2
+
+                            instr += [
+                                (i, i, i_out, 'uuw', True, alpha)
+                            ]
+
+    return instr
+
+
 class TensorSquare(TensorProduct):
     r"""Compute the square tensor product of a tensor and reduce it in irreps
 
@@ -260,6 +409,7 @@ class TensorSquare(TensorProduct):
     def __init__(
         self,
         irreps_in: o3.Irreps,
+        irreps_out: o3.Irreps = None,
         filter_ir_out: Iterator[o3.Irrep] = None,
         irrep_normalization: str = None,
         **kwargs
@@ -277,64 +427,15 @@ class TensorSquare(TensorProduct):
             except ValueError:
                 raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
 
-        irreps_out = []
-        instr = []
-        for i_1, (mul_1, ir_1) in enumerate(irreps_in):
-            for i_2, (mul_2, ir_2) in enumerate(irreps_in):
-                for ir_out in ir_1 * ir_2:
+        if irreps_out is None:
+            irreps_out, instr = _square_instructions_full(irreps_in, filter_ir_out, irrep_normalization)
+        else:
+            if filter_ir_out is not None:
+                raise ValueError("Both `irreps_out` and `filter_ir_out` are not None, this is ambiguous.")
 
-                    if filter_ir_out is not None and ir_out not in filter_ir_out:
-                        continue
+            irreps_out = o3.Irreps(irreps_out).simplify()
 
-                    if irrep_normalization == 'component':
-                        alpha = ir_out.dim
-                    if irrep_normalization == 'norm':
-                        alpha = ir_1.dim * ir_2.dim
-                    if irrep_normalization == 'none':
-                        alpha = 1
-
-                    if i_1 < i_2:
-                        i_out = len(irreps_out)
-                        irreps_out.append((mul_1 * mul_2, ir_out))
-                        instr += [
-                            (i_1, i_2, i_out, 'uvuv', False, alpha)
-                        ]
-                    elif i_1 == i_2:
-                        i = i_1
-                        mul = mul_1
-
-                        if mul > 1:
-                            i_out = len(irreps_out)
-                            irreps_out.append((mul * (mul - 1) // 2, ir_out))
-                            instr += [
-                                (i, i, i_out, 'uvu<v', False, alpha)
-                            ]
-
-                        if ir_out.l % 2 == 0:
-                            if irrep_normalization == 'component':
-                                if ir_out.l == 0:
-                                    alpha = ir_out.dim / (ir_1.dim + 2)
-                                else:
-                                    alpha = ir_out.dim / 2
-                            if irrep_normalization == 'norm':
-                                if ir_out.l == 0:
-                                    alpha = ir_out.dim * ir_1.dim
-                                else:
-                                    alpha = ir_1.dim * (ir_1.dim + 2) / 2
-
-                            i_out = len(irreps_out)
-                            irreps_out.append((mul, ir_out))
-                            instr += [
-                                (i, i, i_out, 'uuu', False, alpha)
-                            ]
-
-        irreps_out = o3.Irreps(irreps_out)
-        irreps_out, p, _ = irreps_out.sort()
-
-        instr = [
-            (i_1, i_2, p[i_out], mode, train, alpha)
-            for i_1, i_2, i_out, mode, train, alpha in instr
-        ]
+            instr = _square_instructions_fully_connected(irreps_in, irreps_out, irrep_normalization)
 
         self.irreps_in = irreps_in
 

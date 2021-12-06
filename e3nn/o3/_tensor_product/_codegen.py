@@ -123,7 +123,7 @@ def codegen_tensor_product_left_right(
         x1 = x1_list[ins.i_in1]
         x2 = x2_list[ins.i_in2]
 
-        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
+        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v', 'u<vw']
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
@@ -134,10 +134,10 @@ def codegen_tensor_product_left_right(
         # If this isn't used, the dead code will get removed
         key = (ins.i_in1, ins.i_in2, ins.connection_mode[:2])
         if key not in xx_dict:
-            if ins.connection_mode[:2] == 'uv':
-                xx_dict[key] = torch.einsum('zui,zvj->zuvij', x1, x2)
             if ins.connection_mode[:2] == 'uu':
                 xx_dict[key] = torch.einsum('zui,zuj->zuij', x1, x2)
+            else:
+                xx_dict[key] = torch.einsum('zui,zvj->zuvij', x1, x2)
         xx = xx_dict[key]
         del key
 
@@ -272,6 +272,15 @@ def codegen_tensor_product_left_right(
             else:
                 # TODO implement specialized code
                 result = torch.einsum("ijk,zwij->zwk", w3j, xx)
+        if ins.connection_mode == 'u<vw':
+            assert mul_ir_in1.mul == mul_ir_in2.mul
+            assert ins.has_weight
+            name = f"_triu_indices_{mul_ir_in1.mul}"
+            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
+            i = fx.Proxy(graph.get_attr(name), tracer=tracer)
+            xx = xx[:, i[0], i[1]]  # zuvij -> zqij
+            # TODO implement specialized code
+            result = torch.einsum(f"{z}qw,ijk,zqij->zwk", w, w3j, xx)
 
         result = ins.path_weight * result
 
@@ -450,7 +459,7 @@ def codegen_tensor_product_right(
         e2 = fx.Proxy(graph.call_function(torch.eye, (mul_ir_in2.mul,), dict(dtype=x2s.dtype.node, device=x2s.device.node)), tracer=tracer)
         i1 = fx.Proxy(graph.call_function(torch.eye, (mul_ir_in1.ir.dim,), dict(dtype=x2s.dtype.node, device=x2s.device.node)), tracer=tracer)
 
-        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
+        assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v', 'u<vw']
 
         if ins.has_weight:
             # Extract the weight from the flattened weight tensor
@@ -556,6 +565,8 @@ def codegen_tensor_product_right(
                 # TODO implement specialized code
                 result = torch.einsum("ijk,uw,zvj->zuiwvk", w3j, e1, x2)
         if ins.connection_mode == 'uvu<v':
+            raise NotImplementedError
+        if ins.connection_mode == 'u<vw':
             raise NotImplementedError
 
         result = ins.path_weight * result

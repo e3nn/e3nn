@@ -241,6 +241,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     'uuu': (self.irreps_in1[i_in1].mul,),
                     'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
                     'uvu<v': (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2,),
+                    'u<vw': (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2, self.irreps_out[i_out].mul),
                 }[connection_mode],
             )
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
@@ -273,6 +274,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 'uuu': 1,
                 'uvuv': 1,
                 'uvu<v': 1,
+                'u<vw': self.irreps_in1[ins.i_in1].mul * (self.irreps_in2[ins.i_in2].mul - 1) // 2,
             }[ins.connection_mode]
 
         normalization_coefficients = []
@@ -282,7 +284,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             mul_ir_out = self.irreps_out[ins.i_out]
             assert mul_ir_in1.ir.p * mul_ir_in2.ir.p == mul_ir_out.ir.p
             assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
-            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v']
+            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v', 'u<vw']
 
             if irrep_normalization == 'component':
                 alpha = mul_ir_out.ir.dim
@@ -718,7 +720,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             codes += [Path.MOVETO, Path.LINETO]
 
             if plot_weight:
-                color = cmap(path_weight[ins_index]) if ins.has_weight else 'black'
+                color = cmap(0.5 + 0.5 * path_weight[ins_index]) if ins.has_weight else 'black'
             else:
                 color = 'green' if ins.has_weight else 'black'
 

@@ -92,6 +92,14 @@ def test_square_normalization():
 
     assert not (y.pow(2).mean(0).log().abs().exp() < 1.1).all()
 
+    # with weights
+    tp = TensorSquare(irreps, irreps)
+
+    n = 2_000
+    y = torch.stack([tp(tp.irreps_in.randn(n, -1), torch.randn(tp.weight_numel)) for _ in range(n)])
+
+    assert (y.pow(2).mean([0, 1]).log().abs().exp() < 1.1).all()
+
 
 def test_square_elasticity_tensor():
     tp = TensorSquare("1o")
