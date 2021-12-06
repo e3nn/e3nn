@@ -80,7 +80,7 @@ def test_square_normalization():
 
     assert (n.mean(0).log().abs().exp() < 1.1).all()
 
-    irreps = o3.Irreps("0e + 1e + 3e")
+    irreps = o3.Irreps("0e + 3x1e + 3e")
     tp = o3.TensorSquare(irreps, irrep_normalization='component')
     x = irreps.randn(1_000_000, -1, normalization='component')
     y = tp(x)
