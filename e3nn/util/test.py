@@ -150,10 +150,11 @@ def format_equivariance_error(errors: dict) -> str:
         A string.
     """
     return "; ".join(
-        "(parity_k={:d}, did_translate={}) -> error={:.3e}".format(
+        "(parity_k={:d}, did_translate={}) -> max error={:.3e} in argument {}".format(
             int(k[0]),
             bool(k[1]),
-            float(v)
+            float(v.max()),
+            int(v.argmax())
         )
         for k, v in errors.items()
     )
@@ -215,7 +216,7 @@ def assert_equivariant(
     if tolerance is None:
         tolerance = FLOAT_TOLERANCE[torch.get_default_dtype()]
 
-    problems = {case: err for case, err in errors.items() if err > tolerance}
+    problems = {case: err for case, err in errors.items() if err.max() > tolerance}
 
     if len(problems) != 0:
         errstr = "Largest componentwise equivariance error was too large for: "
@@ -257,7 +258,8 @@ def equivariance_error(
 
     Returns
     -------
-    dictionary mapping tuples ``(parity_k, did_translate)`` to errors
+    dictionary mapping tuples ``(parity_k, did_translate)`` to an array of errors,
+    each entry the biggest over all trials for that output, in order.
     """
     irreps_in, irreps_out = _get_io_irreps(func, irreps_in=irreps_in, irreps_out=irreps_out)
 
@@ -274,10 +276,14 @@ def equivariance_error(
     else:
         do_translation = [False]
 
-    tests = itertools.product(parity_ks, do_translation)
+    tests = list(itertools.product(parity_ks, do_translation))
 
     neg_inf = -float("Inf")
-    biggest_errs = {}
+    dtype, device = next((t.dtype, t.device) for t in args_in if isinstance(t, torch.Tensor))
+    biggest_errs = {
+        test: torch.full((len(irreps_out),), neg_inf, dtype=dtype, device=device)
+        for test in tests
+    }
 
     for trial in range(ntrials):
         for this_test in tests:
@@ -314,13 +320,12 @@ def equivariance_error(
             # apply the group action to x2
             x2 = _transform(x2, irreps_out, rot_mat, translation)
 
-            error = max(
+            errors = torch.stack([
                 (a - b).abs().max()
                 for a, b in zip(x1, x2)
-            )
+            ])
 
-            if error > biggest_errs.get(this_test, neg_inf):
-                biggest_errs[this_test] = error
+            biggest_errs[this_test] = torch.where(errors > biggest_errs[this_test], errors, biggest_errs[this_test])
 
     return biggest_errs
 
