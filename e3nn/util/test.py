@@ -149,7 +149,7 @@ def format_equivariance_error(errors: dict) -> str:
     -------
         A string.
     """
-    return "; ".join(
+    return "\n".join(
         "(parity_k={:d}, did_translate={}) -> max error={:.3e} in argument {}".format(
             int(k[0]),
             bool(k[1]),
@@ -207,7 +207,7 @@ def assert_equivariant(
     )
 
     logger.info(
-        "Tested equivariance of `%s` -- max componentwise errors: %s",
+        "Tested equivariance of `%s` -- max componentwise errors:\n%s",
         _logging_name(func),
         format_equivariance_error(errors),
     )
@@ -233,7 +233,8 @@ def equivariance_error(
     irreps_out=None,
     ntrials=1,
     do_parity=True,
-    do_translation=True
+    do_translation=True,
+    transform_dtype=torch.float64
 ):
     r"""Get the maximum equivariance error for ``func`` over ``ntrials``
 
@@ -289,7 +290,7 @@ def equivariance_error(
         for this_test in tests:
             parity_k, this_do_translate = this_test
             # Build a rotation matrix for point data
-            rot_mat = o3.rand_matrix()
+            rot_mat = o3.rand_matrix(dtype=transform_dtype)
             # add parity
             rot_mat *= (-1)**parity_k
             # build translation
