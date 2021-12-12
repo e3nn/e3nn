@@ -7,15 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Remove `CartesianTensor._rtp`. Instead recompute the `ReducedTensorProduct` everytime. The user can save the `ReducedTensorProduct` to avoid creating it each time.
+
 ### Added
 - Created module for reflected imports allowing for nice syntax for creating `irreps`, e.g. `from e3nn.o3.irreps import l3o # same as Irreps("o3")`
 - Add `uvu<v` mode for `TensorProduct`. Compute only the upper triangular part of the `uv` terms.
 - `TensorSquare`. computes `x \otimes x` and decompose it.
 - `*equivariance_error` now tell you which arguments had which error
+
 ### Changed
 - Give up the support of python 3.6, set `python_requires='>=3.7'` in setup
 - Optimize a little bit `ReducedTensorProduct`: solve linear system only once per irrep instead of 2L+1 times.
 - Do not scale line width by `path_weight` in `TensorProduct.visualize`
+- `*equivariance_error` now transforms its inputs in float64 by default, regardless of the dtype used for the calculation itself
 
 ## [0.4.3] - 2021-11-18
 ### Fixed
