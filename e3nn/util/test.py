@@ -280,9 +280,9 @@ def equivariance_error(
     tests = list(itertools.product(parity_ks, do_translation))
 
     neg_inf = -float("Inf")
-    dtype, device = next((t.dtype, t.device) for t in args_in if isinstance(t, torch.Tensor))
+    device = next(t.device for t in args_in if isinstance(t, torch.Tensor))
     biggest_errs = {
-        test: torch.full((len(irreps_out),), neg_inf, dtype=dtype, device=device)
+        test: torch.full((len(irreps_out),), neg_inf, dtype=transform_dtype, device=device)
         for test in tests
     }
 
@@ -299,28 +299,36 @@ def equivariance_error(
             # Evaluate the function on rotated arguments:
             rot_args = _transform(args_in, irreps_in, rot_mat, translation)
             x1 = func(*rot_args)
+            if isinstance(x1, torch.Tensor):
+                x1 = [x1]
+            elif isinstance(x1, (list, tuple)):
+                x1 = list(x1)
+            else:
+                raise TypeError(f"equivariance_error cannot handle output type {type(x1)}")
+            # if `func` was a model, the outputs might be attached in the autograd graph
+            # convert into the transform dtype for computing the difference
+            x1 = [t.detach().to(transform_dtype) for t in x1]
 
             # Evaluate the function on the arguments, then apply group action:
             x2 = func(*args_in)
-
-            # Deal with output shapes
-            assert type(x1) == type(x2), f"Inconsistant return types {type(x1)} and {type(x2)}"  # pylint: disable=unidiomatic-typecheck
-            if isinstance(x1, torch.Tensor):
-                # Make sequences
-                x1 = [x1]
+            if isinstance(x2, torch.Tensor):
                 x2 = [x2]
-            elif isinstance(x1, (list, tuple)):
-                # They're already tuples
-                x1 = list(x1)
+            elif isinstance(x2, (list, tuple)):
                 x2 = list(x2)
             else:
-                raise TypeError(f"equivariance_error cannot handle output type {type(x1)}")
+                raise TypeError(f"equivariance_error cannot handle output type {type(x2)}")
+            x2 = [t.detach() for t in x2]
+
+            # confirm sanity
             assert len(x1) == len(x2)
             assert len(x1) == len(irreps_out)
 
             # apply the group action to x2
-            x2 = _transform(x2, irreps_out, rot_mat, translation)
+            # get this in the transform dtype
+            x2 = _transform(x2, irreps_out, rot_mat, translation, output_transform_dtype=True)
 
+            # compute errors in the transform dtype,
+            # then convert back to default later
             errors = torch.stack([
                 (a - b).abs().max()
                 for a, b in zip(x1, x2)
@@ -328,7 +336,10 @@ def equivariance_error(
 
             biggest_errs[this_test] = torch.where(errors > biggest_errs[this_test], errors, biggest_errs[this_test])
 
-    return biggest_errs
+    # convert errors back to default dtype to return:
+    return {
+        k: v.to(torch.get_default_dtype()) for k, v in biggest_errs.items()
+    }
 
 
 # TODO: this is only for things marked with @compile_mode.
