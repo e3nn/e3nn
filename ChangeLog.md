@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Remove `CartesianTensor._rtp`. Instead recompute the `ReducedTensorProduct` everytime. The user can save the `ReducedTensorProduct` to avoid creating it each time.
 - `*equivariance_error` no longer keeps around unneeded autograd graphs
+- `CartesianTensor` builds `ReducedTensorProduct` with correct device/dtype when called without one
 
 ### Added
 - Created module for reflected imports allowing for nice syntax for creating `irreps`, e.g. `from e3nn.o3.irreps import l3o # same as Irreps("o3")`
