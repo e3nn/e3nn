@@ -5,12 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.4] - 2021-12-15
 ### Fixed
 - Remove `CartesianTensor._rtp`. Instead recompute the `ReducedTensorProduct` everytime. The user can save the `ReducedTensorProduct` to avoid creating it each time.
 ### Added
 - Created module for reflected imports allowing for nice syntax for creating `irreps`, e.g. `from e3nn.o3.irreps import l3o # same as Irreps("o3")`
 - Add `uvu<v` mode for `TensorProduct`. Compute only the upper triangular part of the `uv` terms.
-- `TensorSquare`. computes `x \otimes x` and decompose it.
+- (beta) `TensorSquare`. computes `x \otimes x` and decompose it.
 ### Changed
 - Give up the support of python 3.6, set `python_requires='>=3.7'` in setup
 - Optimize a little bit `ReducedTensorProduct`: solve linear system only once per irrep instead of 2L+1 times.

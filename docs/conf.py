@@ -22,7 +22,7 @@ copyright = '2020, e3nn Developers'
 author = 'e3nn Developers'
 
 # The full version, including alpha/beta/rc tags
-release = '0.4.3'
+release = '0.4.4'
 
 # -- General configuration ---------------------------------------------------
 
