@@ -8,18 +8,32 @@ import torch
 from e3nn.o3 import Irreps
 
 
-def _transform(dat, irreps_dat, rot_mat, translation=0.):
+def _transform(dat, irreps_dat, rot_mat, translation=0.0, output_transform_dtype: bool = False):
     """Transform ``dat`` by ``rot_mat`` and ``translation`` according to ``irreps_dat``."""
     out = []
+    transform_dtype = rot_mat.dtype
+    translation = torch.as_tensor(translation, dtype=transform_dtype)
     for irreps, a in zip(irreps_dat, dat):
+        if output_transform_dtype:
+            out_dtype = transform_dtype
+        else:
+            out_dtype = a.dtype
         if irreps is None:
-            out.append(a)
+            out.append(a.clone())
         elif irreps == 'cartesian_points':
             translation = torch.as_tensor(translation, device=a.device)
-            out.append((a @ rot_mat.T.to(a.device)) + translation)
+            out.append(
+                (
+                    (a.to(transform_dtype) @ rot_mat.T.to(a.device)) + translation
+                ).to(out_dtype)
+            )
         else:
             # For o3.Irreps
-            out.append(a @ irreps.D_from_matrix(rot_mat).T.to(a.device))
+            out.append(
+                (
+                    a.to(transform_dtype) @ irreps.D_from_matrix(rot_mat).T.to(a.device)
+                ).to(out_dtype)
+            )
     return out
 
 
