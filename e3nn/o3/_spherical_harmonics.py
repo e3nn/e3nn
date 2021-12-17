@@ -194,7 +194,7 @@ def _generate_spherical_harmonics(lmax, normalization, device=None):  # pragma: 
 
     x, y, z = sympy.symbols('x y z')
     polynomials = [x, y, z]
-    polynormz = [0, 1, 0]
+    polynormz = [0, 0, 1]
 
     for l in range(1, lmax+1):
         names = sympy.symbols(" ".join(f'sh_{l}_{m}' for m in range(2 * l + 1)))
