@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from math import sqrt
-from typing import List, Tuple
+from typing import List
 
 import torch
 from e3nn import o3
@@ -28,7 +28,7 @@ def codegen_tensor_product_left_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[fx.GraphModule, fx.GraphModule]:
+) -> fx.GraphModule:
     graph = fx.Graph()
 
     # = Function definitions =
@@ -374,7 +374,7 @@ def codegen_tensor_product_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> Tuple[fx.GraphModule, fx.GraphModule]:
+) -> fx.GraphModule:
     graph = fx.Graph()
 
     # = Function definitions =
