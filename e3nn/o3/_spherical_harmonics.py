@@ -188,7 +188,7 @@ def _generate_spherical_harmonics(lmax, normalization, device=None):  # pragma: 
     if lmax == 0:
         # for the short circut, normalize:
         if normalization == "integral":
-            # norm and component are same for l=0
+            # norm and component are same and trivial for l=0
             outlines.append(f"sh_0_0 = {1.0 / math.sqrt(4 * math.pi)} * sh_0_0")
         outlines.append("return sh_0_0.unsqueeze(-1)")
 
