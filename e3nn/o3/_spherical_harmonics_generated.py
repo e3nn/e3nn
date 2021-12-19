@@ -5,7 +5,7 @@ import torch
 @torch.jit.script
 def _sph_lmax_0_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_0_0 = sqrt(1) / sqrt(4*pi) * sh_0_0
     return torch.stack([
@@ -16,7 +16,7 @@ def _sph_lmax_0_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_1_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -34,7 +34,7 @@ def _sph_lmax_1_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_2_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -63,7 +63,7 @@ def _sph_lmax_2_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_3_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -107,7 +107,7 @@ def _sph_lmax_3_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_4_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -170,7 +170,7 @@ def _sph_lmax_4_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_5_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -256,7 +256,7 @@ def _sph_lmax_5_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_6_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -369,7 +369,7 @@ def _sph_lmax_6_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_7_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -513,7 +513,7 @@ def _sph_lmax_7_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_8_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -692,7 +692,7 @@ def _sph_lmax_8_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_9_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -910,7 +910,7 @@ def _sph_lmax_9_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> t
 @torch.jit.script
 def _sph_lmax_10_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1171,7 +1171,7 @@ def _sph_lmax_10_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_11_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1479,7 +1479,7 @@ def _sph_lmax_11_integral(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_0_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     return torch.stack([
         sh_0_0
@@ -1489,7 +1489,7 @@ def _sph_lmax_0_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_1_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1506,7 +1506,7 @@ def _sph_lmax_1_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_2_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1534,7 +1534,7 @@ def _sph_lmax_2_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_3_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1577,7 +1577,7 @@ def _sph_lmax_3_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_4_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1639,7 +1639,7 @@ def _sph_lmax_4_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_5_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1724,7 +1724,7 @@ def _sph_lmax_5_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_6_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1836,7 +1836,7 @@ def _sph_lmax_6_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_7_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -1979,7 +1979,7 @@ def _sph_lmax_7_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_8_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -2157,7 +2157,7 @@ def _sph_lmax_8_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_9_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -2374,7 +2374,7 @@ def _sph_lmax_9_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> 
 @torch.jit.script
 def _sph_lmax_10_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -2634,7 +2634,7 @@ def _sph_lmax_10_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) ->
 @torch.jit.script
 def _sph_lmax_11_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -2941,7 +2941,7 @@ def _sph_lmax_11_component(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) ->
 @torch.jit.script
 def _sph_lmax_0_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     return torch.stack([
         sh_0_0
@@ -2951,7 +2951,7 @@ def _sph_lmax_0_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_1_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -2965,7 +2965,7 @@ def _sph_lmax_1_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_2_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -2985,7 +2985,7 @@ def _sph_lmax_2_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_3_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3013,7 +3013,7 @@ def _sph_lmax_3_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_4_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3051,7 +3051,7 @@ def _sph_lmax_4_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_5_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3101,7 +3101,7 @@ def _sph_lmax_5_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_6_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3165,7 +3165,7 @@ def _sph_lmax_6_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_7_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3245,7 +3245,7 @@ def _sph_lmax_7_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_8_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3343,7 +3343,7 @@ def _sph_lmax_8_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_9_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3461,7 +3461,7 @@ def _sph_lmax_9_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch
 @torch.jit.script
 def _sph_lmax_10_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
@@ -3601,7 +3601,7 @@ def _sph_lmax_10_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torc
 @torch.jit.script
 def _sph_lmax_11_norm(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sqrt = torch.sqrt
-    pi = torch.pi
+    pi = 3.141592653589793
     sh_0_0 = torch.ones_like(x)
     sh_1_0 = x
     sh_1_1 = y
