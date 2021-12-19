@@ -182,7 +182,7 @@ def _generate_spherical_harmonics(lmax, normalization, device=None):  # pragma: 
         f"def _sph_lmax_{lmax}_{normalization}(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:"
     ]
     outlines.append("sqrt = torch.sqrt")
-    outlines.append("pi = torch.pi")
+    outlines.append("pi = 3.141592653589793")
     outlines.append("sh_0_0 = torch.ones_like(x)")
 
     x, y, z = sympy.symbols('x y z')
