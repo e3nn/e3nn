@@ -1,8 +1,37 @@
 from typing import Optional
+from threading import local
+from collections import defaultdict
 
 import torch
 
 from e3nn import o3
+
+
+# CartesianTensor shouldn't carry a torch.nn.Module child
+# but we don't want to rebuild the RTP every call
+# cache it here in thread local storage (to avoid
+# possibility of weird threading bugs)
+_RTP_CACHE = local()
+_RTP_CACHE.cache = defaultdict(dict)  # Dict[formula, Dict[(device, dtype), ReducedTensorProducts]]
+_RTP_CACHE.refcount = defaultdict(lambda: 0)  # Dict[formula, int]
+
+
+def _make_rtp(formula: str, indices: str, device, dtype) -> o3.ReducedTensorProducts:
+    device = torch.device(device)
+    key = (device, dtype)
+    # TODO: this can be done a little more intellegently by deepcopying
+    # an existing RTP for the given formula, and moving it to device and dtype
+    # For standard workflows, however, this should only happen twice anyway
+    # and it shouldn't be a big deal.
+    # This way we at least avoid constant CPU-GPU traffic if a formula is used
+    # on both CPU and GPU.
+    if key in _RTP_CACHE.cache.get(formula, {}):
+        return _RTP_CACHE.cache[formula][key]
+    else:
+        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
+        rtp = rtp.to(device=device, dtype=dtype)
+        _RTP_CACHE.cache[formula][key] = rtp
+        return rtp
 
 
 class CartesianTensor(o3.Irreps):
@@ -45,11 +74,27 @@ class CartesianTensor(o3.Irreps):
         formula,
     ):
         indices = formula.split("=")[0].replace("-", "")
-        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
+        rtp = _make_rtp(formula=formula, indices=indices, device="cpu", dtype=torch.get_default_dtype())
+        _RTP_CACHE.refcount[formula] += 1
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
         ret.indices = indices
         return ret
+
+    def __del__(self):
+        # be polite and clean up cached RTPs if no current tensors
+        # with given formula
+        _RTP_CACHE.refcount[self.formula] -= 1
+        if _RTP_CACHE.refcount[self.formula] <= 0:
+            _RTP_CACHE.refcount[self.formula] = 0
+            # rather than del in case of some weird case meaning its not there
+            _RTP_CACHE.cache.pop(self.formula, None)
+
+    @staticmethod
+    def reset_rtp_cache():
+        """Empty the CartesianTensor ReducedTensorProduct cache"""
+        _RTP_CACHE.refcount.clear()
+        _RTP_CACHE.cache.clear()
 
     def from_cartesian(self, data, rtp=None):
         r"""convert cartesian tensor into irreps
@@ -115,15 +160,30 @@ class CartesianTensor(o3.Irreps):
 
         return cartesian_tensor
 
-    def reduced_tensor_products(self, data: Optional[torch.Tensor] = None) -> o3.ReducedTensorProducts:
-        r"""reduced tensor products
+    def reduced_tensor_products(self, data: Optional[torch.Tensor] = None, device=None, dtype=None) -> o3.ReducedTensorProducts:
+        r"""Get the reduced tensor products for this ``CartesianTensor``.
+
+        Looks for a caches RTP and creates it if one does not exist.
+
+        Parameters
+        ----------
+        data : `torch.Tensor`
+            an example tensor from which to take the device and dtype for the RTP
+        device : `torch.device`
+            the device for the RTP
+        dtype : `torch.dtype`
+            the dtype for the RTP
 
         Returns
         -------
         `e3nn.ReducedTensorProducts`
             reduced tensor products
         """
-        rtp = o3.ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
         if data is not None:
-            rtp = rtp.to(device=data.device, dtype=data.dtype)
-        return rtp
+            assert device is None and dtype is None
+            device = data.device
+            dtype = data.dtype
+        else:
+            device = "cpu"
+            dtype = torch.get_default_dtype()
+        return _make_rtp(formula=self.formula, indices=self.indices, device=device, dtype=dtype)
