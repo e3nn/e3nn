@@ -120,22 +120,25 @@ def wigner_3j(l1, l2, l3, flat_src=_W3j_flat, dtype=None, device=None):
 
     try:
         if l1 <= l2 <= l3:
-            out = flat_src[_W3j_indices[(l1, l2, l3)]].reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1).clone()
+            out = flat_src[_W3j_indices[(l1, l2, l3)]].reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
         if l1 <= l3 <= l2:
-            out = flat_src[_W3j_indices[(l1, l3, l2)]].reshape(2 * l1 + 1, 2 * l3 + 1, 2 * l2 + 1).transpose(1, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = flat_src[_W3j_indices[(l1, l3, l2)]].reshape(2 * l1 + 1, 2 * l3 + 1, 2 * l2 + 1).transpose(1, 2).mul((-1) ** (l1 + l2 + l3))
         if l2 <= l1 <= l3:
-            out = flat_src[_W3j_indices[(l2, l1, l3)]].reshape(2 * l2 + 1, 2 * l1 + 1, 2 * l3 + 1).transpose(0, 1).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = flat_src[_W3j_indices[(l2, l1, l3)]].reshape(2 * l2 + 1, 2 * l1 + 1, 2 * l3 + 1).transpose(0, 1).mul((-1) ** (l1 + l2 + l3))
         if l3 <= l2 <= l1:
-            out = flat_src[_W3j_indices[(l3, l2, l1)]].reshape(2 * l3 + 1, 2 * l2 + 1, 2 * l1 + 1).transpose(0, 2).mul((-1) ** (l1 + l2 + l3)).clone()
+            out = flat_src[_W3j_indices[(l3, l2, l1)]].reshape(2 * l3 + 1, 2 * l2 + 1, 2 * l1 + 1).transpose(0, 2).mul((-1) ** (l1 + l2 + l3))
         if l2 <= l3 <= l1:
-            out = flat_src[_W3j_indices[(l2, l3, l1)]].reshape(2 * l2 + 1, 2 * l3 + 1, 2 * l1 + 1).transpose(0, 2).transpose(1, 2).clone()
+            out = flat_src[_W3j_indices[(l2, l3, l1)]].reshape(2 * l2 + 1, 2 * l3 + 1, 2 * l1 + 1).transpose(0, 2).transpose(1, 2)
         if l3 <= l1 <= l2:
-            out = flat_src[_W3j_indices[(l3, l1, l2)]].reshape(2 * l3 + 1, 2 * l1 + 1, 2 * l2 + 1).transpose(0, 2).transpose(0, 1).clone()
+            out = flat_src[_W3j_indices[(l3, l1, l2)]].reshape(2 * l3 + 1, 2 * l1 + 1, 2 * l2 + 1).transpose(0, 2).transpose(0, 1)
     except KeyError:
         raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j_indices.keys())[0]}, send us an email to ask for more')
 
     dtype, device = explicit_default_types(dtype, device)
-    return out.to(dtype=dtype, device=device)
+    # make sure we always get:
+    # 1. a copy so mutation doesn't ruin the stored tensors
+    # 2. a contiguous tensor, regardless of what transpositions happened above
+    return out.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
 
 
 def _generate_wigner_3j(l1, l2, l3, dtype=None, device=None):  # pragma: no cover
