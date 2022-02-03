@@ -24,19 +24,21 @@ def _make_rtp(formula: str, indices: str, device, dtype) -> o3.ReducedTensorProd
     if key in _RTP_CACHE.cache:
         return _RTP_CACHE.cache[key]
 
-    base_key = (formula, torch.device('cpu'), torch.get_default_dtype())
+    base_key = (formula, torch.device('cpu'), torch.float64)
 
     if key == base_key:
         # create a new RTP
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
+        # TODO: the following line might convert float32 into float64 and therefore lose precision
+        rtp = rtp.to(dtype=torch.float64)
     else:
         # get the base RTP
-        rtp = _make_rtp(formula, indices, "cpu", torch.get_default_dtype())
+        rtp = _make_rtp(formula, indices, "cpu", torch.float64)
         # copy and move the build RTP to device/dtype
         rtp = copy.deepcopy(rtp)
         rtp = rtp.to(device=device, dtype=dtype)
 
-    # cache it (it can't have been in the cache already if we made it past the L28 return)
+    # cache it (it can't have been in the cache already if we made it past the first return)
     _RTP_CACHE.cache[key] = rtp
     return rtp
 
