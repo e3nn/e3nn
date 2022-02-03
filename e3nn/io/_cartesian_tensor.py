@@ -13,34 +13,31 @@ from e3nn import o3
 # cache it here in thread local storage (to avoid
 # possibility of weird threading bugs)
 _RTP_CACHE = local()
-_RTP_CACHE.cache = defaultdict(dict)  # Dict[formula, Dict[(device, dtype), ReducedTensorProducts]]
+_RTP_CACHE.cache = dict()  # Dict[(formula, device, dtype), ReducedTensorProducts]
 _RTP_CACHE.refcount = defaultdict(lambda: 0)  # Dict[formula, int]
 
 
 def _make_rtp(formula: str, indices: str, device, dtype) -> o3.ReducedTensorProducts:
     device = torch.device(device)
-    key = (device, dtype)
-    rtp = None
-    if formula in _RTP_CACHE.cache:
-        cache = _RTP_CACHE.cache[formula]
-        if key in cache:
-            # we have one on the right device and dtype
-            return cache[key]
-        # the key for a basic RTP we could copy to request device/dtype
-        base_key = ("cpu", torch.get_default_dtype())
-        if base_key in cache:
-            # if we have a sane default one in the cache,
-            # copy it and move it to the request device/dtype
-            # this saves the expensive compilation
-            rtp = copy.deepcopy(cache[base_key])
+    key = (formula, device, dtype)
 
-    # Finally, if cache gets failed, just build and cache it:
-    if rtp is None:
+    if key in _RTP_CACHE.cache:
+        return _RTP_CACHE.cache[key]
+
+    base_key = (formula, torch.device('cpu'), torch.get_default_dtype())
+
+    if key == base_key:
+        # create a new RTP
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
-    # move the build RTP (or copied base one) to device/dtype
-    rtp = rtp.to(device=device, dtype=dtype)
+    else:
+        # get the base RTP
+        rtp = _make_rtp(formula, indices, "cpu", torch.get_default_dtype())
+        # copy and move the build RTP to device/dtype
+        rtp = copy.deepcopy(rtp)
+        rtp = rtp.to(device=device, dtype=dtype)
+
     # cache it (it can't have been in the cache already if we made it past the L28 return)
-    _RTP_CACHE.cache[formula][key] = rtp
+    _RTP_CACHE.cache[key] = rtp
     return rtp
 
 
@@ -97,8 +94,10 @@ class CartesianTensor(o3.Irreps):
         _RTP_CACHE.refcount[self.formula] -= 1
         if _RTP_CACHE.refcount[self.formula] <= 0:
             _RTP_CACHE.refcount[self.formula] = 0
-            # rather than del in case of some weird case meaning its not there
-            _RTP_CACHE.cache.pop(self.formula, None)
+            for formula, device, dtype in list(_RTP_CACHE.cache):
+                if formula == self.formula:
+                    # rather than del in case of some weird case meaning its not there
+                    del _RTP_CACHE.cache[(formula, device, dtype)]
 
     @staticmethod
     def reset_rtp_cache():
