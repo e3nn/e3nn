@@ -1,6 +1,7 @@
 from typing import Optional
 from threading import local
 from collections import defaultdict
+import copy
 
 import torch
 
@@ -19,19 +20,28 @@ _RTP_CACHE.refcount = defaultdict(lambda: 0)  # Dict[formula, int]
 def _make_rtp(formula: str, indices: str, device, dtype) -> o3.ReducedTensorProducts:
     device = torch.device(device)
     key = (device, dtype)
-    # TODO: this can be done a little more intellegently by deepcopying
-    # an existing RTP for the given formula, and moving it to device and dtype
-    # For standard workflows, however, this should only happen twice anyway
-    # and it shouldn't be a big deal.
-    # This way we at least avoid constant CPU-GPU traffic if a formula is used
-    # on both CPU and GPU.
-    if key in _RTP_CACHE.cache.get(formula, {}):
-        return _RTP_CACHE.cache[formula][key]
-    else:
+    rtp = None
+    if formula in _RTP_CACHE.cache:
+        cache = _RTP_CACHE.cache[formula]
+        if key in cache:
+            # we have one on the right device and dtype
+            return cache[key]
+        # the key for a basic RTP we could copy to request device/dtype
+        base_key = ("cpu", torch.get_default_dtype())
+        if base_key in cache:
+            # if we have a sane default one in the cache,
+            # copy it and move it to the request device/dtype
+            # this saves the expensive compilation
+            rtp = copy.deepcopy(cache[base_key])
+
+    # Finally, if cache gets failed, just build and cache it:
+    if rtp is None:
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
-        rtp = rtp.to(device=device, dtype=dtype)
-        _RTP_CACHE.cache[formula][key] = rtp
-        return rtp
+    # move the build RTP (or copied base one) to device/dtype
+    rtp = rtp.to(device=device, dtype=dtype)
+    # cache it (it can't have been in the cache already if we made it past the L28 return)
+    _RTP_CACHE.cache[formula][key] = rtp
+    return rtp
 
 
 class CartesianTensor(o3.Irreps):
