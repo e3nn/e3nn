@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - `CartesianTensor` now caches its `ReducedTensorProduct`s rather than recreating it each call
+- Added optional `dtype` argument to `TensorProduct` and `ReducedTensorProduct`
 
 ### Fixed
 - `wigner_3j`  now _always_ returns a contiguous copy regardless of dtype or device

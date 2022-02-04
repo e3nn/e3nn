@@ -28,9 +28,7 @@ def _make_rtp(formula: str, indices: str, device, dtype) -> o3.ReducedTensorProd
 
     if key == base_key:
         # create a new RTP
-        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
-        # TODO: the following line might convert float32 into float64 and therefore lose precision
-        rtp = rtp.to(dtype=torch.float64)
+        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices}, dtype=torch.float64)
     else:
         # get the base RTP
         rtp = _make_rtp(formula, indices, "cpu", torch.float64)

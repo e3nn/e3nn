@@ -28,6 +28,7 @@ def codegen_tensor_product_left_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
+    dtype: torch.dtype = None,
 ) -> fx.GraphModule:
     graph = fx.Graph()
 
@@ -295,7 +296,7 @@ def codegen_tensor_product_left_right(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l, dtype=dtype)
 
     # = Return the result =
     outputs = [
@@ -374,6 +375,7 @@ def codegen_tensor_product_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
+    dtype: torch.dtype = None,
 ) -> fx.GraphModule:
     graph = fx.Graph()
 
@@ -582,7 +584,7 @@ def codegen_tensor_product_right(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l, dtype=dtype)
 
     # = Return the result =
     outputs = [
