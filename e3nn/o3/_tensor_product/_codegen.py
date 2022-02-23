@@ -28,6 +28,7 @@ def codegen_tensor_product_left_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
+    dtype: torch.dtype = None,
 ) -> fx.GraphModule:
     graph = fx.Graph()
 
@@ -295,7 +296,7 @@ def codegen_tensor_product_left_right(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l, dtype=dtype)
 
     # = Return the result =
     outputs = [
@@ -354,11 +355,12 @@ def codegen_tensor_product_left_right(
         # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
         batchdim = 4
         example_inputs = (
-            torch.zeros((batchdim, irreps_in1.dim)),
-            torch.zeros((batchdim, irreps_in2.dim)),
+            torch.zeros((batchdim, irreps_in1.dim), dtype=dtype),
+            torch.zeros((batchdim, irreps_in2.dim), dtype=dtype),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 flat_weight_index,
+                dtype=dtype
             ),
         )
         graphmod = optimize_einsums_full(graphmod, example_inputs)
@@ -374,6 +376,7 @@ def codegen_tensor_product_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
+    dtype: torch.dtype = None,
 ) -> fx.GraphModule:
     graph = fx.Graph()
 
@@ -582,7 +585,7 @@ def codegen_tensor_product_right(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l, dtype=dtype)
 
     # = Return the result =
     outputs = [
@@ -640,15 +643,14 @@ def codegen_tensor_product_right(
         # TODO: consider the impact maximum intermediate result size on this logic
         #         \- this is the `memory_limit` option in opt_einsum
         # TODO: allow user to choose opt_einsum parameters?
-        #
-        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
         batchdim = 4
         example_inputs = (
-            torch.zeros((batchdim, irreps_in1.dim)),
-            torch.zeros((batchdim, irreps_in2.dim)),
+            torch.zeros((batchdim, irreps_in1.dim), dtype=dtype),
+            torch.zeros((batchdim, irreps_in2.dim), dtype=dtype),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 flat_weight_index,
+                dtype=dtype
             ),
         )
         graphmod = optimize_einsums_full(graphmod, example_inputs[1:])

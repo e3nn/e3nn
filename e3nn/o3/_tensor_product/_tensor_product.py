@@ -204,6 +204,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         compile_left_right: bool = True,
         compile_right: bool = False,
         normalization=None,  # for backward compatibility
+        dtype: Optional[torch.dtype] = None,
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None
     ):
@@ -356,7 +357,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     self.instructions,
                     self.shared_weights,
                     self._specialized_code,
-                    self._optimize_einsums
+                    self._optimize_einsums,
+                    dtype,
                 )
                 if graphmod_left_right is not None:
                     break
@@ -381,7 +383,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     self.instructions,
                     self.shared_weights,
                     self._specialized_code,
-                    self._optimize_einsums
+                    self._optimize_einsums,
+                    dtype,
                 )
                 if graphmod_right is not None:
                     break
@@ -406,23 +409,23 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         if internal_weights and self.weight_numel > 0:
             assert self.shared_weights, "Having internal weights impose shared weights"
-            self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
+            self.weight = torch.nn.Parameter(torch.randn(self.weight_numel, dtype=dtype))
         else:
             # For TorchScript, there always has to be some kind of defined .weight
-            self.register_buffer('weight', torch.Tensor())
+            self.register_buffer('weight', torch.ones(0, dtype=dtype))
 
         if self.irreps_out.dim > 0:
             output_mask = torch.cat([
-                torch.ones(mul * ir.dim)
+                torch.ones(mul * ir.dim, dtype=dtype)
                 if any(
                     (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
                     for ins in self.instructions
                 )
-                else torch.zeros(mul * ir.dim)
+                else torch.zeros(mul * ir.dim, dtype=dtype)
                 for i_out, (mul, ir) in enumerate(self.irreps_out)
             ])
         else:
-            output_mask = torch.ones(0)
+            output_mask = torch.ones(0, dtype=dtype)
         self.register_buffer('output_mask', output_mask)
 
         # For TorchScript, this needs to be done in advance:

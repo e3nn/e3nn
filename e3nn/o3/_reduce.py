@@ -128,7 +128,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
     """
     # pylint: disable=abstract-method
 
-    def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, **irreps):
+    def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, dtype=None, **irreps):
         super().__init__()
 
         if filter_ir_out is not None:
@@ -229,7 +229,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
                 change_of_basis.append(C)
                 irreps_out.append((1, ir))
 
-        dtype, _ = explicit_default_types(None, None)
+        dtype, _ = explicit_default_types(dtype, None)
         self.register_buffer('change_of_basis', torch.cat(change_of_basis).to(dtype=dtype))
 
         tps = set()
@@ -242,7 +242,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         tps = list(tps)
         for i, op in enumerate(tps):
-            tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
+            tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)], dtype=dtype)
             setattr(root, f'tp{i}', tp)
 
         graph = fx.Graph()
