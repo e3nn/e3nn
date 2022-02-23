@@ -1,4 +1,4 @@
-from typing import Optional, NamedTuple
+from typing import Optional
 from threading import local
 import weakref
 import copy
@@ -12,14 +12,15 @@ from e3nn import o3
 # but we don't want to rebuild the RTP every call
 # cache it here in thread local storage (to avoid
 # possibility of weird threading bugs)
-_RTP_CACHE = weakref.WeakKeyDictionary()  # Dict[_formula, Dict[(device, dtype), ReducedTensorProducts]]
+_RTP_CACHE = local()
+_RTP_CACHE.cache = weakref.WeakKeyDictionary()  # Dict[_formula, Dict[(device, dtype), ReducedTensorProducts]]
 
 
 # need something that gets garbage collected; raw str won't do
 class _formula:
     formula: str
 
-    def __init__(self, formula:str) -> None:
+    def __init__(self, formula: str) -> None:
         super().__init__()
         self.formula = formula
 
@@ -28,7 +29,7 @@ def _make_rtp(formula: str, indices: str, device=torch.device('cpu'), dtype=torc
     base_key = (torch.device('cpu'), torch.float64)
     # build formula as a "singleton"
     formula_obj = None
-    for f in _RTP_CACHE.keys():
+    for f in _RTP_CACHE.cache.keys():
         if f.formula == formula:
             formula_obj = f
             break
@@ -38,11 +39,11 @@ def _make_rtp(formula: str, indices: str, device=torch.device('cpu'), dtype=torc
         # create a new base RTP
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices}, dtype=torch.float64)
         # save it
-        _RTP_CACHE[formula_obj] = {base_key: rtp}
+        _RTP_CACHE.cache[formula_obj] = {base_key: rtp}
     # key for the inner dict
     device = torch.device(device)
     key = (device, dtype)
-    inner_dict = _RTP_CACHE[formula_obj]
+    inner_dict = _RTP_CACHE.cache[formula_obj]
 
     # get cached if we have it
     if key in inner_dict:
@@ -107,7 +108,7 @@ class CartesianTensor(o3.Irreps):
     @staticmethod
     def reset_rtp_cache():
         """Empty the CartesianTensor ReducedTensorProduct cache"""
-        _RTP_CACHE.clear()
+        _RTP_CACHE.cache.clear()
 
     def from_cartesian(self, data):
         r"""convert cartesian tensor into irreps
