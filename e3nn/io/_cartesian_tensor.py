@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, NamedTuple
 from threading import local
-from collections import defaultdict
+import weakref
 import copy
 
 import torch
@@ -12,33 +12,50 @@ from e3nn import o3
 # but we don't want to rebuild the RTP every call
 # cache it here in thread local storage (to avoid
 # possibility of weird threading bugs)
-_RTP_CACHE = local()
-_RTP_CACHE.cache = dict()  # Dict[(formula, device, dtype), ReducedTensorProducts]
-_RTP_CACHE.refcount = defaultdict(lambda: 0)  # Dict[formula, int]
+_RTP_CACHE = weakref.WeakKeyDictionary()  # Dict[_formula, Dict[(device, dtype), ReducedTensorProducts]]
 
 
-def _make_rtp(formula: str, indices: str, device, dtype) -> o3.ReducedTensorProducts:
-    device = torch.device(device)
-    key = (formula, device, dtype)
+# need something that gets garbage collected; raw str won't do
+class _formula:
+    formula: str
 
-    if key in _RTP_CACHE.cache:
-        return _RTP_CACHE.cache[key]
+    def __init__(self, formula:str) -> None:
+        super().__init__()
+        self.formula = formula
 
-    base_key = (formula, torch.device('cpu'), torch.float64)
 
-    if key == base_key:
-        # create a new RTP
+def _make_rtp(formula: str, indices: str, device=torch.device('cpu'), dtype=torch.float64) -> o3.ReducedTensorProducts:
+    base_key = (torch.device('cpu'), torch.float64)
+    # build formula as a "singleton"
+    formula_obj = None
+    for f in _RTP_CACHE.keys():
+        if f.formula == formula:
+            formula_obj = f
+            break
+    if formula_obj is None:
+        # make a new one
+        formula_obj = _formula(formula)
+        # create a new base RTP
         rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices}, dtype=torch.float64)
+        # save it
+        _RTP_CACHE[formula_obj] = {base_key: rtp}
+    # key for the inner dict
+    device = torch.device(device)
+    key = (device, dtype)
+    inner_dict = _RTP_CACHE[formula_obj]
+
+    # get cached if we have it
+    if key in inner_dict:
+        return inner_dict[key]
     else:
         # get the base RTP
-        rtp = _make_rtp(formula, indices, "cpu", torch.float64)
+        rtp = inner_dict[base_key]
         # copy and move the build RTP to device/dtype
         rtp = copy.deepcopy(rtp)
         rtp = rtp.to(device=device, dtype=dtype)
-
-    # cache it (it can't have been in the cache already if we made it past the first return)
-    _RTP_CACHE.cache[key] = rtp
-    return rtp
+        # cache it (it can't have been in the cache already if we made it past the first return)
+        inner_dict[key] = rtp
+        return rtp
 
 
 class CartesianTensor(o3.Irreps):
@@ -81,29 +98,16 @@ class CartesianTensor(o3.Irreps):
         formula,
     ):
         indices = formula.split("=")[0].replace("-", "")
-        rtp = _make_rtp(formula=formula, indices=indices, device="cpu", dtype=torch.get_default_dtype())
-        _RTP_CACHE.refcount[formula] += 1
+        rtp = _make_rtp(formula=formula, indices=indices)
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
         ret.indices = indices
         return ret
 
-    def __del__(self):
-        # be polite and clean up cached RTPs if no current tensors
-        # with given formula
-        _RTP_CACHE.refcount[self.formula] -= 1
-        if _RTP_CACHE.refcount[self.formula] <= 0:
-            _RTP_CACHE.refcount[self.formula] = 0
-            for formula, device, dtype in list(_RTP_CACHE.cache):
-                if formula == self.formula:
-                    # rather than del in case of some weird case meaning its not there
-                    del _RTP_CACHE.cache[(formula, device, dtype)]
-
     @staticmethod
     def reset_rtp_cache():
         """Empty the CartesianTensor ReducedTensorProduct cache"""
-        _RTP_CACHE.refcount.clear()
-        _RTP_CACHE.cache.clear()
+        _RTP_CACHE.clear()
 
     def from_cartesian(self, data):
         r"""convert cartesian tensor into irreps
