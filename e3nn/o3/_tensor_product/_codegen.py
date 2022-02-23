@@ -264,7 +264,7 @@ def codegen_tensor_product_left_right(
             assert mul_ir_in1.mul == mul_ir_in2.mul
             assert mul_ir_in1.mul * (mul_ir_in1.mul - 1) // 2 == mul_ir_out.mul
             name = f"_triu_indices_{mul_ir_in1.mul}"
-            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1, dtype=dtype)
+            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
             xx = xx[:, i[0], i[1]]  # zuvij -> zwij
             if ins.has_weight:
@@ -277,7 +277,7 @@ def codegen_tensor_product_left_right(
             assert mul_ir_in1.mul == mul_ir_in2.mul
             assert ins.has_weight
             name = f"_triu_indices_{mul_ir_in1.mul}"
-            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1, dtype=dtype)
+            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
             xx = xx[:, i[0], i[1]]  # zuvij -> zqij
             # TODO implement specialized code
