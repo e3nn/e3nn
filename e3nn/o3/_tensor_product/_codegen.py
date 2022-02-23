@@ -264,7 +264,7 @@ def codegen_tensor_product_left_right(
             assert mul_ir_in1.mul == mul_ir_in2.mul
             assert mul_ir_in1.mul * (mul_ir_in1.mul - 1) // 2 == mul_ir_out.mul
             name = f"_triu_indices_{mul_ir_in1.mul}"
-            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
+            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1, dtype=dtype)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
             xx = xx[:, i[0], i[1]]  # zuvij -> zwij
             if ins.has_weight:
@@ -277,7 +277,7 @@ def codegen_tensor_product_left_right(
             assert mul_ir_in1.mul == mul_ir_in2.mul
             assert ins.has_weight
             name = f"_triu_indices_{mul_ir_in1.mul}"
-            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
+            constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1, dtype=dtype)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
             xx = xx[:, i[0], i[1]]  # zuvij -> zqij
             # TODO implement specialized code
@@ -355,11 +355,12 @@ def codegen_tensor_product_left_right(
         # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
         batchdim = 4
         example_inputs = (
-            torch.zeros((batchdim, irreps_in1.dim)),
-            torch.zeros((batchdim, irreps_in2.dim)),
+            torch.zeros((batchdim, irreps_in1.dim), dtype=dtype),
+            torch.zeros((batchdim, irreps_in2.dim), dtype=dtype),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 flat_weight_index,
+                dtype=dtype
             ),
         )
         graphmod = optimize_einsums_full(graphmod, example_inputs)
@@ -642,15 +643,14 @@ def codegen_tensor_product_right(
         # TODO: consider the impact maximum intermediate result size on this logic
         #         \- this is the `memory_limit` option in opt_einsum
         # TODO: allow user to choose opt_einsum parameters?
-        #
-        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
         batchdim = 4
         example_inputs = (
-            torch.zeros((batchdim, irreps_in1.dim)),
-            torch.zeros((batchdim, irreps_in2.dim)),
+            torch.zeros((batchdim, irreps_in1.dim), dtype=dtype),
+            torch.zeros((batchdim, irreps_in2.dim), dtype=dtype),
             torch.zeros(
                 1 if shared_weights else batchdim,
                 flat_weight_index,
+                dtype=dtype
             ),
         )
         graphmod = optimize_einsums_full(graphmod, example_inputs[1:])
