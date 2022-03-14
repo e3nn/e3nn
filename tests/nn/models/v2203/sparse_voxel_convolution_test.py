@@ -18,16 +18,18 @@ rotations = [
 
 
 def rotate_sparse_tensor(x, irreps, abc):
-    """representation of a sparse tensor
+    """Perform a rotation of angles abc to a sparse tensor
     """
     from MinkowskiEngine import SparseTensor
 
+    # rotate the coordinates (like vectors l=1)
     coordinates = x.C[:, 1:].to(x.F.dtype)
     coordinates = torch.einsum("ij,bj->bi", Irreps("1e").D_from_angles(*abc), coordinates)
     assert (coordinates - coordinates.round()).abs().max() < 1e-6
     coordinates = coordinates.round().to(torch.int32)
-    coordinates = torch.cat([torch.zeros((coordinates.size(0), 1), dtype=torch.int32), coordinates], dim=1)
+    coordinates = torch.cat([x.C[:, :1], coordinates], dim=1)
 
+    # rotate the features (according to `irreps`)
     features = x.F
     features = torch.einsum("ij,bj->bi", irreps.D_from_angles(*abc), features)
 
