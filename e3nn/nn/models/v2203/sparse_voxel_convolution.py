@@ -4,9 +4,12 @@ import torch
 from e3nn import o3
 from e3nn.math import soft_one_hot_linspace
 from e3nn.o3 import FullyConnectedTensorProduct, Linear
-from MinkowskiEngine import (KernelGenerator, MinkowskiConvolutionFunction,
-                             SparseTensor)
-from MinkowskiEngineBackend._C import ConvolutionMode
+
+try:
+    from MinkowskiEngine import KernelGenerator, MinkowskiConvolutionFunction, SparseTensor
+    from MinkowskiEngineBackend._C import ConvolutionMode
+except ImportError:
+    pass
 
 
 class Convolution(torch.nn.Module):
