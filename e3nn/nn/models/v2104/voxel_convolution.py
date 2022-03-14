@@ -58,7 +58,7 @@ class Convolution(torch.nn.Module):
         s = math.floor(r / steps[2])
         z = torch.arange(-s, s + 1.0) * steps[2]
 
-        lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+        lattice = torch.stack(torch.meshgrid(x, y, z, indexing="ij"), dim=-1)  # [x, y, z, R^3]
         self.register_buffer('lattice', lattice)
 
         if 'padding' not in kwargs:

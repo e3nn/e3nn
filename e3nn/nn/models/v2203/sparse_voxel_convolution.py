@@ -94,7 +94,11 @@ class Convolution(torch.nn.Module):
         weight = self.emb @ self.weight
         weight = weight / (self.sh.shape[0] * self.sh.shape[1] * self.sh.shape[2])
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
-        kernel = kernel.reshape(-1, *kernel.shape[-2:])  # [x*y*z, irreps_in.dim, irreps_out.dim]
+
+        # TODO: understand why this is necessary
+        kernel = torch.einsum('xyzij->zyxij', kernel)  # [z, y, x, irreps_in.dim, irreps_out.dim]
+
+        kernel = kernel.reshape(-1, *kernel.shape[-2:])  # [z * y * x, irreps_in.dim, irreps_out.dim]
         return kernel
 
     def forward(self, x):
