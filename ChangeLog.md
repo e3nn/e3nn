@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Sparse Voxel Convolution
+
+### Changed
+- Since now the code is no more tested against `torch==1.8.0`, only tested against `torch>=1.10.0`
+
 ### Fixed
 - `wigner_3j`  now _always_ returns a contiguous copy regardless of dtype or device
 
