@@ -1,19 +1,20 @@
 import pytest
 import torch
 from e3nn.o3 import Irreps
+import math
 
 rotations = [
     (0.0, 0.0, 0.0),
-    (0.0, 0.0, torch.pi / 2),
-    (0.0, 0.0, torch.pi),
-    (0.0, torch.pi / 2, 0.0),
-    (0.0, torch.pi / 2, torch.pi / 2),
-    (0.0, torch.pi / 2, torch.pi),
-    (0.0, torch.pi, 0.0),
-    (torch.pi / 2, 0.0, 0.0),
-    (torch.pi / 2, 0.0, torch.pi / 2),
-    (torch.pi / 2, 0.0, torch.pi),
-    (torch.pi / 2, torch.pi / 2, 0.0),
+    (0.0, 0.0, math.pi / 2),
+    (0.0, 0.0, math.pi),
+    (0.0, math.pi / 2, 0.0),
+    (0.0, math.pi / 2, math.pi / 2),
+    (0.0, math.pi / 2, math.pi),
+    (0.0, math.pi, 0.0),
+    (math.pi / 2, 0.0, 0.0),
+    (math.pi / 2, 0.0, math.pi / 2),
+    (math.pi / 2, 0.0, math.pi),
+    (math.pi / 2, math.pi / 2, 0.0),
 ]
 
 
