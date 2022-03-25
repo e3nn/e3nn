@@ -85,7 +85,7 @@ As a consequence, the spherical harmonics are equivariant,
     def s2_grid():
         betas = torch.linspace(0, math.pi, 40)
         alphas = torch.linspace(0, 2 * math.pi, 80)
-        beta, alpha = torch.meshgrid(betas, alphas)
+        beta, alpha = torch.meshgrid(betas, alphas, indexing='ij')
         return o3.angles_to_xyz(alpha, beta)
 
     def trace(r, f, c, radial_abs=True):

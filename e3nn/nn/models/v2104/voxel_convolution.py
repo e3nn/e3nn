@@ -133,7 +133,7 @@ class LowPassFilter(torch.nn.Module):
         y = y[y.abs() <= 1]
         z = r * steps[2] / min(steps)
         z = z[z.abs() <= 1]
-        lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+        lattice = torch.stack(torch.meshgrid(x, y, z, indexing='ij'), dim=-1)  # [x, y, z, R^3]
         lattice = (size // 2) * lattice
 
         kernel = torch.exp(-lattice.norm(dim=-1).pow(2) / (2 * sigma**2))
