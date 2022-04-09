@@ -30,7 +30,7 @@ def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tenso
     for m in range(1, l + 1):
         q[l + m, l + abs(m)] = (-1)**m / 2**0.5
         q[l + m, l - abs(m)] = 1j * (-1)**m / 2**0.5
-    q = 1j**l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
+    q = (-1j)**l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
 
     dtype, device = explicit_default_types(dtype, device)
     dtype = {
