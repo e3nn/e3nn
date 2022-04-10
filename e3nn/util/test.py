@@ -400,7 +400,7 @@ def assert_auto_jitable(
                         func_jit(*bad_args)
                     else:
                         getattr(func_jit, method)(*bad_args)
-                except (torch.jit.Error, RuntimeError):
+                except (torch.jit.Error, RuntimeError):  # type: ignore
                     # As far as I can tell, there's no good way to introspect TorchScript exceptions.
                     pass
                 else:

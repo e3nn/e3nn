@@ -3,6 +3,10 @@ __version__ = "0.4.4"
 
 from typing import Dict
 
+from .io import *  # noqa: F401, F403
+from .nn import *  # noqa: F401, F403
+from .o3 import *  # noqa: F401, F403
+
 _OPT_DEFAULTS: Dict[str, bool] = dict(
     specialized_code=True,
     optimize_einsums=True,
