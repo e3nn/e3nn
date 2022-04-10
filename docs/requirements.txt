@@ -9,10 +9,10 @@ plotly
 jupyter-sphinx
 ase
 
---find-links https://download.pytorch.org/whl/torch_stable.html
-torch==1.8.0+cpu
+--find-links https://download.pytorch.org/whl/cpu
+torch==1.11.0
 
---find-links https://pytorch-geometric.com/whl/torch-1.8.0+cpu.html
+--find-links https://data.pyg.org/whl/torch-1.11.0+cpu.html
 torch-scatter
 torch-sparse
 torch-cluster
