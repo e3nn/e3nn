@@ -32,7 +32,7 @@ FLOAT_TOLERANCE = {
     t: torch.as_tensor(v, dtype=t)
     for t, v in {
         torch.float32: 1e-3,
-        torch.float64: 1e-10
+        torch.float64: 1e-9
     }.items()
 }
 
