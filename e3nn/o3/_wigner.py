@@ -268,7 +268,7 @@ def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
 
     S = 0
     for v in range(vmin, vmax + 1):
-        S += (-1.0)**(v + j2 + m2) * Fraction(
+        S += (-1)**int(v + j2 + m2) * Fraction(
             f(j2 + j3 + m1 - v) * f(j1 - m1 + v),
             f(v) * f(j3 - j1 + j2 - v) * f(j3 + m3 - v) * f(v + j1 - j2 - m3)
         )
