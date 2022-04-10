@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Sparse Voxel Convolution
 - `o3`, `nn` and `io` are accessible into `e3nn`. For instance `e3nn.rand_axis_angle`.
+- Clebsch-Gordan coefficients are computed via a change of basis from the complex to real basis.
 
 ### Changed
 - Since now the code is no more tested against `torch==1.8.0`, only tested against `torch>=1.10.0`
