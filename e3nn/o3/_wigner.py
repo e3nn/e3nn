@@ -1,7 +1,8 @@
 r"""Core functions of :math:`SO(3)`
 """
-import torch
+import functools
 
+import torch
 from e3nn.util import explicit_default_types
 
 
@@ -129,11 +130,22 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
         tensor :math:`C` of shape :math:`(2l_1+1, 2l_2+1, 2l_3+1)`
     """
     assert abs(l2 - l3) <= l1 <= l2 + l3
+    assert isinstance(l1, int) and isinstance(l2, int) and isinstance(l3, int)
+    C = _so3_clebsch_gordan(l1, l2, l3)
 
+    dtype, device = explicit_default_types(dtype, device)
+    # make sure we always get:
+    # 1. a copy so mutation doesn't ruin the stored tensors
+    # 2. a contiguous tensor, regardless of what transpositions happened above
+    return C.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
+
+
+@functools.lru_cache(maxsize=None)
+def _so3_clebsch_gordan(l1, l2, l3):
     Q1 = change_basis_real_to_complex(l1, dtype=torch.float64)
     Q2 = change_basis_real_to_complex(l2, dtype=torch.float64)
     Q3 = change_basis_real_to_complex(l3, dtype=torch.float64)
-    C = su2_clebsch_gordan(l1, l2, l3).to(dtype=torch.complex128)
+    C = _su2_clebsch_gordan(l1, l2, l3).to(dtype=torch.complex128)
     C = torch.einsum('ij,kl,mn,ikn->jlm', Q1, Q2, torch.conj(Q3.T), C)
 
     # make it real
@@ -142,12 +154,7 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
 
     # normalization
     C = C / torch.norm(C)
-
-    dtype, device = explicit_default_types(dtype, device)
-    # make sure we always get:
-    # 1. a copy so mutation doesn't ruin the stored tensors
-    # 2. a contiguous tensor, regardless of what transpositions happened above
-    return C.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
+    return C
 
 
 # Taken from http://qutip.org/docs/3.1.0/modules/qutip/utilities.html
@@ -185,7 +192,8 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
 #    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-def su2_clebsch_gordan(j1, j2, j3):
+@functools.lru_cache(maxsize=None)
+def _su2_clebsch_gordan(j1, j2, j3):
     """Calculates the Clebsch-Gordon matrix
     for SU(2) coupling j1 and j2 to give j3.
     Parameters
@@ -209,11 +217,11 @@ def su2_clebsch_gordan(j1, j2, j3):
         for m1 in (x / 2 for x in range(-int(2 * j1), int(2 * j1) + 1, 2)):
             for m2 in (x / 2 for x in range(-int(2 * j2), int(2 * j2) + 1, 2)):
                 if abs(m1 + m2) <= j3:
-                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = su2_clebsch_gordan_coeff((j1, m1), (j2, m2), (j3, m1 + m2))
+                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = _su2_clebsch_gordan_coeff((j1, m1), (j2, m2), (j3, m1 + m2))
     return mat
 
 
-def su2_clebsch_gordan_coeff(idx1, idx2, idx3):
+def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
     """Calculates the Clebsch-Gordon coefficient
     for SU(2) coupling (j1,m1) and (j2,m2) to give (j3,m3).
     Parameters
