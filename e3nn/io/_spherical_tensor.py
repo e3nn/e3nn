@@ -128,7 +128,7 @@ class SphericalTensor(o3.Irreps):
             coeff
         )
         # Y(v_a) . Y(v_b) solution_b = radii_a
-        solution = torch.lstsq(values, A).solution.reshape(-1)  # [b]
+        solution = torch.linalg.lstsq(A, values).solution.reshape(-1)  # [b]
         assert (values - A @ solution).abs().max() < 1e-5 * values.abs().max()
 
         return solution @ coeff

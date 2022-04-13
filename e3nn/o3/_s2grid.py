@@ -361,7 +361,7 @@ class ToS2Grid(torch.nn.Module):
 
     @property
     def grid(self):
-        beta, alpha = torch.meshgrid(self.betas, self.alphas)
+        beta, alpha = torch.meshgrid(self.betas, self.alphas, indexing='ij')
         return o3.angles_to_xyz(alpha, beta)
 
     def forward(self, x):
@@ -480,7 +480,7 @@ class FromS2Grid(torch.nn.Module):
 
     @property
     def grid(self):
-        beta, alpha = torch.meshgrid(self.betas, self.alphas)
+        beta, alpha = torch.meshgrid(self.betas, self.alphas, indexing='ij')
         return o3.angles_to_xyz(alpha, beta)
 
     def forward(self, x):

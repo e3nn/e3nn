@@ -58,7 +58,7 @@ class Convolution(torch.nn.Module):
         s = math.floor(r / steps[2])
         z = torch.arange(-s, s + 1.0) * steps[2]
 
-        lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+        lattice = torch.stack(torch.meshgrid(x, y, z, indexing="ij"), dim=-1)  # [x, y, z, R^3]
         self.register_buffer('lattice', lattice)
 
         if 'padding' not in kwargs:
@@ -133,7 +133,7 @@ class LowPassFilter(torch.nn.Module):
         y = y[y.abs() <= 1]
         z = r * steps[2] / min(steps)
         z = z[z.abs() <= 1]
-        lattice = torch.stack(torch.meshgrid(x, y, z), dim=-1)  # [x, y, z, R^3]
+        lattice = torch.stack(torch.meshgrid(x, y, z, indexing='ij'), dim=-1)  # [x, y, z, R^3]
         lattice = (size // 2) * lattice
 
         kernel = torch.exp(-lattice.norm(dim=-1).pow(2) / (2 * sigma**2))

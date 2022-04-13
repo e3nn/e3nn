@@ -1,6 +1,6 @@
 import warnings
 from math import sqrt
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Callable
 
 import e3nn
 import torch
@@ -12,6 +12,13 @@ from e3nn.util.jit import compile_mode
 from torch import fx
 from ._codegen import codegen_tensor_product_left_right, codegen_tensor_product_right
 from ._instruction import Instruction
+
+
+# A list, in order of priority, of codegen providers for the tensor product.
+# If a provider does not support the parameters it is given, it should
+# return `None`, in which case the next provider in the list will be tried.
+_CODEGEN_PROVIDERS_LEFT_RIGHT: List[Callable] = [codegen_tensor_product_left_right]
+_CODEGEN_PROVIDERS_RIGHT: List[Callable] = [codegen_tensor_product_right]
 
 
 @compile_mode('script')
@@ -341,15 +348,19 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # Generate the actual tensor product code
         if compile_left_right:
-            graphmod_left_right = codegen_tensor_product_left_right(
-                self.irreps_in1,
-                self.irreps_in2,
-                self.irreps_out,
-                self.instructions,
-                self.shared_weights,
-                self._specialized_code,
-                self._optimize_einsums
-            )
+            for codegen in _CODEGEN_PROVIDERS_LEFT_RIGHT:
+                graphmod_left_right = codegen(
+                    self.irreps_in1,
+                    self.irreps_in2,
+                    self.irreps_out,
+                    self.instructions,
+                    self.shared_weights,
+                    self._specialized_code,
+                    self._optimize_einsums
+                )
+                if graphmod_left_right is not None:
+                    break
+            assert graphmod_left_right is not None
         else:
             graphmod_left_right = fx.Graph()
             graphmod_left_right.placeholder('x1', torch.Tensor)
@@ -362,15 +373,19 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             graphmod_left_right = fx.GraphModule(torch.nn.Module(), graphmod_left_right, class_name="tp_forward")
 
         if compile_right:
-            graphmod_right = codegen_tensor_product_right(
-                self.irreps_in1,
-                self.irreps_in2,
-                self.irreps_out,
-                self.instructions,
-                self.shared_weights,
-                self._specialized_code,
-                self._optimize_einsums
-            )
+            for codegen in _CODEGEN_PROVIDERS_RIGHT:
+                graphmod_right = codegen(
+                    self.irreps_in1,
+                    self.irreps_in2,
+                    self.irreps_out,
+                    self.instructions,
+                    self.shared_weights,
+                    self._specialized_code,
+                    self._optimize_einsums
+                )
+                if graphmod_right is not None:
+                    break
+            assert graphmod_right is not None
         else:
             graphmod_right = fx.Graph()
             graphmod_right.placeholder('x2', torch.Tensor)

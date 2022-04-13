@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2022-04-13
+### Added
+- Sparse Voxel Convolution
+- Clebsch-Gordan coefficients are computed via a change of basis from the complex to real basis.
+- `o3`, `nn` and `io` are accessible through `e3nn`. For instance `e3nn.o3.rand_axis_angle`.
+
+### Changed
+- Since now the code is no more tested against `torch==1.8.0`, only tested against `torch>=1.10.0`
+
+### Fixed
+- `wigner_3j`  now _always_ returns a contiguous copy regardless of dtype or device
+
 ## [0.4.4] - 2021-12-15
 ### Fixed
 - Remove `CartesianTensor._rtp`. Instead recompute the `ReducedTensorProduct` everytime. The user can save the `ReducedTensorProduct` to avoid creating it each time.

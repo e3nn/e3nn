@@ -15,7 +15,7 @@ def s2_near_identity_grid(max_beta=math.pi / 8, n_alpha=8, n_beta=3):
     '''
     beta = torch.arange(1, n_beta + 1) * max_beta / n_beta
     alpha = torch.linspace(0, 2 * math.pi, n_alpha + 1)[:-1]
-    a, b = torch.meshgrid(alpha, beta)
+    a, b = torch.meshgrid(alpha, beta, indexing='ij')
     b = b.flatten()
     a = a.flatten()
     return torch.stack((a, b))
@@ -32,7 +32,7 @@ def so3_near_identity_grid(max_beta=math.pi / 8, max_gamma=2*math.pi, n_alpha=8,
     beta = torch.arange(1, n_beta + 1) * max_beta / n_beta
     alpha = torch.linspace(0, 2 * math.pi, n_alpha)[:-1]
     pre_gamma = torch.linspace(-max_gamma, max_gamma, n_gamma)
-    A, B, preC = torch.meshgrid(alpha, beta, pre_gamma)
+    A, B, preC = torch.meshgrid(alpha, beta, pre_gamma, indexing='ij')
     C = preC - A
     A = A.flatten()
     B = B.flatten()

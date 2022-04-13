@@ -191,6 +191,24 @@ class Irrep(tuple):
         k = (1 - d) / 2
         return self.D_from_angles(*_rotation.matrix_to_angles(R), k)
 
+    def D_from_axis_angle(self, axis, angle):
+        r"""Matrix of the representation, see `Irrep.D_from_angles`
+
+        Parameters
+        ----------
+        axis : `torch.Tensor`
+            tensor of shape :math:`(..., 3)`
+
+        angle : `torch.Tensor`
+            tensor of shape :math:`(...)`
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape :math:`(..., 2l+1, 2l+1)`
+        """
+        return self.D_from_angles(*_rotation.axis_angle_to_angles(axis, angle))
+
     @property
     def dim(self) -> int:
         """The dimension of the representation, :math:`2 l + 1`."""
@@ -655,3 +673,21 @@ class Irreps(tuple):
         R = d[..., None, None] * R
         k = (1 - d) / 2
         return self.D_from_angles(*_rotation.matrix_to_angles(R), k)
+
+    def D_from_axis_angle(self, axis, angle):
+        r"""Matrix of the representation
+
+        Parameters
+        ----------
+        axis : `torch.Tensor`
+            tensor of shape :math:`(..., 3)`
+
+        angle : `torch.Tensor`
+            tensor of shape :math:`(...)`
+
+        Returns
+        -------
+        `torch.Tensor`
+            tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
+        """
+        return self.D_from_angles(*_rotation.axis_angle_to_angles(axis, angle))
