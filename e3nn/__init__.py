@@ -3,9 +3,6 @@ __version__ = "0.4.4"
 
 from typing import Dict
 
-from .io import *  # noqa: F401, F403
-from .nn import *  # noqa: F401, F403
-from .o3 import *  # noqa: F401, F403
 
 _OPT_DEFAULTS: Dict[str, bool] = dict(
     specialized_code=True,
@@ -31,3 +28,8 @@ def set_optimization_defaults(**kwargs) -> None:
 def get_optimization_defaults() -> Dict[str, bool]:
     r"""Get the global default optimization settings."""
     return dict(_OPT_DEFAULTS)
+
+
+from e3nn import o3 as o3  # noqa: F401, E402
+from e3nn import nn as nn  # noqa: F401, E402
+from e3nn import io as io  # noqa: F401, E402
