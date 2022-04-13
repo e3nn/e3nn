@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.0] - 2022-04-13
 ### Added
 - Sparse Voxel Convolution
 - Clebsch-Gordan coefficients are computed via a change of basis from the complex to real basis.
