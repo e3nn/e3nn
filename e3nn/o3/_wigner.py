@@ -1,37 +1,55 @@
 r"""Core functions of :math:`SO(3)`
 """
-import os
+import functools
 
 import torch
-
-from e3nn import o3
 from e3nn.util import explicit_default_types
 
-_Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
-# _Jd is a list of tensors of shape (2l+1, 2l+1)
-# _W3j_flat is a flatten version of W3j symbols
-# _W3j_indices is a dict from (l1, l2, l3) -> slice(i, j) to index the flat tensor
-# only l1 <= l2 <= l3 are stored
+
+def su2_generators(j) -> torch.Tensor:
+    m = torch.arange(-j, j)
+    raising = torch.diag(-torch.sqrt(j * (j + 1) - m * (m + 1)), diagonal=-1)
+
+    m = torch.arange(-j + 1, j + 1)
+    lowering = torch.diag(torch.sqrt(j * (j + 1) - m * (m - 1)), diagonal=1)
+
+    m = torch.arange(-j, j + 1)
+    return torch.stack([
+        0.5 * (raising + lowering),  # x (usually)
+        torch.diag(1j * m),  # z (usually)
+        -0.5j * (raising - lowering),  # -y (usually)
+    ], dim=0)
 
 
-def _z_rot_mat(angle, l):
-    r"""
-    Create the matrix representation of a z-axis rotation by the given angle,
-    in the irrep l of dimension 2 * l + 1, in the basis of real centered
-    spherical harmonics (RC basis in rep_bases.py).
+def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tensor:
+    # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
+    q = torch.zeros((2 * l + 1, 2 * l + 1), dtype=torch.complex128)
+    for m in range(-l, 0):
+        q[l + m, l + abs(m)] = 1 / 2**0.5
+        q[l + m, l - abs(m)] = -1j / 2**0.5
+    q[l, l] = 1
+    for m in range(1, l + 1):
+        q[l + m, l + abs(m)] = (-1)**m / 2**0.5
+        q[l + m, l - abs(m)] = 1j * (-1)**m / 2**0.5
+    q = (-1j)**l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
 
-    Note: this function is easy to use, but inefficient: only the entries
-    on the diagonal and anti-diagonal are non-zero, so explicitly constructing
-    this matrix is unnecessary.
-    """
-    shape, device, dtype = angle.shape, angle.device, angle.dtype
-    M = angle.new_zeros((*shape, 2 * l + 1, 2 * l + 1))
-    inds = torch.arange(0, 2 * l + 1, 1, device=device)
-    reversed_inds = torch.arange(2 * l, -1, -1, device=device)
-    frequencies = torch.arange(l, -l - 1, -1, dtype=dtype, device=device)
-    M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
-    M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
-    return M
+    dtype, device = explicit_default_types(dtype, device)
+    dtype = {
+        torch.float32: torch.complex64,
+        torch.float64: torch.complex128,
+    }[dtype]
+    # make sure we always get:
+    # 1. a copy so mutation doesn't ruin the stored tensors
+    # 2. a contiguous tensor, regardless of what transpositions happened above
+    return q.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
+
+
+def so3_generators(l) -> torch.Tensor:
+    X = su2_generators(l)
+    Q = change_basis_real_to_complex(l)
+    X = torch.conj(Q.T) @ X @ Q
+    assert torch.all(torch.abs(torch.imag(X)) < 1e-5)
+    return torch.real(X)
 
 
 def wigner_D(l, alpha, beta, gamma):
@@ -43,8 +61,6 @@ def wigner_D(l, alpha, beta, gamma):
     * :math:`D(R_1 \circ R_2) = D(R_1) \circ D(R_2)`
     * :math:`D(R^{-1}) = D(R)^{-1} = D(R)^T`
     * :math:`D(\text{rotation around Y axis})` has some property that allows us to use FFT in `ToS2Grid`
-
-    Code of this function has beed copied from `lie_learn <https://github.com/AMLab-Amsterdam/lie_learn>`_ made by Taco Cohen.
 
     Parameters
     ----------
@@ -68,18 +84,15 @@ def wigner_D(l, alpha, beta, gamma):
     `torch.Tensor`
         tensor :math:`D^l(\alpha, \beta, \gamma)` of shape :math:`(2l+1, 2l+1)`
     """
-    if not l < len(_Jd):
-        raise NotImplementedError(f'wigner D maximum l implemented is {len(_Jd) - 1}, send us an email to ask for more')
-
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    J = _Jd[l].to(dtype=alpha.dtype, device=alpha.device)
-    Xa = _z_rot_mat(alpha, l)
-    Xb = _z_rot_mat(beta, l)
-    Xc = _z_rot_mat(gamma, l)
-    return Xa @ J @ Xb @ J @ Xc
+    alpha = alpha[..., None, None] % (2 * torch.pi)
+    beta = beta[..., None, None] % (2 * torch.pi)
+    gamma = gamma[..., None, None] % (2 * torch.pi)
+    X = so3_generators(l)
+    return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
 
 
-def wigner_3j(l1, l2, l3, flat_src=_W3j_flat, dtype=None, device=None):
+def wigner_3j(l1, l2, l3, dtype=None, device=None):
     r"""Wigner 3j symbols :math:`C_{lmn}`.
 
     It satisfies the following two properties:
@@ -117,77 +130,147 @@ def wigner_3j(l1, l2, l3, flat_src=_W3j_flat, dtype=None, device=None):
         tensor :math:`C` of shape :math:`(2l_1+1, 2l_2+1, 2l_3+1)`
     """
     assert abs(l2 - l3) <= l1 <= l2 + l3
-
-    try:
-        if l1 <= l2 <= l3:
-            out = flat_src[_W3j_indices[(l1, l2, l3)]].reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
-        if l1 <= l3 <= l2:
-            out = flat_src[_W3j_indices[(l1, l3, l2)]].reshape(2 * l1 + 1, 2 * l3 + 1, 2 * l2 + 1).transpose(1, 2).mul((-1) ** (l1 + l2 + l3))
-        if l2 <= l1 <= l3:
-            out = flat_src[_W3j_indices[(l2, l1, l3)]].reshape(2 * l2 + 1, 2 * l1 + 1, 2 * l3 + 1).transpose(0, 1).mul((-1) ** (l1 + l2 + l3))
-        if l3 <= l2 <= l1:
-            out = flat_src[_W3j_indices[(l3, l2, l1)]].reshape(2 * l3 + 1, 2 * l2 + 1, 2 * l1 + 1).transpose(0, 2).mul((-1) ** (l1 + l2 + l3))
-        if l2 <= l3 <= l1:
-            out = flat_src[_W3j_indices[(l2, l3, l1)]].reshape(2 * l2 + 1, 2 * l3 + 1, 2 * l1 + 1).transpose(0, 2).transpose(1, 2)
-        if l3 <= l1 <= l2:
-            out = flat_src[_W3j_indices[(l3, l1, l2)]].reshape(2 * l3 + 1, 2 * l1 + 1, 2 * l2 + 1).transpose(0, 2).transpose(0, 1)
-    except KeyError:
-        raise NotImplementedError(f'Wigner 3j symbols maximum l implemented is {max(_W3j_indices.keys())[0]}, send us an email to ask for more')
+    assert isinstance(l1, int) and isinstance(l2, int) and isinstance(l3, int)
+    C = _so3_clebsch_gordan(l1, l2, l3)
 
     dtype, device = explicit_default_types(dtype, device)
     # make sure we always get:
     # 1. a copy so mutation doesn't ruin the stored tensors
     # 2. a contiguous tensor, regardless of what transpositions happened above
-    return out.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
+    return C.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
 
 
-def _generate_wigner_3j(l1, l2, l3, dtype=None, device=None):  # pragma: no cover
-    r"""Computes the 3-j symbol
+@functools.lru_cache(maxsize=None)
+def _so3_clebsch_gordan(l1, l2, l3):
+    Q1 = change_basis_real_to_complex(l1, dtype=torch.float64)
+    Q2 = change_basis_real_to_complex(l2, dtype=torch.float64)
+    Q3 = change_basis_real_to_complex(l3, dtype=torch.float64)
+    C = _su2_clebsch_gordan(l1, l2, l3).to(dtype=torch.complex128)
+    C = torch.einsum('ij,kl,mn,ikn->jlm', Q1, Q2, torch.conj(Q3.T), C)
+
+    # make it real
+    assert torch.all(torch.abs(torch.imag(C)) < 1e-5)
+    C = torch.real(C)
+
+    # normalization
+    C = C / torch.norm(C)
+    return C
+
+
+# Taken from http://qutip.org/docs/3.1.0/modules/qutip/utilities.html
+
+# This file is part of QuTiP: Quantum Toolbox in Python.
+#
+#    Copyright (c) 2011 and later, Paul D. Nation and Robert J. Johansson.
+#    All rights reserved.
+#
+#    Redistribution and use in source and binary forms, with or without
+#    modification, are permitted provided that the following conditions are
+#    met:
+#
+#    1. Redistributions of source code must retain the above copyright notice,
+#       this list of conditions and the following disclaimer.
+#
+#    2. Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#
+#    3. Neither the name of the QuTiP: Quantum Toolbox in Python nor the names
+#       of its contributors may be used to endorse or promote products derived
+#       from this software without specific prior written permission.
+#
+#    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+#    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+#    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+#    HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+#    LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#    DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#    THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+###############################################################################
+
+@functools.lru_cache(maxsize=None)
+def _su2_clebsch_gordan(j1, j2, j3):
+    """Calculates the Clebsch-Gordon matrix
+    for SU(2) coupling j1 and j2 to give j3.
+    Parameters
+    ----------
+    j1 : float
+        Total angular momentum 1.
+    j2 : float
+        Total angular momentum 2.
+    j3 : float
+        Total angular momentum 3.
+    Returns
+    -------
+    cg_matrix : numpy.array
+        Requested Clebsch-Gordan matrix.
     """
-    # these three propositions are equivalent
-    assert abs(l2 - l3) <= l1 <= l2 + l3
-    assert abs(l3 - l1) <= l2 <= l3 + l1
-    assert abs(l1 - l2) <= l3 <= l1 + l2
+    assert isinstance(j1, (int, float))
+    assert isinstance(j2, (int, float))
+    assert isinstance(j3, (int, float))
+    mat = torch.zeros((int(2 * j1 + 1), int(2 * j2 + 1), int(2 * j3 + 1)), dtype=torch.float64)
+    if int(2 * j3) in range(int(2 * abs(j1 - j2)), int(2 * (j1 + j2)) + 1, 2):
+        for m1 in (x / 2 for x in range(-int(2 * j1), int(2 * j1) + 1, 2)):
+            for m2 in (x / 2 for x in range(-int(2 * j2), int(2 * j2) + 1, 2)):
+                if abs(m1 + m2) <= j3:
+                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = _su2_clebsch_gordan_coeff((j1, m1), (j2, m2), (j3, m1 + m2))
+    return mat
 
-    n = (2 * l1 + 1) * (2 * l2 + 1) * (2 * l3 + 1)  # dimension of the 3-j symbol
 
-    def _DxDxD(a, b, c):
-        D1 = wigner_D(l1, a, b, c)
-        D2 = wigner_D(l2, a, b, c)
-        D3 = wigner_D(l3, a, b, c)
-        return torch.einsum('il,jm,kn->ijklmn', D1, D2, D3).reshape(n, n)
+def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
+    """Calculates the Clebsch-Gordon coefficient
+    for SU(2) coupling (j1,m1) and (j2,m2) to give (j3,m3).
+    Parameters
+    ----------
+    j1 : float
+        Total angular momentum 1.
+    j2 : float
+        Total angular momentum 2.
+    j3 : float
+        Total angular momentum 3.
+    m1 : float
+        z-component of angular momentum 1.
+    m2 : float
+        z-component of angular momentum 2.
+    m3 : float
+        z-component of angular momentum 3.
+    Returns
+    -------
+    cg_coeff : float
+        Requested Clebsch-Gordan coefficient.
+    """
+    from fractions import Fraction
+    from math import factorial
 
-    random_angles = torch.tensor([
-        [4.41301023, 5.56684102, 4.59384642],
-        [4.93325116, 6.12697327, 4.14574096],
-        [0.53878964, 4.09050444, 5.36539036],
-        [2.16017393, 3.48835314, 5.55174441],
-        [2.52385107, 0.29089583, 3.90040975],
-    ], dtype=dtype, device=device)
+    j1, m1 = idx1
+    j2, m2 = idx2
+    j3, m3 = idx3
 
-    B = random_angles.new_zeros((n, n))
-    for abc in random_angles:
-        D = _DxDxD(*abc) - torch.eye(n, dtype=dtype, device=device)
-        B += D.T @ D
+    if m3 != m1 + m2:
+        return 0
+    vmin = int(max([-j1 + j2 + m3, -j1 + m1, 0]))
+    vmax = int(min([j2 + j3 + m1, j3 - j1 + j2, j3 + m3]))
 
-    eigenvalues, eigenvectors = torch.linalg.eigh(B)
-    assert eigenvalues[0] < 1e-10
-    Q = eigenvectors[:, 0]
-    assert (B @ Q).norm() < 1e-10
-    Q = Q.reshape(2 * l1 + 1, 2 * l2 + 1, 2 * l3 + 1)
+    def f(n):
+        assert n == round(n)
+        return factorial(round(n))
 
-    Q[Q.abs() < 1e-14] = 0
+    C = (
+        (2.0 * j3 + 1.0) * Fraction(
+            f(j3 + j1 - j2) * f(j3 - j1 + j2) * f(j1 + j2 - j3) * f(j3 + m3) * f(j3 - m3),
+            f(j1 + j2 + j3 + 1) * f(j1 - m1) * f(j1 + m1) * f(j2 - m2) * f(j2 + m2)
+        )
+    )**0.5
 
-    if Q[l1, l2, l3] != 0:
-        if Q[l1, l2, l3] < 0:
-            Q.neg_()
-    else:
-        if next(x for x in Q.flatten() if x != 0) < 0:
-            Q.neg_()
-
-    abc = o3.rand_angles(100, dtype=dtype, device=device)
-    Q2 = torch.einsum("zil,zjm,zkn,lmn->zijk", wigner_D(l1, *abc), wigner_D(l2, *abc), wigner_D(l3, *abc), Q)
-    assert (Q - Q2).norm() < 1e-10
-    assert abs(Q.norm() - 1) < 1e-10
-
-    return Q
+    S = 0
+    for v in range(vmin, vmax + 1):
+        S += (-1)**int(v + j2 + m2) * Fraction(
+            f(j2 + j3 + m1 - v) * f(j1 - m1 + v),
+            f(v) * f(j3 - j1 + j2 - v) * f(j3 + m3 - v) * f(v + j1 - j2 - m3)
+        )
+    C = C * S
+    return C

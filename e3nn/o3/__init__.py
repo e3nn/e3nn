@@ -28,7 +28,7 @@ from ._rotation import (
     angles_to_xyz,
     xyz_to_angles,
 )
-from ._wigner import wigner_D, wigner_3j
+from ._wigner import wigner_D, wigner_3j, change_basis_real_to_complex, su2_generators, so3_generators
 from ._irreps import Irrep, Irreps
 from ._tensor_product import (
     Instruction,
@@ -90,6 +90,9 @@ __all__ = [
     "xyz_to_angles",
     "wigner_D",
     "wigner_3j",
+    "change_basis_real_to_complex",
+    "su2_generators",
+    "so3_generators",
     "Irrep",
     "Irreps",
     "irrep",
