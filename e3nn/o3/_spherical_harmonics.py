@@ -1,14 +1,13 @@
 r"""Spherical Harmonics as polynomials of x, y, z
 """
-import fractions
 from typing import Any, List, Union
+import math
 
-import sympy
 import torch
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 
-from ._spherical_harmonics_generated import _spherical_harmonics
+from ._spherical_harmonics_generated import _get_spherical_harmonics
 
 
 @compile_mode('trace')
@@ -78,7 +77,7 @@ class SphericalHarmonics(torch.nn.Module):
         if self.normalize:
             x = torch.nn.functional.normalize(x, dim=-1)  # forward 0's instead of nan for zero-radius
 
-        sh = _spherical_harmonics[(self._lmax, self.normalization)](
+        sh = _get_spherical_harmonics(self._lmax)(
             x[..., 0], x[..., 1], x[..., 2]
         )
 
@@ -87,6 +86,16 @@ class SphericalHarmonics(torch.nn.Module):
                 sh[..., l*l:(l+1)*(l+1)]
                 for l in self._ls_list
             ], dim=-1)
+
+        # defualt normalization is component
+        # correct for the other normalizations if asked for:
+        if self.normalization == 'integral':
+            sh.div_(math.sqrt(4 * math.pi))
+        elif self.normalization == 'norm':
+            sh.div_(torch.cat([
+                math.sqrt(2 * l + 1) * torch.ones(2 * l + 1, dtype=sh.dtype, device=sh.device)
+                for l in self._ls_list
+            ]))
 
         return sh
 
@@ -170,105 +179,106 @@ def spherical_harmonics(
     return sh(x)
 
 
-def _generate_spherical_harmonics(lmax, normalization, device=None):  # pragma: no cover
+def _generate_spherical_harmonics(lmax, device=None):  # pragma: no cover
     r"""code used to generate the code above
 
     based on `wigner_3j`
     """
+    import sympy
+    from sympy.printing.pycode import pycode
+
     torch.set_default_dtype(torch.float64)
 
+    def to_frac(x: float):
+        from fractions import Fraction
+        s = 1 if x >= 0 else -1
+        x = x**2
+        x = Fraction(x).limit_denominator()
+        x = s * sympy.sqrt(x)
+        x = sympy.simplify(x)
+        return x
+
     outlines = [
-        "@torch.jit.script\n"
-        f"def _sph_lmax_{lmax}_{normalization}(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:"
+        f"def _sph_lmax_{lmax}(x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:",
     ]
-    outlines.append("sqrt = torch.sqrt")
-    outlines.append("pi = 3.141592653589793")
     outlines.append("sh_0_0 = torch.ones_like(x)")
 
-    x, y, z = sympy.symbols('x y z')
-    spherical_harmonics = [x, y, z]
-    evaluated_in_z = [0, 0, 1]
+    x_var, y_var, z_var = sympy.symbols('x y z')
+    polynomials = [sympy.sqrt(3) * x_var, sympy.sqrt(3) * y_var, sympy.sqrt(3) * z_var]
+
+    def sub_z1(p, names, polynormz):
+        p = p.subs(x_var, 0).subs(y_var, 1).subs(z_var, 0)
+        for n, c in zip(names, polynormz):
+            p = p.subs(n, c)
+        return p
+
+    poly_evalz = [
+        sub_z1(p, [], [])
+        for p in polynomials
+    ]
 
     for l in range(1, lmax+1):
-        names = sympy.symbols(" ".join(f'sh_{l}_{m}' for m in range(2 * l + 1)))
+        sh_variables = sympy.symbols(" ".join(f'sh_{l}_{m}' for m in range(2 * l + 1)))
 
-        for n, p in zip(names, spherical_harmonics):
-            outlines.append(f"{n} = {p}")
+        for n, p in zip(sh_variables, polynomials):
+            outlines.append(f"{n} = {pycode(p)}")
 
         if l == lmax:
             break
 
-        # create l + 1
-        def float_to_sympy(x):
-            result = sympy.sqrt(sympy.Rational(fractions.Fraction(x**2).limit_denominator()))
-            if x < 0.0:
-                return -result
-            return result
-
-        spherical_harmonics = [
+        polynomials = [
             sum(
-                float_to_sympy(c.item()) * v * p
-                for cj, v in zip(cij, [x, y, z])
-                for c, p in zip(cj, names)
+                to_frac(c.item()) * v * sh
+                for cj, v in zip(cij, [x_var, y_var, z_var])
+                for c, sh in zip(cj, sh_variables)
             )
-            for cij in o3.wigner_3j(l + 1, 1, l, dtype=torch.float64)
+            for cij in o3.wigner_3j(l+1, 1, l, device=device)
         ]
 
-        def sub(p, names, values):
-            p = p.subs(x, 0).subs(y, 0).subs(z, 1)
-            for n, c in zip(names, values):
-                p = p.subs(n, c)
-            return p
-
-        evaluated_in_z = [
-            sub(p, names, evaluated_in_z)
-            for p in spherical_harmonics
+        poly_evalz = [
+            sub_z1(p, sh_variables, poly_evalz)
+            for p in polynomials
         ]
-        norm = sympy.sqrt(sum(p**2 for p in evaluated_in_z))
-        spherical_harmonics = [p / norm for p in spherical_harmonics]
-        evaluated_in_z = [p / norm for p in evaluated_in_z]
+        norm = sympy.sqrt(sum(p**2 for p in poly_evalz))
+        # the sympy.sqrt is "component" normalization
+        polynomials = [sympy.sqrt(2 * l + 3) * p / norm for p in polynomials]
+        poly_evalz = [sympy.sqrt(2 * l + 3) * p / norm for p in poly_evalz]
 
-        spherical_harmonics = [
-            sympy.simplify(p)
-            for p in spherical_harmonics
+        polynomials = [
+            sympy.simplify(p, full=True)
+            for p in polynomials
         ]
 
-    # do the output
-    # here its time to multiply in normalization constants
-    if normalization == "integral":
-        for j in range(lmax + 1):
-            for m in range(2 * j + 1):
-                outlines.append(f"sh_{j}_{m} = sqrt({2 * j + 1}) / sqrt(4*pi) * sh_{j}_{m}")
-    elif normalization == "component":
-        for j in range(1, lmax + 1):  # component is trivial for l = 0
-            for m in range(2 * j + 1):
-                outlines.append(f"sh_{j}_{m} = sqrt({2 * j + 1}) * sh_{j}_{m}")
-    elif normalization == "norm":
-        pass  # this is what we already have
-    else:
-        raise ValueError
     u = ",\n        ".join(", ".join(f"sh_{j}_{m}" for m in range(2 * j + 1)) for j in range(lmax + 1))
     outlines.append(f"return torch.stack([\n        {u}\n    ], dim=-1)")
 
     # indent function body
     outlines = [outlines[0]] + ["    " + e for e in outlines[1:]]
-    return "\n".join(outlines)
+    out = "\n".join(outlines)
+    return out.replace(
+        "math.sqrt",  # generated by sympy
+        "sqrt",       # shorten the file and use alias
+    )
 
 
-def _generate_all_spherical_harmonics(lmax, device=None, normalizations=("integral", "component", "norm")):  # pragma: no cover
+def _generate_all_spherical_harmonics(lmax, device=None):  # pragma: no cover
     funcs = [
-        _generate_spherical_harmonics(l, normalization=normalization, device=device)
-        for normalization in normalizations
+        _generate_spherical_harmonics(l, device=device)
         for l in range(lmax + 1)
     ]
     funcs = [
         "# flake8: noqa\n"
-        "import torch"
+        "import torch\n"
+        "import math\n"
+        "import functools\n\n"
+        "sqrt = math.sqrt\n"
     ] + funcs + [
         "_spherical_harmonics = {" + ", ".join(
-            f"({l}, '{normalization}'): _sph_lmax_{l}_{normalization}"
-            for normalization in normalizations
+            f"{l}: _sph_lmax_{l}"
             for l in range(lmax + 1)
-        ) + "}"
+        ) + "}",
+        "@functools.lru_cache\n"
+        "def _get_spherical_harmonics(lmax: int):\n"
+        "    return torch.jit.script(_spherical_harmonics[lmax])\n"
     ]
     return "\n\n\n".join(funcs)
