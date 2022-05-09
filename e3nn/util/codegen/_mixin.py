@@ -15,6 +15,7 @@ class CodeGenMixin:
     ``__getstate__``/``__setstate__``, they should be sure to call CodeGenMixin's
     implimentation first and use its output.
     """
+
     # pylint: disable=super-with-arguments
 
     def _codegen_register(
@@ -38,7 +39,7 @@ class CodeGenMixin:
         for fname, graphmod in funcs.items():
             assert isinstance(graphmod, fx.GraphModule)
 
-            if opt_defaults['jit_script_fx']:
+            if opt_defaults["jit_script_fx"]:
                 scriptmod = torch.jit.script(jitable(graphmod))
                 assert isinstance(scriptmod, torch.jit.ScriptModule)
             else:

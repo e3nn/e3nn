@@ -27,13 +27,10 @@ class InvariantPolynomial(torch.nn.Module):
 
         # to multiply the edge type one-hot with the spherical harmonics to get the edge attributes
         self.mul = TensorProduct(
-            [(num_z**2, "0e")],
+            [(num_z ** 2, "0e")],
             self.irreps_sh,
-            [(num_z**2, ir) for _, ir in self.irreps_sh],
-            [
-                (0, l, l, "uvu", False)
-                for l in range(lmax + 1)
-            ]
+            [(num_z ** 2, ir) for _, ir in self.irreps_sh],
+            [(0, l, l, "uvu", False) for l in range(lmax + 1)],
         )
         irreps_attr = self.mul.irreps_out
 
@@ -61,39 +58,41 @@ class InvariantPolynomial(torch.nn.Module):
 
         # spherical harmonics
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalize=False, normalization='component')
+        edge_sh = o3.spherical_harmonics(self.irreps_sh, edge_vec, normalize=False, normalization="component")
 
         # edge types
         edge_zz = num_z * data.z[edge_src] + data.z[edge_dst]  # from 0 to num_z^2 - 1
-        edge_zz = torch.nn.functional.one_hot(edge_zz, num_z**2).mul(num_z)
+        edge_zz = torch.nn.functional.one_hot(edge_zz, num_z ** 2).mul(num_z)
         edge_zz = edge_zz.to(edge_sh.dtype)
 
         # edge attributes
         edge_attr = self.mul(edge_zz, edge_sh)
 
         # For each node, the initial features are the sum of the spherical harmonics of the neighbors
-        node_features = scatter(edge_sh, edge_dst, dim=0).div(num_neighbors**0.5)
+        node_features = scatter(edge_sh, edge_dst, dim=0).div(num_neighbors ** 0.5)
 
         # For each edge, tensor product the features on the source node with the spherical harmonics
         edge_features = self.tp1(node_features[edge_src], edge_attr)
-        node_features = scatter(edge_features, edge_dst, dim=0).div(num_neighbors**0.5)
+        node_features = scatter(edge_features, edge_dst, dim=0).div(num_neighbors ** 0.5)
 
         edge_features = self.tp2(node_features[edge_src], edge_attr)
-        node_features = scatter(edge_features, edge_dst, dim=0).div(num_neighbors**0.5)
+        node_features = scatter(edge_features, edge_dst, dim=0).div(num_neighbors ** 0.5)
 
         # For each graph, all the node's features are summed
-        return scatter(node_features, data.batch, dim=0).div(num_nodes**0.5)
+        return scatter(node_features, data.batch, dim=0).div(num_nodes ** 0.5)
 
 
 def test():
     torch.set_default_dtype(torch.float64)
 
-    pos = torch.tensor([
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.5],
-    ])
+    pos = torch.tensor(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.5],
+        ]
+    )
 
     # atom type
     z = torch.tensor([0, 1, 2, 2])

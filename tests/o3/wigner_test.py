@@ -36,7 +36,7 @@ def commutator(A, B):
     return A @ B - B @ A
 
 
-@pytest.mark.parametrize("j", [0, 1/2, 1, 3/2, 2, 5/2])
+@pytest.mark.parametrize("j", [0, 1 / 2, 1, 3 / 2, 2, 5 / 2])
 def test_su2_algebra(j, float_tolerance):
     X = o3.su2_generators(j)
     assert torch.allclose(commutator(X[0], X[1]), X[2], atol=float_tolerance)

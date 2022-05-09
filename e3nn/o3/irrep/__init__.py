@@ -19,15 +19,15 @@ from .._irreps import Irrep
 def __getattr__(name: str):
     r"""Creates an Irreps obeject by reflection
 
-        Parameters
-        ----------
-        name : string
-            the o3 object name prefixed by l. Example: l1o == Irrep("1o")
+    Parameters
+    ----------
+    name : string
+        the o3 object name prefixed by l. Example: l1o == Irrep("1o")
 
-        Returns
-        -------
-        `e3nn.o3.Irrep`
-            irreducible representation of :math:`O(3)`
+    Returns
+    -------
+    `e3nn.o3.Irrep`
+        irreducible representation of :math:`O(3)`
     """
 
     prefix, *ir = name

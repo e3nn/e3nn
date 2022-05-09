@@ -19,8 +19,7 @@ rotations = [
 
 
 def rotate_sparse_tensor(x, irreps, abc):
-    """Perform a rotation of angles abc to a sparse tensor
-    """
+    """Perform a rotation of angles abc to a sparse tensor"""
     from MinkowskiEngine import SparseTensor
 
     # rotate the coordinates (like vectors l=1)
@@ -49,13 +48,7 @@ def test_equivariance(abc):
     irreps_in = Irreps("1e")
     irreps_out = Irreps("0e + 1e + 2e")
 
-    conv = Convolution(
-        irreps_in, irreps_out,
-        irreps_sh="0e + 1e + 2e",
-        diameter=7,
-        num_radial_basis=3,
-        steps=(1.0, 1.0, 1.0)
-    )
+    conv = Convolution(irreps_in, irreps_out, irreps_sh="0e + 1e + 2e", diameter=7, num_radial_basis=3, steps=(1.0, 1.0, 1.0))
 
     x1 = SparseTensor(
         coordinates=torch.tensor([[0, 0, 0, 0], [0, 0, 0, 1], [0, 0, 1, 0], [0, 1, 1, 0]], dtype=torch.int32),

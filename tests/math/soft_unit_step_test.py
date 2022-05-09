@@ -19,11 +19,11 @@ def test_grads():
     y0 = soft_unit_step(x)
     assert torch.isfinite(y0).all()
 
-    y1, = torch.autograd.grad(y0.sum(), x, create_graph=True)
+    (y1,) = torch.autograd.grad(y0.sum(), x, create_graph=True)
     assert torch.isfinite(y1).all()
 
-    y2, = torch.autograd.grad(y1.sum(), x, create_graph=True)
+    (y2,) = torch.autograd.grad(y1.sum(), x, create_graph=True)
     assert torch.isfinite(y2).all()
 
-    y3, = torch.autograd.grad(y2.sum(), x, create_graph=True)
+    (y3,) = torch.autograd.grad(y2.sum(), x, create_graph=True)
     assert torch.isfinite(y3).all()

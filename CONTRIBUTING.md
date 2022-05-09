@@ -21,3 +21,16 @@ Additionally, you may want to run the tests locally before pushing to remote.  T
 ```
 pytest tests
 ```
+
+For formatting we use the [black](https://black.readthedocs.io/en/stable/index.html) library.
+It can be installed with:
+
+```
+pip install black
+```
+
+and run with:
+
+```
+black .
+```

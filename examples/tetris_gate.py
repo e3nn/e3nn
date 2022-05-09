@@ -33,19 +33,22 @@ def tetris():
     pos = torch.tensor(pos, dtype=torch.get_default_dtype())
 
     # Since chiral shapes are the mirror of one another we need an *odd* scalar to distinguish them
-    labels = torch.tensor([
-        [+1, 0, 0, 0, 0, 0, 0],  # chiral_shape_1
-        [-1, 0, 0, 0, 0, 0, 0],  # chiral_shape_2
-        [0, 1, 0, 0, 0, 0, 0],  # square
-        [0, 0, 1, 0, 0, 0, 0],  # line
-        [0, 0, 0, 1, 0, 0, 0],  # corner
-        [0, 0, 0, 0, 1, 0, 0],  # L
-        [0, 0, 0, 0, 0, 1, 0],  # T
-        [0, 0, 0, 0, 0, 0, 1],  # zigzag
-    ], dtype=torch.get_default_dtype())
+    labels = torch.tensor(
+        [
+            [+1, 0, 0, 0, 0, 0, 0],  # chiral_shape_1
+            [-1, 0, 0, 0, 0, 0, 0],  # chiral_shape_2
+            [0, 1, 0, 0, 0, 0, 0],  # square
+            [0, 0, 1, 0, 0, 0, 0],  # line
+            [0, 0, 0, 1, 0, 0, 0],  # corner
+            [0, 0, 0, 0, 1, 0, 0],  # L
+            [0, 0, 0, 0, 0, 1, 0],  # T
+            [0, 0, 0, 0, 0, 0, 1],  # zigzag
+        ],
+        dtype=torch.get_default_dtype(),
+    )
 
     # apply random rotation
-    pos = torch.einsum('zij,zaj->zai', o3.rand_matrix(len(pos)), pos)
+    pos = torch.einsum("zij,zaj->zai", o3.rand_matrix(len(pos)), pos)
 
     # put in torch_geometric format
     dataset = [Data(pos=pos) for pos in pos]
@@ -78,7 +81,7 @@ class Convolution(torch.nn.Module):
     def forward(self, node_features, edge_src, edge_dst, edge_attr, edge_scalars) -> torch.Tensor:
         weight = self.fc(edge_scalars)
         edge_features = self.tp(node_features[edge_src], edge_attr, weight)
-        node_features = scatter(edge_features, edge_dst, dim=0).div(self.num_neighbors**0.5)
+        node_features = scatter(edge_features, edge_dst, dim=0).div(self.num_neighbors ** 0.5)
         return node_features
 
 
@@ -92,9 +95,11 @@ class Network(torch.nn.Module):
 
         # First layer with gate
         gate = Gate(
-            "16x0e + 16x0o", [torch.relu, torch.abs],  # scalar
-            "8x0e + 8x0o + 8x0e + 8x0o", [torch.relu, torch.tanh, torch.relu, torch.tanh],  # gates (scalars)
-            "16x1o + 16x1e"  # gated tensors, num_irreps has to match with gates
+            "16x0e + 16x0o",
+            [torch.relu, torch.abs],  # scalar
+            "8x0e + 8x0o + 8x0e + 8x0o",
+            [torch.relu, torch.tanh, torch.relu, torch.tanh],  # gates (scalars)
+            "16x1o + 16x1e",  # gated tensors, num_irreps has to match with gates
         )
         self.conv = Convolution(irreps, self.irreps_sh, gate.irreps_in, self.num_neighbors)
         self.gate = gate
@@ -109,28 +114,19 @@ class Network(torch.nn.Module):
 
         edge_src, edge_dst = radius_graph(x=data.pos, r=2.5, batch=data.batch)
         edge_vec = data.pos[edge_src] - data.pos[edge_dst]
-        edge_attr = o3.spherical_harmonics(
-            l=self.irreps_sh,
-            x=edge_vec,
-            normalize=True,
-            normalization='component'
+        edge_attr = o3.spherical_harmonics(l=self.irreps_sh, x=edge_vec, normalize=True, normalization="component")
+        edge_length_embedded = (
+            soft_one_hot_linspace(x=edge_vec.norm(dim=1), start=0.5, end=2.5, number=3, basis="smooth_finite", cutoff=True)
+            * 3 ** 0.5
         )
-        edge_length_embedded = soft_one_hot_linspace(
-            x=edge_vec.norm(dim=1),
-            start=0.5,
-            end=2.5,
-            number=3,
-            basis='smooth_finite',
-            cutoff=True
-        ) * 3**0.5
 
-        x = scatter(edge_attr, edge_dst, dim=0).div(self.num_neighbors**0.5)
+        x = scatter(edge_attr, edge_dst, dim=0).div(self.num_neighbors ** 0.5)
 
         x = self.conv(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
         x = self.gate(x)
         x = self.final(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
-        return scatter(x, data.batch, dim=0).div(num_nodes**0.5)
+        return scatter(x, data.batch, dim=0).div(num_nodes ** 0.5)
 
 
 def main():
@@ -189,7 +185,7 @@ def main():
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
 
@@ -210,11 +206,11 @@ def test():
 
 def profile():
     data, labels = tetris()
-    data = data.to(device='cuda')
-    labels = labels.to(device='cuda')
+    data = data.to(device="cuda")
+    labels = labels.to(device="cuda")
 
     f = Network()
-    f.to(device='cuda')
+    f.to(device="cuda")
 
     optim = torch.optim.Adam(f.parameters(), lr=1e-2)
 
@@ -226,14 +222,9 @@ def profile():
         called_num[0] += 1
 
     with torch.profiler.profile(
-        activities=[
-            torch.profiler.ProfilerActivity.CPU,
-            torch.profiler.ProfilerActivity.CUDA],
-        schedule=torch.profiler.schedule(
-            wait=50,
-            warmup=1,
-            active=1),
-        on_trace_ready=trace_handler
+        activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+        schedule=torch.profiler.schedule(wait=50, warmup=1, active=1),
+        on_trace_ready=trace_handler,
     ) as p:
         for _ in range(52):
             pred = f(data)

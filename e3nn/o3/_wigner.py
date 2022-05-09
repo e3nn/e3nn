@@ -14,24 +14,27 @@ def su2_generators(j) -> torch.Tensor:
     lowering = torch.diag(torch.sqrt(j * (j + 1) - m * (m - 1)), diagonal=1)
 
     m = torch.arange(-j, j + 1)
-    return torch.stack([
-        0.5 * (raising + lowering),  # x (usually)
-        torch.diag(1j * m),  # z (usually)
-        -0.5j * (raising - lowering),  # -y (usually)
-    ], dim=0)
+    return torch.stack(
+        [
+            0.5 * (raising + lowering),  # x (usually)
+            torch.diag(1j * m),  # z (usually)
+            -0.5j * (raising - lowering),  # -y (usually)
+        ],
+        dim=0,
+    )
 
 
 def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tensor:
     # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
     q = torch.zeros((2 * l + 1, 2 * l + 1), dtype=torch.complex128)
     for m in range(-l, 0):
-        q[l + m, l + abs(m)] = 1 / 2**0.5
-        q[l + m, l - abs(m)] = -1j / 2**0.5
+        q[l + m, l + abs(m)] = 1 / 2 ** 0.5
+        q[l + m, l - abs(m)] = -1j / 2 ** 0.5
     q[l, l] = 1
     for m in range(1, l + 1):
-        q[l + m, l + abs(m)] = (-1)**m / 2**0.5
-        q[l + m, l - abs(m)] = 1j * (-1)**m / 2**0.5
-    q = (-1j)**l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
+        q[l + m, l + abs(m)] = (-1) ** m / 2 ** 0.5
+        q[l + m, l - abs(m)] = 1j * (-1) ** m / 2 ** 0.5
+    q = (-1j) ** l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
 
     dtype, device = explicit_default_types(dtype, device)
     dtype = {
@@ -146,7 +149,7 @@ def _so3_clebsch_gordan(l1, l2, l3):
     Q2 = change_basis_real_to_complex(l2, dtype=torch.float64)
     Q3 = change_basis_real_to_complex(l3, dtype=torch.float64)
     C = _su2_clebsch_gordan(l1, l2, l3).to(dtype=torch.complex128)
-    C = torch.einsum('ij,kl,mn,ikn->jlm', Q1, Q2, torch.conj(Q3.T), C)
+    C = torch.einsum("ij,kl,mn,ikn->jlm", Q1, Q2, torch.conj(Q3.T), C)
 
     # make it real
     assert torch.all(torch.abs(torch.imag(C)) < 1e-5)
@@ -192,6 +195,7 @@ def _so3_clebsch_gordan(l1, l2, l3):
 #    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+
 @functools.lru_cache(maxsize=None)
 def _su2_clebsch_gordan(j1, j2, j3):
     """Calculates the Clebsch-Gordon matrix
@@ -217,7 +221,9 @@ def _su2_clebsch_gordan(j1, j2, j3):
         for m1 in (x / 2 for x in range(-int(2 * j1), int(2 * j1) + 1, 2)):
             for m2 in (x / 2 for x in range(-int(2 * j2), int(2 * j2) + 1, 2)):
                 if abs(m1 + m2) <= j3:
-                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = _su2_clebsch_gordan_coeff((j1, m1), (j2, m2), (j3, m1 + m2))
+                    mat[int(j1 + m1), int(j2 + m2), int(j3 + m1 + m2)] = _su2_clebsch_gordan_coeff(
+                        (j1, m1), (j2, m2), (j3, m1 + m2)
+                    )
     return mat
 
 
@@ -260,17 +266,17 @@ def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
         return factorial(round(n))
 
     C = (
-        (2.0 * j3 + 1.0) * Fraction(
+        (2.0 * j3 + 1.0)
+        * Fraction(
             f(j3 + j1 - j2) * f(j3 - j1 + j2) * f(j1 + j2 - j3) * f(j3 + m3) * f(j3 - m3),
-            f(j1 + j2 + j3 + 1) * f(j1 - m1) * f(j1 + m1) * f(j2 - m2) * f(j2 + m2)
+            f(j1 + j2 + j3 + 1) * f(j1 - m1) * f(j1 + m1) * f(j2 - m2) * f(j2 + m2),
         )
-    )**0.5
+    ) ** 0.5
 
     S = 0
     for v in range(vmin, vmax + 1):
-        S += (-1)**int(v + j2 + m2) * Fraction(
-            f(j2 + j3 + m1 - v) * f(j1 - m1 + v),
-            f(v) * f(j3 - j1 + j2 - v) * f(j3 + m3 - v) * f(v + j1 - j2 - m3)
+        S += (-1) ** int(v + j2 + m2) * Fraction(
+            f(j2 + j3 + m1 - v) * f(j1 - m1 + v), f(v) * f(j3 - j1 + j2 - v) * f(j3 + m3 - v) * f(v + j1 - j2 - m3)
         )
     C = C * S
     return C

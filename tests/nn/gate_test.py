@@ -7,7 +7,13 @@ from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_norma
 
 
 def test_gate():
-    irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated = Irreps("16x0o"), [torch.tanh], Irreps("32x0o"), [torch.tanh], Irreps("16x1e+16x1o")
+    irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated = (
+        Irreps("16x0o"),
+        [torch.tanh],
+        Irreps("32x0o"),
+        [torch.tanh],
+        Irreps("16x1e+16x1o"),
+    )
 
     sc = _Sortcut(irreps_scalars, irreps_gates)
     assert_auto_jitable(sc)

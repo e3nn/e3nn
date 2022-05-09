@@ -5,7 +5,7 @@ from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('trace')
+@compile_mode("trace")
 class Activation(torch.nn.Module):
     r"""Scalar activation function.
 
@@ -30,6 +30,7 @@ class Activation(torch.nn.Module):
     >>> a.irreps_out
     256x0o+16x1e
     """
+
     def __init__(self, irreps_in, acts):
         super().__init__()
         irreps_in = o3.Irreps(irreps_in)
@@ -60,7 +61,9 @@ class Activation(torch.nn.Module):
                 irreps_out.append((mul, (0, p_out)))
 
                 if p_out == 0:
-                    raise ValueError("Activation: the parity is violated! The input scalar is odd but the activation is neither even nor odd.")
+                    raise ValueError(
+                        "Activation: the parity is violated! The input scalar is odd but the activation is neither even nor odd."
+                    )
             else:
                 irreps_out.append((mul, (l_in, p_in)))
 
@@ -74,7 +77,7 @@ class Activation(torch.nn.Module):
         return f"{self.__class__.__name__} [{acts}] ({self.irreps_in} -> {self.irreps_out})"
 
     def forward(self, features, dim=-1):
-        '''evaluate
+        """evaluate
 
         Parameters
         ----------
@@ -85,7 +88,7 @@ class Activation(torch.nn.Module):
         -------
         `torch.Tensor`
             tensor of shape the same shape as the input
-        '''
+        """
         # - PROFILER - with torch.autograd.profiler.record_function(repr(self)):
         output = []
         index = 0

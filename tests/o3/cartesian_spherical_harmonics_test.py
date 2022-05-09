@@ -25,28 +25,22 @@ def test_weird_irreps():
         o3.SphericalHarmonics(
             irreps_out="1x0e + 4x1e + 3x2e",
             normalize=True,
-            normalization='integral',
+            normalization="integral",
             irreps_in="1o",
         )
 
     # Good parity but psuedovector input
-    _ = o3.SphericalHarmonics(
-        irreps_in="1e",
-        irreps_out="1x0e + 4x1e + 3x2e",
-        normalize=True
-    )
+    _ = o3.SphericalHarmonics(irreps_in="1e", irreps_out="1x0e + 4x1e + 3x2e", normalize=True)
 
     # Invalid input
     with pytest.raises(ValueError):
-        _ = o3.SphericalHarmonics(
-            irreps_in="1e + 3o",  # invalid
-            irreps_out="1x0e + 4x1e + 3x2e",
-            normalize=True
-        )
+        _ = o3.SphericalHarmonics(irreps_in="1e + 3o", irreps_out="1x0e + 4x1e + 3x2e", normalize=True)  # invalid
 
 
 def test_zeros():
-    assert torch.allclose(o3.spherical_harmonics([0, 1], torch.zeros(1, 3), False, normalization='norm'), torch.tensor([[1, 0, 0, 0.0]]))
+    assert torch.allclose(
+        o3.spherical_harmonics([0, 1], torch.zeros(1, 3), False, normalization="norm"), torch.tensor([[1, 0, 0, 0.0]])
+    )
 
 
 def test_equivariance(float_tolerance):
@@ -57,35 +51,40 @@ def test_equivariance(float_tolerance):
     y1 = o3.spherical_harmonics(irreps, x @ o3.angles_to_matrix(*abc).T, False)
     y2 = o3.spherical_harmonics(irreps, x, False) @ irreps.D_from_angles(*abc).T
 
-    assert (y1 - y2).abs().max() < 10*float_tolerance
+    assert (y1 - y2).abs().max() < 10 * float_tolerance
 
 
 def test_backwardable():
     lmax = 3
     ls = list(range(lmax + 1))
 
-    xyz = torch.tensor([
-        [0., 0., 1.],
-        [1.0, 0, 0],
-        [0.0, 10.0, 0],
-        [0.435, 0.7644, 0.023],
-    ], requires_grad=True, dtype=torch.float64)
+    xyz = torch.tensor(
+        [
+            [0.0, 0.0, 1.0],
+            [1.0, 0, 0],
+            [0.0, 10.0, 0],
+            [0.435, 0.7644, 0.023],
+        ],
+        requires_grad=True,
+        dtype=torch.float64,
+    )
 
     def func(pos):
         return o3.spherical_harmonics(ls, pos, False)
+
     assert torch.autograd.gradcheck(func, (xyz,), check_undefined_grad=False)
 
 
-@pytest.mark.parametrize('l', range(10 + 1))
+@pytest.mark.parametrize("l", range(10 + 1))
 def test_normalization(float_tolerance, l):
 
-    n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization='integral').pow(2).mean()
+    n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization="integral").pow(2).mean()
     assert abs(n - 1 / (4 * math.pi)) < float_tolerance
 
-    n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization='norm').norm()
+    n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization="norm").norm()
     assert abs(n - 1) < float_tolerance
 
-    n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization='component').pow(2).mean()
+    n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization="component").pow(2).mean()
     assert abs(n - 1) < float_tolerance
 
 
@@ -107,49 +106,40 @@ def test_closure():
                 assert m.abs().max() < 0.01
 
 
-@pytest.mark.parametrize('l', range(11 + 1))
+@pytest.mark.parametrize("l", range(11 + 1))
 def test_parity(float_tolerance, l):
     r"""
     (-1)^l Y(x) = Y(-x)
     """
     x = torch.randn(3)
-    Y1 = (-1)**l * o3.spherical_harmonics(l, x, False)
+    Y1 = (-1) ** l * o3.spherical_harmonics(l, x, False)
     Y2 = o3.spherical_harmonics(l, -x, False)
     assert (Y1 - Y2).abs().max() < float_tolerance
 
 
-@pytest.mark.parametrize('l', range(9 + 1))
+@pytest.mark.parametrize("l", range(9 + 1))
 def test_recurrence_relation(float_tolerance, l):
     if torch.get_default_dtype() != torch.float64 and l > 6:
-        pytest.xfail('we expect this to fail for high l and single precision')
+        pytest.xfail("we expect this to fail for high l and single precision")
 
     x = torch.randn(3, requires_grad=True)
 
     a = o3.spherical_harmonics(l + 1, x, False)
 
-    b = torch.einsum(
-        'ijk,j,k->i',
-        o3.wigner_3j(l + 1, l, 1),
-        o3.spherical_harmonics(l, x, False),
-        x
-    )
+    b = torch.einsum("ijk,j,k->i", o3.wigner_3j(l + 1, l, 1), o3.spherical_harmonics(l, x, False), x)
 
     alpha = b.norm() / a.norm()
 
-    assert (a / a.norm() - b / b.norm()).abs().max() < 10*float_tolerance
+    assert (a / a.norm() - b / b.norm()).abs().max() < 10 * float_tolerance
 
     def f(x):
         return o3.spherical_harmonics(l + 1, x, False)
 
     a = torch.autograd.functional.jacobian(f, x)
 
-    b = (l + 1) / alpha * torch.einsum(
-        'ijk,j->ik',
-        o3.wigner_3j(l + 1, l, 1),
-        o3.spherical_harmonics(l, x, False)
-    )
+    b = (l + 1) / alpha * torch.einsum("ijk,j->ik", o3.wigner_3j(l + 1, l, 1), o3.spherical_harmonics(l, x, False))
 
-    assert (a - b).abs().max() < 100*float_tolerance
+    assert (a - b).abs().max() < 100 * float_tolerance
 
 
 @pytest.mark.parametrize("normalization", ["integral", "component", "norm"])
@@ -159,8 +149,5 @@ def test_module(normalization, normalize):
     sp = o3.SphericalHarmonics(l, normalize, normalization)
     sp_jit = assert_auto_jitable(sp)
     xyz = torch.randn(11, 3)
-    assert torch.allclose(
-        sp_jit(xyz),
-        o3.spherical_harmonics(l, xyz, normalize, normalization)
-    )
+    assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)

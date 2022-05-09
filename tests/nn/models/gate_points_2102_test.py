@@ -35,11 +35,7 @@ def network():
 
     def random_graph():
         N = random.randint(3, 7)
-        return {
-            'pos': torch.randn(N, 3),
-            'x': f.irreps_in.randn(N, -1),
-            'z': f.irreps_node_attr.randn(N, -1)
-        }
+        return {"pos": torch.randn(N, 3), "x": f.irreps_in.randn(N, -1), "z": f.irreps_node_attr.randn(N, -1)}
 
     return f, random_graph
 
@@ -60,7 +56,7 @@ def test_gate_points_2102_equivariant(network):
 
     assert_equivariant(
         wrapper,
-        irreps_in=['cartesian_points', f.irreps_in, f.irreps_node_attr],
+        irreps_in=["cartesian_points", f.irreps_in, f.irreps_node_attr],
         irreps_out=[f.irreps_out],
     )
 

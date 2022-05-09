@@ -195,12 +195,15 @@ def compose_quaternion(q1, q2):
         tensor of shape :math:`(..., 4)`
     """
     q1, q2 = torch.broadcast_tensors(q1, q2)
-    return torch.stack([
-        q1[..., 0] * q2[..., 0] - q1[..., 1] * q2[..., 1] - q1[..., 2] * q2[..., 2] - q1[..., 3] * q2[..., 3],
-        q1[..., 1] * q2[..., 0] + q1[..., 0] * q2[..., 1] + q1[..., 2] * q2[..., 3] - q1[..., 3] * q2[..., 2],
-        q1[..., 0] * q2[..., 2] - q1[..., 1] * q2[..., 3] + q1[..., 2] * q2[..., 0] + q1[..., 3] * q2[..., 1],
-        q1[..., 0] * q2[..., 3] + q1[..., 1] * q2[..., 2] - q1[..., 2] * q2[..., 1] + q1[..., 3] * q2[..., 0],
-    ], dim=-1)
+    return torch.stack(
+        [
+            q1[..., 0] * q2[..., 0] - q1[..., 1] * q2[..., 1] - q1[..., 2] * q2[..., 2] - q1[..., 3] * q2[..., 3],
+            q1[..., 1] * q2[..., 0] + q1[..., 0] * q2[..., 1] + q1[..., 2] * q2[..., 3] - q1[..., 3] * q2[..., 2],
+            q1[..., 0] * q2[..., 2] - q1[..., 1] * q2[..., 3] + q1[..., 2] * q2[..., 0] + q1[..., 3] * q2[..., 1],
+            q1[..., 0] * q2[..., 3] + q1[..., 1] * q2[..., 2] - q1[..., 2] * q2[..., 1] + q1[..., 3] * q2[..., 0],
+        ],
+        dim=-1,
+    )
 
 
 def inverse_quaternion(q):
@@ -272,7 +275,9 @@ def compose_axis_angle(axis1, angle1, axis2, angle2):
     angle : `torch.Tensor`
         tensor of shape :math:`(...)`
     """
-    return quaternion_to_axis_angle(compose_quaternion(axis_angle_to_quaternion(axis1, angle1), axis_angle_to_quaternion(axis2, angle2)))
+    return quaternion_to_axis_angle(
+        compose_quaternion(axis_angle_to_quaternion(axis1, angle1), axis_angle_to_quaternion(axis2, angle2))
+    )
 
 
 # conversions
@@ -295,11 +300,14 @@ def matrix_x(angle: torch.Tensor) -> torch.Tensor:
     s = angle.sin()
     o = torch.ones_like(angle)
     z = torch.zeros_like(angle)
-    return torch.stack([
-        torch.stack([o, z, z], dim=-1),
-        torch.stack([z, c, -s], dim=-1),
-        torch.stack([z, s, c], dim=-1),
-    ], dim=-2)
+    return torch.stack(
+        [
+            torch.stack([o, z, z], dim=-1),
+            torch.stack([z, c, -s], dim=-1),
+            torch.stack([z, s, c], dim=-1),
+        ],
+        dim=-2,
+    )
 
 
 def matrix_y(angle: torch.Tensor) -> torch.Tensor:
@@ -319,11 +327,14 @@ def matrix_y(angle: torch.Tensor) -> torch.Tensor:
     s = angle.sin()
     o = torch.ones_like(angle)
     z = torch.zeros_like(angle)
-    return torch.stack([
-        torch.stack([c, z, s], dim=-1),
-        torch.stack([z, o, z], dim=-1),
-        torch.stack([-s, z, c], dim=-1),
-    ], dim=-2)
+    return torch.stack(
+        [
+            torch.stack([c, z, s], dim=-1),
+            torch.stack([z, o, z], dim=-1),
+            torch.stack([-s, z, c], dim=-1),
+        ],
+        dim=-2,
+    )
 
 
 def matrix_z(angle: torch.Tensor) -> torch.Tensor:
@@ -343,11 +354,9 @@ def matrix_z(angle: torch.Tensor) -> torch.Tensor:
     s = angle.sin()
     o = torch.ones_like(angle)
     z = torch.zeros_like(angle)
-    return torch.stack([
-        torch.stack([c, -s, z], dim=-1),
-        torch.stack([s, c, z], dim=-1),
-        torch.stack([z, z, o], dim=-1)
-    ], dim=-2)
+    return torch.stack(
+        [torch.stack([c, -s, z], dim=-1), torch.stack([s, c, z], dim=-1), torch.stack([z, z, o], dim=-1)], dim=-2
+    )
 
 
 def angles_to_matrix(alpha, beta, gamma):
@@ -505,11 +514,14 @@ def matrix_to_axis_angle(R):
     assert torch.allclose(torch.det(R), R.new_tensor(1))
     tr = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
     angle = torch.acos(tr.sub(1).div(2).clamp(-1, 1))
-    axis = torch.stack([
-        R[..., 2, 1] - R[..., 1, 2],
-        R[..., 0, 2] - R[..., 2, 0],
-        R[..., 1, 0] - R[..., 0, 1],
-    ], dim=-1)
+    axis = torch.stack(
+        [
+            R[..., 2, 1] - R[..., 1, 2],
+            R[..., 0, 2] - R[..., 2, 0],
+            R[..., 1, 0] - R[..., 0, 1],
+        ],
+        dim=-1,
+    )
     axis = torch.nn.functional.normalize(axis, dim=-1)
     return axis, angle
 

@@ -24,10 +24,12 @@ def test_conversions(float_tolerance):
                 return f(*x)
             else:
                 return f(x)
+
         return g
 
     def identity(x):
         return x
+
     conv = [
         [identity, wrap(o3.angles_to_matrix), wrap(o3.angles_to_axis_angle), wrap(o3.angles_to_quaternion)],
         [wrap(o3.matrix_to_angles), identity, wrap(o3.matrix_to_axis_angle), wrap(o3.matrix_to_quaternion)],
@@ -102,11 +104,11 @@ def test_rand_axis_angle():
 def test_matrix_xyz(float_tolerance):
     x = torch.randn(100, 3)
 
-    y = torch.einsum('zij,zj->zi', o3.matrix_x(torch.randn(100)), x)
+    y = torch.einsum("zij,zj->zi", o3.matrix_x(torch.randn(100)), x)
     assert (x[:, 0] - y[:, 0]).abs().max() < float_tolerance
 
-    y = torch.einsum('zij,zj->zi', o3.matrix_y(torch.randn(100)), x)
+    y = torch.einsum("zij,zj->zi", o3.matrix_y(torch.randn(100)), x)
     assert (x[:, 1] - y[:, 1]).abs().max() < float_tolerance
 
-    y = torch.einsum('zij,zj->zi', o3.matrix_z(torch.randn(100)), x)
+    y = torch.einsum("zij,zj->zi", o3.matrix_z(torch.randn(100)), x)
     assert (x[:, 2] - y[:, 2]).abs().max() < float_tolerance

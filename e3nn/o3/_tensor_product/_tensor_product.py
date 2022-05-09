@@ -21,7 +21,7 @@ _CODEGEN_PROVIDERS_LEFT_RIGHT: List[Callable] = [codegen_tensor_product_left_rig
 _CODEGEN_PROVIDERS_RIGHT: List[Callable] = [codegen_tensor_product_right]
 
 
-@compile_mode('script')
+@compile_mode("script")
 class TensorProduct(CodeGenMixin, torch.nn.Module):
     r"""Tensor product with parametrized paths.
 
@@ -205,26 +205,23 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         compile_right: bool = False,
         normalization=None,  # for backward compatibility
         _specialized_code: Optional[bool] = None,
-        _optimize_einsums: Optional[bool] = None
+        _optimize_einsums: Optional[bool] = None,
     ):
         # === Setup ===
         super().__init__()
 
         if normalization is not None:
-            warnings.warn(
-                "`normalization` is deprecated. Use `irrep_normalization` instead.",
-                DeprecationWarning
-            )
+            warnings.warn("`normalization` is deprecated. Use `irrep_normalization` instead.", DeprecationWarning)
             irrep_normalization = normalization
 
         if irrep_normalization is None:
-            irrep_normalization = 'component'
+            irrep_normalization = "component"
 
         if path_normalization is None:
-            path_normalization = 'element'
+            path_normalization = "element"
 
-        assert irrep_normalization in ['component', 'norm', 'none']
-        assert path_normalization in ['element', 'path', 'none']
+        assert irrep_normalization in ["component", "norm", "none"]
+        assert path_normalization in ["element", "path", "none"]
 
         self.irreps_in1 = o3.Irreps(irreps_in1)
         self.irreps_in2 = o3.Irreps(irreps_in2)
@@ -241,14 +238,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 has_weight=has_weight,
                 path_weight=path_weight,
                 path_shape={
-                    'uvw': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
-                    'uvu': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                    'uvv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                    'uuw': (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
-                    'uuu': (self.irreps_in1[i_in1].mul,),
-                    'uvuv': (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
-                    'uvu<v': (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2,),
-                    'u<vw': (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2, self.irreps_out[i_out].mul),
+                    "uvw": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul, self.irreps_out[i_out].mul),
+                    "uvu": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    "uvv": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    "uuw": (self.irreps_in1[i_in1].mul, self.irreps_out[i_out].mul),
+                    "uuu": (self.irreps_in1[i_in1].mul,),
+                    "uvuv": (self.irreps_in1[i_in1].mul, self.irreps_in2[i_in2].mul),
+                    "uvu<v": (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2,),
+                    "u<vw": (self.irreps_in1[i_in1].mul * (self.irreps_in2[i_in2].mul - 1) // 2, self.irreps_out[i_out].mul),
                 }[connection_mode],
             )
             for i_in1, i_in2, i_out, connection_mode, has_weight, path_weight in instructions
@@ -274,14 +271,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         def num_elements(ins):
             return {
-                'uvw': (self.irreps_in1[ins.i_in1].mul * self.irreps_in2[ins.i_in2].mul),
-                'uvu': self.irreps_in2[ins.i_in2].mul,
-                'uvv': self.irreps_in1[ins.i_in1].mul,
-                'uuw': self.irreps_in1[ins.i_in1].mul,
-                'uuu': 1,
-                'uvuv': 1,
-                'uvu<v': 1,
-                'u<vw': self.irreps_in1[ins.i_in1].mul * (self.irreps_in2[ins.i_in2].mul - 1) // 2,
+                "uvw": (self.irreps_in1[ins.i_in1].mul * self.irreps_in2[ins.i_in2].mul),
+                "uvu": self.irreps_in2[ins.i_in2].mul,
+                "uvv": self.irreps_in1[ins.i_in1].mul,
+                "uuw": self.irreps_in1[ins.i_in1].mul,
+                "uuu": 1,
+                "uvuv": 1,
+                "uvu<v": 1,
+                "u<vw": self.irreps_in1[ins.i_in1].mul * (self.irreps_in2[ins.i_in2].mul - 1) // 2,
             }[ins.connection_mode]
 
         normalization_coefficients = []
@@ -291,25 +288,21 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             mul_ir_out = self.irreps_out[ins.i_out]
             assert mul_ir_in1.ir.p * mul_ir_in2.ir.p == mul_ir_out.ir.p
             assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
-            assert ins.connection_mode in ['uvw', 'uvu', 'uvv', 'uuw', 'uuu', 'uvuv', 'uvu<v', 'u<vw']
+            assert ins.connection_mode in ["uvw", "uvu", "uvv", "uuw", "uuu", "uvuv", "uvu<v", "u<vw"]
 
-            if irrep_normalization == 'component':
+            if irrep_normalization == "component":
                 alpha = mul_ir_out.ir.dim
-            if irrep_normalization == 'norm':
+            if irrep_normalization == "norm":
                 alpha = mul_ir_in1.ir.dim * mul_ir_in2.ir.dim
-            if irrep_normalization == 'none':
+            if irrep_normalization == "none":
                 alpha = 1
 
-            if path_normalization == 'element':
-                x = sum(
-                    in1_var[i.i_in1] * in2_var[i.i_in2] * num_elements(i)
-                    for i in instructions
-                    if i.i_out == ins.i_out
-                )
-            if path_normalization == 'path':
+            if path_normalization == "element":
+                x = sum(in1_var[i.i_in1] * in2_var[i.i_in2] * num_elements(i) for i in instructions if i.i_out == ins.i_out)
+            if path_normalization == "path":
                 x = in1_var[ins.i_in1] * in2_var[ins.i_in2] * num_elements(ins)
                 x *= len([i for i in instructions if i.i_out == ins.i_out])
-            if path_normalization == 'none':
+            if path_normalization == "none":
                 x = 1
 
             if x > 0.0:
@@ -342,8 +335,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         self.shared_weights = shared_weights
 
         opt_defaults = e3nn.get_optimization_defaults()
-        self._specialized_code = _specialized_code if _specialized_code is not None else opt_defaults['specialized_code']
-        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults['optimize_einsums']
+        self._specialized_code = _specialized_code if _specialized_code is not None else opt_defaults["specialized_code"]
+        self._optimize_einsums = _optimize_einsums if _optimize_einsums is not None else opt_defaults["optimize_einsums"]
         del opt_defaults
 
         # Generate the actual tensor product code
@@ -356,19 +349,22 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     self.instructions,
                     self.shared_weights,
                     self._specialized_code,
-                    self._optimize_einsums
+                    self._optimize_einsums,
                 )
                 if graphmod_left_right is not None:
                     break
             assert graphmod_left_right is not None
         else:
             graphmod_left_right = fx.Graph()
-            graphmod_left_right.placeholder('x1', torch.Tensor)
-            graphmod_left_right.placeholder('x2', torch.Tensor)
-            graphmod_left_right.placeholder('w', torch.Tensor)
+            graphmod_left_right.placeholder("x1", torch.Tensor)
+            graphmod_left_right.placeholder("x2", torch.Tensor)
+            graphmod_left_right.placeholder("w", torch.Tensor)
             graphmod_left_right.call_function(
                 torch._assert,
-                args=(False, "`left_right` method is not compiled, set `compile_left_right` to True when creating the TensorProduct")
+                args=(
+                    False,
+                    "`left_right` method is not compiled, set `compile_left_right` to True when creating the TensorProduct",
+                ),
             )
             graphmod_left_right = fx.GraphModule(torch.nn.Module(), graphmod_left_right, class_name="tp_forward")
 
@@ -381,25 +377,22 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     self.instructions,
                     self.shared_weights,
                     self._specialized_code,
-                    self._optimize_einsums
+                    self._optimize_einsums,
                 )
                 if graphmod_right is not None:
                     break
             assert graphmod_right is not None
         else:
             graphmod_right = fx.Graph()
-            graphmod_right.placeholder('x2', torch.Tensor)
-            graphmod_right.placeholder('w', torch.Tensor)
+            graphmod_right.placeholder("x2", torch.Tensor)
+            graphmod_right.placeholder("w", torch.Tensor)
             graphmod_right.call_function(
                 torch._assert,
-                args=(False, "`right` method is not compiled, set `compile_right` to True when creating the TensorProduct")
+                args=(False, "`right` method is not compiled, set `compile_right` to True when creating the TensorProduct"),
             )
             graphmod_right = fx.GraphModule(torch.nn.Module(), graphmod_right, class_name="tp_forward")
 
-        self._codegen_register({
-            "_compiled_main_left_right": graphmod_left_right,
-            "_compiled_main_right": graphmod_right
-        })
+        self._codegen_register({"_compiled_main_left_right": graphmod_left_right, "_compiled_main_right": graphmod_right})
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
@@ -409,21 +402,23 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             self.weight = torch.nn.Parameter(torch.randn(self.weight_numel))
         else:
             # For TorchScript, there always has to be some kind of defined .weight
-            self.register_buffer('weight', torch.Tensor())
+            self.register_buffer("weight", torch.Tensor())
 
         if self.irreps_out.dim > 0:
-            output_mask = torch.cat([
-                torch.ones(mul * ir.dim)
-                if any(
-                    (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
-                    for ins in self.instructions
-                )
-                else torch.zeros(mul * ir.dim)
-                for i_out, (mul, ir) in enumerate(self.irreps_out)
-            ])
+            output_mask = torch.cat(
+                [
+                    torch.ones(mul * ir.dim)
+                    if any(
+                        (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
+                        for ins in self.instructions
+                    )
+                    else torch.zeros(mul * ir.dim)
+                    for i_out, (mul, ir) in enumerate(self.irreps_out)
+                ]
+            )
         else:
             output_mask = torch.ones(0)
-        self.register_buffer('output_mask', output_mask)
+        self.register_buffer("output_mask", output_mask)
 
         # For TorchScript, this needs to be done in advance:
         self._profiling_str = str(self)
@@ -543,11 +538,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         real_weight = self._get_weights(weight)
         return self._compiled_main_left_right(x, y, real_weight)
 
-    def weight_view_for_instruction(
-        self,
-        instruction: int,
-        weight: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def weight_view_for_instruction(self, instruction: int, weight: Optional[torch.Tensor] = None) -> torch.Tensor:
         r"""View of weights corresponding to ``instruction``.
 
         Parameters
@@ -571,11 +562,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         batchshape = weight.shape[:-1]
         return weight.narrow(-1, offset, prod(ins.path_shape)).view(batchshape + ins.path_shape)
 
-    def weight_views(
-        self,
-        weight: Optional[torch.Tensor] = None,
-        yield_instruction: bool = False
-    ):
+    def weight_views(self, weight: Optional[torch.Tensor] = None, yield_instruction: bool = False):
         r"""Iterator over weight views for each weighted instruction.
 
         Parameters
@@ -605,11 +592,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     yield this_weight
 
     def visualize(
-        self,
-        weight: Optional[torch.Tensor] = None,
-        plot_weight: bool = True,
-        aspect_ratio=1,
-        ax=None
+        self, weight: Optional[torch.Tensor] = None, plot_weight: bool = True, aspect_ratio=1, ax=None
     ):  # pragma: no cover
         r"""Visualize the connectivity of this `e3nn.o3.TensorProduct`
 
@@ -632,10 +615,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         import numpy as np
 
         def _intersection(x, u, y, v):
-            u2 = np.sum(u**2)
-            v2 = np.sum(v**2)
+            u2 = np.sum(u ** 2)
+            v2 = np.sum(v ** 2)
             uv = np.sum(u * v)
-            det = u2 * v2 - uv**2
+            det = u2 * v2 - uv ** 2
             mu = np.sum((u * uv - v * u2) * (y - x)) / det
             return y + mu * v
 
@@ -650,16 +633,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         fig = ax.get_figure()
 
         # hexagon
-        verts = [
-            np.array([np.cos(a * 2 * np.pi / 6), np.sin(a * 2 * np.pi / 6)])
-            for a in range(6)
-        ]
+        verts = [np.array([np.cos(a * 2 * np.pi / 6), np.sin(a * 2 * np.pi / 6)]) for a in range(6)]
         verts = np.asarray(verts)
 
         # scale it
-        assert aspect_ratio in ['auto'] or isinstance(aspect_ratio, (float, int))
+        assert aspect_ratio in ["auto"] or isinstance(aspect_ratio, (float, int))
 
-        if aspect_ratio == 'auto':
+        if aspect_ratio == "auto":
             factor = 0.2 / 2
             min_aspect = 1 / 2
             h_factor = max(len(self.irreps_in2), len(self.irreps_in1))
@@ -677,16 +657,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         codes = [
             Path.MOVETO,
             Path.LINETO,
-
             Path.MOVETO,
             Path.LINETO,
-
             Path.MOVETO,
             Path.LINETO,
         ]
 
         path = Path(verts, codes)
-        patch = patches.PathPatch(path, facecolor='none', lw=1, zorder=2)
+        patch = patches.PathPatch(path, facecolor="none", lw=1, zorder=2)
         ax.add_patch(patch)
 
         n = len(self.irreps_in1)
@@ -720,7 +698,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                         path_weight.append(0)
                 path_weight = np.asarray(path_weight)
                 path_weight /= np.abs(path_weight).max()
-        cmap = matplotlib.cm.get_cmap('Blues')
+        cmap = matplotlib.cm.get_cmap("Blues")
 
         for ins_index, ins in enumerate(self.instructions):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)
@@ -735,18 +713,20 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             codes += [Path.MOVETO, Path.LINETO]
 
             if plot_weight:
-                color = cmap(0.5 + 0.5 * path_weight[ins_index]) if ins.has_weight else 'black'
+                color = cmap(0.5 + 0.5 * path_weight[ins_index]) if ins.has_weight else "black"
             else:
-                color = 'green' if ins.has_weight else 'black'
+                color = "green" if ins.has_weight else "black"
 
-            ax.add_patch(patches.PathPatch(
-                Path(verts, codes),
-                facecolor='none',
-                edgecolor=color,
-                alpha=0.5,
-                ls='-',
-                lw=1.5,
-            ))
+            ax.add_patch(
+                patches.PathPatch(
+                    Path(verts, codes),
+                    facecolor="none",
+                    edgecolor=color,
+                    alpha=0.5,
+                    ls="-",
+                    lw=1.5,
+                )
+            )
 
         # add labels
         padding = 3
@@ -761,37 +741,37 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             ax.annotate(
                 format_ir(mul_ir),
                 s_in1[i],
-                horizontalalignment='right',
-                textcoords='offset points',
+                horizontalalignment="right",
+                textcoords="offset points",
                 xytext=(-padding, 0),
-                fontsize=fontsize
+                fontsize=fontsize,
             )
 
         for i, mul_ir in enumerate(self.irreps_in2):
             ax.annotate(
                 format_ir(mul_ir),
                 s_in2[i],
-                horizontalalignment='left',
-                textcoords='offset points',
+                horizontalalignment="left",
+                textcoords="offset points",
                 xytext=(padding, 0),
-                fontsize=fontsize
+                fontsize=fontsize,
             )
 
         for i, mul_ir in enumerate(self.irreps_out):
             ax.annotate(
                 format_ir(mul_ir),
                 s_out[i],
-                horizontalalignment='center',
-                verticalalignment='top',
+                horizontalalignment="center",
+                verticalalignment="top",
                 rotation=90,
-                textcoords='offset points',
+                textcoords="offset points",
                 xytext=(0, -padding),
-                fontsize=fontsize
+                fontsize=fontsize,
             )
 
         ax.set_xlim(-2, 2)
         ax.set_ylim(-2, 2)
-        ax.axis('equal')
-        ax.axis('off')
+        ax.axis("equal")
+        ax.axis("off")
 
         return fig, ax

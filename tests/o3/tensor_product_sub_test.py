@@ -21,11 +21,11 @@ def test_fully_connected():
 def test_fully_connected_normalization():
     m = FullyConnectedTensorProduct("10x0e", "10x0e", "0e")
     for p in m.parameters():
-        p.data.fill_(1.)
+        p.data.fill_(1.0)
 
     n = FullyConnectedTensorProduct("3x0e + 7x0e", "3x0e + 7x0e", "0e")
     for p in n.parameters():
-        p.data.fill_(1.)
+        p.data.fill_(1.0)
 
     x1, x2 = torch.randn(2, 3, 10)
     assert torch.allclose(m(x1, x2), n(x1, x2))
@@ -57,11 +57,7 @@ def test_norm():
     scalars = torch.randn(3)
     vecs = torch.randn(5, 3)
     norm = Norm(irreps_in=irreps_in)
-    out_norms = norm(
-        torch.cat((
-            scalars.reshape(1, -1), vecs.reshape(1, -1)
-        ), dim=-1)
-    )
+    out_norms = norm(torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1))
     true_scalar_norms = torch.abs(scalars)
     true_vec_norms = torch.linalg.norm(vecs, dim=-1)
     assert torch.allclose(out_norms[0, :3], true_scalar_norms)
@@ -73,21 +69,21 @@ def test_norm():
 
 def test_square_normalization():
     irreps = o3.Irreps("0e + 1e + 2e")
-    tp = TensorSquare(irreps, irrep_normalization='norm')
-    x = irreps.randn(1_000_000, -1, normalization='norm')
+    tp = TensorSquare(irreps, irrep_normalization="norm")
+    x = irreps.randn(1_000_000, -1, normalization="norm")
     y = tp(x)
     n = Norm(tp.irreps_out, squared=True)(y)
 
     assert (n.mean(0).log().abs().exp() < 1.1).all()
 
     irreps = o3.Irreps("0e + 3x1e + 3e")
-    tp = o3.TensorSquare(irreps, irrep_normalization='component')
-    x = irreps.randn(1_000_000, -1, normalization='component')
+    tp = o3.TensorSquare(irreps, irrep_normalization="component")
+    x = irreps.randn(1_000_000, -1, normalization="component")
     y = tp(x)
 
     assert (y.pow(2).mean(0).log().abs().exp() < 1.1).all()
 
-    tp = TensorSquare(irreps, irrep_normalization='none')
+    tp = TensorSquare(irreps, irrep_normalization="none")
     y = tp(x)
 
     assert not (y.pow(2).mean(0).log().abs().exp() < 1.1).all()

@@ -108,16 +108,16 @@ def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutof
 
     diff = (x[..., None] - values) / step
 
-    if basis == 'gaussian':
+    if basis == "gaussian":
         return diff.pow(2).neg().exp().div(1.12)
 
-    if basis == 'cosine':
-        return torch.cos(math.pi/2 * diff) * (diff < 1) * (-1 < diff)
+    if basis == "cosine":
+        return torch.cos(math.pi / 2 * diff) * (diff < 1) * (-1 < diff)
 
-    if basis == 'smooth_finite':
+    if basis == "smooth_finite":
         return 1.14136 * torch.exp(torch.tensor(2.0)) * soft_unit_step(diff + 1) * soft_unit_step(1 - diff)
 
-    if basis == 'fourier':
+    if basis == "fourier":
         x = (x[..., None] - start) / (end - start)
         if not cutoff:
             i = torch.arange(0, number, dtype=x.dtype, device=x.device)
@@ -126,7 +126,7 @@ def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutof
             i = torch.arange(1, number + 1, dtype=x.dtype, device=x.device)
             return torch.sin(math.pi * i * x) / math.sqrt(0.25 + number / 2) * (0 < x) * (x < 1)
 
-    if basis == 'bessel':
+    if basis == "bessel":
         x = x[..., None] - start
         c = end - start
         bessel_roots = torch.arange(1, number + 1, dtype=x.dtype, device=x.device) * math.pi
@@ -137,4 +137,4 @@ def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutof
         else:
             return out * ((x / c) < 1) * (0 < x)
 
-    raise ValueError(f"basis=\"{basis}\" is not a valid entry")
+    raise ValueError(f'basis="{basis}" is not a valid entry')

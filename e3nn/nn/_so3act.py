@@ -4,9 +4,9 @@ from e3nn.util.jit import compile_mode
 from e3nn.o3 import SO3Grid
 
 
-@compile_mode('script')
+@compile_mode("script")
 class SO3Activation(torch.nn.Module):
-    r'''Apply non linearity on the signal on SO(3)
+    r"""Apply non linearity on the signal on SO(3)
 
     Parameters
     ----------
@@ -23,8 +23,9 @@ class SO3Activation(torch.nn.Module):
         SO(3) grid resolution
 
     normalization : {'norm', 'component'}
-    '''
-    def __init__(self, lmax_in, lmax_out, act, resolution, *, normalization='component', aspect_ratio=2):
+    """
+
+    def __init__(self, lmax_in, lmax_out, act, resolution, *, normalization="component", aspect_ratio=2):
         super().__init__()
 
         self.grid_in = SO3Grid(lmax_in, resolution, normalization=normalization, aspect_ratio=aspect_ratio)
@@ -38,7 +39,7 @@ class SO3Activation(torch.nn.Module):
         return f"{self.__class__.__name__} ({self.lmax_in} -> {self.lmax_out})"
 
     def forward(self, features):
-        r'''evaluate
+        r"""evaluate
 
         Parameters
         ----------
@@ -50,7 +51,7 @@ class SO3Activation(torch.nn.Module):
         -------
         `torch.Tensor`
             tensor of shape ``(..., self.irreps_out.dim)``
-        '''
+        """
         features = self.grid_in.to_grid(features)
         features = self.act(features)
         features = self.grid_out.from_grid(features)

@@ -63,9 +63,13 @@ class SphericalTensor(o3.Irreps):
     # pylint: disable=abstract-method
 
     def __new__(
-            # pylint: disable=signature-differs
-            cls, lmax, p_val, p_arg):
-        return super().__new__(cls, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
+        # pylint: disable=signature-differs
+        cls,
+        lmax,
+        p_val,
+        p_arg,
+    ):
+        return super().__new__(cls, [(1, (l, p_val * p_arg ** l)) for l in range(lmax + 1)])
 
     def with_peaks_at(self, vectors, values=None):
         r"""Create a spherical tensor with peaks
@@ -112,7 +116,9 @@ class SphericalTensor(o3.Irreps):
         if vectors.numel() == 0:
             return torch.zeros(vectors.shape[:-2] + (self.dim,))
 
-        assert self[0][1].p == 1, "since the value is set by the radii who is even, p_val has to be 1"  # pylint: disable=no-member
+        assert (
+            self[0][1].p == 1
+        ), "since the value is set by the radii who is even, p_val has to be 1"  # pylint: disable=no-member
 
         assert vectors.dim() == 2 and vectors.shape[1] == 3
 
@@ -122,11 +128,7 @@ class SphericalTensor(o3.Irreps):
         values = values[values != 0]
 
         coeff = o3.spherical_harmonics(self, vectors, normalize=True)  # [batch, l * m]
-        A = torch.einsum(
-            "ai,bi->ab",
-            coeff,
-            coeff
-        )
+        A = torch.einsum("ai,bi->ab", coeff, coeff)
         # Y(v_a) . Y(v_b) solution_b = radii_a
         solution = torch.linalg.lstsq(A, values).solution.reshape(-1)  # [b]
         assert (values - A @ solution).abs().max() < 1e-5 * values.abs().max()
@@ -185,7 +187,7 @@ class SphericalTensor(o3.Irreps):
         y = o3.spherical_harmonics(self, positions, True)  # [..., N, dim]
         v = values[..., None]
 
-        return 4 * pi / (self.lmax + 1)**2 * (y * v).sum(-2)
+        return 4 * pi / (self.lmax + 1) ** 2 * (y * v).sum(-2)
 
     def from_samples_on_s2(self, positions: torch.Tensor, values: torch.Tensor, res=100) -> torch.Tensor:
         r"""Convert a set of position on the sphere and values into a spherical tensor
@@ -249,7 +251,7 @@ class SphericalTensor(o3.Irreps):
         positions = positions.reshape(-1, n, 3)
         values = values.reshape(-1, n)
 
-        s2 = FromS2Grid(res=res, lmax=self.lmax, normalization='integral', dtype=values.dtype, device=values.device)
+        s2 = FromS2Grid(res=res, lmax=self.lmax, normalization="integral", dtype=values.dtype, device=values.device)
         pos = s2.grid.reshape(1, -1, 3)
 
         cd = torch.cdist(pos, positions)  # [batch, b*a, N]
@@ -284,7 +286,7 @@ class SphericalTensor(o3.Irreps):
         i = 0
         norms = []
         for _, ir in self:
-            norms += [signal[..., i: i + ir.dim].norm(dim=-1)]
+            norms += [signal[..., i : i + ir.dim].norm(dim=-1)]
             i += ir.dim
         return torch.stack(norms, dim=-1)
 
@@ -315,18 +317,17 @@ class SphericalTensor(o3.Irreps):
         torch.Size([2, 1, 3, 2, 4])
         """
         sh = o3.spherical_harmonics(self, r, normalize=True)
-        dim = (self.lmax + 1)**2
-        output = torch.einsum('bi,ai->ab', sh.reshape(-1, dim), signal.reshape(-1, dim))
+        dim = (self.lmax + 1) ** 2
+        output = torch.einsum("bi,ai->ab", sh.reshape(-1, dim), signal.reshape(-1, dim))
         return output.reshape(signal.shape[:-1] + r.shape[:-1])
 
-    def signal_on_grid(self, signal, res=100, normalization='integral'):
-        r"""Evaluate the signal on a grid on the sphere
-        """
+    def signal_on_grid(self, signal, res=100, normalization="integral"):
+        r"""Evaluate the signal on a grid on the sphere"""
         Ret = namedtuple("Return", "grid, values")
         s2 = ToS2Grid(lmax=self.lmax, res=res, normalization=normalization)
         return Ret(s2.grid, s2(signal))
 
-    def plotly_surface(self, signals, centers=None, res=100, radius=True, relu=False, normalization='integral'):
+    def plotly_surface(self, signals, centers=None, res=100, radius=True, relu=False, normalization="integral"):
         r"""Create traces for plotly
 
         Examples
@@ -347,17 +348,18 @@ class SphericalTensor(o3.Irreps):
         traces = []
         for signal, center in zip(signals, centers):
             r, f = self.plot(signal, center, res, radius, relu, normalization)
-            traces += [dict(
-                x=r[:, :, 0].numpy(),
-                y=r[:, :, 1].numpy(),
-                z=r[:, :, 2].numpy(),
-                surfacecolor=f.numpy(),
-            )]
+            traces += [
+                dict(
+                    x=r[:, :, 0].numpy(),
+                    y=r[:, :, 1].numpy(),
+                    z=r[:, :, 2].numpy(),
+                    surfacecolor=f.numpy(),
+                )
+            ]
         return traces
 
-    def plot(self, signal, center=None, res=100, radius=True, relu=False, normalization='integral'):
-        r"""Create surface in order to make a plot
-        """
+    def plot(self, signal, center=None, res=100, radius=True, relu=False, normalization="integral"):
+        r"""Create surface in order to make a plot"""
         assert signal.dim() == 1
 
         r, f = self.signal_on_grid(signal, res, normalization)
@@ -407,7 +409,7 @@ class SphericalTensor(o3.Irreps):
 
         r_signal = D @ signal
         rx2, f2 = self.signal_on_grid(r_signal, res)
-        x2 = torch.einsum('ij,baj->bai', R.T, rx2)
+        x2 = torch.einsum("ij,baj->bai", R.T, rx2)
 
         ij = _find_peaks_2d(f1)
         x1p = torch.stack([x1[i, j] for i, j in ij])

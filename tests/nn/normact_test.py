@@ -7,22 +7,17 @@ from e3nn.nn import NormActivation
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
-@pytest.mark.parametrize('do_bias', [True, False])
-@pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
+@pytest.mark.parametrize("do_bias", [True, False])
+@pytest.mark.parametrize("nonlin", [torch.tanh, torch.sigmoid])
 def test_norm_activation(float_tolerance, do_bias, nonlin):
     irreps_in = e3nn.o3.Irreps("4x0e + 5x1o")
     N_batch = 3
     in_features = torch.randn(N_batch, irreps_in.dim)
     # Set some features to zero to test avoiding divide by zero
     in_features[0, 0] = 0  # batch 0, scalar 0
-    in_features[1, 4:4+3] = 0  # batch 0, vector 1
+    in_features[1, 4 : 4 + 3] = 0  # batch 0, vector 1
 
-    norm_act = NormActivation(
-        irreps_in=irreps_in,
-        scalar_nonlinearity=nonlin,
-        normalize=True,
-        bias=do_bias
-    )
+    norm_act = NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, normalize=True, bias=do_bias)
 
     if do_bias:
         assert len(list(norm_act.parameters())) == 1
@@ -44,11 +39,7 @@ def test_norm_activation(float_tolerance, do_bias, nonlin):
             true_nonlin_arg = scalar_in.abs() + norm_act.biases[:4]
         else:
             true_nonlin_arg = scalar_in.abs()
-        assert torch.allclose(
-            torch.sign(scalar_in)*nonlin(true_nonlin_arg),
-            out[batch, :4],
-            atol=float_tolerance
-        )
+        assert torch.allclose(torch.sign(scalar_in) * nonlin(true_nonlin_arg), out[batch, :4], atol=float_tolerance)
         # vectors
         # first, check norms:
         vector_in = in_features[batch, 4:].reshape(5, 3)
@@ -73,23 +64,19 @@ def test_norm_activation(float_tolerance, do_bias, nonlin):
                 vector_out[mask] / out_norms[mask, None],
             ).abs(),
             torch.ones(mask.sum()),
-            atol=float_tolerance
+            atol=float_tolerance,
         )
 
 
-@pytest.mark.parametrize('do_bias', [True, False])
-@pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
+@pytest.mark.parametrize("do_bias", [True, False])
+@pytest.mark.parametrize("nonlin", [torch.tanh, torch.sigmoid])
 def test_norm_activation_equivariant(do_bias, nonlin):
     irreps_in = e3nn.o3.Irreps(
         # test lots of different irreps
         "2x0e + 3x0o + 5x1o + 1x1e + 2x2e + 1x2o + 1x3e + 1x3o + 1x5e + 1x6o"
     )
 
-    norm_act = NormActivation(
-        irreps_in=irreps_in,
-        scalar_nonlinearity=nonlin,
-        bias=do_bias
-    )
+    norm_act = NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
 
     if do_bias:
         # Set up some nonzero biases
@@ -101,8 +88,8 @@ def test_norm_activation_equivariant(do_bias, nonlin):
     assert_auto_jitable(norm_act)
 
 
-@pytest.mark.parametrize('do_bias', [True, False])
-@pytest.mark.parametrize('nonlin', [torch.tanh, torch.sigmoid])
+@pytest.mark.parametrize("do_bias", [True, False])
+@pytest.mark.parametrize("nonlin", [torch.tanh, torch.sigmoid])
 def test_zeros(do_bias, nonlin):
     """Confirm that `epsilon` gives non-NaN grads"""
     irreps_in = e3nn.o3.Irreps("2x0e + 3x0o")

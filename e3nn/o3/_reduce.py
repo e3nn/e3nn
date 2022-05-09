@@ -8,32 +8,32 @@ from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
 from torch import fx
 
-_TP = collections.namedtuple('tp', 'op, args')
-_INPUT = collections.namedtuple('input', 'tensor, start, stop')
+_TP = collections.namedtuple("tp", "op, args")
+_INPUT = collections.namedtuple("input", "tensor, start, stop")
 
 
-def _wigner_nj(*irrepss, normalization='component', filter_ir_mid=None, dtype=None, device=None):
+def _wigner_nj(*irrepss, normalization="component", filter_ir_mid=None, dtype=None, device=None):
     irrepss = [o3.Irreps(irreps) for irreps in irrepss]
     if filter_ir_mid is not None:
         filter_ir_mid = [o3.Irrep(ir) for ir in filter_ir_mid]
 
     if len(irrepss) == 1:
-        irreps, = irrepss
+        (irreps,) = irrepss
         ret = []
         e = torch.eye(irreps.dim, dtype=dtype, device=device)
         i = 0
         for mul, ir in irreps:
             for _ in range(mul):
                 sl = slice(i, i + ir.dim)
-                ret += [
-                    (ir, _INPUT(0, sl.start, sl.stop), e[sl])
-                ]
+                ret += [(ir, _INPUT(0, sl.start, sl.stop), e[sl])]
                 i += ir.dim
         return ret
 
     *irrepss_left, irreps_right = irrepss
     ret = []
-    for ir_left, path_left, C_left in _wigner_nj(*irrepss_left, normalization=normalization, filter_ir_mid=filter_ir_mid, dtype=dtype, device=device):
+    for ir_left, path_left, C_left in _wigner_nj(
+        *irrepss_left, normalization=normalization, filter_ir_mid=filter_ir_mid, dtype=dtype, device=device
+    ):
         i = 0
         for mul, ir in irreps_right:
             for ir_out in ir_left * ir:
@@ -41,25 +41,24 @@ def _wigner_nj(*irrepss, normalization='component', filter_ir_mid=None, dtype=No
                     continue
 
                 C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype, device=device)
-                if normalization == 'component':
-                    C *= ir_out.dim**0.5
-                if normalization == 'norm':
-                    C *= ir_left.dim**0.5 * ir.dim**0.5
+                if normalization == "component":
+                    C *= ir_out.dim ** 0.5
+                if normalization == "norm":
+                    C *= ir_left.dim ** 0.5 * ir.dim ** 0.5
 
-                C = torch.einsum('jk,ijl->ikl', C_left.flatten(1), C)
+                C = torch.einsum("jk,ijl->ikl", C_left.flatten(1), C)
                 C = C.reshape(ir_out.dim, *(irreps.dim for irreps in irrepss_left), ir.dim)
                 for u in range(mul):
-                    E = torch.zeros(ir_out.dim, *(irreps.dim for irreps in irrepss_left), irreps_right.dim, dtype=dtype, device=device)
-                    sl = slice(i + u * ir.dim, i + (u+1) * ir.dim)
+                    E = torch.zeros(
+                        ir_out.dim, *(irreps.dim for irreps in irrepss_left), irreps_right.dim, dtype=dtype, device=device
+                    )
+                    sl = slice(i + u * ir.dim, i + (u + 1) * ir.dim)
                     E[..., sl] = C
                     ret += [
                         (
                             ir_out,
-                            _TP(
-                                op=(ir_left, ir, ir_out),
-                                args=(path_left, _INPUT(len(irrepss_left), sl.start, sl.stop))
-                            ),
-                            E
+                            _TP(op=(ir_left, ir, ir_out), args=(path_left, _INPUT(len(irrepss_left), sl.start, sl.stop))),
+                            E,
                         )
                     ]
             i += mul * ir.dim
@@ -76,7 +75,7 @@ def _get_ops(path):
         yield op
 
 
-@compile_mode('trace')
+@compile_mode("trace")
 class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
     r"""reduce a tensor with symmetries into irreducible representations
 
@@ -155,7 +154,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
             f = "".join(f0[i] for i in p)
             for i, j in zip(f0, f):
                 if i in irreps and j in irreps and irreps[i] != irreps[j]:
-                    raise RuntimeError(f'irreps of {i} and {j} should be the same')
+                    raise RuntimeError(f"irreps of {i} and {j} should be the same")
                 if i in irreps:
                     irreps[j] = irreps[i]
                 if j in irreps:
@@ -163,18 +162,13 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         for i in f0:
             if i not in irreps:
-                raise RuntimeError(f'index {i} has no irreps associated to it')
+                raise RuntimeError(f"index {i} has no irreps associated to it")
 
         for i in irreps:
             if i not in f0:
-                raise RuntimeError(f'index {i} has an irreps but does not appear in the fomula')
+                raise RuntimeError(f"index {i} has an irreps but does not appear in the fomula")
 
-        base_perm, _ = reduce_permutation(
-            f0,
-            formulas,
-            dtype=torch.float64,
-            **{i: irs.dim for i, irs in irreps.items()}
-        )
+        base_perm, _ = reduce_permutation(f0, formulas, dtype=torch.float64, **{i: irs.dim for i, irs in irreps.items()})
 
         Ps = collections.defaultdict(list)
 
@@ -204,10 +198,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
                 RR = R[:, j] @ R[:, j].T  # (u,u)
                 RP = R[:, j] @ P.T  # (u,a)
 
-                prob = torch.cat([
-                    torch.cat([RR, -RP], dim=1),
-                    torch.cat([-RP.T, PP], dim=1)
-                ], dim=0)
+                prob = torch.cat([torch.cat([RR, -RP], dim=1), torch.cat([-RP.T, PP], dim=1)], dim=0)
                 eigenvalues, eigenvectors = torch.linalg.eigh(prob)
                 X = eigenvectors[:, eigenvalues < eps][:mul].T  # [solutions, multiplicity]
                 proj_s.append(X.T @ X)
@@ -222,7 +213,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
             for x in X:
                 C = torch.einsum("u,ui...->i...", x, base_o3)
-                correction = (ir.dim / C.pow(2).sum())**0.5
+                correction = (ir.dim / C.pow(2).sum()) ** 0.5
                 C = correction * C
 
                 outputs.append([((correction * v).item(), p) for v, p in zip(x, paths) if v.abs() > eps])
@@ -230,7 +221,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
                 irreps_out.append((1, ir))
 
         dtype, _ = explicit_default_types(None, None)
-        self.register_buffer('change_of_basis', torch.cat(change_of_basis).to(dtype=dtype))
+        self.register_buffer("change_of_basis", torch.cat(change_of_basis).to(dtype=dtype))
 
         tps = set()
         for vp_list in outputs:
@@ -242,15 +233,12 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         tps = list(tps)
         for i, op in enumerate(tps):
-            tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, 'uuu', False)])
-            setattr(root, f'tp{i}', tp)
+            tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, "uuu", False)])
+            setattr(root, f"tp{i}", tp)
 
         graph = fx.Graph()
         tracer = torch.fx.proxy.GraphAppendingTracer(graph)
-        inputs = [
-            fx.Proxy(graph.placeholder(f"x{i}", torch.Tensor), tracer)
-            for i in f0
-        ]
+        inputs = [fx.Proxy(graph.placeholder(f"x{i}", torch.Tensor), tracer) for i in f0]
 
         self.irreps_in = [irreps[i] for i in f0]
         self.irreps_out = o3.Irreps(irreps_out).simplify()
@@ -268,7 +256,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
             if isinstance(path, _TP):
                 x1 = evaluate(path.args[0]).node
                 x2 = evaluate(path.args[1]).node
-                out = fx.Proxy(graph.call_module(f'tp{tps.index(path.op)}', (x1, x2)), tracer)
+                out = fx.Proxy(graph.call_module(f"tp{tps.index(path.op)}", (x1, x2)), tracer)
             values[path] = out
             return out
 
@@ -289,9 +277,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
         graph.output(out.node)
         graphmod = fx.GraphModule(root, graph, "main")
 
-        self._codegen_register({
-            "main": graphmod
-        })
+        self._codegen_register({"main": graphmod})
 
     def __repr__(self):
         return (

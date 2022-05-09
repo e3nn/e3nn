@@ -28,13 +28,7 @@ def _logging_name(func) -> str:
 
 
 # The default float tolerance
-FLOAT_TOLERANCE = {
-    t: torch.as_tensor(v, dtype=t)
-    for t, v in {
-        torch.float32: 1e-3,
-        torch.float64: 1e-9
-    }.items()
-}
+FLOAT_TOLERANCE = {t: torch.as_tensor(v, dtype=t) for t, v in {torch.float32: 1e-3, torch.float64: 1e-9}.items()}
 
 
 try:
@@ -42,7 +36,7 @@ try:
     # See https://docs.pytest.org/en/stable/fixture.html#using-fixtures-from-other-projects
     import pytest
 
-    @pytest.fixture(scope='session', autouse=True, params=['float32', 'float64'])
+    @pytest.fixture(scope="session", autouse=True, params=["float32", "float64"])
     def float_tolerance(request):
         """Run all tests with various PyTorch default dtypes.
 
@@ -53,13 +47,11 @@ try:
             A precision threshold to use for closeness tests.
         """
         old_dtype = torch.get_default_dtype()
-        dtype = {
-            'float32': torch.float32,
-            'float64': torch.float64
-        }[request.param]
+        dtype = {"float32": torch.float32, "float64": torch.float64}[request.param]
         torch.set_default_dtype(dtype)
         yield FLOAT_TOLERANCE[dtype]
         torch.set_default_dtype(old_dtype)
+
 except ImportError:
     pass
 
@@ -72,7 +64,7 @@ def random_irreps(
     len_min: int = 0,
     len_max: int = 4,
     clean: bool = False,
-    allow_empty: bool = True
+    allow_empty: bool = True,
 ):
     r"""Generate random irreps parameters for testing.
 
@@ -112,10 +104,7 @@ def random_irreps(
     for _ in range(n):
         this_irreps = []
         for _ in range(random.randint(len_min, len_max)):
-            this_irreps.append((
-                random.randint(mul_min, mul_max),
-                (random.randint(0, lmax), random.choice((1, -1)))
-            ))
+            this_irreps.append((random.randint(mul_min, mul_max), (random.randint(0, lmax), random.choice((1, -1)))))
         if not allow_empty and all(m == 0 for m, _ in this_irreps):
             this_irreps[-1] = (random.randint(1, mul_max), this_irreps[-1][1])
         this_irreps = o3.Irreps(this_irreps)
@@ -151,23 +140,13 @@ def format_equivariance_error(errors: dict) -> str:
     """
     return "\n".join(
         "(parity_k={:d}, did_translate={}) -> max error={:.3e} in argument {}".format(
-            int(k[0]),
-            bool(k[1]),
-            float(v.max()),
-            int(v.argmax())
+            int(k[0]), bool(k[1]), float(v.max()), int(v.argmax())
         )
         for k, v in errors.items()
     )
 
 
-def assert_equivariant(
-    func,
-    args_in=None,
-    irreps_in=None,
-    irreps_out=None,
-    tolerance=None,
-    **kwargs
-) -> dict:
+def assert_equivariant(func, args_in=None, irreps_in=None, irreps_out=None, tolerance=None, **kwargs) -> dict:
     r"""Assert that ``func`` is equivariant.
 
     Parameters
@@ -190,21 +169,10 @@ def assert_equivariant(
     # Prevent pytest from showing this function in the traceback
     __tracebackhide__ = True
 
-    args_in, irreps_in, irreps_out = _get_args_in(
-        func,
-        args_in=args_in,
-        irreps_in=irreps_in,
-        irreps_out=irreps_out
-    )
+    args_in, irreps_in, irreps_out = _get_args_in(func, args_in=args_in, irreps_in=irreps_in, irreps_out=irreps_out)
 
     # Get error
-    errors = equivariance_error(
-        func,
-        args_in=args_in,
-        irreps_in=irreps_in,
-        irreps_out=irreps_out,
-        **kwargs
-    )
+    errors = equivariance_error(func, args_in=args_in, irreps_in=irreps_in, irreps_out=irreps_out, **kwargs)
 
     logger.info(
         "Tested equivariance of `%s` -- max componentwise errors:\n%s",
@@ -234,7 +202,7 @@ def equivariance_error(
     ntrials=1,
     do_parity=True,
     do_translation=True,
-    transform_dtype=torch.float64
+    transform_dtype=torch.float64,
 ):
     r"""Get the maximum equivariance error for ``func`` over ``ntrials``
 
@@ -269,7 +237,7 @@ def equivariance_error(
     else:
         parity_ks = [0]
 
-    if 'cartesian_points' not in irreps_in:
+    if "cartesian_points" not in irreps_in:
         # There's nothing to translate
         do_translation = False
     if do_translation:
@@ -281,10 +249,7 @@ def equivariance_error(
 
     neg_inf = -float("Inf")
     device = next(t.device for t in args_in if isinstance(t, torch.Tensor))
-    biggest_errs = {
-        test: torch.full((len(irreps_out),), neg_inf, dtype=transform_dtype, device=device)
-        for test in tests
-    }
+    biggest_errs = {test: torch.full((len(irreps_out),), neg_inf, dtype=transform_dtype, device=device) for test in tests}
 
     for trial in range(ntrials):
         for this_test in tests:
@@ -292,9 +257,9 @@ def equivariance_error(
             # Build a rotation matrix for point data
             rot_mat = o3.rand_matrix(dtype=transform_dtype)
             # add parity
-            rot_mat *= (-1)**parity_k
+            rot_mat *= (-1) ** parity_k
             # build translation
-            translation = 10 * torch.randn(1, 3, dtype=rot_mat.dtype) if this_do_translate else 0.
+            translation = 10 * torch.randn(1, 3, dtype=rot_mat.dtype) if this_do_translate else 0.0
 
             # Evaluate the function on rotated arguments:
             rot_args = _transform(args_in, irreps_in, rot_mat, translation)
@@ -329,17 +294,12 @@ def equivariance_error(
 
             # compute errors in the transform dtype,
             # then convert back to default later
-            errors = torch.stack([
-                (a - b).abs().max()
-                for a, b in zip(x1, x2)
-            ])
+            errors = torch.stack([(a - b).abs().max() for a, b in zip(x1, x2)])
 
             biggest_errs[this_test] = torch.where(errors > biggest_errs[this_test], errors, biggest_errs[this_test])
 
     # convert errors back to default dtype to return:
-    return {
-        k: v.to(torch.get_default_dtype()) for k, v in biggest_errs.items()
-    }
+    return {k: v.to(torch.get_default_dtype()) for k, v in biggest_errs.items()}
 
 
 # TODO: this is only for things marked with @compile_mode.
@@ -375,11 +335,8 @@ def assert_auto_jitable(
     # Test tracing
     with warnings.catch_warnings():
         if error_on_warnings:
-            warnings.filterwarnings('error', category=torch.jit.TracerWarning)
-        func_jit = compile(
-            func,
-            n_trace_checks=n_trace_checks
-        )
+            warnings.filterwarnings("error", category=torch.jit.TracerWarning)
+        func_jit = compile(func, n_trace_checks=n_trace_checks)
 
     # Confirm that it rejects incorrect shapes
     # This check only makes sense if all inputs are Tensors with irreps; otherwise we can't know how to modify the arguments or that our modifications make them wrong.
@@ -394,9 +351,9 @@ def assert_auto_jitable(
                 # Since _rand_args is OK, they're all Irreps style args where changing the feature dimension is wrong
                 bad_which = random.randint(0, len(bad_args) - 1)
                 bad_args = list(bad_args)
-                bad_args[bad_which] = bad_args[bad_which][..., :-random.randint(1, 3)]  # make bad shape
+                bad_args[bad_which] = bad_args[bad_which][..., : -random.randint(1, 3)]  # make bad shape
                 try:
-                    if method == 'forward':
+                    if method == "forward":
                         func_jit(*bad_args)
                     else:
                         getattr(func_jit, method)(*bad_args)
@@ -516,12 +473,10 @@ def assert_normalized(
             if ir_slice.start == ir_slice.stop:
                 continue
             max_componentwise = (expected_square[ir_slice] - target).abs().max().item()
-            logger.info(
-                "Tested normalization of %r: max componentwise error %.6f",
-                _logging_name(func),
-                max_componentwise
-            )
-            assert max_componentwise <= atol, f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {max_componentwise:.6f}"
+            logger.info("Tested normalization of %r: max componentwise error %.6f", _logging_name(func), max_componentwise)
+            assert (
+                max_componentwise <= atol
+            ), f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {max_componentwise:.6f}"
 
 
 def set_random_seeds():

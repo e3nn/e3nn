@@ -6,9 +6,7 @@ from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps
 
 
-@pytest.mark.parametrize(
-    "irreps_in", ["", "5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4)
-)
+@pytest.mark.parametrize("irreps_in", ["", "5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4))
 @pytest.mark.parametrize("squared", [True, False])
 def test_norm(irreps_in, squared):
     m = o3.Norm(irreps_in, squared=squared)

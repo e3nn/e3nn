@@ -11,7 +11,7 @@ from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('script')
+@compile_mode("script")
 class Convolution(torch.nn.Module):
     r"""equivariant convolution
 
@@ -44,6 +44,7 @@ class Convolution(torch.nn.Module):
     num_neighbors : float
         typical number of nodes convolved over
     """
+
     def __init__(
         self,
         irreps_node_input,
@@ -54,7 +55,7 @@ class Convolution(torch.nn.Module):
         num_edge_scalar_attr,
         radial_layers,
         radial_neurons,
-        num_neighbors
+        num_neighbors,
     ) -> None:
         super().__init__()
         self.irreps_node_input = o3.Irreps(irreps_node_input)
@@ -74,14 +75,11 @@ class Convolution(torch.nn.Module):
                     if ir_out in self.irreps_node_output:
                         k = len(irreps_mid)
                         irreps_mid.append((mul, ir_out))
-                        instructions.append((i, j, k, 'uvu', True))
+                        instructions.append((i, j, k, "uvu", True))
         irreps_mid = o3.Irreps(irreps_mid)
         irreps_mid, p, _ = irreps_mid.sort()
 
-        instructions = [
-            (i_1, i_2, p[i_out], mode, train)
-            for i_1, i_2, i_out, mode, train in instructions
-        ]
+        instructions = [(i_1, i_2, p[i_out], mode, train) for i_1, i_2, i_out, mode, train in instructions]
 
         tp = TensorProduct(
             self.irreps_node_input,
@@ -92,21 +90,22 @@ class Convolution(torch.nn.Module):
             shared_weights=False,
         )
         self.fc = FullyConnectedNet(
-            [num_edge_scalar_attr] + radial_layers * [radial_neurons] + [tp.weight_numel],
-            torch.nn.functional.silu
+            [num_edge_scalar_attr] + radial_layers * [radial_neurons] + [tp.weight_numel], torch.nn.functional.silu
         )
         self.tp = tp
 
         self.lin2 = FullyConnectedTensorProduct(irreps_mid, self.irreps_node_attr_output, self.irreps_node_output)
 
-    def forward(self, node_input, node_attr_input, node_attr_output, edge_src, edge_dst, edge_attr, edge_scalar_attr) -> torch.Tensor:
+    def forward(
+        self, node_input, node_attr_input, node_attr_output, edge_src, edge_dst, edge_attr, edge_scalar_attr
+    ) -> torch.Tensor:
         weight = self.fc(edge_scalar_attr)
 
         node_input = self.lin1(node_input, node_attr_input)
 
         edge_features = self.tp(node_input[edge_src], edge_attr, weight)
         node_output = scatter(edge_features, edge_dst, dim=0, dim_size=node_attr_output.shape[0])
-        node_output.div_(self.num_neighbors**0.5)
+        node_output.div_(self.num_neighbors ** 0.5)
 
         return self.lin2(node_output, node_attr_output)
 
@@ -116,11 +115,11 @@ def test():
     from e3nn.math import soft_one_hot_linspace
 
     conv = Convolution(
-        irreps_node_input='0e + 1e',
-        irreps_node_output='0e + 1e',
-        irreps_node_attr_input='2x0e',
-        irreps_node_attr_output='3x0e',
-        irreps_edge_attr='0e + 1e',
+        irreps_node_input="0e + 1e",
+        irreps_node_output="0e + 1e",
+        irreps_node_attr_input="2x0e",
+        irreps_node_attr_output="3x0e",
+        irreps_edge_attr="0e + 1e",
         num_edge_scalar_attr=4,
         radial_layers=1,
         radial_neurons=50,
@@ -137,6 +136,8 @@ def test():
     edge_src, edge_dst = radius(pos_out, pos_in, r=2.0)
     edge_vec = pos_in[edge_src] - pos_out[edge_dst]
     edge_attr = o3.spherical_harmonics([0, 1], edge_vec, True)
-    edge_scalar_attr = soft_one_hot_linspace(x=edge_vec.norm(dim=1), start=0.0, end=2.0, number=4, basis='smooth_finite', cutoff=True)
+    edge_scalar_attr = soft_one_hot_linspace(
+        x=edge_vec.norm(dim=1), start=0.0, end=2.0, number=4, basis="smooth_finite", cutoff=True
+    )
 
     conv(node_input, node_attr_input, node_attr_output, edge_src, edge_dst, edge_attr, edge_scalar_attr)

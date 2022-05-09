@@ -5,7 +5,7 @@ from e3nn.nn import Extract, Activation
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('script')
+@compile_mode("script")
 class _Sortcut(torch.nn.Module):
     def __init__(self, *irreps_outs):
         super().__init__()
@@ -29,7 +29,7 @@ class _Sortcut(torch.nn.Module):
         return self.cut(x)
 
 
-@compile_mode('script')
+@compile_mode("script")
 class Gate(torch.nn.Module):
     r"""Gate activation function.
 
@@ -81,6 +81,7 @@ class Gate(torch.nn.Module):
     >>> g.irreps_out
     16x0o+16x1o+16x1e
     """
+
     def __init__(self, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated):
         super().__init__()
         irreps_scalars = o3.Irreps(irreps_scalars)
@@ -92,7 +93,9 @@ class Gate(torch.nn.Module):
         if len(irreps_scalars) > 0 and irreps_scalars.lmax > 0:
             raise ValueError(f"Scalars must be scalars, instead got irreps_scalars = {irreps_scalars}")
         if irreps_gates.num_irreps != irreps_gated.num_irreps:
-            raise ValueError(f"There are {irreps_gated.num_irreps} irreps in irreps_gated, but a different number ({irreps_gates.num_irreps}) of gate scalars in irreps_gates")
+            raise ValueError(
+                f"There are {irreps_gated.num_irreps} irreps in irreps_gated, but a different number ({irreps_gates.num_irreps}) of gate scalars in irreps_gates"
+            )
 
         self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_gated)
         self.irreps_scalars, self.irreps_gates, self.irreps_gated = self.sc.irreps_outs

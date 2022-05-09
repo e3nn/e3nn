@@ -9,30 +9,30 @@ from e3nn.nn import SO3Activation
 
 
 def s2_near_identity_grid(max_beta=math.pi / 8, n_alpha=8, n_beta=3):
-    '''
+    """
     :return: rings around the north pole
     size of the kernel = n_alpha * n_beta
-    '''
+    """
     beta = torch.arange(1, n_beta + 1) * max_beta / n_beta
     alpha = torch.linspace(0, 2 * math.pi, n_alpha + 1)[:-1]
-    a, b = torch.meshgrid(alpha, beta, indexing='ij')
+    a, b = torch.meshgrid(alpha, beta, indexing="ij")
     b = b.flatten()
     a = a.flatten()
     return torch.stack((a, b))
 
 
-def so3_near_identity_grid(max_beta=math.pi / 8, max_gamma=2*math.pi, n_alpha=8, n_beta=3, n_gamma=None):
-    '''
+def so3_near_identity_grid(max_beta=math.pi / 8, max_gamma=2 * math.pi, n_alpha=8, n_beta=3, n_gamma=None):
+    """
     :return: rings of rotations around the identity, all points (rotations) in
     a ring are at the same distance from the identity
     size of the kernel = n_alpha * n_beta * n_gamma
-    '''
+    """
     if n_gamma is None:
         n_gamma = n_alpha  # similar to regular representations
     beta = torch.arange(1, n_beta + 1) * max_beta / n_beta
     alpha = torch.linspace(0, 2 * math.pi, n_alpha)[:-1]
     pre_gamma = torch.linspace(-max_gamma, max_gamma, n_gamma)
-    A, B, preC = torch.meshgrid(alpha, beta, pre_gamma, indexing='ij')
+    A, B, preC = torch.meshgrid(alpha, beta, pre_gamma, indexing="ij")
     C = preC - A
     A = A.flatten()
     B = B.flatten()
@@ -49,30 +49,36 @@ def so3_irreps(lmax):
 
 
 def flat_wigner(lmax, alpha, beta, gamma):
-    return torch.cat([(2 * l + 1)**0.5 * o3.wigner_D(l, alpha, beta, gamma).flatten(-2) for l in range(lmax + 1)], dim=-1)
+    return torch.cat([(2 * l + 1) ** 0.5 * o3.wigner_D(l, alpha, beta, gamma).flatten(-2) for l in range(lmax + 1)], dim=-1)
 
 
 class S2Convolution(torch.nn.Module):
     def __init__(self, f_in, f_out, lmax, kernel_grid):
         super().__init__()
-        self.register_parameter("w", torch.nn.Parameter(torch.randn(f_in, f_out, kernel_grid.shape[1])))  # [f_in, f_out, n_s2_pts]
-        self.register_buffer("Y", o3.spherical_harmonics_alpha_beta(range(lmax + 1), *kernel_grid, normalization='component'))  # [n_s2_pts, psi]
+        self.register_parameter(
+            "w", torch.nn.Parameter(torch.randn(f_in, f_out, kernel_grid.shape[1]))
+        )  # [f_in, f_out, n_s2_pts]
+        self.register_buffer(
+            "Y", o3.spherical_harmonics_alpha_beta(range(lmax + 1), *kernel_grid, normalization="component")
+        )  # [n_s2_pts, psi]
         self.lin = o3.Linear(s2_irreps(lmax), so3_irreps(lmax), f_in=f_in, f_out=f_out, internal_weights=False)
 
     def forward(self, x):
-        psi = torch.einsum("ni,xyn->xyi", self.Y, self.w) / self.Y.shape[0]**0.5
+        psi = torch.einsum("ni,xyn->xyi", self.Y, self.w) / self.Y.shape[0] ** 0.5
         return self.lin(x, weight=psi)
 
 
 class SO3Convolution(torch.nn.Module):
     def __init__(self, f_in, f_out, lmax, kernel_grid):
         super().__init__()
-        self.register_parameter("w", torch.nn.Parameter(torch.randn(f_in, f_out, kernel_grid.shape[1])))  # [f_in, f_out, n_so3_pts]
+        self.register_parameter(
+            "w", torch.nn.Parameter(torch.randn(f_in, f_out, kernel_grid.shape[1]))
+        )  # [f_in, f_out, n_so3_pts]
         self.register_buffer("D", flat_wigner(lmax, *kernel_grid))  # [n_so3_pts, psi]
         self.lin = o3.Linear(so3_irreps(lmax), so3_irreps(lmax), f_in=f_in, f_out=f_out, internal_weights=False)
 
     def forward(self, x):
-        psi = torch.einsum("ni,xyn->xyi", self.D, self.w) / self.D.shape[0]**0.5
+        psi = torch.einsum("ni,xyn->xyi", self.D, self.w) / self.D.shape[0] ** 0.5
         return self.lin(x, weight=psi)
 
 
@@ -97,19 +103,11 @@ class S2ConvNet_original(torch.nn.Module):
 
         self.from_s2 = o3.FromS2Grid((b_in, b_in), lmax1)
 
-        self.conv1 = S2Convolution(
-            1,
-            f1,
-            lmax1,
-            kernel_grid=grid_s2)
+        self.conv1 = S2Convolution(1, f1, lmax1, kernel_grid=grid_s2)
 
         self.act1 = SO3Activation(lmax1, lmax2, torch.relu, b_l1)
 
-        self.conv2 = SO3Convolution(
-            f1,
-            f2,
-            lmax2,
-            kernel_grid=grid_so3)
+        self.conv2 = SO3Convolution(f1, f2, lmax2, kernel_grid=grid_so3)
 
         self.act2 = SO3Activation(lmax2, 0, torch.relu, b_l2)
 
@@ -135,23 +133,19 @@ LEARNING_RATE = 5e-3
 
 def load_data(path, batch_size):
 
-    with gzip.open(path, 'rb') as f:
+    with gzip.open(path, "rb") as f:
         dataset = pickle.load(f)
 
-    train_data = torch.from_numpy(
-        dataset["train"]["images"][:, None, :, :].astype(np.float32))
-    train_labels = torch.from_numpy(
-        dataset["train"]["labels"].astype(np.int64))
+    train_data = torch.from_numpy(dataset["train"]["images"][:, None, :, :].astype(np.float32))
+    train_labels = torch.from_numpy(dataset["train"]["labels"].astype(np.int64))
 
     train_data /= 57
 
     train_dataset = torch.utils.data.TensorDataset(train_data, train_labels)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    test_data = torch.from_numpy(
-        dataset["test"]["images"][:, None, :, :].astype(np.float32))
-    test_labels = torch.from_numpy(
-        dataset["test"]["labels"].astype(np.int64))
+    test_data = torch.from_numpy(dataset["test"]["images"][:, None, :, :].astype(np.float32))
+    test_labels = torch.from_numpy(dataset["test"]["labels"].astype(np.int64))
 
     test_data /= 57
 
@@ -169,9 +163,7 @@ def main():
 
     print("#params", sum(x.numel() for x in classifier.parameters()))
 
-    optimizer = torch.optim.Adam(
-        classifier.parameters(),
-        lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=LEARNING_RATE)
 
     for epoch in range(NUM_EPOCHS):
         for i, (images, labels) in enumerate(train_loader):
@@ -187,9 +179,12 @@ def main():
 
             optimizer.step()
 
-            print('\rEpoch [{0}/{1}], Iter [{2}/{3}] Loss: {4:.4f}'.format(
-                epoch+1, NUM_EPOCHS, i+1, len(train_dataset)//BATCH_SIZE,
-                loss.item()), end="")
+            print(
+                "\rEpoch [{0}/{1}], Iter [{2}/{3}] Loss: {4:.4f}".format(
+                    epoch + 1, NUM_EPOCHS, i + 1, len(train_dataset) // BATCH_SIZE, loss.item()
+                ),
+                end="",
+            )
         print("")
         correct = 0
         total = 0
@@ -206,7 +201,7 @@ def main():
                 total += labels.size(0)
                 correct += (predicted == labels).long().sum().item()
 
-        print('Test Accuracy: {0}'.format(100 * correct / total))
+        print("Test Accuracy: {0}".format(100 * correct / total))
 
 
 if __name__ == "__main__":

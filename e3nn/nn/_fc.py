@@ -6,7 +6,7 @@ from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('script')
+@compile_mode("script")
 class _Layer(torch.nn.Module):
     h_in: float
     h_out: float
@@ -28,7 +28,7 @@ class _Layer(torch.nn.Module):
 
     def __repr__(self):
         act = self.act
-        if hasattr(act, '__name__'):
+        if hasattr(act, "__name__"):
             act = act.__name__
         elif isinstance(act, torch.nn.Module):
             act = act.__class__.__name__
@@ -38,17 +38,17 @@ class _Layer(torch.nn.Module):
     def forward(self, x: torch.Tensor):
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         if self.act is not None:
-            w = self.weight / (self.h_in * self.var_in)**0.5
+            w = self.weight / (self.h_in * self.var_in) ** 0.5
             x = x @ w
             x = self.act(x)
-            x = x * self.var_out**0.5
+            x = x * self.var_out ** 0.5
         else:
-            w = self.weight / (self.h_in * self.var_in / self.var_out)**0.5
+            w = self.weight / (self.h_in * self.var_in / self.var_out) ** 0.5
             x = x @ w
         return x
 
 
-@compile_mode('script')
+@compile_mode("script")
 class FullyConnectedNet(torch.nn.Sequential):
     r"""Fully-connected Neural Network
 

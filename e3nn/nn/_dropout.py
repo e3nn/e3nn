@@ -3,7 +3,7 @@ from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('script')
+@compile_mode("script")
 class Dropout(torch.nn.Module):
     """Equivariant Dropout
 
@@ -27,6 +27,7 @@ class Dropout(torch.nn.Module):
     p : float
         probability to drop
     """
+
     def __init__(self, irreps, p):
         super().__init__()
         self.irreps = o3.Irreps(irreps)

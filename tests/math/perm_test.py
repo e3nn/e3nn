@@ -5,7 +5,7 @@ import torch
 from e3nn.math import perm
 
 
-@pytest.mark.parametrize('n', [0, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize("n", [0, 1, 2, 3, 4, 5])
 def test_inverse(n):
     for p in perm.group(n):
         ip = perm.inverse(p)
@@ -14,7 +14,7 @@ def test_inverse(n):
         assert perm.compose(ip, p) == perm.identity(n)
 
 
-@pytest.mark.parametrize('n', [0, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize("n", [0, 1, 2, 3, 4, 5])
 def test_int_inverse(n):
     for j in range(math.factorial(n)):
         p = perm.from_int(j, n)
@@ -22,7 +22,7 @@ def test_int_inverse(n):
         assert i == j
 
 
-@pytest.mark.parametrize('n', [0, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize("n", [0, 1, 2, 3, 4, 5])
 def test_int_injection(n):
     group = {perm.from_int(j, n) for j in range(math.factorial(n))}
     assert len(group) == math.factorial(n)
@@ -33,7 +33,7 @@ def test_germinate():
     assert perm.is_group(perm.germinate({(1, 0, 2, 3), (0, 2, 1, 3), (0, 1, 3, 2)}))
 
 
-@pytest.mark.parametrize('n', [0, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize("n", [0, 1, 2, 3, 4, 5])
 def test_rand(n):
     perm.is_perm(perm.rand(n))
 
@@ -55,7 +55,7 @@ def test_sign():
     assert perm.sign((1, 0, 3, 2, 5, 6, 7, 4)) == -1
 
 
-@pytest.mark.parametrize('n', [3, 7, 15])
+@pytest.mark.parametrize("n", [3, 7, 15])
 def test_standard_representation(float_tolerance, n):
     # identity
     e = perm.standard_representation(perm.identity(n))
@@ -78,7 +78,7 @@ def test_standard_representation(float_tolerance, n):
     assert torch.allclose(a @ a.T, torch.eye(n - 1), atol=float_tolerance)
 
 
-@pytest.mark.parametrize('n', [3, 7, 15])
+@pytest.mark.parametrize("n", [3, 7, 15])
 def test_natural_representation(float_tolerance, n):
     p = perm.rand(n)
     a = torch.eye(n)[list(perm.inverse(p))]

@@ -8,17 +8,17 @@ class _SoftUnitStep(torch.autograd.Function):
     def forward(ctx, x):
         ctx.save_for_backward(x)
         y = torch.zeros_like(x)
-        m = (x > 0.0)
-        y[m] = (-1/x[m]).exp()
+        m = x > 0.0
+        y[m] = (-1 / x[m]).exp()
         return y
 
     @staticmethod
     def backward(ctx, dy):
-        x, = ctx.saved_tensors
+        (x,) = ctx.saved_tensors
         dx = torch.zeros_like(x)
-        m = (x > 0.0)
+        m = x > 0.0
         xm = x[m]
-        dx[m] = (-1/xm).exp() / xm.pow(2)
+        dx[m] = (-1 / xm).exp() / xm.pow(2)
         return dx * dy
 
 

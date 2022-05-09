@@ -8,8 +8,8 @@ from opt_einsum_fx import jitable
 from torch import fx
 
 _E3NN_COMPILE_MODE = "__e3nn_compile_mode__"
-_VALID_MODES = ('trace', 'script', 'unsupported', None)
-_MAKE_TRACING_INPUTS = '_make_tracing_inputs'
+_VALID_MODES = ("trace", "script", "unsupported", None)
+_MAKE_TRACING_INPUTS = "_make_tracing_inputs"
 
 
 def compile_mode(mode: str):
@@ -48,7 +48,7 @@ def get_compile_mode(mod: torch.nn.Module) -> str:
     else:
         mode = getattr(type(mod), _E3NN_COMPILE_MODE, None)
     if mode is None and isinstance(mod, fx.GraphModule):
-        mode = 'script'
+        mode = "script"
     assert mode in _VALID_MODES, "Invalid compile mode `%r`" % mode
     return mode
 
@@ -83,7 +83,7 @@ def compile(
     trace_options = trace_options or {}
 
     mode = get_compile_mode(mod)
-    if mode == 'unsupported':
+    if mode == "unsupported":
         raise NotImplementedError(f"{type(mod).__name__} does not support TorchScript compilation")
 
     if not in_place:
@@ -102,14 +102,14 @@ def compile(
                 script_options=script_options,
                 trace_options=trace_options,
                 in_place=True,  # since we deepcopied the module above, we can do inplace
-            )
+            ),
         )
     # == Compile this module now ==
-    if mode == 'script':
+    if mode == "script":
         if isinstance(mod, fx.GraphModule):
             mod = jitable(mod)
         mod = torch.jit.script(mod, **script_options)
-    elif mode == 'trace':
+    elif mode == "trace":
         # These are always modules, so we're always using trace_module
         # We need tracing inputs:
         check_inputs = get_tracing_inputs(
@@ -118,20 +118,12 @@ def compile(
         )
         assert len(check_inputs) >= 1, "Must have at least one tracing input."
         # Do the actual trace
-        mod = torch.jit.trace_module(
-            mod,
-            inputs=check_inputs[0],
-            check_inputs=check_inputs,
-            **trace_options
-        )
+        mod = torch.jit.trace_module(mod, inputs=check_inputs[0], check_inputs=check_inputs, **trace_options)
     return mod
 
 
 def get_tracing_inputs(
-    mod: torch.nn.Module,
-    n: int = 1,
-    device: Optional[torch.device] = None,
-    dtype: Optional[torch.dtype] = None
+    mod: torch.nn.Module, n: int = 1, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None
 ):
     """Get random tracing inputs for ``mod``.
 
@@ -155,8 +147,7 @@ def get_tracing_inputs(
         Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of arguments.
     """
     # Avoid circular imports
-    from ._argtools import (_get_device, _get_floating_dtype, _get_io_irreps,
-                            _rand_args, _to_device_dtype)
+    from ._argtools import _get_device, _get_floating_dtype, _get_io_irreps, _rand_args, _to_device_dtype
 
     # - Get inputs -
     if hasattr(mod, _MAKE_TRACING_INPUTS):
@@ -165,14 +156,13 @@ def get_tracing_inputs(
         assert isinstance(trace_inputs, list)
         for d in trace_inputs:
             assert isinstance(d, dict), "_make_tracing_inputs must return a list of dict[str, tuple]"
-            assert all(isinstance(k, str) and isinstance(v, tuple) for k, v in d.items()), "_make_tracing_inputs must return a list of dict[str, tuple]"
+            assert all(
+                isinstance(k, str) and isinstance(v, tuple) for k, v in d.items()
+            ), "_make_tracing_inputs must return a list of dict[str, tuple]"
     else:
         # Try to infer. This will throw if it can't.
-        irreps_in, _ = _get_io_irreps(
-            mod,
-            irreps_out=[None]  # we're only trying to infer inputs
-        )
-        trace_inputs = [{'forward': _rand_args(irreps_in)} for _ in range(n)]
+        irreps_in, _ = _get_io_irreps(mod, irreps_out=[None])  # we're only trying to infer inputs
+        trace_inputs = [{"forward": _rand_args(irreps_in)} for _ in range(n)]
     # - Put them on the right device -
     if device is None:
         device = _get_device(mod)
@@ -183,12 +173,7 @@ def get_tracing_inputs(
     return trace_inputs
 
 
-def trace_module(
-    mod: torch.nn.Module,
-    inputs: dict = None,
-    check_inputs: list = None,
-    in_place: bool = True
-):
+def trace_module(mod: torch.nn.Module, inputs: dict = None, check_inputs: list = None, in_place: bool = True):
     """Trace a module.
 
     Identical signature to ``torch.jit.trace_module``, but first recursively compiles ``mod`` using ``compile``.
@@ -206,19 +191,17 @@ def trace_module(
 
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
-    if old_mode is not None and old_mode != 'trace':
-        warnings.warn(f"Trying to trace a module of type {type(mod).__name__} marked with @compile_mode != 'trace', expect errors!")
-    setattr(mod, _E3NN_COMPILE_MODE, 'trace')
+    if old_mode is not None and old_mode != "trace":
+        warnings.warn(
+            f"Trying to trace a module of type {type(mod).__name__} marked with @compile_mode != 'trace', expect errors!"
+        )
+    setattr(mod, _E3NN_COMPILE_MODE, "trace")
 
     # If inputs are provided, set make_tracing_input temporarily
     old_make_tracing_input = None
     if inputs is not None:
         old_make_tracing_input = getattr(mod, _MAKE_TRACING_INPUTS, None)
-        setattr(
-            mod,
-            _MAKE_TRACING_INPUTS,
-            lambda num: ([inputs] + check_inputs)
-        )
+        setattr(mod, _MAKE_TRACING_INPUTS, lambda num: ([inputs] + check_inputs))
 
     # Compile
     out = compile(mod, in_place=in_place)
@@ -231,12 +214,7 @@ def trace_module(
     return out
 
 
-def trace(
-    mod: torch.nn.Module,
-    example_inputs: tuple = None,
-    check_inputs: list = None,
-    in_place: bool = True
-):
+def trace(mod: torch.nn.Module, example_inputs: tuple = None, check_inputs: list = None, in_place: bool = True):
     """Trace a module.
 
     Identical signature to ``torch.jit.trace``, but first recursively compiles ``mod`` using :func:``compile``.
@@ -254,9 +232,9 @@ def trace(
 
     return trace_module(
         mod=mod,
-        inputs=({'forward': example_inputs} if example_inputs is not None else None),
-        check_inputs=[{'forward': c} for c in check_inputs],
-        in_place=in_place
+        inputs=({"forward": example_inputs} if example_inputs is not None else None),
+        check_inputs=[{"forward": c} for c in check_inputs],
+        in_place=in_place,
     )
 
 
@@ -274,9 +252,11 @@ def script(mod: torch.nn.Module, in_place: bool = True):
     """
     # Set the compile mode for mod, temporarily
     old_mode = getattr(mod, _E3NN_COMPILE_MODE, None)
-    if old_mode is not None and old_mode != 'script':
-        warnings.warn(f"Trying to script a module of type {type(mod).__name__} marked with @compile_mode != 'script', expect errors!")
-    setattr(mod, _E3NN_COMPILE_MODE, 'script')
+    if old_mode is not None and old_mode != "script":
+        warnings.warn(
+            f"Trying to script a module of type {type(mod).__name__} marked with @compile_mode != 'script', expect errors!"
+        )
+    setattr(mod, _E3NN_COMPILE_MODE, "script")
 
     # Compile
     out = compile(mod, in_place=in_place)

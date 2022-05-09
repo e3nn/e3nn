@@ -7,7 +7,10 @@ from e3nn.nn import S2Activation
 from e3nn.util.test import assert_equivariant
 
 
-@pytest.mark.parametrize('act, normalization, p_val, p_arg', itertools.product([torch.tanh, lambda x: x**2], ['norm', 'component'], [-1, 1], [-1, 1]))
+@pytest.mark.parametrize(
+    "act, normalization, p_val, p_arg",
+    itertools.product([torch.tanh, lambda x: x ** 2], ["norm", "component"], [-1, 1], [-1, 1]),
+)
 def test_equivariance(float_tolerance, act, normalization, p_val, p_arg):
     irreps = io.SphericalTensor(3, p_val, p_arg)
 

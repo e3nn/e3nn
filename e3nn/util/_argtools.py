@@ -20,26 +20,18 @@ def _transform(dat, irreps_dat, rot_mat, translation=0.0, output_transform_dtype
             out_dtype = a.dtype
         if irreps is None:
             out.append(a.clone())
-        elif irreps == 'cartesian_points':
+        elif irreps == "cartesian_points":
             translation = torch.as_tensor(translation, device=a.device)
-            out.append(
-                (
-                    (a.to(transform_dtype) @ rot_mat.T.to(a.device)) + translation
-                ).to(out_dtype)
-            )
+            out.append(((a.to(transform_dtype) @ rot_mat.T.to(a.device)) + translation).to(out_dtype))
         else:
             # For o3.Irreps
-            out.append(
-                (
-                    a.to(transform_dtype) @ irreps.D_from_matrix(rot_mat).T.to(a.device)
-                ).to(out_dtype)
-            )
+            out.append((a.to(transform_dtype) @ irreps.D_from_matrix(rot_mat).T.to(a.device)).to(out_dtype))
     return out
 
 
 def _get_io_irreps(func, irreps_in=None, irreps_out=None):
     """Preprocess or, if not given, try to infer the I/O irreps for ``func``."""
-    SPECIAL_VALS = ['cartesian_points', None]
+    SPECIAL_VALS = ["cartesian_points", None]
 
     if (irreps_in is None or irreps_out is None) and isinstance(func, torch.jit.ScriptModule):
         warnings.warn(
@@ -47,14 +39,14 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
         )
 
     if irreps_in is None:
-        if hasattr(func, 'irreps_in'):
+        if hasattr(func, "irreps_in"):
             irreps_in = func.irreps_in  # gets checked for type later
-        elif hasattr(func, 'irreps_in1'):
+        elif hasattr(func, "irreps_in1"):
             irreps_in = [func.irreps_in1, func.irreps_in2]
         else:
             raise ValueError("Cannot infer irreps_in for %r; provide them explicitly" % func)
     if irreps_out is None:
-        if hasattr(func, 'irreps_out'):
+        if hasattr(func, "irreps_out"):
             irreps_out = func.irreps_out  # gets checked for type later
         else:
             raise ValueError("Cannot infer irreps_out for %r; provide them explicitly" % func)
@@ -93,14 +85,15 @@ def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
 
 
 def _rand_args(irreps_in, batch_size: Optional[int] = None):
-    if not all((isinstance(i, Irreps) or i == 'cartesian_points') for i in irreps_in):
-        raise ValueError("Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``")
+    if not all((isinstance(i, Irreps) or i == "cartesian_points") for i in irreps_in):
+        raise ValueError(
+            "Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``"
+        )
     if batch_size is None:
         # Generate random args with random size batch dim between 1 and 4:
         batch_size = random.randint(1, 4)
     args_in = [
-        torch.randn(batch_size, 3) if (irreps == 'cartesian_points') else irreps.randn(batch_size, -1)
-        for irreps in irreps_in
+        torch.randn(batch_size, 3) if (irreps == "cartesian_points") else irreps.randn(batch_size, -1) for irreps in irreps_in
     ]
     return args_in
 
@@ -111,7 +104,7 @@ def _get_device(mod: torch.nn.Module) -> torch.device:
     if a_buf is None:
         # If there isn't one, try to get a buffer
         a_buf = next(mod.buffers(), None)
-    return a_buf.device if a_buf is not None else 'cpu'
+    return a_buf.device if a_buf is not None else "cpu"
 
 
 def _get_floating_dtype(mod: torch.nn.Module) -> torch.dtype:
@@ -137,9 +130,9 @@ def _get_floating_dtype(mod: torch.nn.Module) -> torch.dtype:
 def _to_device_dtype(args, device=None, dtype=None):
     kwargs = {}
     if device is not None:
-        kwargs['device'] = device
+        kwargs["device"] = device
     if dtype is not None:
-        kwargs['dtype'] = dtype
+        kwargs["dtype"] = dtype
 
     if isinstance(args, torch.Tensor):
         if args.is_floating_point():
@@ -152,6 +145,6 @@ def _to_device_dtype(args, device=None, dtype=None):
     elif isinstance(args, list):
         return [_to_device_dtype(e, **kwargs) for e in args]
     elif isinstance(args, dict):
-        return{k: _to_device_dtype(v, **kwargs) for k, v in args.items()}
+        return {k: _to_device_dtype(v, **kwargs) for k, v in args.items()}
     else:
         raise TypeError("Only (nested) dict/tuple/lists of Tensors can be moved to a device/dtype.")

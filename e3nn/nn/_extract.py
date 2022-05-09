@@ -8,7 +8,7 @@ from e3nn.util.jit import compile_mode
 from e3nn import o3
 
 
-@compile_mode('script')
+@compile_mode("script")
 class Extract(CodeGenMixin, torch.nn.Module):
     # pylint: disable=abstract-method
 
@@ -48,14 +48,12 @@ class Extract(CodeGenMixin, torch.nn.Module):
 
         # == generate code ==
         graph = fx.Graph()
-        x = fx.Proxy(graph.placeholder('x', torch.Tensor))
+        x = fx.Proxy(graph.placeholder("x", torch.Tensor))
         torch._assert(x.shape[-1] == self.irreps_in.dim, "invalid input shape")
 
         out = []
         for irreps in self.irreps_outs:
-            out.append(
-                x.new_zeros(x.shape[:-1] + (irreps.dim,))
-            )
+            out.append(x.new_zeros(x.shape[:-1] + (irreps.dim,)))
 
         for i, (irreps_out, ins) in enumerate(zip(self.irreps_outs, self.instructions)):
             if ins == tuple(range(len(self.irreps_in))):
@@ -64,17 +62,13 @@ class Extract(CodeGenMixin, torch.nn.Module):
                 for s_out, i_in in zip(irreps_out.slices(), ins):
                     i_start = self.irreps_in[:i_in].dim
                     i_len = self.irreps_in[i_in].dim
-                    out[i].narrow(
-                        -1, s_out.start, s_out.stop - s_out.start
-                    ).copy_(
-                        x.narrow(-1, i_start, i_len)
-                    )
+                    out[i].narrow(-1, s_out.start, s_out.stop - s_out.start).copy_(x.narrow(-1, i_start, i_len))
 
         out = tuple(e.node for e in out)
         if squeeze_out and len(out) == 1:
             graph.output(out[0], torch.Tensor)
         else:
-            graph.output(out, Tuple[(torch.Tensor,)*len(self.irreps_outs)])
+            graph.output(out, Tuple[(torch.Tensor,) * len(self.irreps_outs)])
 
         self._codegen_register({"_compiled_forward": fx.GraphModule({}, graph)})
 
@@ -82,7 +76,7 @@ class Extract(CodeGenMixin, torch.nn.Module):
         return self._compiled_forward(x)
 
 
-@compile_mode('script')
+@compile_mode("script")
 class ExtractIr(Extract):
     # pylint: disable=abstract-method
 

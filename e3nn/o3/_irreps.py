@@ -5,6 +5,7 @@ from typing import List, Union
 import torch
 
 from e3nn.math import direct_sum, perm
+
 # These imports avoid cyclic reference from o3 itself
 from . import _rotation
 from . import _wigner
@@ -50,7 +51,8 @@ class Irrep(tuple):
     >>> Irrep("1o") + Irrep("2o")
     1x1o+1x2o
     """
-    def __new__(cls, l: Union[int, 'Irrep', str, tuple], p=None):
+
+    def __new__(cls, l: Union[int, "Irrep", str, tuple], p=None):
         if p is None:
             if isinstance(l, Irrep):
                 return l
@@ -61,12 +63,12 @@ class Irrep(tuple):
                     l = int(name[:-1])
                     assert l >= 0
                     p = {
-                        'e': 1,
-                        'o': -1,
-                        'y': (-1)**l,
+                        "e": 1,
+                        "o": -1,
+                        "y": (-1) ** l,
                     }[name[-1]]
                 except Exception:
-                    raise ValueError(f"unable to convert string \"{name}\" into an Irrep")
+                    raise ValueError(f'unable to convert string "{name}" into an Irrep')
             elif isinstance(l, tuple):
                 l, p = l
 
@@ -75,7 +77,7 @@ class Irrep(tuple):
         return super().__new__(cls, (l, p))
 
     @property
-    def l(self) -> int:
+    def l(self) -> int:  # noqa: E743
         r"""The degree of the representation, :math:`l = 0, 1, \dots`."""
         return self[0]
 
@@ -85,7 +87,7 @@ class Irrep(tuple):
         return self[1]
 
     def __repr__(self):
-        p = {+1: 'e', -1: 'o'}[self.p]
+        p = {+1: "e", -1: "o"}[self.p]
         return f"{self.l}{p}"
 
     @classmethod
@@ -99,8 +101,8 @@ class Irrep(tuple):
         (0e, 0o, 1o, 1e)
         """
         for l in itertools.count():
-            yield Irrep(l, (-1)**l)
-            yield Irrep(l, -(-1)**l)
+            yield Irrep(l, (-1) ** l)
+            yield Irrep(l, -((-1) ** l))
 
             if l == lmax:
                 break
@@ -142,7 +144,7 @@ class Irrep(tuple):
             k = torch.zeros_like(alpha)
 
         alpha, beta, gamma, k = torch.broadcast_tensors(alpha, beta, gamma, k)
-        return _wigner.wigner_D(self.l, alpha, beta, gamma) * self.p**k[..., None, None]
+        return _wigner.wigner_D(self.l, alpha, beta, gamma) * self.p ** k[..., None, None]
 
     def D_from_quaternion(self, q, k=None):
         r"""Matrix of the representation, see `Irrep.D_from_angles`
@@ -337,7 +339,8 @@ class Irreps(tuple):
     >>> Irreps(), Irreps("")
     (, )
     """
-    def __new__(cls, irreps=None) -> Union[_MulIr, 'Irreps']:
+
+    def __new__(cls, irreps=None) -> Union[_MulIr, "Irreps"]:
         if isinstance(irreps, Irreps):
             return super().__new__(cls, irreps)
 
@@ -347,9 +350,9 @@ class Irreps(tuple):
         elif isinstance(irreps, str):
             try:
                 if irreps.strip() != "":
-                    for mul_ir in irreps.split('+'):
-                        if 'x' in mul_ir:
-                            mul, ir = mul_ir.split('x')
+                    for mul_ir in irreps.split("+"):
+                        if "x" in mul_ir:
+                            mul, ir = mul_ir.split("x")
                             mul = int(mul)
                             ir = Irrep(ir)
                         else:
@@ -359,7 +362,7 @@ class Irreps(tuple):
                         assert isinstance(mul, int) and mul >= 0
                         out.append(_MulIr(mul, ir))
             except Exception:
-                raise ValueError(f"Unable to convert string \"{irreps}\" into an Irreps")
+                raise ValueError(f'Unable to convert string "{irreps}" into an Irreps')
         elif irreps is None:
             pass
         else:
@@ -380,7 +383,7 @@ class Irreps(tuple):
                     ir = Irrep(ir)
 
                 if not (isinstance(mul, int) and mul >= 0 and ir is not None):
-                    raise ValueError(f"Unable to interpret \"{mul_ir}\" as an irrep.")
+                    raise ValueError(f'Unable to interpret "{mul_ir}" as an irrep.')
 
                 out.append(_MulIr(mul, ir))
         return super().__new__(cls, out)
@@ -411,7 +414,7 @@ class Irreps(tuple):
         >>> Irreps.spherical_harmonics(4, p=1)
         1x0e+1x1e+1x2e+1x3e+1x4e
         """
-        return Irreps([(1, (l, p**l)) for l in range(lmax + 1)])
+        return Irreps([(1, (l, p ** l)) for l in range(lmax + 1)])
 
     def slices(self):
         r"""List of slices corresponding to indices for each irrep.
@@ -429,7 +432,7 @@ class Irreps(tuple):
             i += mul_ir.dim
         return s
 
-    def randn(self, *size, normalization='component', requires_grad=False, dtype=None, device=None):
+    def randn(self, *size, normalization="component", requires_grad=False, dtype=None, device=None):
         r"""Random tensor.
 
         Parameters
@@ -456,11 +459,11 @@ class Irreps(tuple):
         """
         di = size.index(-1)
         lsize = size[:di]
-        rsize = size[di + 1:]
+        rsize = size[di + 1 :]
 
-        if normalization == 'component':
+        if normalization == "component":
             return torch.randn(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
-        elif normalization == 'norm':
+        elif normalization == "norm":
             x = torch.zeros(*lsize, self.dim, *rsize, requires_grad=requires_grad, dtype=dtype, device=device)
             with torch.no_grad():
                 for s, (mul, ir) in zip(self.slices(), self):
@@ -471,7 +474,7 @@ class Irreps(tuple):
         else:
             raise ValueError("Normalization needs to be 'norm' or 'component'")
 
-    def __getitem__(self, i) -> Union[_MulIr, 'Irreps']:
+    def __getitem__(self, i) -> Union[_MulIr, "Irreps"]:
         x = super().__getitem__(i)
         if isinstance(i, slice):
             return Irreps(x)

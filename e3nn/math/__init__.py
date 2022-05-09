@@ -14,5 +14,5 @@ __all__ = [
     "soft_unit_step",
     "soft_one_hot_linspace",
     "germinate_formulas",
-    "reduce_permutation"
+    "reduce_permutation",
 ]

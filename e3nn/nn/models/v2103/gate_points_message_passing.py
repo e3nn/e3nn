@@ -58,6 +58,7 @@ class MessagePassing(torch.nn.Module):
         number of neurons per layers in the fully connected network
         first layer and hidden layers but not the output layer
     """
+
     def __init__(
         self,
         irreps_node_input,
@@ -92,43 +93,39 @@ class MessagePassing(torch.nn.Module):
         self.layers = torch.nn.ModuleList()
 
         for _ in range(layers):
-            irreps_scalars = o3.Irreps([
-                (mul, ir)
-                for mul, ir in self.irreps_node_hidden
-                if ir.l == 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
-            ]).simplify()
-            irreps_gated = o3.Irreps([
-                (mul, ir)
-                for mul, ir in self.irreps_node_hidden
-                if ir.l > 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
-            ])
+            irreps_scalars = o3.Irreps(
+                [
+                    (mul, ir)
+                    for mul, ir in self.irreps_node_hidden
+                    if ir.l == 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
+                ]
+            ).simplify()
+            irreps_gated = o3.Irreps(
+                [
+                    (mul, ir)
+                    for mul, ir in self.irreps_node_hidden
+                    if ir.l > 0 and tp_path_exists(irreps_node, self.irreps_edge_attr, ir)
+                ]
+            )
             ir = "0e" if tp_path_exists(irreps_node, self.irreps_edge_attr, "0e") else "0o"
             irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated]).simplify()
 
             gate = Gate(
-                irreps_scalars, [act[ir.p] for _, ir in irreps_scalars],  # scalar
-                irreps_gates, [act_gates[ir.p] for _, ir in irreps_gates],  # gates (scalars)
-                irreps_gated  # gated tensors
+                irreps_scalars,
+                [act[ir.p] for _, ir in irreps_scalars],  # scalar
+                irreps_gates,
+                [act_gates[ir.p] for _, ir in irreps_gates],  # gates (scalars)
+                irreps_gated,  # gated tensors
             )
             conv = Convolution(
-                irreps_node,
-                self.irreps_node_attr,
-                self.irreps_edge_attr,
-                gate.irreps_in,
-                fc_neurons,
-                num_neighbors
+                irreps_node, self.irreps_node_attr, self.irreps_edge_attr, gate.irreps_in, fc_neurons, num_neighbors
             )
             irreps_node = gate.irreps_out
             self.layers.append(Compose(conv, gate))
 
         self.layers.append(
             Convolution(
-                irreps_node,
-                self.irreps_node_attr,
-                self.irreps_edge_attr,
-                self.irreps_node_output,
-                fc_neurons,
-                num_neighbors
+                irreps_node, self.irreps_node_attr, self.irreps_edge_attr, self.irreps_node_output, fc_neurons, num_neighbors
             )
         )
 

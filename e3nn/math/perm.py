@@ -72,11 +72,7 @@ def germinate(subset: Set[TY_PERM]) -> Set[TY_PERM]:
     while True:
         n = len(subset)
         subset = subset.union([inverse(p) for p in subset])
-        subset = subset.union([
-            compose(p1, p2)
-            for p1 in subset
-            for p2 in subset
-        ])
+        subset = subset.union([compose(p1, p2) for p1 in subset for p2 in subset])
         if len(subset) == n:
             return subset
 
@@ -132,23 +128,17 @@ def sign(p: TY_PERM) -> int:
 
 
 def standard_representation(
-        p: TY_PERM,
-        dtype: Optional[torch.dtype] = None,
-        device: Optional[torch.dtype] = None
+    p: TY_PERM, dtype: Optional[torch.dtype] = None, device: Optional[torch.dtype] = None
 ) -> torch.Tensor:
-    r"""irrep of Sn of dimension n - 1
-    """
+    r"""irrep of Sn of dimension n - 1"""
     A = complete_basis(torch.ones(1, len(p), dtype=dtype, device=device), eps=0.1 / len(p))
     return A @ natural_representation(p) @ A.T
 
 
 def natural_representation(
-        p: TY_PERM,
-        dtype: Optional[torch.dtype] = None,
-        device: Optional[torch.dtype] = None
+    p: TY_PERM, dtype: Optional[torch.dtype] = None, device: Optional[torch.dtype] = None
 ) -> torch.Tensor:
-    r"""natural representation of Sn
-    """
+    r"""natural representation of Sn"""
     n = len(p)
     ip = inverse(p)
     d = torch.zeros(n, n, dtype=dtype, device=device)

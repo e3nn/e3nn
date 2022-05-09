@@ -16,24 +16,29 @@ def moment(f, n, dtype=None, device=None):
     return f(z).pow(n).mean()
 
 
-@compile_mode('trace')
+@compile_mode("trace")
 class normalize2mom(torch.nn.Module):
     _is_id: bool
     cst: float
 
     def __init__(
-            # pylint: disable=unused-argument
-            self, f, dtype=None, device=None):
+        # pylint: disable=unused-argument
+        self,
+        f,
+        dtype=None,
+        device=None,
+    ):
         super().__init__()
 
         # Try to infer a device:
         if device is None and isinstance(f, torch.nn.Module):
             # Avoid circular import
             from e3nn.util._argtools import _get_device
+
             device = _get_device(f)
 
         with torch.no_grad():
-            cst = moment(f, 2, dtype=torch.float64, device='cpu').pow(-0.5).item()
+            cst = moment(f, 2, dtype=torch.float64, device="cpu").pow(-0.5).item()
 
         if abs(cst - 1) < 1e-4:
             self._is_id = True
@@ -51,9 +56,18 @@ class normalize2mom(torch.nn.Module):
 
     @staticmethod
     def _make_tracing_inputs(
-            # pylint: disable=unused-argument
-            n: int):
+        # pylint: disable=unused-argument
+        n: int,
+    ):
         # No reason to trace this with more than one tiny input,
         # since f is assumed by `moment` to be an elementwise scalar
         # function
-        return [{'forward': (torch.zeros(size=(1,), ),)}]
+        return [
+            {
+                "forward": (
+                    torch.zeros(
+                        size=(1,),
+                    ),
+                )
+            }
+        ]

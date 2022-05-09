@@ -35,6 +35,7 @@ class Convolution(torch.nn.Module):
     steps : tuple of float
         size of the pixel in physical units
     """
+
     def __init__(self, irreps_in, irreps_out, irreps_sh, diameter, num_radial_basis, steps=(1.0, 1.0, 1.0)):
         super().__init__()
 
@@ -59,29 +60,28 @@ class Convolution(torch.nn.Module):
         s = math.floor(r / steps[2])
         z = torch.arange(-s, s + 1.0) * steps[2]
 
-        lattice = torch.stack(torch.meshgrid(x, y, z, indexing='ij'), dim=-1)  # [x, y, z, R^3]
-        self.register_buffer('lattice', lattice)
+        lattice = torch.stack(torch.meshgrid(x, y, z, indexing="ij"), dim=-1)  # [x, y, z, R^3]
+        self.register_buffer("lattice", lattice)
 
         emb = soft_one_hot_linspace(
             x=lattice.norm(dim=-1),
             start=0.0,
             end=r,
             number=self.num_radial_basis,
-            basis='smooth_finite',
+            basis="smooth_finite",
             cutoff=True,
         )
-        self.register_buffer('emb', emb)
+        self.register_buffer("emb", emb)
 
         sh = o3.spherical_harmonics(
-            l=self.irreps_sh,
-            x=lattice,
-            normalize=True,
-            normalization='component'
+            l=self.irreps_sh, x=lattice, normalize=True, normalization="component"
         )  # [x, y, z, irreps_sh.dim]
-        self.register_buffer('sh', sh)
+        self.register_buffer("sh", sh)
 
         self.tp = FullyConnectedTensorProduct(
-            self.irreps_in, self.irreps_sh, self.irreps_out,
+            self.irreps_in,
+            self.irreps_sh,
+            self.irreps_out,
             shared_weights=False,
             compile_left_right=False,
             compile_right=True,
@@ -99,7 +99,7 @@ class Convolution(torch.nn.Module):
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
 
         # TODO: understand why this is necessary
-        kernel = torch.einsum('xyzij->zyxij', kernel)  # [z, y, x, irreps_in.dim, irreps_out.dim]
+        kernel = torch.einsum("xyzij->zyxij", kernel)  # [z, y, x, irreps_in.dim, irreps_out.dim]
 
         kernel = kernel.reshape(-1, *kernel.shape[-2:])  # [z * y * x, irreps_in.dim, irreps_out.dim]
         return kernel

@@ -26,19 +26,22 @@ def tetris():
     pos = torch.tensor(pos, dtype=torch.get_default_dtype())
 
     # Since chiral shapes are the mirror of one another we need an *odd* scalar to distinguish them
-    labels = torch.tensor([
-        [+1, 0, 0, 0, 0, 0, 0],  # chiral_shape_1
-        [-1, 0, 0, 0, 0, 0, 0],  # chiral_shape_2
-        [0, 1, 0, 0, 0, 0, 0],  # square
-        [0, 0, 1, 0, 0, 0, 0],  # line
-        [0, 0, 0, 1, 0, 0, 0],  # corner
-        [0, 0, 0, 0, 1, 0, 0],  # L
-        [0, 0, 0, 0, 0, 1, 0],  # T
-        [0, 0, 0, 0, 0, 0, 1],  # zigzag
-    ], dtype=torch.get_default_dtype())
+    labels = torch.tensor(
+        [
+            [+1, 0, 0, 0, 0, 0, 0],  # chiral_shape_1
+            [-1, 0, 0, 0, 0, 0, 0],  # chiral_shape_2
+            [0, 1, 0, 0, 0, 0, 0],  # square
+            [0, 0, 1, 0, 0, 0, 0],  # line
+            [0, 0, 0, 1, 0, 0, 0],  # corner
+            [0, 0, 0, 0, 1, 0, 0],  # L
+            [0, 0, 0, 0, 0, 1, 0],  # T
+            [0, 0, 0, 0, 0, 0, 1],  # zigzag
+        ],
+        dtype=torch.get_default_dtype(),
+    )
 
     # apply random rotation
-    pos = torch.einsum('zij,zaj->zai', o3.rand_matrix(len(pos)), pos)
+    pos = torch.einsum("zij,zaj->zai", o3.rand_matrix(len(pos)), pos)
 
     return pos, labels
 
@@ -96,7 +99,7 @@ def main():
     print(f"Equivariance error = {error.abs().max().item():.1e}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
 
@@ -120,11 +123,11 @@ def test():
 def profile():
     data, labels = tetris()
     data = make_batch(data)
-    data = data.to(device='cuda')
-    labels = labels.to(device='cuda')
+    data = data.to(device="cuda")
+    labels = labels.to(device="cuda")
 
     f = Network()
-    f.to(device='cuda')
+    f.to(device="cuda")
 
     optim = torch.optim.Adam(f.parameters(), lr=1e-2)
 
@@ -136,14 +139,9 @@ def profile():
         called_num[0] += 1
 
     with torch.profiler.profile(
-        activities=[
-            torch.profiler.ProfilerActivity.CPU,
-            torch.profiler.ProfilerActivity.CUDA],
-        schedule=torch.profiler.schedule(
-            wait=50,
-            warmup=1,
-            active=1),
-        on_trace_ready=trace_handler
+        activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+        schedule=torch.profiler.schedule(wait=50, warmup=1, active=1),
+        on_trace_ready=trace_handler,
     ) as p:
         for _ in range(52):
             pred = f(data)

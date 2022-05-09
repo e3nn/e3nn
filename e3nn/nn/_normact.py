@@ -6,7 +6,7 @@ from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode('trace')
+@compile_mode("trace")
 class NormActivation(torch.nn.Module):
     r"""Norm-based activation function
     Applies a scalar nonlinearity to the norm of each irrep and ouputs a (normalized) version of that irrep multiplied by the scalar output of the scalar nonlinearity.
@@ -42,7 +42,7 @@ class NormActivation(torch.nn.Module):
         scalar_nonlinearity: Callable,
         normalize: bool = True,
         epsilon: Optional[float] = None,
-        bias: bool = False
+        bias: bool = False,
     ):
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
@@ -74,7 +74,7 @@ class NormActivation(torch.nn.Module):
         )
 
     def forward(self, features):
-        '''evaluate
+        """evaluate
         Parameters
         ----------
         features : `torch.Tensor`
@@ -83,7 +83,7 @@ class NormActivation(torch.nn.Module):
         -------
         `torch.Tensor`
             tensor of shape ``(..., irreps_in.dim)``
-        '''
+        """
         norms = self.norm(features)
         if self._eps_squared > 0:
             # See TFN for the original version of this approach:
