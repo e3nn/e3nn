@@ -50,18 +50,22 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
                   Maurice Weiler and
                   Michał Tyszkiewicz and
                   Simon Batzner and
+                  Dylan Madisetti and
                   Martin Uhrin and
                   Jes Frellsen and
                   Nuri Jung and
                   Sophia Sanborn and
+                  Mingjian Wen and
                   Josh Rackers and
+                  Marcel Rød and
                   Michael Bailey},
   title        = {Euclidean neural networks: e3nn},
-  year         = 2020,
+  month        = apr,
+  year         = 2022,
   publisher    = {Zenodo},
-  version      = {0.4.0},
-  doi          = {10.5281/zenodo.5292912},
-  url          = {https://doi.org/10.5281/zenodo.5292912}
+  version      = {0.5.0},
+  doi          = {10.5281/zenodo.6459381},
+  url          = {https://doi.org/10.5281/zenodo.6459381}
 }
 ```
 
