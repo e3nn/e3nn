@@ -262,7 +262,8 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
 def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
     orig_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=False, _optimize_einsums=False)
     opt_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
-    # We don't use state_dict here since that contains things like wigners that can differ between optimized and unoptimized TPs
+    # We don't use state_dict here since that contains things like wigners that
+    # can differ between optimized and unoptimized TPs
     with torch.no_grad():
         opt_tp.weight[:] = orig_tp.weight
     assert opt_tp._specialized_code == special_code
@@ -284,7 +285,8 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
     )
     assert torch.allclose(orig_tp.right(x2), opt_tp.right(x2), atol=float_tolerance)
 
-    # We also test .to(), even if only with a dtype, to ensure that various optimizations still always store constants in correct ways
+    # We also test .to(), even if only with a dtype, to ensure that various optimizations still
+    # always store constants in correct ways
     other_dtype = next(d for d in [torch.float32, torch.float64] if d != torch.get_default_dtype())
     x1, x2 = x1.to(other_dtype), x2.to(other_dtype)
     opt_tp = opt_tp.to(other_dtype)

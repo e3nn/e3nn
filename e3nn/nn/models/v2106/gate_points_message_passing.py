@@ -104,7 +104,8 @@ class MessagePassing(torch.nn.Module):
                     ir = "0o"
                 else:
                     raise ValueError(
-                        f"irreps_node={irreps_node} times irreps_edge_attr={self.irreps_edge_attr} is unable to produce gates needed for irreps_gated={irreps_gated}"
+                        f"irreps_node={irreps_node} times irreps_edge_attr={self.irreps_edge_attr} is unable to produce gates "
+                        f"needed for irreps_gated={irreps_gated}"
                     )
             else:
                 ir = None

@@ -26,7 +26,9 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
     Notes
     -----
-        `e3nn.o3.Linear` objects created with different partitionings of the same irreps, such as ``Linear("10x0e", "0e")`` and ``Linear("3x0e + 7x0e", "0e")``, are *not* equivalent: the second module has more instructions, which affects normalization. In a rough sense:
+        `e3nn.o3.Linear` objects created with different partitionings of the same irreps, such as ``Linear("10x0e", "0e")``
+        and ``Linear("3x0e + 7x0e", "0e")``, are *not* equivalent: the second module has more instructions, which affects
+        normalization. In a rough sense:
 
             Linear("10x0e", "0e") = normalization_coeff_0 * W_0 @ input
             Linear("3x0e + 7x0e", "0e") = normalization_coeff_1 * W_1 @ input[:3] + normalization_coeff_2 * W_2 @ input[3:]
@@ -45,16 +47,21 @@ class Linear(CodeGenMixin, torch.nn.Module):
         representation of the output
 
     internal_weights : bool
-        whether the `e3nn.o3.Linear` should store its own weights. Defaults to ``True`` unless ``shared_weights`` is explicitly set to ``False``, for consistancy with `e3nn.o3.TensorProduct`.
+        whether the `e3nn.o3.Linear` should store its own weights. Defaults to ``True`` unless ``shared_weights`` is
+        explicitly set to ``False``, for consistancy with `e3nn.o3.TensorProduct`.
 
     shared_weights : bool
-        whether the `e3nn.o3.Linear` should be weighted individually for each input in a batch. Defaults to ``False``. Cannot be ``True`` if ``internal_weights`` is ``True``.
+        whether the `e3nn.o3.Linear` should be weighted individually for each input in a batch. Defaults to ``False``.
+        Cannot be ``True`` if ``internal_weights`` is ``True``.
 
     instructions : list of 2-tuples, optional
-        list of tuples ``(i_in, i_out)`` indicating which irreps in ``irreps_in`` should contribute to which irreps in ``irreps_out``. If ``None`` (the default), all allowable instructions will be created: every ``(i_in, i_out)`` such that ``irreps_in[i_in].ir == irreps_out[i_out].ir``.
+        list of tuples ``(i_in, i_out)`` indicating which irreps in ``irreps_in`` should contribute to which irreps in
+        ``irreps_out``. If ``None`` (the default), all allowable instructions will be created: every ``(i_in, i_out)`` such
+        that ``irreps_in[i_in].ir == irreps_out[i_out].ir``.
 
     biases : list of bool, optional
-        indicates for each element of ``irreps_out`` if it has a bias. By default there is no bias. If ``biases=True`` it gives bias to all scalars (l=0 and p=1).
+        indicates for each element of ``irreps_out`` if it has a bias. By default there is no bias.
+        If ``biases=True`` it gives bias to all scalars (l=0 and p=1).
 
     Attributes
     ----------
@@ -76,7 +83,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
     >>> lin.weight_numel
     25
 
-    Be careful: because they have different instructions, the following two operations are not normalized in the same way, even though they contain all the same "connections":
+    Be careful: because they have different instructions, the following two operations are not normalized in the same way,
+    even though they contain all the same "connections":
 
     >>> lin1 = Linear("10x0e", "0e")
     >>> lin2 = Linear("3x0e + 7x0e", "0e")
@@ -281,7 +289,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
         Returns
         -------
         `torch.Tensor`
-            A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th instruction.
+            A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th
+            instruction.
         """
         if weight is None:
             assert self.internal_weights, "Weights must be provided when internal_weights = False"

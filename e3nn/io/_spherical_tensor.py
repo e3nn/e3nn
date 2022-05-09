@@ -31,7 +31,8 @@ class SphericalTensor(o3.Irreps):
         f(x) = \sum_{l=0}^{l_\mathrm{max}} A^l \cdot Y^l(x)
 
 
-    The way this function is transformed by parity :math:`f \longrightarrow P f` is described by the two parameters :math:`p_v` and :math:`p_a`
+    The way this function is transformed by parity :math:`f \longrightarrow P f` is described by the two parameters :math:`p_v`
+    and :math:`p_a`
 
     .. math::
         (P f)(x) &= p_v f(p_a x)

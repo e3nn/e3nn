@@ -69,7 +69,9 @@ def compile(
         mod : torch.nn.Module
             The module to compile. The module will have its submodules compiled replaced in-place.
         n_trace_checks : int, default = 1
-            How many random example inputs to generate when tracing a module. Must be at least one in order to have a tracing input. Extra example inputs will be pased to ``torch.jit.trace`` to confirm that the traced copmute graph doesn't change.
+            How many random example inputs to generate when tracing a module. Must be at least one in order to have a tracing
+            input. Extra example inputs will be pased to ``torch.jit.trace`` to confirm that the traced copmute graph doesn't
+            change.
         script_options : dict, default = {}
             Extra kwargs for ``torch.jit.script``.
         trace_options : dict, default = {}
@@ -127,7 +129,8 @@ def get_tracing_inputs(
 ):
     """Get random tracing inputs for ``mod``.
 
-    First checks if ``mod`` has a ``_make_tracing_inputs`` method. If so, calls it with ``n`` as the single argument and returns its results.
+    First checks if ``mod`` has a ``_make_tracing_inputs`` method. If so, calls it with ``n`` as the single argument and
+    returns its results.
 
     Otherwise, attempts to infer the input signature of the module using ``e3nn.util._argtools._get_io_irreps``.
 
@@ -144,7 +147,8 @@ def get_tracing_inputs(
     Returns
     -------
     list of dict
-        Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of arguments.
+        Tracing inputs in the format of ``torch.jit.trace_module``: dicts mapping method names like ``'forward'`` to tuples of
+        arguments.
     """
     # Avoid circular imports
     from ._argtools import _get_device, _get_floating_dtype, _get_io_irreps, _rand_args, _to_device_dtype

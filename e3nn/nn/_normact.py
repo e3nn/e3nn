@@ -9,7 +9,8 @@ from e3nn.util.jit import compile_mode
 @compile_mode("trace")
 class NormActivation(torch.nn.Module):
     r"""Norm-based activation function
-    Applies a scalar nonlinearity to the norm of each irrep and ouputs a (normalized) version of that irrep multiplied by the scalar output of the scalar nonlinearity.
+    Applies a scalar nonlinearity to the norm of each irrep and ouputs a (normalized) version of that irrep multiplied by the
+    scalar output of the scalar nonlinearity.
     Parameters
     ----------
     irreps_in : `e3nn.o3.Irreps`
@@ -19,7 +20,8 @@ class NormActivation(torch.nn.Module):
     normalize : bool
         whether to normalize the input features before multiplying them by the scalars from the nonlinearity
     epsilon : float, optional
-        when ``normalize``ing, norms smaller than ``epsilon`` will be clamped up to ``epsilon`` to avoid division by zero and NaN gradients. Not allowed when ``normalize`` is False.
+        when ``normalize``ing, norms smaller than ``epsilon`` will be clamped up to ``epsilon`` to avoid division by zero and
+        NaN gradients. Not allowed when ``normalize`` is False.
     bias : bool
         whether to apply a learnable additive bias to the inputs of the ``scalar_nonlinearity``
     Examples

@@ -10,7 +10,8 @@ class S2Activation(torch.nn.Module):
     r"""Apply non linearity on the signal on the sphere
 
     | Maps to the sphere, apply the non linearity point wise and project back.
-    | The signal on the sphere is a quasiregular representation of :math:`O(3)` and we can apply a pointwise operation on these representations.
+    | The signal on the sphere is a quasiregular representation of :math:`O(3)` and we can apply a pointwise operation on
+    | these representations.
 
     .. math:: \{A^l\}_l \mapsto \{\int \phi(\sum_l A^l \cdot Y^l(x)) Y^j(x) dx\}_j
 

@@ -35,7 +35,8 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
 
     if (irreps_in is None or irreps_out is None) and isinstance(func, torch.jit.ScriptModule):
         warnings.warn(
-            "Asking to infer irreps in/out of a compiled TorchScript module. This is unreliable, please provide `irreps_in` and `irreps_out` explicitly."
+            "Asking to infer irreps in/out of a compiled TorchScript module. This is unreliable, please provide `irreps_in`"
+            "and `irreps_out` explicitly."
         )
 
     if irreps_in is None:
@@ -58,7 +59,9 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
     else:
         if isinstance(irreps_in, tuple) and not isinstance(irreps_in, Irreps):
             warnings.warn(
-                f"Module {func} had irreps_in of type tuple but not Irreps; ambiguous whether the tuple should be interpreted as a tuple representing a single Irreps or a tuple of objects each to be converted to Irreps. Assuming the former. If the latter, use a list."
+                f"Module {func} had irreps_in of type tuple but not Irreps; ambiguous whether the tuple should be interpreted "
+                f"as a tuple representing a single Irreps or a tuple of objects each to be converted to Irreps. Assuming the "
+                f"former. If the latter, use a list."
             )
         irreps_in = [Irreps(irreps_in)]
 
@@ -69,7 +72,9 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
     else:
         if isinstance(irreps_in, tuple) and not isinstance(irreps_in, Irreps):
             warnings.warn(
-                f"Module {func} had irreps_out of type tuple but not Irreps; ambiguous whether the tuple should be interpreted as a tuple representing a single Irreps or a tuple of objects each to be converted to Irreps. Assuming the former. If the latter, use a list."
+                f"Module {func} had irreps_out of type tuple but not Irreps; ambiguous whether the tuple should be "
+                f"interpreted as a tuple representing a single Irreps or a tuple of objects each to be converted to Irreps. "
+                f"Assuming the former. If the latter, use a list."
             )
         irreps_out = [Irreps(irreps_out)]
 
@@ -87,7 +92,8 @@ def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
 def _rand_args(irreps_in, batch_size: Optional[int] = None):
     if not all((isinstance(i, Irreps) or i == "cartesian_points") for i in irreps_in):
         raise ValueError(
-            "Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; provide explicit ``args_in``"
+            "Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; "
+            "provide explicit ``args_in``"
         )
     if batch_size is None:
         # Generate random args with random size batch dim between 1 and 4:

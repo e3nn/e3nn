@@ -40,7 +40,8 @@ try:
     def float_tolerance(request):
         """Run all tests with various PyTorch default dtypes.
 
-        This is a session-wide, autouse fixture — you only need to request it explicitly if a test needs to know the tolerance for the current default dtype.
+        This is a session-wide, autouse fixture — you only need to request it explicitly if a test needs to know the tolerance
+        for the current default dtype.
 
         Returns
         --------
@@ -83,7 +84,8 @@ def random_irreps(
         len_max : int, optional
             The largest number of irreps to generate, defaults to 4.
         clean : bool, optional
-            If ``True``, only ``o3.Irreps`` objects will be returned. If ``False`` (the default), ``e3nn.o3.Irreps``-like objects like strings and lists of tuples can be returned.
+            If ``True``, only ``o3.Irreps`` objects will be returned. If ``False`` (the default), ``e3nn.o3.Irreps``-like
+            objects like strings and lists of tuples can be returned.
         allow_empty : bool, optional
             Whether to allow generating empty ``e3nn.o3.Irreps``.
     Returns
@@ -152,13 +154,15 @@ def assert_equivariant(func, args_in=None, irreps_in=None, irreps_out=None, tole
     Parameters
     ----------
         args_in : list or None
-            the original input arguments for the function. If ``None`` and the function has ``irreps_in`` consisting only of ``o3.Irreps`` and ``'cartesian'``, random test inputs will be generated.
+            the original input arguments for the function. If ``None`` and the function has ``irreps_in`` consisting only of
+            ``o3.Irreps`` and ``'cartesian'``, random test inputs will be generated.
         irreps_in : object
             see ``equivariance_error``
         irreps_out : object
             see ``equivariance_error``
         tolerance : float or None
-            the threshold below which the equivariance error must fall. If ``None``, (the default), ``FLOAT_TOLERANCE[torch.get_default_dtype()]`` is used.
+            the threshold below which the equivariance error must fall.
+            If ``None``, (the default), ``FLOAT_TOLERANCE[torch.get_default_dtype()]`` is used.
         **kwargs : kwargs
             passed through to ``equivariance_error``.
 
@@ -215,7 +219,10 @@ def equivariance_error(
     args_in : list
         the original inputs to pass to ``func``.
     irreps_in : list of `e3nn.o3.Irreps` or `e3nn.o3.Irreps`
-        the input irreps for each of the arguments in ``args_in``. If left as the default of ``None``, ``get_io_irreps`` will be used to try to infer them. If a sequence is provided, valid elements are also the string ``'cartesian'``, which denotes that the corresponding input should be dealt with as cartesian points in 3D, and ``None``, which indicates that the argument should not be transformed.
+        the input irreps for each of the arguments in ``args_in``. If left as the default of ``None``, ``get_io_irreps`` will
+        be used to try to infer them. If a sequence is provided, valid elements are also the string ``'cartesian'``, which
+        denotes that the corresponding input should be dealt with as cartesian points in 3D, and ``None``, which indicates
+        that the argument should not be transformed.
     irreps_out : list of `e3nn.o3.Irreps` or `e3nn.o3.Irreps`
         the out irreps for each of the return values of ``func``. Accepts similar values to ``irreps_in``.
     ntrials : int
@@ -319,7 +326,8 @@ def assert_auto_jitable(
         error_on_warnings : bool
             If True (default), TracerWarnings emitted by ``torch.jit.trace`` will be treated as errors.
         n_random_tests : int
-            If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be generated as test inputs for ``torch.jit.trace``.
+            If ``args_in`` is ``None`` and arguments are being automatically generated, this many random arguments will be
+            generated as test inputs for ``torch.jit.trace``.
         strict_shapes : bool
             Test that the traced function errors on inputs with feature dimensions that don't match the input irreps.
     Returns
@@ -339,7 +347,8 @@ def assert_auto_jitable(
         func_jit = compile(func, n_trace_checks=n_trace_checks)
 
     # Confirm that it rejects incorrect shapes
-    # This check only makes sense if all inputs are Tensors with irreps; otherwise we can't know how to modify the arguments or that our modifications make them wrong.
+    # This check only makes sense if all inputs are Tensors with irreps; otherwise we can't know how to modify the arguments
+    # or that our modifications make them wrong.
     if strict_shapes and not hasattr(func, _MAKE_TRACING_INPUTS):
         try:
             all_bad_args = get_tracing_inputs(func, n=1)[0]
@@ -381,7 +390,8 @@ def assert_normalized(
 
     See https://docs.e3nn.org/en/stable/guide/normalization.html for more information on the normalization scheme.
 
-    ``atol``, ``n_input``, and ``n_weight`` may need to be significantly higher in order to converge the statistics to pass the test.
+    ``atol``, ``n_input``, and ``n_weight`` may need to be significantly higher in order to converge the statistics
+    to pass the test.
 
     Parameters
     ----------
@@ -392,7 +402,8 @@ def assert_normalized(
         irreps_out : object
             see ``equivariance_error``
         normalization : str, default "component"
-            one of "component" or "norm". Note that this is defined for both the inputs and the outputs; if you need seperate normalizations for input and output please file a feature request.
+            one of "component" or "norm". Note that this is defined for both the inputs and the outputs; if you need seperate
+            normalizations for input and output please file a feature request.
         n_input : int, default 10_000
             the number of input samples to use for each weight init
         n_weight : int, default 20
@@ -474,9 +485,10 @@ def assert_normalized(
                 continue
             max_componentwise = (expected_square[ir_slice] - target).abs().max().item()
             logger.info("Tested normalization of %r: max componentwise error %.6f", _logging_name(func), max_componentwise)
-            assert (
-                max_componentwise <= atol
-            ), f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}. Max componentwise error: {max_componentwise:.6f}"
+            assert max_componentwise <= atol, (
+                f"< x_i^2 > !~= {target:.6f} for output irrep #{i}, {irreps[i]}."
+                f"Max componentwise error: {max_componentwise:.6f}"
+            )
 
 
 def set_random_seeds():

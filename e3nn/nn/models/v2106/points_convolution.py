@@ -68,10 +68,10 @@ class Convolution(torch.nn.Module):
         irreps_mid = o3.Irreps(irreps_mid)
         irreps_mid, p, _ = irreps_mid.sort()
 
-        assert (
-            irreps_mid.dim > 0
-        ), f"irreps_node_input={self.irreps_node_input} time irreps_edge_attr={self.irreps_edge_attr} produces nothing in irreps_node_output={self.irreps_node_output}"
-
+        assert irreps_mid.dim > 0, (
+            f"irreps_node_input={self.irreps_node_input} time irreps_edge_attr={self.irreps_edge_attr} produces nothing "
+            f"in irreps_node_output={self.irreps_node_output}"
+        )
         instructions = [(i_1, i_2, p[i_out], mode, train) for i_1, i_2, i_out, mode, train in instructions]
 
         tp = TensorProduct(

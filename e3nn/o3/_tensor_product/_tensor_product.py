@@ -41,9 +41,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         Each instruction puts ``in1[i_1]`` :math:`\otimes` ``in2[i_2]`` into ``out[i_out]``.
 
-        * ``mode``: `str`. Determines the way the multiplicities are treated, ``"uvw"`` is fully connected. Other valid options are: ``'uvw'``, ``'uvu'``, ``'uvv'``, ``'uuw'``, ``'uuu'``, and ``'uvuv'``.
+        * ``mode``: `str`. Determines the way the multiplicities are treated, ``"uvw"`` is fully connected. Other valid
+        options are: ``'uvw'``, ``'uvu'``, ``'uvv'``, ``'uuw'``, ``'uuu'``, and ``'uvuv'``.
         * ``train``: `bool`. `True` if this path should have learnable weights, otherwise `False`.
-        * ``path_weight``: `float`. A fixed multiplicative weight to apply to the output of this path. Defaults to 1. Note that setting ``path_weight`` breaks the normalization derived from ``in1_var``/``in2_var``/``out_var``.
+        * ``path_weight``: `float`. A fixed multiplicative weight to apply to the output of this path. Defaults to 1. Note
+        that setting ``path_weight`` breaks the normalization derived from ``in1_var``/``in2_var``/``out_var``.
 
     in1_var : list of float, Tensor, or None
         Variance for each irrep in ``irreps_in1``. If ``None``, all default to ``1.0``.
@@ -63,7 +65,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     path_normalization : {'element', 'path'}
         If set to ``element``, each output is normalized by the total number of elements (independently of their paths).
-        If it is set to ``path``, each path is normalized by the total number of elements in the path, then each output is normalized by the number of paths.
+        If it is set to ``path``, each path is normalized by the total number of elements in the path, then each output is
+        normalized by the number of paths.
 
     internal_weights : bool
         whether the `e3nn.o3.TensorProduct` contains its learnable weights as a parameter
@@ -544,7 +547,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         Parameters
         ----------
         instruction : int
-            The index of the instruction to get a view on the weights for. ``self.instructions[instruction].has_weight`` must be ``True``.
+            The index of the instruction to get a view on the weights for. ``self.instructions[instruction].has_weight`` must
+            be ``True``.
 
         weight : `torch.Tensor`, optional
             like ``weight`` argument to ``forward()``
@@ -552,7 +556,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         Returns
         -------
         `torch.Tensor`
-            A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th instruction.
+            A view on ``weight`` or this object's internal weights for the weights corresponding to the ``instruction`` th
+            instruction.
         """
         if not self.instructions[instruction].has_weight:
             raise ValueError(f"Instruction {instruction} has no weights.")

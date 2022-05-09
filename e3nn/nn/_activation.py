@@ -62,7 +62,8 @@ class Activation(torch.nn.Module):
 
                 if p_out == 0:
                     raise ValueError(
-                        "Activation: the parity is violated! The input scalar is odd but the activation is neither even nor odd."
+                        "Activation: the parity is violated! The input scalar is odd but the activation is neither "
+                        "even nor odd."
                     )
             else:
                 irreps_out.append((mul, (l_in, p_in)))

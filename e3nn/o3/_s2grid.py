@@ -8,9 +8,11 @@ One representation that we like to call "spherical tensor" is
 
 .. math:: f(x) = \sum_{l=0}^{l_{\mathit{max}}} F^l \cdot Y^l(x)
 
-it is made of :math:`(l_{\mathit{max}} + 1)^2` real numbers represented in the above formula by the familly of vectors :math:`F^l \in \mathbb{R}^{2l+1}`.
+it is made of :math:`(l_{\mathit{max}} + 1)^2` real numbers represented in the above formula by the familly of vectors
+:math:`F^l \in \mathbb{R}^{2l+1}`.
 
-Another representation is the discretization around the sphere. For this representation we chose a particular grid of size :math:`(N, M)`
+Another representation is the discretization around the sphere. For this representation we chose a particular grid of size
+:math:`(N, M)`
 
 .. math::
 

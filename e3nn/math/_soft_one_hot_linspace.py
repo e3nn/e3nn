@@ -38,10 +38,12 @@ def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutof
         number of basis functions :math:`N`
 
     basis : {'gaussian', 'cosine', 'smooth_finite', 'fourier', 'bessel'}
-        choice of basis family; note that due to the :math:`1/x` term, ``bessel`` basis does not satisfy the normalization of other basis choices
+        choice of basis family; note that due to the :math:`1/x` term, ``bessel`` basis does not satisfy the normalization of
+        other basis choices
 
     cutoff : bool
-        if ``cutoff=True`` then for all :math:`x` outside of the interval defined by ``(start, end)``, :math:`\forall i, \; f_i(x) \approx 0`
+        if ``cutoff=True`` then for all :math:`x` outside of the interval defined by ``(start, end)``,
+        :math:`\forall i, \; f_i(x) \approx 0`
 
     Returns
     -------

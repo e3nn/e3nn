@@ -27,7 +27,8 @@ class Extract(CodeGenMixin, torch.nn.Module):
             list of tuples, one per output continaing each ``len(irreps_outs[i])`` int
 
         squeeze_out : bool, default False
-            if ``squeeze_out`` and only one output exists, a ``torch.Tensor`` will be returned instead of a ``Tuple[torch.Tensor]``
+            if ``squeeze_out`` and only one output exists, a ``torch.Tensor`` will be returned instead of a
+            ``Tuple[torch.Tensor]``
 
 
         Examples

@@ -50,7 +50,8 @@ class SphericalHarmonics(torch.nn.Module):
         irreps_in = o3.Irreps(irreps_in)
         if irreps_in not in (o3.Irreps("1x1o"), o3.Irreps("1x1e")):
             raise ValueError(
-                f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a pseudovector (`1x1e`), not `{irreps_in}`"
+                f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a pseudovector (`1x1e`), "
+                f"not `{irreps_in}`"
             )
         self.irreps_in = irreps_in
         input_p = irreps_in[0].ir.p  # pylint: disable=no-member
@@ -60,7 +61,9 @@ class SphericalHarmonics(torch.nn.Module):
             for mul, (l, p) in irreps_out:
                 if p != input_p ** l:
                     raise ValueError(
-                        f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity p = {p}, which is inconsistent with the input parity {input_p} — the output parity should have been p = {input_p**l}"
+                        f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity "
+                        f"p = {p}, which is inconsistent with the input parity {input_p} — the output parity should have been "
+                        f"p = {input_p**l}"
                     )
                 ls.extend([l] * mul)
         elif isinstance(irreps_out, int):
@@ -133,7 +136,8 @@ def spherical_harmonics(
     .. note::
 
         This function match with this table of standard real spherical harmonics from Wikipedia_
-        when ``normalize=True``, ``normalization='integral'`` and is called with the argument in the order ``y,z,x`` (instead of ``x,y,z``).
+        when ``normalize=True``, ``normalization='integral'`` and is called with the argument in the order ``y,z,x``
+        (instead of ``x,y,z``).
 
     .. _Wikipedia: https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
 
@@ -149,7 +153,8 @@ def spherical_harmonics(
         whether to normalize the ``x`` to unit vectors that lie on the sphere before projecting onto the spherical harmonics
 
     normalization : {'integral', 'component', 'norm'}
-        normalization of the output tensors --- note that this option is independent of ``normalize``, which controls the processing of the *input*, rather than the output.
+        normalization of the output tensors --- note that this option is independent of ``normalize``, which controls the
+        processing of the *input*, rather than the output.
         Valid options:
         * *component*: :math:`\|Y^l(x)\|^2 = 2l+1, x \in S^2`
         * *norm*: :math:`\|Y^l(x)\| = 1, x \in S^2`, ``component / sqrt(2l+1)``

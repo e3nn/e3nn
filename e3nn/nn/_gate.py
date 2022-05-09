@@ -94,7 +94,8 @@ class Gate(torch.nn.Module):
             raise ValueError(f"Scalars must be scalars, instead got irreps_scalars = {irreps_scalars}")
         if irreps_gates.num_irreps != irreps_gated.num_irreps:
             raise ValueError(
-                f"There are {irreps_gated.num_irreps} irreps in irreps_gated, but a different number ({irreps_gates.num_irreps}) of gate scalars in irreps_gates"
+                f"There are {irreps_gated.num_irreps} irreps in irreps_gated, but a different number "
+                f"({irreps_gates.num_irreps}) of gate scalars in irreps_gates"
             )
 
         self.sc = _Sortcut(irreps_scalars, irreps_gates, irreps_gated)

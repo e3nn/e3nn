@@ -376,7 +376,8 @@ def codegen_tensor_product_left_right(
         #    => All following contractions have batch dimension
         #    => All possible contraction paths have cost that scales linearly in batch size
         #    => The optimal path is the same for all batch sizes
-        # For the second case, this logic follows as long as the first contraction is not between the first two operands. Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
+        # For the second case, this logic follows as long as the first contraction is not between the first two operands.
+        # Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
         # https://github.com/dgasmith/opt_einsum/issues/158
         # for more details.
         #
@@ -384,7 +385,8 @@ def codegen_tensor_product_left_right(
         #         \- this is the `memory_limit` option in opt_einsum
         # TODO: allow user to choose opt_einsum parameters?
         #
-        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
+        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or
+        # dtypes.
         batchdim = 4
         example_inputs = (
             torch.zeros((batchdim, irreps_in1.dim)),
@@ -698,7 +700,8 @@ def codegen_tensor_product_right(
         #    => All following contractions have batch dimension
         #    => All possible contraction paths have cost that scales linearly in batch size
         #    => The optimal path is the same for all batch sizes
-        # For the second case, this logic follows as long as the first contraction is not between the first two operands. Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
+        # For the second case, this logic follows as long as the first contraction is not between the first two operands.
+        # Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
         # https://github.com/dgasmith/opt_einsum/issues/158
         # for more details.
         #
@@ -706,7 +709,8 @@ def codegen_tensor_product_right(
         #         \- this is the `memory_limit` option in opt_einsum
         # TODO: allow user to choose opt_einsum parameters?
         #
-        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or dtypes.
+        # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or
+        # dtypes.
         batchdim = 4
         example_inputs = (
             torch.zeros((batchdim, irreps_in1.dim)),

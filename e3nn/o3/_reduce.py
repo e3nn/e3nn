@@ -93,8 +93,9 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
         Optional, list of allowed irrep in the intermediary operations
 
     **kwargs : dict of `e3nn.o3.Irreps`
-        each letter present in the formula has to be present in the ``irreps`` dictionary, unless it can be inferred by the formula.
-        For instance if the formula is ``ij=ji`` you can provide the representation of ``i`` only: ``ReducedTensorProducts('ij=ji', i='1o')``.
+        each letter present in the formula has to be present in the ``irreps`` dictionary, unless it can be inferred by the
+        formula. For instance if the formula is ``ij=ji`` you can provide the representation of ``i`` only:
+        ``ReducedTensorProducts('ij=ji', i='1o')``.
 
     Attributes
     ----------
