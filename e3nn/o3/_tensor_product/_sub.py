@@ -346,13 +346,16 @@ def _square_instructions_fully_connected(irreps_in, irreps_out, irrep_normalizat
 class TensorSquare(TensorProduct):
     r"""Compute the square tensor product of a tensor and reduce it in irreps
 
-    This module contains no parameters.
-    The output representation is determined by the input representation.
+    If `irreps_out` is given, this operation is fully connected.
+    If `irreps_out` is not given, the operation has no parameter and is like full tensor product.
 
     Parameters
     ----------
     irreps_in : `e3nn.o3.Irreps`
         representation of the input
+
+    irreps_out : `e3nn.o3.Irreps`, optional
+        representation of the output
 
     filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
         filter to select only specific `e3nn.o3.Irrep` of the output
