@@ -140,7 +140,7 @@ def load_data(path, batch_size):
     train_data = torch.from_numpy(dataset["train"]["images"][:, None, :, :].astype(np.float32))
     train_labels = torch.from_numpy(dataset["train"]["labels"].astype(np.int64))
 
-    train_data /= 57
+    # train_data /= 57  This normalization was hurtful, see @dmklee comment in discussions/344
 
     train_dataset = torch.utils.data.TensorDataset(train_data, train_labels)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -148,7 +148,7 @@ def load_data(path, batch_size):
     test_data = torch.from_numpy(dataset["test"]["images"][:, None, :, :].astype(np.float32))
     test_labels = torch.from_numpy(dataset["test"]["labels"].astype(np.int64))
 
-    test_data /= 57
+    # test_data /= 57
 
     test_dataset = torch.utils.data.TensorDataset(test_data, test_labels)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
