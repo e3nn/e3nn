@@ -114,11 +114,12 @@ class S2ConvNet_original(torch.nn.Module):
         self.w_out = torch.nn.Parameter(torch.randn(f2, f_output))
 
     def forward(self, x):
-        x = self.from_s2(x)
-        x = self.conv1(x)
-        x = self.act1(x)
-        x = self.conv2(x)
-        x = self.act2(x)  # [z, f2, 1]
+        x = x.transpose(-1, -2)  # [batch, features, alpha, beta] -> [batch, features, beta, alpha]
+        x = self.from_s2(x)  # [batch, features, beta, alpha] -> [batch, features, irreps]
+        x = self.conv1(x)  # [batch, features, irreps] -> [batch, features, irreps]
+        x = self.act1(x)  # [batch, features, irreps] -> [batch, features, irreps]
+        x = self.conv2(x)  # [batch, features, irreps] -> [batch, features, irreps]
+        x = self.act2(x)  # [batch, features, scalar]
         x = x.flatten(1) @ self.w_out / self.w_out.shape[0]
 
         return x
