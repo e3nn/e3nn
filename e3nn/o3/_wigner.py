@@ -1,6 +1,7 @@
 r"""Core functions of :math:`SO(3)`
 """
 import functools
+import math
 
 import torch
 from e3nn.util import explicit_default_types
@@ -88,9 +89,9 @@ def wigner_D(l, alpha, beta, gamma):
         tensor :math:`D^l(\alpha, \beta, \gamma)` of shape :math:`(2l+1, 2l+1)`
     """
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    alpha = alpha[..., None, None] % (2 * torch.pi)
-    beta = beta[..., None, None] % (2 * torch.pi)
-    gamma = gamma[..., None, None] % (2 * torch.pi)
+    alpha = alpha[..., None, None] % (2 * math.pi)
+    beta = beta[..., None, None] % (2 * math.pi)
+    gamma = gamma[..., None, None] % (2 * math.pi)
     X = so3_generators(l)
     return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
 
