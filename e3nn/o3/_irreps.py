@@ -73,8 +73,10 @@ class Irrep(tuple):
             elif isinstance(l, tuple):
                 l, p = l
 
-        assert isinstance(l, int) and l >= 0, l
-        assert p in [-1, 1], p
+        if not isinstance(l, int) or l < 0:
+            raise ValueError(f"l must be positive integer, got {l}")
+        if p not in (-1, 1):
+            raise ValueError(f"parity must be on of (-1, 1), got {p}")
         return super().__new__(cls, (l, p))
 
     @property
@@ -282,6 +284,9 @@ class _MulIr(tuple):
 
     def __repr__(self):
         return f"{self.mul}x{self.ir}"
+
+    def __getitem__(self, item) -> Union[int, Irrep]:  # pylint: disable=useless-super-delegation
+        return super().__getitem__(item)
 
     def count(self, _value):
         raise NotImplementedError
@@ -524,7 +529,7 @@ class Irreps(tuple):
         """
         return Irreps(super().__rmul__(other))
 
-    def simplify(self):
+    def simplify(self) -> 'Irreps':
         """Simplify the representations.
 
         Returns

@@ -1,12 +1,13 @@
 import collections
 
 import torch
+from torch import fx
+
 from e3nn import o3
 from e3nn.math import germinate_formulas, orthonormalize, reduce_permutation
 from e3nn.util import explicit_default_types
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-from torch import fx
 
 _TP = collections.namedtuple("tp", "op, args")
 _INPUT = collections.namedtuple("input", "tensor, start, stop")
@@ -83,7 +84,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
     ----------
     formula : str
         String made of letters ``-`` and ``=`` that represent the indices symmetries of the tensor.
-        For instance ``ij=ji`` means that the tensor has to indices and if they are exchanged, its value is the same.
+        For instance ``ij=ji`` means that the tensor has two indices and if they are exchanged, its value is the same.
         ``ij=-ji`` means that the tensor change its sign if the two indices are exchanged.
 
     filter_ir_out : list of `e3nn.o3.Irrep`, optional
