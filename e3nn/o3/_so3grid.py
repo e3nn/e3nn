@@ -37,7 +37,7 @@ class SO3Grid(torch.nn.Module):  # pylint: disable=abstract-method
 
         b, a = s2_grid(nb, na)
         self.register_buffer("D", flat_wigner(lmax, a[:, None, None], b[None, :, None], a[None, None, :]))
-        qw = _quadrature_weights(nb // 2) * nb ** 2 / na ** 2
+        qw = _quadrature_weights(nb // 2) * nb**2 / na**2
         self.register_buffer("qw", qw)
 
         self.register_buffer("alpha", a)

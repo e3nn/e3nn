@@ -120,7 +120,7 @@ class LowPassFilter(torch.nn.Module):
     def __init__(self, scale, stride=1, transposed=False, steps=(1, 1, 1)):
         super().__init__()
 
-        sigma = 0.5 * (scale ** 2 - 1) ** 0.5
+        sigma = 0.5 * (scale**2 - 1) ** 0.5
 
         size = int(1 + 2 * 2.5 * sigma)
         if size % 2 == 0:
@@ -136,10 +136,10 @@ class LowPassFilter(torch.nn.Module):
         lattice = torch.stack(torch.meshgrid(x, y, z, indexing="ij"), dim=-1)  # [x, y, z, R^3]
         lattice = (size // 2) * lattice
 
-        kernel = torch.exp(-lattice.norm(dim=-1).pow(2) / (2 * sigma ** 2))
+        kernel = torch.exp(-lattice.norm(dim=-1).pow(2) / (2 * sigma**2))
         kernel = kernel / kernel.sum()
         if transposed:
-            kernel = kernel * stride ** 3
+            kernel = kernel * stride**3
         kernel = kernel[None, None]
         self.register_buffer("kernel", kernel)
 

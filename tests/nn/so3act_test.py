@@ -11,7 +11,7 @@ def so3_irreps(lmax):
 
 
 @pytest.mark.parametrize("lmax", [1, 2, 3, 4])
-@pytest.mark.parametrize("act", [torch.tanh, lambda x: x ** 2])
+@pytest.mark.parametrize("act", [torch.tanh, lambda x: x**2])
 def test_equivariance(act, lmax):
     m = SO3Activation(lmax, lmax, act, 6)
 

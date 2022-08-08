@@ -82,7 +82,7 @@ class SimpleNetwork(torch.nn.Module):
             self.number_of_basis,
             basis="cosine",  # the cosine basis with cutoff = True goes to zero at max_radius
             cutoff=True,  # no need for an additional smooth cutoff
-        ).mul(self.number_of_basis ** 0.5)
+        ).mul(self.number_of_basis**0.5)
 
         # Node attributes are not used here
         node_attr = node_inputs.new_ones(node_inputs.shape[0], 1)
@@ -90,7 +90,7 @@ class SimpleNetwork(torch.nn.Module):
         node_outputs = self.mp(node_inputs, node_attr, edge_src, edge_dst, edge_attr, edge_length_embedding)
 
         if self.pool_nodes:
-            return scatter(node_outputs, batch, dim=0).div(self.num_nodes ** 0.5)
+            return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
         else:
             return node_outputs
 
@@ -160,12 +160,12 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             self.number_of_basis,
             basis="cosine",  # the cosine basis with cutoff = True goes to zero at max_radius
             cutoff=True,  # no need for an additional smooth cutoff
-        ).mul(self.number_of_basis ** 0.5)
+        ).mul(self.number_of_basis**0.5)
 
         node_outputs = self.mp(data["node_input"], data["node_attr"], edge_src, edge_dst, edge_attr, edge_length_embedding)
 
         if self.pool_nodes:
-            return scatter(node_outputs, batch, dim=0).div(self.num_nodes ** 0.5)
+            return scatter(node_outputs, batch, dim=0).div(self.num_nodes**0.5)
         else:
             return node_outputs
 

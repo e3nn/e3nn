@@ -110,7 +110,7 @@ class Convolution(torch.nn.Module):
         x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
-        x = scatter(edge_features, edge_dst, dim=0, dim_size=x.shape[0]).div(self.num_neighbors ** 0.5)
+        x = scatter(edge_features, edge_dst, dim=0, dim_size=x.shape[0]).div(self.num_neighbors**0.5)
 
         x = self.lin2(x, node_attr)
 
@@ -317,7 +317,7 @@ class Network(torch.nn.Module):
         edge_length = edge_vec.norm(dim=1)
         edge_length_embedded = soft_one_hot_linspace(
             x=edge_length, start=0.0, end=self.max_radius, number=self.number_of_basis, basis="gaussian", cutoff=False
-        ).mul(self.number_of_basis ** 0.5)
+        ).mul(self.number_of_basis**0.5)
         edge_attr = smooth_cutoff(edge_length / self.max_radius)[:, None] * edge_sh
 
         if self.input_has_node_in and "x" in data:
@@ -337,6 +337,6 @@ class Network(torch.nn.Module):
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
         if self.reduce_output:
-            return scatter(x, batch, dim=0).div(self.num_nodes ** 0.5)
+            return scatter(x, batch, dim=0).div(self.num_nodes**0.5)
         else:
             return x

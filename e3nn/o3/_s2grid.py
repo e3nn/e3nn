@@ -399,7 +399,7 @@ class ToS2Grid(torch.nn.Module):
         return x.reshape(*size, *x.shape[1:])
 
     def _make_tracing_inputs(self, n: int):
-        return [{"forward": (torch.randn(self.lmax ** 2),)} for _ in range(n)]
+        return [{"forward": (torch.randn(self.lmax**2),)} for _ in range(n)]
 
 
 @compile_mode("trace")
@@ -478,7 +478,7 @@ class FromS2Grid(torch.nn.Module):
             n = normalization
         m = _expand_matrix(range(lmax + 1), dtype=dtype, device=device)  # [l, m, i]
         assert res_beta % 2 == 0
-        qw = _quadrature_weights(res_beta // 2, dtype=dtype, device=device) * res_beta ** 2 / res_alpha  # [b]
+        qw = _quadrature_weights(res_beta // 2, dtype=dtype, device=device) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum("lmj,bj,lmi,l,b->mbi", m, shb, m, n, qw)  # [m, b, i]
 
         self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha

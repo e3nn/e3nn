@@ -145,10 +145,10 @@ class Legendre(fx.GraphModule):
                 p = list(p.items())
 
                 (zn, yn), c = p[0]
-                x = float(c) * z ** zn * y ** yn
+                x = float(c) * z**zn * y**yn
 
                 for (zn, yn), c in p[1:]:
-                    x += float(c) * z ** zn * y ** yn
+                    x += float(c) * z**zn * y**yn
 
                 leg.append(x.unsqueeze(-1))
 
@@ -183,7 +183,7 @@ def _sympy_legendre(l, m):
     l = Integer(l)
     m = Integer(abs(m))
     z, y = symbols("z y", real=True)
-    ex = 1 / (2 ** l * factorial(l)) * y ** m * diff((z ** 2 - 1) ** l, z, l + m)
+    ex = 1 / (2**l * factorial(l)) * y**m * diff((z**2 - 1) ** l, z, l + m)
     ex *= sqrt((2 * l + 1) / (4 * pi) * factorial(l - m) / factorial(l + m))
     return ex
 

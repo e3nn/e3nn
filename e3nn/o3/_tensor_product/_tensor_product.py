@@ -620,10 +620,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         import numpy as np
 
         def _intersection(x, u, y, v):
-            u2 = np.sum(u ** 2)
-            v2 = np.sum(v ** 2)
+            u2 = np.sum(u**2)
+            v2 = np.sum(v**2)
             uv = np.sum(u * v)
-            det = u2 * v2 - uv ** 2
+            det = u2 * v2 - uv**2
             mu = np.sum((u * uv - v * u2) * (y - x)) / det
             return y + mu * v
 

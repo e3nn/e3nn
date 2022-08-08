@@ -70,7 +70,7 @@ class SphericalTensor(o3.Irreps):
         p_val,
         p_arg,
     ):
-        return super().__new__(cls, [(1, (l, p_val * p_arg ** l)) for l in range(lmax + 1)])
+        return super().__new__(cls, [(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
 
     def with_peaks_at(self, vectors, values=None):
         r"""Create a spherical tensor with peaks
