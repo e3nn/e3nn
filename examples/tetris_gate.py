@@ -81,7 +81,7 @@ class Convolution(torch.nn.Module):
     def forward(self, node_features, edge_src, edge_dst, edge_attr, edge_scalars) -> torch.Tensor:
         weight = self.fc(edge_scalars)
         edge_features = self.tp(node_features[edge_src], edge_attr, weight)
-        node_features = scatter(edge_features, edge_dst, dim=0).div(self.num_neighbors ** 0.5)
+        node_features = scatter(edge_features, edge_dst, dim=0).div(self.num_neighbors**0.5)
         return node_features
 
 
@@ -117,16 +117,16 @@ class Network(torch.nn.Module):
         edge_attr = o3.spherical_harmonics(l=self.irreps_sh, x=edge_vec, normalize=True, normalization="component")
         edge_length_embedded = (
             soft_one_hot_linspace(x=edge_vec.norm(dim=1), start=0.5, end=2.5, number=3, basis="smooth_finite", cutoff=True)
-            * 3 ** 0.5
+            * 3**0.5
         )
 
-        x = scatter(edge_attr, edge_dst, dim=0).div(self.num_neighbors ** 0.5)
+        x = scatter(edge_attr, edge_dst, dim=0).div(self.num_neighbors**0.5)
 
         x = self.conv(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
         x = self.gate(x)
         x = self.final(x, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
-        return scatter(x, data.batch, dim=0).div(num_nodes ** 0.5)
+        return scatter(x, data.batch, dim=0).div(num_nodes**0.5)
 
 
 def main():

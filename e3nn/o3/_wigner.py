@@ -29,12 +29,12 @@ def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tenso
     # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
     q = torch.zeros((2 * l + 1, 2 * l + 1), dtype=torch.complex128)
     for m in range(-l, 0):
-        q[l + m, l + abs(m)] = 1 / 2 ** 0.5
-        q[l + m, l - abs(m)] = -1j / 2 ** 0.5
+        q[l + m, l + abs(m)] = 1 / 2**0.5
+        q[l + m, l - abs(m)] = -1j / 2**0.5
     q[l, l] = 1
     for m in range(1, l + 1):
-        q[l + m, l + abs(m)] = (-1) ** m / 2 ** 0.5
-        q[l + m, l - abs(m)] = 1j * (-1) ** m / 2 ** 0.5
+        q[l + m, l + abs(m)] = (-1) ** m / 2**0.5
+        q[l + m, l - abs(m)] = 1j * (-1) ** m / 2**0.5
     q = (-1j) ** l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
 
     dtype, device = explicit_default_types(dtype, device)

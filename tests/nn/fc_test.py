@@ -12,8 +12,8 @@ def test_variance(act, var_in, var_out, out_act):
 
     f = FullyConnectedNet(hs, act, var_in, var_out, out_act)
 
-    x = torch.randn(2000, hs[0]) * var_in ** 0.5
-    y = f(x) / var_out ** 0.5
+    x = torch.randn(2000, hs[0]) * var_in**0.5
+    y = f(x) / var_out**0.5
 
     if not out_act:
         assert y.mean().abs() < 0.5

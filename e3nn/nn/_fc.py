@@ -41,7 +41,7 @@ class _Layer(torch.nn.Module):
             w = self.weight / (self.h_in * self.var_in) ** 0.5
             x = x @ w
             x = self.act(x)
-            x = x * self.var_out ** 0.5
+            x = x * self.var_out**0.5
         else:
             w = self.weight / (self.h_in * self.var_in / self.var_out) ** 0.5
             x = x @ w

@@ -59,7 +59,7 @@ class SphericalHarmonics(torch.nn.Module):
         if isinstance(irreps_out, o3.Irreps):
             ls = []
             for mul, (l, p) in irreps_out:
-                if p != input_p ** l:
+                if p != input_p**l:
                     raise ValueError(
                         f"irreps_out `{irreps_out}` passed to SphericalHarmonics asked for an output of l = {l} with parity "
                         f"p = {p}, which is inconsistent with the input parity {input_p} — the output parity should have been "
@@ -71,7 +71,7 @@ class SphericalHarmonics(torch.nn.Module):
         else:
             ls = list(irreps_out)
 
-        irreps_out = o3.Irreps([(1, (l, input_p ** l)) for l in ls]).simplify()
+        irreps_out = o3.Irreps([(1, (l, input_p**l)) for l in ls]).simplify()
         self.irreps_out = irreps_out
         self._ls_list = ls
         self._lmax = max(ls)
@@ -1954,7 +1954,7 @@ def _generate_spherical_harmonics(lmax, device=None):  # pragma: no cover
         from fractions import Fraction
 
         s = 1 if x >= 0 else -1
-        x = x ** 2
+        x = x**2
         x = Fraction(x).limit_denominator()
         x = s * sympy.sqrt(x)
         x = sympy.simplify(x)
@@ -1998,7 +1998,7 @@ def _generate_spherical_harmonics(lmax, device=None):  # pragma: no cover
         ]
 
         poly_evalz = [sub_z1(p, sh_variables, poly_evalz) for p in polynomials]
-        norm = sympy.sqrt(sum(p ** 2 for p in poly_evalz))
+        norm = sympy.sqrt(sum(p**2 for p in poly_evalz))
         polynomials = [sympy.sqrt(2 * l + 3) * p / norm for p in polynomials]
         poly_evalz = [sympy.sqrt(2 * l + 3) * p / norm for p in poly_evalz]
 

@@ -61,16 +61,16 @@ class S2Activation(torch.nn.Module):
             lmax_out = lmax
 
         if p_val in (0, +1):
-            self.irreps_out = o3.Irreps([(1, (l, p_val * p_arg ** l)) for l in range(lmax_out + 1)])
+            self.irreps_out = o3.Irreps([(1, (l, p_val * p_arg**l)) for l in range(lmax_out + 1)])
         if p_val == -1:
             x = torch.linspace(0, 10, 256)
             a1, a2 = act(x), act(-x)
             if (a1 - a2).abs().max() < a1.abs().max() * 1e-10:
                 # p_act = 1
-                self.irreps_out = o3.Irreps([(1, (l, p_arg ** l)) for l in range(lmax_out + 1)])
+                self.irreps_out = o3.Irreps([(1, (l, p_arg**l)) for l in range(lmax_out + 1)])
             elif (a1 + a2).abs().max() < a1.abs().max() * 1e-10:
                 # p_act = -1
-                self.irreps_out = o3.Irreps([(1, (l, -(p_arg ** l))) for l in range(lmax_out + 1)])
+                self.irreps_out = o3.Irreps([(1, (l, -(p_arg**l))) for l in range(lmax_out + 1)])
             else:
                 # p_act = 0
                 raise ValueError("warning! the parity is violated")

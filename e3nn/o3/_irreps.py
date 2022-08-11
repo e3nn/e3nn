@@ -416,7 +416,7 @@ class Irreps(tuple):
         >>> Irreps.spherical_harmonics(4, p=1)
         1x0e+1x1e+1x2e+1x3e+1x4e
         """
-        return Irreps([(1, (l, p ** l)) for l in range(lmax + 1)])
+        return Irreps([(1, (l, p**l)) for l in range(lmax + 1)])
 
     def slices(self):
         r"""List of slices corresponding to indices for each irrep.

@@ -105,7 +105,7 @@ class Convolution(torch.nn.Module):
 
         edge_features = self.tp(node_input[edge_src], edge_attr, weight)
         node_output = scatter(edge_features, edge_dst, dim=0, dim_size=node_attr_output.shape[0])
-        node_output.div_(self.num_neighbors ** 0.5)
+        node_output.div_(self.num_neighbors**0.5)
 
         return self.lin2(node_output, node_attr_output)
 

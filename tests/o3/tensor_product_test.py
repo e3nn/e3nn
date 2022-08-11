@@ -11,7 +11,7 @@ from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_norma
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: bool = True, **kwargs):
     def mul_out(mul):
         if mode == "uvuv":
-            return mul ** 2
+            return mul**2
         if mode == "uvu<v":
             return mul * (mul - 1) // 2
         return mul
