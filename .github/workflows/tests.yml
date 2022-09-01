@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.10]
+        python-version: [3.7, '3.10']
         torch-version: [1.10.0, 1.12.1]
 
     steps:
