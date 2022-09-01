@@ -232,6 +232,7 @@ def _square_instructions_full(irreps_in, filter_ir_out=None, irrep_normalization
         list of instructions
 
     """
+    # pylint: disable=too-many-nested-blocks
     irreps_out = []
     instr = []
     for i_1, (mul_1, ir_1) in enumerate(irreps_in):
@@ -304,10 +305,11 @@ def _square_instructions_fully_connected(irreps_in, irreps_out, irrep_normalizat
     instr : list of tuple
         list of instructions
     """
+    # pylint: disable=too-many-nested-blocks
     instr = []
     for i_1, (mul_1, ir_1) in enumerate(irreps_in):
-        for i_2, (mul_2, ir_2) in enumerate(irreps_in):
-            for i_out, (mul_out, ir_out) in enumerate(irreps_out):
+        for i_2, (_mul_2, ir_2) in enumerate(irreps_in):
+            for i_out, (_mul_out, ir_out) in enumerate(irreps_out):
                 if ir_out in ir_1 * ir_2:
 
                     if irrep_normalization == "component":
@@ -382,8 +384,8 @@ class TensorSquare(TensorProduct):
         if filter_ir_out is not None:
             try:
                 filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
-            except ValueError:
-                raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
+            except ValueError as exc:
+                raise ValueError(f'Error constructing filter_ir_out irrep: {exc}') from exc
 
         if irreps_out is None:
             irreps_out, instr = _square_instructions_full(irreps_in, filter_ir_out, irrep_normalization)
@@ -407,5 +409,5 @@ class TensorSquare(TensorProduct):
             f"-> {self.irreps_out.simplify()} | {npath} paths | {self.weight_numel} weights)"
         )
 
-    def forward(self, x, weight: Optional[torch.Tensor] = None):
+    def forward(self, x, weight: Optional[torch.Tensor] = None):  # pylint: disable=arguments-differ
         return super().forward(x, x, weight)

@@ -34,7 +34,8 @@ class Activation(torch.nn.Module):
     def __init__(self, irreps_in, acts):
         super().__init__()
         irreps_in = o3.Irreps(irreps_in)
-        assert len(irreps_in) == len(acts), (irreps_in, acts)
+        if len(irreps_in) != len(acts):
+            raise ValueError(f'Irreps in and number of activation functions does not match: {len(acts), (irreps_in, acts)}')
 
         # normalize the second moment
         acts = [normalize2mom(act) if act is not None else None for act in acts]

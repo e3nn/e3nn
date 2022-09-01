@@ -1,15 +1,15 @@
-import warnings
 from math import sqrt
 from typing import List, Optional, Union, Any, Callable
+import warnings
+
+import torch
+from torch import fx
 
 import e3nn
-import torch
-import torch.fx
 from e3nn import o3
 from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-from torch import fx
 from ._codegen import codegen_tensor_product_left_right, codegen_tensor_product_right
 from ._instruction import Instruction
 
@@ -642,7 +642,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         verts = np.asarray(verts)
 
         # scale it
-        assert aspect_ratio in ["auto"] or isinstance(aspect_ratio, (float, int))
+        if not (aspect_ratio in ["auto"] or isinstance(aspect_ratio, (float, int))):
+            raise ValueError(f"aspect_ratio must be 'auto' or a float or int, got {aspect_ratio}")
 
         if aspect_ratio == "auto":
             factor = 0.2 / 2
@@ -697,7 +698,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 path_weight = []
                 for ins_i, ins in enumerate(self.instructions):
                     if ins.has_weight:
-                        this_weight = self.weight_view_for_instruction(ins_i, weight=weight)
+                        this_weight = self.weight_view_for_instruction(ins_i, weight=weight).cpu()
                         path_weight.append(this_weight.pow(2).mean())
                     else:
                         path_weight.append(0)

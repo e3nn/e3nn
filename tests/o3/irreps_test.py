@@ -97,6 +97,29 @@ def test_contains():
     assert o3.Irrep("2o") not in o3.Irreps("3x0e + 2x2e + 1x3o")
 
 
+def test_errors():
+    """Test invalid irrep specifications"""
+    # Irrep
+    with pytest.raises(ValueError):
+        o3.Irrep(-1)
+
+    with pytest.raises(ValueError):
+        o3.Irrep(1, p=2)
+
+    with pytest.raises(ValueError):
+        o3.Irrep("-1e")
+
+    # Irreps
+    with pytest.raises(ValueError):
+        o3.Irreps("-1x1e")
+
+    with pytest.raises(ValueError):
+        o3.Irreps("1x-1e")
+
+    with pytest.raises(ValueError):
+        o3.Irreps("bla")
+
+
 @pytest.mark.xfail()
 def test_fail1():
     o3.Irreps([(32, 1)])

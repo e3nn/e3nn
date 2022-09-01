@@ -52,6 +52,9 @@ jobs:
       run: |
         coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ .
     - name: Upload to coveralls
-      if: github.event_name == 'push'
+      env:
+        COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+      # Only send to coveralls if the token has been set and the user pushed
+      if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
       run: |
         COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
