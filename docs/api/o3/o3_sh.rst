@@ -20,12 +20,14 @@ Given :math:`p_a, p_v` two scalar representations:
 
 :math:`L` is representation of :math:`O(3)`. But :math:`L` is not irreducible.
 It can be decomposed via a change of basis into a sum of irreps,
+In a handwavey notation we can write:
 
 .. math::
 
     Y^T L(g) Y = 0 \oplus 1 \oplus 2 \oplus 3 \oplus \dots
 
 where the change of basis are the spherical harmonics!
+This notation is handwavey because :math:`x` is a continuous variable, and therefore the change of basis :math:`Y` is not a matrix.
 
 As a consequence, the spherical harmonics are equivariant,
 
