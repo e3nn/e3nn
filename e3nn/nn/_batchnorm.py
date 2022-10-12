@@ -174,8 +174,10 @@ class BatchNorm(nn.Module):
             assert ib == self.bias.numel()
 
         if self.training and not self.instance:
-            torch.cat(new_means, out=self.running_mean)
-            torch.cat(new_vars, out=self.running_var)
+            if len(new_means) > 0:
+                torch.cat(new_means, out=self.running_mean)
+            if len(new_vars) > 0:
+                torch.cat(new_vars, out=self.running_var)
 
         output = torch.cat(fields, dim=2)  # [batch, sample, stacked features]
         return output.reshape(batch, *size, dim)
