@@ -11,7 +11,7 @@ They form a basis of the space on function on the sphere:
     \mathcal{F} = \{ S^2 \longrightarrow \mathbb{R} \}
 
 
-On this space it is nautal how the group :math:`O(3)` acts,
+On this space it is known how the group :math:`O(3)` acts,
 Given :math:`p_a, p_v` two scalar representations:
 
 .. math::
