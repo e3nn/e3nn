@@ -6,12 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2022-12-12
 ### Added
 - L=12 spherical harmonics
 
 ### Fixed
 - `TensorProduct.visualize` now works even if the TP is on the GPU.
 - Github actions only trigger a push to coveralls if the corresponding token is set in github secrets.
+- Batchnorm
 
 ## [0.5.0] - 2022-04-13
 ### Added
