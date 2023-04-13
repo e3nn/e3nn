@@ -149,9 +149,9 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             batch = data["pos"].new_zeros(data["pos"].shape[0], dtype=torch.long)
 
         # Create graph
-        if "edge_src" in data and "edge_dst" in data:
-            edge_src = data["edge_src"]
-            edge_dst = data["edge_dst"]
+        if "edge_index" in data:
+            edge_src = data["edge_index"][0]
+            edge_dst = data["edge_index"][1]
         else:
             edge_index = radius_graph(data["pos"], self.max_radius, batch)
             edge_src = edge_index[0]
