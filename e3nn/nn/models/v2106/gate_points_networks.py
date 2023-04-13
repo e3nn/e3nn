@@ -211,8 +211,7 @@ def test_network_for_a_graph_with_attributes():
     net(
         {
             "pos": torch.randn(3, 3),
-            "edge_src": torch.tensor([0, 1, 2]),
-            "edge_dst": torch.tensor([1, 2, 0]),
+            "edge_index": torch.tensor([[0, 1, 2], [1, 2, 0]]),
             "node_input": net.irreps_node_input.randn(3, -1),
             "node_attr": net.irreps_node_attr.randn(3, -1),
             "edge_attr": net.irreps_edge_attr.randn(3, -1),
