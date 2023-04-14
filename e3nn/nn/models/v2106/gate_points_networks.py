@@ -149,9 +149,9 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             batch = data["pos"].new_zeros(data["pos"].shape[0], dtype=torch.long)
 
         # Create graph
-        if "edge_src" in data and "edge_dst" in data:
-            edge_src = data["edge_src"]
-            edge_dst = data["edge_dst"]
+        if "edge_index" in data:
+            edge_src = data["edge_index"][0]
+            edge_dst = data["edge_index"][1]
         else:
             edge_index = radius_graph(data["pos"], self.max_radius, batch)
             edge_src = edge_index[0]
@@ -211,8 +211,7 @@ def test_network_for_a_graph_with_attributes():
     net(
         {
             "pos": torch.randn(3, 3),
-            "edge_src": torch.tensor([0, 1, 2]),
-            "edge_dst": torch.tensor([1, 2, 0]),
+            "edge_index": torch.tensor([[0, 1, 2], [1, 2, 0]]),
             "node_input": net.irreps_node_input.randn(3, -1),
             "node_attr": net.irreps_node_attr.randn(3, -1),
             "edge_attr": net.irreps_edge_attr.randn(3, -1),
