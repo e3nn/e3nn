@@ -13,7 +13,7 @@ All the core component of ``e3nn`` can be found in ``e3nn.o3``.
 
 
 An instance of `e3nn.o3.Irreps` describe how some data behave under rotation.
-The mathematical describtion of irreps can be found in the API :ref:`Irreducible representations`.
+The mathematical description of irreps can be found in the API :ref:`Irreducible representations`.
 
 .. jupyter-execute::
 
