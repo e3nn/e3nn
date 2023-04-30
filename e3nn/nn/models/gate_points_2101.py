@@ -5,18 +5,29 @@ Exact equivariance to :math:`E(3)`
 version of january 2021
 """
 import math
-from typing import Dict, Union
+from typing import Dict
 
 import torch
-from torch_geometric.data import Data
-from torch_cluster import radius_graph
-from torch_scatter import scatter
-
 from e3nn import o3
 from e3nn.math import soft_one_hot_linspace
 from e3nn.nn import FullyConnectedNet, Gate
-from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct
+from e3nn.o3 import FullyConnectedTensorProduct, TensorProduct
 from e3nn.util.jit import compile_mode
+
+
+def scatter(src: torch.Tensor, index: torch.Tensor, dim_size: int) -> torch.Tensor:
+    # special case of torch_scatter.scatter with dim=0
+    out = src.new_zeros(dim_size, src.shape[1])
+    index = index.reshape(-1, 1).expand_as(src)
+    return out.scatter_add_(0, index, src)
+
+
+def radius_graph(pos, r_max, batch):
+    # naive and inefficient version of torch_cluster.radius_graph
+    r = torch.cdist(pos, pos)
+    index = ((r < r_max) & (r > 0)).nonzero().T
+    index = index[:, batch[index[0]] == batch[index[1]]]
+    return index
 
 
 @compile_mode("script")
@@ -110,7 +121,7 @@ class Convolution(torch.nn.Module):
         x = self.lin1(x, node_attr)
 
         edge_features = self.tp(x[edge_src], edge_attr, weight)
-        x = scatter(edge_features, edge_dst, dim=0, dim_size=x.shape[0]).div(self.num_neighbors**0.5)
+        x = scatter(edge_features, edge_dst, dim_size=x.shape[0]).div(self.num_neighbors**0.5)
 
         x = self.lin2(x, node_attr)
 
@@ -292,7 +303,7 @@ class Network(torch.nn.Module):
             )
         )
 
-    def forward(self, data: Union[Data, Dict[str, torch.Tensor]]) -> torch.Tensor:
+    def forward(self, data: Dict[str, torch.Tensor]) -> torch.Tensor:
         """evaluate the network
 
         Parameters
@@ -337,6 +348,6 @@ class Network(torch.nn.Module):
             x = lay(x, z, edge_src, edge_dst, edge_attr, edge_length_embedded)
 
         if self.reduce_output:
-            return scatter(x, batch, dim=0).div(self.num_nodes**0.5)
+            return scatter(x, batch, dim_size=int(batch.max()) + 1).div(self.num_nodes**0.5)
         else:
             return x
