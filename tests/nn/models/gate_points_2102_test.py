@@ -1,14 +1,12 @@
-import pytest
-
-import random
 import copy
+import random
 
+import pytest
 import torch
-from torch_geometric.data import Data
 
 from e3nn import o3
 from e3nn.nn.models.gate_points_2102 import Network
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
+from e3nn.util.test import assert_auto_jitable, assert_equivariant
 
 
 @pytest.fixture
@@ -51,7 +49,7 @@ def test_gate_points_2102_equivariant(network):
 
     # -- Test equivariance: --
     def wrapper(pos, x, z):
-        data = Data(pos=pos, x=x, z=z, batch=torch.zeros(pos.shape[0], dtype=torch.long))
+        data = dict(pos=pos, x=x, z=z, batch=torch.zeros(pos.shape[0], dtype=torch.long))
         return f(data)
 
     assert_equivariant(
