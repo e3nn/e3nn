@@ -60,14 +60,10 @@ def codegen_tensor_product_left_right(
         return fx.GraphModule({}, graph, "tp_forward")
 
     # = Broadcast inputs =
-    if shared_weights:
-        x1s, x2s = x1s.broadcast_to(output_shape + (-1,)), x2s.broadcast_to(output_shape + (-1,))
-    else:
-        x1s, x2s, weights = (
-            x1s.broadcast_to(output_shape + (-1,)),
-            x2s.broadcast_to(output_shape + (-1,)),
-            weights.broadcast_to(output_shape + (-1,)),
-        )
+    bc_shape = output_shape + (-1,)
+    x1s, x2s = x1s.expand(bc_shape), x2s.expand(bc_shape)
+    if not shared_weights:
+        weights = weights.expand(bc_shape)
 
     output_shape = output_shape + (irreps_out.dim,)
 
