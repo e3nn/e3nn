@@ -4,6 +4,7 @@ import warnings
 
 import torch
 from torch import fx
+from torch.fx._symbolic_trace import is_fx_tracing
 
 import e3nn
 from e3nn import o3
@@ -456,12 +457,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
             return self.weight
         else:
-            if self.shared_weights:
-                assert weight.shape == (self.weight_numel,), "Invalid weight shape"
-            else:
-                assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
-                assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
-            return weight
+            if not is_fx_tracing():
+                if self.shared_weights:
+                    assert weight.shape == (self.weight_numel,), "Invalid weight shape"
+                else:
+                    assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
+                    assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
+        return weight
 
     @torch.jit.export
     def right(self, y, weight: Optional[torch.Tensor] = None):
@@ -534,8 +536,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
-        assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
+        if not is_fx_tracing():
+            assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
+            assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)

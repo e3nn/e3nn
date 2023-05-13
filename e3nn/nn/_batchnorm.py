@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.fx._symbolic_trace import is_fx_tracing
 
 from e3nn import o3
 from e3nn.util.jit import compile_mode
@@ -86,7 +87,9 @@ class BatchNorm(nn.Module):
         `torch.Tensor`
             tensor of shape ``(batch, ..., irreps.dim)``
         """
-        batch, *size, dim = input.shape
+        orig_shape = input.shape
+        batch = input.shape[0]
+        dim = input.shape[-1]
         input = input.reshape(batch, -1, dim)  # [batch, sample, stacked features]
 
         if self.training and not self.instance:
@@ -161,7 +164,7 @@ class BatchNorm(nn.Module):
 
             fields.append(field.reshape(batch, -1, mul * d))  # [batch, sample, mul * repr]
 
-        if ix != dim:
+        if not is_fx_tracing() and ix != dim:
             fmt = "`ix` should have reached input.size(-1) ({}), but it ended at {}"
             msg = fmt.format(dim, ix)
             raise AssertionError(msg)
@@ -169,7 +172,7 @@ class BatchNorm(nn.Module):
         if self.training and not self.instance:
             assert irm == self.running_mean.numel()
             assert irv == self.running_var.size(0)
-        if self.affine:
+        if not is_fx_tracing() and self.affine:
             assert iw == self.weight.size(0)
             assert ib == self.bias.numel()
 
@@ -180,4 +183,4 @@ class BatchNorm(nn.Module):
                 torch.cat(new_vars, out=self.running_var)
 
         output = torch.cat(fields, dim=2)  # [batch, sample, stacked features]
-        return output.reshape(batch, *size, dim)
+        return output.reshape(orig_shape)
