@@ -544,8 +544,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
-        compiled_method = self._compiled_main_left_right
-        res = compiled_method(x, y, real_weight)
+        res = self._compiled_main_left_right(x, y, real_weight)
         return res
 
     def weight_view_for_instruction(self, instruction: int, weight: Optional[torch.Tensor] = None) -> torch.Tensor:
