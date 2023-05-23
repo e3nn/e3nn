@@ -457,12 +457,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                 raise RuntimeError("Weights must be provided when the TensorProduct does not have `internal_weights`")
             return self.weight
         else:
-            if not is_fx_tracing():
-                if self.shared_weights:
-                    assert weight.shape == (self.weight_numel,), "Invalid weight shape"
-                else:
-                    assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
-                    assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
+            if not torch.jit.is_scripting():
+                if not is_fx_tracing():
+                    if self.shared_weights:
+                        assert weight.shape == (self.weight_numel,), "Invalid weight shape"
+                    else:
+                        assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
+                        assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
         return weight
 
     @torch.jit.export
@@ -536,13 +537,16 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        if not is_fx_tracing():
-            assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
-            assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
-
+        if not torch.jit.is_scripting():
+            if not is_fx_tracing():
+                assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
+                assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
+                
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
-        return self._compiled_main_left_right(x, y, real_weight)
+        compiled_method = self._compiled_main_left_right
+        res = compiled_method(x, y, real_weight)
+        return res
 
     def weight_view_for_instruction(self, instruction: int, weight: Optional[torch.Tensor] = None) -> torch.Tensor:
         r"""View of weights corresponding to ``instruction``.
