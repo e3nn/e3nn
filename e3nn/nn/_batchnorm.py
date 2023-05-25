@@ -153,7 +153,7 @@ class BatchNorm(nn.Module):
                 field_norm = self.running_var[irv : irv + mul]
             irv += mul
 
-            field_norm = torch.reciprocal(torch.sqrt(field_norm + self.eps)) # .pow(-0.5)  # [(batch,) mul]
+            field_norm = (field_norm + self.eps).pow(-0.5)  # [(batch,) mul]
 
             if self.affine:
                 weight = self.weight[iw : iw + mul]  # [mul]
