@@ -34,7 +34,8 @@ class BatchNorm(nn.Module):
     instance : bool
         apply instance norm instead of batch norm
     """
-
+    __constants__ = ['instance', 'normalization', 'irs', 'affine']
+    
     def __init__(self, irreps, eps=1e-5, momentum=0.1, affine=True, reduce="mean", instance=False, normalization="component"):
         super().__init__()
 
@@ -46,7 +47,8 @@ class BatchNorm(nn.Module):
 
         num_scalar = sum(mul for mul, ir in self.irreps if ir.is_scalar())
         num_features = self.irreps.num_irreps
-
+        self.features = [ ]
+        
         if self.instance:
             self.register_buffer("running_mean", None)
             self.register_buffer("running_var", None)
@@ -64,6 +66,10 @@ class BatchNorm(nn.Module):
         assert isinstance(reduce, str), "reduce should be passed as a string value"
         assert reduce in ["mean", "max"], "reduce needs to be 'mean' or 'max'"
         self.reduce = reduce
+        irs = []
+        for mul, ir in self.irreps:
+            irs.append((mul, ir.dim, ir.is_scalar()))
+        self.irs = irs
 
         assert normalization in ["norm", "component"], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
@@ -103,15 +109,15 @@ class BatchNorm(nn.Module):
         iw = 0
         ib = 0
 
-        for mul, ir in self.irreps:
-            d = ir.dim
+        for (mul, d, is_s) in self.irs:
+            # d = ir.dim
             field = input[:, :, ix : ix + mul * d]  # [batch, sample, mul * repr]
             ix += mul * d
 
             # [batch, sample, mul, repr]
             field = field.reshape(batch, -1, mul, d)
 
-            if ir.is_scalar():  # scalars
+            if is_s:  # scalars
                 if self.training or self.instance:
                     if self.instance:
                         field_mean = field.mean(1).reshape(batch, mul)  # [batch, mul]
@@ -147,7 +153,7 @@ class BatchNorm(nn.Module):
                 field_norm = self.running_var[irv : irv + mul]
             irv += mul
 
-            field_norm = (field_norm + self.eps).pow(-0.5)  # [(batch,) mul]
+            field_norm = torch.reciprocal(torch.sqrt(field_norm + self.eps)) # .pow(-0.5)  # [(batch,) mul]
 
             if self.affine:
                 weight = self.weight[iw : iw + mul]  # [mul]
@@ -157,7 +163,7 @@ class BatchNorm(nn.Module):
 
             field = field * field_norm.reshape(-1, 1, mul, 1)  # [batch, sample, mul, repr]
 
-            if self.affine and ir.is_scalar():  # scalars
+            if self.affine and is_s:  # scalars
                 bias = self.bias[ib : ib + mul]  # [mul]
                 ib += mul
                 field += bias.reshape(mul, 1)  # [batch, sample, mul, repr]
