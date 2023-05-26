@@ -46,7 +46,6 @@ class CodeGenMixin:
                 scriptmod = graphmod
 
             # Add the ScriptModule as a submodule so it can be called
-            # setattr(self, fname, scriptmod)
             self.add_module(fname, scriptmod)
 
     # In order to support copy.deepcopy and pickling, we need to not save the compiled TorchScript functions:
