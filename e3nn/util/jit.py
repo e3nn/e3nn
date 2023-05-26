@@ -87,7 +87,7 @@ def compile(
     mode = get_compile_mode(mod)
     if mode == "unsupported":
         raise NotImplementedError(f"{type(mod).__name__} does not support TorchScript compilation")
-    
+
     if not in_place:
         mod = copy.deepcopy(mod)
     # TODO: debug logging
