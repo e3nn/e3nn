@@ -47,7 +47,7 @@ class BatchNorm(nn.Module):
 
         num_scalar = sum(mul for mul, ir in self.irreps if ir.is_scalar())
         num_features = self.irreps.num_irreps
-        self.features = [ ]
+        self.features = []
         
         if self.instance:
             self.register_buffer("running_mean", None)
