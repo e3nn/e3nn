@@ -34,8 +34,9 @@ class BatchNorm(nn.Module):
     instance : bool
         apply instance norm instead of batch norm
     """
-    __constants__ = ['instance', 'normalization', 'irs', 'affine']
-    
+
+    __constants__ = ["instance", "normalization", "irs", "affine"]
+
     def __init__(self, irreps, eps=1e-5, momentum=0.1, affine=True, reduce="mean", instance=False, normalization="component"):
         super().__init__()
 
@@ -48,7 +49,7 @@ class BatchNorm(nn.Module):
         num_scalar = sum(mul for mul, ir in self.irreps if ir.is_scalar())
         num_features = self.irreps.num_irreps
         self.features = []
-        
+
         if self.instance:
             self.register_buffer("running_mean", None)
             self.register_buffer("running_var", None)
@@ -109,7 +110,7 @@ class BatchNorm(nn.Module):
         iw = 0
         ib = 0
 
-        for (mul, d, is_scalar) in self.irs:
+        for mul, d, is_scalar in self.irs:
             field = input[:, :, ix : ix + mul * d]  # [batch, sample, mul * repr]
             ix += mul * d
 

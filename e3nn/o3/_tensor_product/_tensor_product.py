@@ -544,7 +544,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             if not is_fx_tracing():
                 assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
                 assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
-                
+
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
         return self._compiled_main_left_right(x, y, real_weight)
