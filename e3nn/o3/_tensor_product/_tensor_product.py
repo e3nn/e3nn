@@ -483,6 +483,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         .. math::
 
             w_{ijk} y_j \rightarrow b_{ik}
+
+        .. math::
+
             x_i b_{ik} \rightarrow z_k
 
         The result of this method can be applied with a tensor contraction:
