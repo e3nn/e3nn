@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch.fx._symbolic_trace import is_fx_tracing
 
 from e3nn import o3
 from e3nn.util.jit import compile_mode
@@ -169,10 +168,7 @@ class BatchNorm(nn.Module):
 
             fields.append(field.reshape(batch, -1, mul * d))  # [batch, sample, mul * repr]
 
-        if not is_fx_tracing() and ix != dim:
-            fmt = "`ix` should have reached input.size(-1) ({}), but it ended at {}"
-            msg = fmt.format(dim, ix)
-            raise AssertionError(msg)
+        torch._assert(ix == dim, f"`ix` should have reached input.size(-1) ({dim}), but it ended at {ix}")
 
         if self.training and not self.instance:
             assert irm == self.running_mean.numel()
