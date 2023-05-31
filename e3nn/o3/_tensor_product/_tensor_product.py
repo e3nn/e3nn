@@ -457,7 +457,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             return self.weight
         else:
             if self.shared_weights:
-                torch._assert(assert weight.shape == (self.weight_numel,), "Invalid weight shape")
+                torch._assert(weight.shape == (self.weight_numel,), "Invalid weight shape")
             else:
                 torch._assert(weight.shape[-1] == self.weight_numel, "Invalid weight shape")
                 torch._assert(weight.ndim > 1, "When shared weights is false, weights must have batch dimension")
@@ -537,8 +537,8 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        torch._assert(assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x")
-        torch._assert(assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y")
+        torch._assert(x.shape[-1] == self._in1_dim, "Incorrect last dimension for x")
+        torch._assert(y.shape[-1] == self._in2_dim, "Incorrect last dimension for y")
                 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)

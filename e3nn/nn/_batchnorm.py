@@ -171,11 +171,11 @@ class BatchNorm(nn.Module):
         torch._assert(ix == dim, f"`ix` should have reached input.size(-1) ({dim}), but it ended at {ix}")
 
         if self.training and not self.instance:
-            assert irm == self.running_mean.numel()
-            assert irv == self.running_var.size(0)
-        if not is_fx_tracing() and self.affine:
-            assert iw == self.weight.size(0)
-            assert ib == self.bias.numel()
+            torch._assert(irm == self.running_mean.numel(), "irm == self.running_mean.numel()")
+            torch._assert(irv == self.running_var.size(0), "irv == self.running_var.size(0)")
+        if self.affine:
+            torch._assert(iw == self.weight.size(0), "iw == self.weight.size(0)")
+            torch._assert(ib == self.bias.numel(), "ib == self.bias.numel()")
 
         if self.training and not self.instance:
             if len(new_means) > 0:
