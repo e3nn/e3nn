@@ -538,7 +538,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             tensor of shape ``(..., irreps_out.dim)``
         """
 
-	torch._assert(x.shape[-1] == self._in1_dim, "Incorrect last dimension for x")
+        torch._assert(x.shape[-1] == self._in1_dim, "Incorrect last dimension for x")
         torch._assert(y.shape[-1] == self._in2_dim, "Incorrect last dimension for y")
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
