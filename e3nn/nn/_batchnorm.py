@@ -34,6 +34,8 @@ class BatchNorm(nn.Module):
         apply instance norm instead of batch norm
     """
 
+    __constants__ = ["instance", "normalization", "irs", "affine"]
+
     def __init__(self, irreps, eps=1e-5, momentum=0.1, affine=True, reduce="mean", instance=False, normalization="component"):
         super().__init__()
 
@@ -45,6 +47,7 @@ class BatchNorm(nn.Module):
 
         num_scalar = sum(mul for mul, ir in self.irreps if ir.is_scalar())
         num_features = self.irreps.num_irreps
+        self.features = []
 
         if self.instance:
             self.register_buffer("running_mean", None)
@@ -63,6 +66,10 @@ class BatchNorm(nn.Module):
         assert isinstance(reduce, str), "reduce should be passed as a string value"
         assert reduce in ["mean", "max"], "reduce needs to be 'mean' or 'max'"
         self.reduce = reduce
+        irs = []
+        for mul, ir in self.irreps:
+            irs.append((mul, ir.dim, ir.is_scalar()))
+        self.irs = irs
 
         assert normalization in ["norm", "component"], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
@@ -86,7 +93,9 @@ class BatchNorm(nn.Module):
         `torch.Tensor`
             tensor of shape ``(batch, ..., irreps.dim)``
         """
-        batch, *size, dim = input.shape
+        orig_shape = input.shape
+        batch = input.shape[0]
+        dim = input.shape[-1]
         input = input.reshape(batch, -1, dim)  # [batch, sample, stacked features]
 
         if self.training and not self.instance:
@@ -100,15 +109,14 @@ class BatchNorm(nn.Module):
         iw = 0
         ib = 0
 
-        for mul, ir in self.irreps:
-            d = ir.dim
+        for mul, d, is_scalar in self.irs:
             field = input[:, :, ix : ix + mul * d]  # [batch, sample, mul * repr]
             ix += mul * d
 
             # [batch, sample, mul, repr]
             field = field.reshape(batch, -1, mul, d)
 
-            if ir.is_scalar():  # scalars
+            if is_scalar:
                 if self.training or self.instance:
                     if self.instance:
                         field_mean = field.mean(1).reshape(batch, mul)  # [batch, mul]
@@ -154,24 +162,21 @@ class BatchNorm(nn.Module):
 
             field = field * field_norm.reshape(-1, 1, mul, 1)  # [batch, sample, mul, repr]
 
-            if self.affine and ir.is_scalar():  # scalars
+            if self.affine and is_scalar:
                 bias = self.bias[ib : ib + mul]  # [mul]
                 ib += mul
                 field += bias.reshape(mul, 1)  # [batch, sample, mul, repr]
 
             fields.append(field.reshape(batch, -1, mul * d))  # [batch, sample, mul * repr]
 
-        if ix != dim:
-            fmt = "`ix` should have reached input.size(-1) ({}), but it ended at {}"
-            msg = fmt.format(dim, ix)
-            raise AssertionError(msg)
+        torch._assert(ix == dim, f"`ix` should have reached input.size(-1) ({dim}), but it ended at {ix}")
 
         if self.training and not self.instance:
-            assert irm == self.running_mean.numel()
-            assert irv == self.running_var.size(0)
+            torch._assert(irm == self.running_mean.numel(), "irm == self.running_mean.numel()")
+            torch._assert(irv == self.running_var.size(0), "irv == self.running_var.size(0)")
         if self.affine:
-            assert iw == self.weight.size(0)
-            assert ib == self.bias.numel()
+            torch._assert(iw == self.weight.size(0), "iw == self.weight.size(0)")
+            torch._assert(ib == self.bias.numel(), "ib == self.bias.numel()")
 
         if self.training and not self.instance:
             if len(new_means) > 0:
@@ -180,4 +185,4 @@ class BatchNorm(nn.Module):
                 torch.cat(new_vars, out=self.running_var)
 
         output = torch.cat(fields, dim=2)  # [batch, sample, stacked features]
-        return output.reshape(batch, *size, dim)
+        return output.reshape(orig_shape)

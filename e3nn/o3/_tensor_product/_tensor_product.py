@@ -457,11 +457,11 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             return self.weight
         else:
             if self.shared_weights:
-                assert weight.shape == (self.weight_numel,), "Invalid weight shape"
+                torch._assert(weight.shape == (self.weight_numel,), "Invalid weight shape")
             else:
-                assert weight.shape[-1] == self.weight_numel, "Invalid weight shape"
-                assert weight.ndim > 1, "When shared weights is false, weights must have batch dimension"
-            return weight
+                torch._assert(weight.shape[-1] == self.weight_numel, "Invalid weight shape")
+                torch._assert(weight.ndim > 1, "When shared weights is false, weights must have batch dimension")
+        return weight
 
     @torch.jit.export
     def right(self, y, weight: Optional[torch.Tensor] = None):
@@ -508,7 +508,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
-        assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
+        torch._assert(y.shape[-1] == self._in2_dim, "Incorrect last dimension for y")
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
@@ -537,8 +537,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_out.dim)``
         """
-        assert x.shape[-1] == self._in1_dim, "Incorrect last dimension for x"
-        assert y.shape[-1] == self._in2_dim, "Incorrect last dimension for y"
+
+        torch._assert(x.shape[-1] == self._in1_dim, "Incorrect last dimension for x")
+        torch._assert(y.shape[-1] == self._in2_dim, "Incorrect last dimension for y")
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
