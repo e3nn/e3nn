@@ -129,15 +129,15 @@ def codegen_tensor_product_left_right(
             )
             flat_weight_index += prod(ins.path_shape)
 
-        # Construct the general xx in case this instruction isn't specialized
+        # Construct the general xx_string for einsum in case this instruction isn't specialized
         # If this isn't used, the dead code will get removed
         key = (ins.i_in1, ins.i_in2, ins.connection_mode[:2])
         if key not in xx_dict:
             if ins.connection_mode[:2] == "uu":
-                xx_dict[key] = torch.einsum("zui,zuj->zuij", x1, x2)
+                xx_dict[key] = "zui,zuj->zuij"
             else:
-                xx_dict[key] = torch.einsum("zui,zvj->zuvij", x1, x2)
-        xx = xx_dict[key]
+                xx_dict[key] = "zui,zvj->zuvij"
+        xx_string = xx_dict[key]
         del key
 
         # Create a proxy & request for the relevant wigner w3j
@@ -164,7 +164,7 @@ def codegen_tensor_product_left_right(
             elif specialized_code and mul_ir_out.ir.l == 0:
                 result = torch.einsum(f"{z}uvw,zui,zvi->zw", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
             else:
-                result = torch.einsum(f"{z}uvw,ijk,zuvij->zwk", w, w3j, xx)
+                result = torch.einsum(f"{z}uvw,ijk,zuvij->zwk", w, w3j, torch.einsum(xx_string, x1, x2))
         if ins.connection_mode == "uvu":
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
