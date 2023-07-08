@@ -225,11 +225,11 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum(f"{z}uw,zui,zui->zw", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum(f"{z}uw,ijk,zui,zvj->zwk", w, w3j, x1, x2)
+                    result = torch.einsum(f"{z}uw,ijk,zui,zuj->zwk", w, w3j, x1, x2)
             else:
                 # equivalent to tp(x, y, 'uuu').sum('u')
                 assert mul_ir_out.mul == 1
-                result = torch.einsum("ijk,zui,zvj->zk", w3j, x1, x2)
+                result = torch.einsum("ijk,zui,zuj->zk", w3j, x1, x2)
         if ins.connection_mode == "uuu":
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
@@ -250,7 +250,7 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum(f"{z}u,zui,zui->zu", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum(f"{z}u,ijk,zui,zvj->zuk", w, w3j, x1, x2)
+                    result = torch.einsum(f"{z}u,ijk,zui,zuj->zuk", w, w3j, x1, x2)
             else:
                 if specialized_code and l1l2l3 == (0, 0, 0):
                     result = torch.einsum(
@@ -265,7 +265,7 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum("zui,zui->zu", x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum("ijk,zui,zvj->zuk", w3j, x1, x2)
+                    result = torch.einsum("ijk,zui,zuj->zuk", w3j, x1, x2)
         if ins.connection_mode == "uvuv":
             assert mul_ir_in1.mul * mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
