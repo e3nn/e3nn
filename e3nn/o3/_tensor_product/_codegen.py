@@ -98,9 +98,6 @@ def codegen_tensor_product_left_right(
     # The einsum string index to prepend to the weights if the weights are not shared and have a batch dimension
     z = "" if shared_weights else "z"
 
-    # Cache of input irrep pairs whose outer products (xx) have already been computed
-    xx_dict = dict()
-
     # Current index in the flat weight tensor
     flat_weight_index = 0
 
@@ -153,10 +150,7 @@ def codegen_tensor_product_left_right(
             elif specialized_code and mul_ir_out.ir.l == 0:
                 result = torch.einsum(f"{z}uvw,zui,zvi->zw", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
             else:
-                if ins.connection_mode[:2] == "uu":
-                    result = torch.einsum(f"{z}uvw,ijk,zui,zuj->zwk", w, w3j, x1, x2)
-                else:
-                    result = torch.einsum(f"{z}uvw,ijk,zui,zvj->zwk", w, w3j, x1, x2)
+                result = torch.einsum(f"{z}uvw,ijk,zui,zvj->zwk", w, w3j, x1, x2)
         if ins.connection_mode == "uvu":
             assert mul_ir_in1.mul == mul_ir_out.mul
             if ins.has_weight:
@@ -175,10 +169,10 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum(f"{z}uv,zui,zvi->zu", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum(f"{z}uv,ijk,zuvij->zuk", w, w3j, xx)
+                    result = torch.einsum(f"{z}uv,ijk,zui,zvj->zuk", w, w3j, x1, x2)
             else:
                 # not so useful operation because v is summed
-                result = torch.einsum("ijk,zuvij->zuk", w3j, xx)
+                result = torch.einsum("ijk,zui,zvj->zuk", w3j, x1, x2)
         if ins.connection_mode == "uvv":
             assert mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
@@ -197,7 +191,7 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum(f"{z}uv,zui,zvi->zv", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum(f"{z}uv,ijk,zuvij->zvk", w, w3j, xx)
+                    result = torch.einsum(f"{z}uv,ijk,zui,zvj->zvk", w, w3j, x1, x2)
             else:
                 # not so useful operation because u is summed
                 # only specialize out for this path
@@ -212,7 +206,7 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum("zui,zvi->zv", x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum("ijk,zuvij->zvk", w3j, xx)
+                    result = torch.einsum("ijk,zui,zvj->zvk", w3j, x1, x2)
         if ins.connection_mode == "uuw":
             assert mul_ir_in1.mul == mul_ir_in2.mul
             if ins.has_weight:
@@ -231,11 +225,11 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum(f"{z}uw,zui,zui->zw", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum(f"{z}uw,ijk,zuij->zwk", w, w3j, xx)
+                    result = torch.einsum(f"{z}uw,ijk,zui,zvj->zwk", w, w3j, x1, x2)
             else:
                 # equivalent to tp(x, y, 'uuu').sum('u')
                 assert mul_ir_out.mul == 1
-                result = torch.einsum("ijk,zuij->zk", w3j, xx)
+                result = torch.einsum("ijk,zui,zvj->zk", w3j, x1, x2)
         if ins.connection_mode == "uuu":
             assert mul_ir_in1.mul == mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
@@ -256,7 +250,7 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum(f"{z}u,zui,zui->zu", w, x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum(f"{z}u,ijk,zuij->zuk", w, w3j, xx)
+                    result = torch.einsum(f"{z}u,ijk,zui,zvj->zuk", w, w3j, x1, x2)
             else:
                 if specialized_code and l1l2l3 == (0, 0, 0):
                     result = torch.einsum(
@@ -271,22 +265,22 @@ def codegen_tensor_product_left_right(
                 elif specialized_code and mul_ir_out.ir.l == 0:
                     result = torch.einsum("zui,zui->zu", x1, x2) / sqrt(mul_ir_in1.ir.dim)
                 else:
-                    result = torch.einsum("ijk,zuij->zuk", w3j, xx)
+                    result = torch.einsum("ijk,zui,zvj->zuk", w3j, x1, x2)
         if ins.connection_mode == "uvuv":
             assert mul_ir_in1.mul * mul_ir_in2.mul == mul_ir_out.mul
             if ins.has_weight:
                 # TODO implement specialized code
-                result = torch.einsum(f"{z}uv,ijk,zuvij->zuvk", w, w3j, xx)
+                result = torch.einsum(f"{z}uv,ijk,zui,zvj->zuvk", w, w3j, x1, x2)
             else:
                 # TODO implement specialized code
-                result = torch.einsum("ijk,zuvij->zuvk", w3j, xx)
+                result = torch.einsum("ijk,zui,zvj->zuvk", w3j, x1, x2)
         if ins.connection_mode == "uvu<v":
             assert mul_ir_in1.mul == mul_ir_in2.mul
             assert mul_ir_in1.mul * (mul_ir_in1.mul - 1) // 2 == mul_ir_out.mul
             name = f"_triu_indices_{mul_ir_in1.mul}"
             constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
-            xx = xx[:, i[0], i[1]]  # zuvij -> zwij
+            xx = torch.einsum("zui,zvj->zuvij", x1, x2)[:, i[0], i[1]] # zui,zvj -> zuvij -> zwij
             if ins.has_weight:
                 # TODO implement specialized code
                 result = torch.einsum(f"{z}w,ijk,zwij->zwk", w, w3j, xx)
@@ -299,7 +293,7 @@ def codegen_tensor_product_left_right(
             name = f"_triu_indices_{mul_ir_in1.mul}"
             constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
-            xx = xx[:, i[0], i[1]]  # zuvij -> zqij
+            xx = torch.einsum("zui,zvj->zuvij", x1, x2)[:, i[0], i[1]] # zuvij -> zqij
             # TODO implement specialized code
             result = torch.einsum(f"{z}qw,ijk,zqij->zwk", w, w3j, xx)
 
