@@ -280,7 +280,7 @@ def codegen_tensor_product_left_right(
             name = f"_triu_indices_{mul_ir_in1.mul}"
             constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
-            xx = torch.einsum("zui,zvj->zuvij", x1, x2)[:, i[0], i[1]] # zui,zvj -> zuvij -> zwij
+            xx = torch.einsum("zui,zvj->zuvij", x1, x2)[:, i[0], i[1]]  # zui,zvj -> zuvij -> zwij
             if ins.has_weight:
                 # TODO implement specialized code
                 result = torch.einsum(f"{z}w,ijk,zwij->zwk", w, w3j, xx)
@@ -293,7 +293,7 @@ def codegen_tensor_product_left_right(
             name = f"_triu_indices_{mul_ir_in1.mul}"
             constants[name] = torch.triu_indices(mul_ir_in1.mul, mul_ir_in1.mul, 1)
             i = fx.Proxy(graph.get_attr(name), tracer=tracer)
-            xx = torch.einsum("zui,zvj->zuvij", x1, x2)[:, i[0], i[1]] # zuvij -> zqij
+            xx = torch.einsum("zui,zvj->zuvij", x1, x2)[:, i[0], i[1]]  # zuvij -> zqij
             # TODO implement specialized code
             result = torch.einsum(f"{z}qw,ijk,zqij->zwk", w, w3j, xx)
 
