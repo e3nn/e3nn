@@ -105,8 +105,8 @@ def codegen_tensor_product_left_right(
     flat_weight_index = 0
 
     outputs = []
-
-    for ins in instructions:
+    
+    def kernel_launcher(ins, flat_weight_index):
         mul_ir_in1 = irreps_in1[ins.i_in1]
         mul_ir_in2 = irreps_in2[ins.i_in2]
         mul_ir_out = irreps_out[ins.i_out]
@@ -115,7 +115,7 @@ def codegen_tensor_product_left_right(
         assert abs(mul_ir_in1.ir.l - mul_ir_in2.ir.l) <= mul_ir_out.ir.l <= mul_ir_in1.ir.l + mul_ir_in2.ir.l
 
         if mul_ir_in1.dim == 0 or mul_ir_in2.dim == 0 or mul_ir_out.dim == 0:
-            continue
+            ...
 
         x1 = x1_list[ins.i_in1]
         x2 = x2_list[ins.i_in2]
@@ -312,9 +312,9 @@ def codegen_tensor_product_left_right(
             result = torch.einsum(f"{z}qw,ijk,zqij->zwk", w, w3j, xx)
 
         result = ins.path_weight * result
-
-        outputs += [result.reshape(batch_numel, mul_ir_out.dim)]
-
+        
+        result = result.reshape(batch_numel, mul_ir_out.dim)
+        
         # Remove unused w3js:
         if len(w3j.node.users) == 0:
             # The w3j nodes are reshapes, so we have to remove them from the graph
@@ -325,6 +325,57 @@ def codegen_tensor_product_left_right(
         else:
             if w3j_name not in constants:
                 constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+    
+        graphmod = fx.GraphModule(constants, graph, class_name="tp_forward")
+        # == Optimize ==
+        # TODO: when eliminate_dead_code() is in PyTorch stable, use that
+
+        if optimize_einsums:
+            # Note that for our einsums, we can optimize _once_ for _any_ batch dimension
+            # and still get the right path for _all_ batch dimensions.
+            # This is because our einsums are essentially of the form:
+            #    zuvw,ijk,zuvij->zwk    OR     uvw,ijk,zuvij->zwk
+            # In the first case, all but one operands have the batch dimension
+            #    => The first contraction gains the batch dimension
+            #    => All following contractions have batch dimension
+            #    => All possible contraction paths have cost that scales linearly in batch size
+            #    => The optimal path is the same for all batch sizes
+            # For the second case, this logic follows as long as the first contraction is not between the first two operands.
+            # Since those two operands do not share any indexes, contracting them first is a rare pathological case. See
+            # https://github.com/dgasmith/opt_einsum/issues/158
+            # for more details.
+            #
+            # TODO: consider the impact maximum intermediate result size on this logic
+            #         \- this is the `memory_limit` option in opt_einsum
+            # TODO: allow user to choose opt_einsum parameters?
+            #
+            # We use float32 and zeros to save memory and time, since opt_einsum_fx looks only at traced shapes, not values or
+            # dtypes.
+            batchdim = 4
+            example_inputs = (
+                torch.zeros((batchdim, irreps_in1.dim)),
+                torch.zeros((batchdim, irreps_in2.dim)),
+                torch.zeros(
+                    1 if shared_weights else batchdim,
+                    flat_weight_index,
+                ),
+            )
+            graphmod = optimize_einsums_full(graphmod, example_inputs)
+        
+        return graphmod
+
+    futures: List[torch.jit.Future[torch.fx.GraphModule]] = []
+
+    for ins in instructions:
+        futures.append(
+            torch.jit.fork(
+                kernel_launcher,
+                ins,
+                flat_weight_index
+            ))
+        
+    for i,fut in enumerate(futures):
+        outputs += [torch.jit.wait(futures[i])]
 
     # = Return the result =
     outputs = [
