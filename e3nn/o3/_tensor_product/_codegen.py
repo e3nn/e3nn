@@ -385,7 +385,7 @@ def codegen_tensor_product_left_right(
         graphmod = single_instruction_codegen(
             ins, irreps_in1, irreps_in2, irreps_out, shared_weights, specialized_code, optimize_einsums
         )
-        graphmods[f"_compiled_main_left_right_{ins.connection_mode}_{ins.i_in1},{ins.i_in2},{ins.i_out}"] = graphmod
+        graphmods[f"_compiled_main_left_right_{ins.connection_mode}_{ins.i_in1}_{ins.i_in2}_{ins.i_out}"] = graphmod
 
     return graphmods
 

@@ -551,7 +551,32 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
         real_weight = self._get_weights(weight)
-        return self._compiled_main_left_right(x, y, real_weight)
+        futures: List[torch.jit.Future[torch.Tensor]] = []
+        outputs = []
+        for fname, graphmod in self._combined_dict.items():
+            futures.append(torch.jit.fork(getattr(self, graphmod), x, y, real_weight))
+
+        for fut in futures:
+            outputs.append(torch.jit.wait(fut))
+
+        # = Return the result =
+        outputs = [
+            _sum_tensors(
+                [out for ins, out in zip(instructions, outputs) if ins.i_out == i_out],
+                shape=(batch_numel, mul_ir_out.dim),
+                like=x1s,
+            )
+            for i_out, mul_ir_out in enumerate(irreps_out)
+            if mul_ir_out.mul > 0
+        ]
+        if len(outputs) > 1:
+            outputs = torch.cat(outputs, dim=1)
+        else:
+            # Avoid an unnecessary copy in a size one torch.cat
+            outputs = outputs[0]
+
+        outputs = outputs.reshape(output_shape)
+        return outputs
 
     def weight_view_for_instruction(self, instruction: int, weight: Optional[torch.Tensor] = None) -> torch.Tensor:
         r"""View of weights corresponding to ``instruction``.
