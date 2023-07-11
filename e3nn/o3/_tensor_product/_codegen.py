@@ -21,17 +21,12 @@ def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
 
 
 def single_instruction_codegen(
-    ins,
-    flat_weight_index,
-    irreps_in1,
-    irreps_in2,
-    irreps_out,
-    weight_numel,
-    shared_weights,
-    specialized_code,
-    optimize_einsums,
-):
+    ins, irreps_in1, irreps_in2, irreps_out, shared_weights, specialized_code, optimize_einsums
+) -> List[fx.GraphModule]:
     graph = fx.Graph()
+
+    # Current index in the flat weight tensor
+    flat_weight_index = 0
 
     # = Function definitions =
     tracer = fx.proxy.GraphAppendingTracer(graph)
@@ -73,7 +68,8 @@ def single_instruction_codegen(
     x2s = x2s.reshape(-1, irreps_in2.dim)
 
     batch_numel = x1s.shape[0]
-
+    # = Determine number of weights and reshape weights ==
+    weight_numel = prod(ins.path_shape) if ins.has_weight else 0
     if weight_numel > 0:
         weights = weights.reshape(-1, weight_numel)
 
@@ -334,7 +330,7 @@ def single_instruction_codegen(
     for key, value in constants.items():
         constants_root.register_buffer(key, value)
 
-    graphmod = fx.GraphModule(constants_root, graph, class_name=f"tp_forward")
+    graphmod = fx.GraphModule(constants_root, graph, class_name="tp_forward")
     # == Optimize ==
     # TODO: when eliminate_dead_code() is in PyTorch stable, use that
 
@@ -365,7 +361,7 @@ def single_instruction_codegen(
             torch.zeros((batchdim, irreps_in2.dim)),
             torch.zeros(
                 1 if shared_weights else batchdim,
-                flat_weight_index,
+                weight_numel,
             ),
         )
         graphmod = optimize_einsums_full(graphmod, example_inputs)
@@ -381,53 +377,17 @@ def codegen_tensor_product_left_right(
     shared_weights: bool = False,
     specialized_code: bool = True,
     optimize_einsums: bool = True,
-) -> fx.GraphModule:
-    outputs = []
-
-    futures: List[torch.jit.Future[torch.fx.GraphModule]] = []
-
-    # = Determine number of weights and reshape weights ==
-    weight_numel = sum(prod(ins.path_shape) for ins in instructions if ins.has_weight)
-    # del weight_numel
+):
+    graphmods = OrderedDict()
 
     for ins in instructions:
-        # Current index in the flat weight tensor
-        flat_weight_index = 0
-        futures.append(
-            torch.jit.fork(
-                single_instruction_codegen,
-                ins,
-                flat_weight_index,
-                irreps_in1,
-                irreps_in2,
-                irreps_out,
-                weight_numel,
-                shared_weights,
-                specialized_code,
-                optimize_einsums,
-            )
+        # Unique identification for each instruction
+        graphmod = single_instruction_codegen(
+            ins, irreps_in1, irreps_in2, irreps_out, shared_weights, specialized_code, optimize_einsums
         )
+        graphmods[f"_compiled_main_left_right_{ins.connection_mode}_{ins.i_in1},{ins.i_in2},{ins.i_out}"] = graphmod
 
-    for fut in futures:
-        outputs += [torch.jit.wait(fut)()]
-
-    # = Return the result =
-    outputs = [
-        _sum_tensors(
-            [out for ins, out in zip(instructions, outputs) if ins.i_out == i_out],
-            shape=(batch_numel, mul_ir_out.dim),
-            like=x1s,
-        )
-        for i_out, mul_ir_out in enumerate(irreps_out)
-        if mul_ir_out.mul > 0
-    ]
-    if len(outputs) > 1:
-        outputs = torch.cat(outputs, dim=1)
-    else:
-        # Avoid an unnecessary copy in a size one torch.cat
-        outputs = outputs[0]
-
-    outputs = outputs.reshape(output_shape)
+    return graphmods
 
 
 def codegen_tensor_product_right(

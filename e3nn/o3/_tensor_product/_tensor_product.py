@@ -1,5 +1,5 @@
 from math import sqrt
-from typing import List, Optional, Union, Any, Callable
+from typing import List, Optional, Union, Any, Callable, OrderedDict
 import warnings
 
 import torch
@@ -395,7 +395,15 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             )
             graphmod_right = fx.GraphModule(torch.nn.Module(), graphmod_right, class_name="tp_forward")
 
-        self._codegen_register({"_compiled_main_left_right": graphmod_left_right, "_compiled_main_right": graphmod_right})
+        self._combined_dict = {
+            **(
+                graphmod_left_right
+                if isinstance(graphmod_left_right, OrderedDict)
+                else {"_compiled_main_left_right": graphmod_left_right}
+            ),
+            **{"_compiled_main_right": graphmod_right},
+        }
+        self._codegen_register(self._combined_dict)
 
         # === Determine weights ===
         self.weight_numel = sum(prod(ins.path_shape) for ins in self.instructions if ins.has_weight)
