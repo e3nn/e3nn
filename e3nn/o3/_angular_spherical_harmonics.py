@@ -22,7 +22,7 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
     _ls_list: List[int]
     _lmax: int
 
-    def __init__(self, l, normalization="integral"):
+    def __init__(self, l, normalization: str = "integral"):
         super().__init__()
 
         if isinstance(l, o3.Irreps):
@@ -59,7 +59,7 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
         return out.reshape(alpha.shape + (shy.shape[1],))
 
 
-def spherical_harmonics_alpha_beta(l, alpha, beta, *, normalization="integral"):
+def spherical_harmonics_alpha_beta(l, alpha, beta, *, normalization: str = "integral"):
     r"""Spherical harmonics of :math:`\vec r = R_y(\alpha) R_x(\beta) e_y`
 
     .. math:: Y^l(\alpha, \beta) = S^l(\alpha) P^l(\cos(\beta))

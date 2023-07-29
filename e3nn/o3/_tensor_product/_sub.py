@@ -385,7 +385,7 @@ class TensorSquare(TensorProduct):
             try:
                 filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
             except ValueError as exc:
-                raise ValueError(f'Error constructing filter_ir_out irrep: {exc}') from exc
+                raise ValueError(f"Error constructing filter_ir_out irrep: {exc}") from exc
 
         if irreps_out is None:
             irreps_out, instr = _square_instructions_full(irreps_in, filter_ir_out, irrep_normalization)

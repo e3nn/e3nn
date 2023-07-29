@@ -35,7 +35,7 @@ class Activation(torch.nn.Module):
         super().__init__()
         irreps_in = o3.Irreps(irreps_in)
         if len(irreps_in) != len(acts):
-            raise ValueError(f'Irreps in and number of activation functions does not match: {len(acts), (irreps_in, acts)}')
+            raise ValueError(f"Irreps in and number of activation functions does not match: {len(acts), (irreps_in, acts)}")
 
         # normalize the second moment
         acts = [normalize2mom(act) if act is not None else None for act in acts]
@@ -78,7 +78,7 @@ class Activation(torch.nn.Module):
         acts = "".join(["x" if a is not None else " " for a in self.acts])
         return f"{self.__class__.__name__} [{acts}] ({self.irreps_in} -> {self.irreps_out})"
 
-    def forward(self, features, dim=-1):
+    def forward(self, features, dim: int = -1):
         """evaluate
 
         Parameters

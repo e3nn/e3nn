@@ -5,7 +5,7 @@ Exact equivariance to :math:`E(3)`
 version of february 2021
 """
 import math
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
@@ -64,14 +64,14 @@ class Convolution(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in,
-        irreps_node_attr,
-        irreps_edge_attr,
-        irreps_out,
-        number_of_edge_features,
-        radial_layers,
-        radial_neurons,
-        num_neighbors,
+        irreps_in: o3.Irreps,
+        irreps_node_attr: o3.Irreps,
+        irreps_edge_attr: o3.Irreps,
+        irreps_out: Optional[o3.Irreps],
+        number_of_edge_features: int,
+        radial_layers: int,
+        radial_neurons: int,
+        num_neighbors: float,
     ) -> None:
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
@@ -214,19 +214,19 @@ class Network(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in,
-        irreps_hidden,
-        irreps_out,
-        irreps_node_attr,
-        irreps_edge_attr,
-        layers,
-        max_radius,
-        number_of_basis,
-        radial_layers,
-        radial_neurons,
-        num_neighbors,
-        num_nodes,
-        reduce_output=True,
+        irreps_in: o3.Irreps,
+        irreps_hidden: o3.Irreps,
+        irreps_out: o3.Irreps,
+        irreps_node_attr: o3.Irreps,
+        irreps_edge_attr: o3.Irreps,
+        layers: int,
+        max_radius: float,
+        number_of_basis: int,
+        radial_layers: int,
+        radial_neurons: int,
+        num_neighbors: float,
+        num_nodes: float,
+        reduce_output: bool = True,
     ) -> None:
         super().__init__()
         self.max_radius = max_radius

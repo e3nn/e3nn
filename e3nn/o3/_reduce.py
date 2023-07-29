@@ -13,7 +13,7 @@ _TP = collections.namedtuple("tp", "op, args")
 _INPUT = collections.namedtuple("input", "tensor, start, stop")
 
 
-def _wigner_nj(*irrepss, normalization="component", filter_ir_mid=None, dtype=None, device=None):
+def _wigner_nj(*irrepss, normalization: str = "component", filter_ir_mid=None, dtype=None, device=None):
     irrepss = [o3.Irreps(irreps) for irreps in irrepss]
     if filter_ir_mid is not None:
         filter_ir_mid = [o3.Irrep(ir) for ir in filter_ir_mid]
@@ -129,7 +129,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
     """
     # pylint: disable=abstract-method
 
-    def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps=1e-9, **irreps):
+    def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps: float = 1e-9, **irreps):
         super().__init__()
 
         if filter_ir_out is not None:
@@ -245,7 +245,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
         self.irreps_in = [irreps[i] for i in f0]
         self.irreps_out = o3.Irreps(irreps_out).simplify()
 
-        values = dict()
+        values = {}
 
         def evaluate(path):
             if path in values:

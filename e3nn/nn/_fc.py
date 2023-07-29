@@ -66,7 +66,7 @@ class FullyConnectedNet(torch.nn.Sequential):
     """
     hs: List[int]
 
-    def __init__(self, hs, act=None, variance_in=1, variance_out=1, out_act=False):
+    def __init__(self, hs, act=None, variance_in: int = 1, variance_out: int = 1, out_act: bool = False):
         super().__init__()
         self.hs = list(hs)
         if act is not None:

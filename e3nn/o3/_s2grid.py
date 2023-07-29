@@ -325,7 +325,7 @@ class ToS2Grid(torch.nn.Module):
         positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
     """
 
-    def __init__(self, lmax=None, res=None, normalization="component", dtype=None, device=None):
+    def __init__(self, lmax=None, res=None, normalization: str = "component", dtype=None, device=None):
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
@@ -445,7 +445,7 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    def __init__(self, res=None, lmax=None, normalization="component", lmax_in=None, dtype=None, device=None):
+    def __init__(self, res=None, lmax=None, normalization: str = "component", lmax_in=None, dtype=None, device=None):
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(

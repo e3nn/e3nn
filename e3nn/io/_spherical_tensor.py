@@ -190,7 +190,7 @@ class SphericalTensor(o3.Irreps):
 
         return 4 * pi / (self.lmax + 1) ** 2 * (y * v).sum(-2)
 
-    def from_samples_on_s2(self, positions: torch.Tensor, values: torch.Tensor, res=100) -> torch.Tensor:
+    def from_samples_on_s2(self, positions: torch.Tensor, values: torch.Tensor, res: int = 100) -> torch.Tensor:
         r"""Convert a set of position on the sphere and values into a spherical tensor
 
         Parameters
@@ -322,13 +322,15 @@ class SphericalTensor(o3.Irreps):
         output = torch.einsum("bi,ai->ab", sh.reshape(-1, dim), signal.reshape(-1, dim))
         return output.reshape(signal.shape[:-1] + r.shape[:-1])
 
-    def signal_on_grid(self, signal, res=100, normalization="integral"):
+    def signal_on_grid(self, signal, res: int = 100, normalization: str = "integral"):
         r"""Evaluate the signal on a grid on the sphere"""
         Ret = namedtuple("Return", "grid, values")
         s2 = ToS2Grid(lmax=self.lmax, res=res, normalization=normalization)
         return Ret(s2.grid, s2(signal))
 
-    def plotly_surface(self, signals, centers=None, res=100, radius=True, relu=False, normalization="integral"):
+    def plotly_surface(
+        self, signals, centers=None, res: int = 100, radius: bool = True, relu: bool = False, normalization: str = "integral"
+    ):
         r"""Create traces for plotly
 
         Examples
@@ -359,7 +361,9 @@ class SphericalTensor(o3.Irreps):
             ]
         return traces
 
-    def plot(self, signal, center=None, res=100, radius=True, relu=False, normalization="integral"):
+    def plot(
+        self, signal, center=None, res: int = 100, radius: bool = True, relu: bool = False, normalization: str = "integral"
+    ):
         r"""Create surface in order to make a plot"""
         assert signal.dim() == 1
 
@@ -384,7 +388,7 @@ class SphericalTensor(o3.Irreps):
 
         return r, f
 
-    def find_peaks(self, signal, res=100):
+    def find_peaks(self, signal, res: int = 100):
         r"""Locate peaks on the sphere
 
         Examples

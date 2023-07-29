@@ -20,12 +20,12 @@ class SimpleNetwork(torch.nn.Module):
         irreps_in,
         irreps_out,
         max_radius,
-        num_neighbors,
-        num_nodes,
-        mul=50,
-        layers=3,
-        lmax=2,
-        pool_nodes=True,
+        num_neighbors: int,
+        num_nodes: int,
+        mul: int = 50,
+        layers: int = 3,
+        lmax: int = 2,
+        pool_nodes: bool = True,
     ) -> None:
         super().__init__()
 
@@ -98,17 +98,17 @@ class SimpleNetwork(torch.nn.Module):
 class NetworkForAGraphWithAttributes(torch.nn.Module):
     def __init__(
         self,
-        irreps_node_input,
-        irreps_node_attr,
-        irreps_edge_attr,
-        irreps_node_output,
+        irreps_node_input: o3.Irreps,
+        irreps_node_attr: o3.Irreps,
+        irreps_edge_attr: o3.Irreps,
+        irreps_node_output: o3.Irreps,
         max_radius,
-        num_neighbors,
-        num_nodes,
-        mul=50,
-        layers=3,
-        lmax=2,
-        pool_nodes=True,
+        num_neighbors: int,
+        num_nodes: int,
+        mul: int = 50,
+        layers: int = 3,
+        lmax: int = 2,
+        pool_nodes: bool = True,
     ) -> None:
         super().__init__()
 

@@ -2,6 +2,8 @@ r"""example of a graph convolution when the input and output nodes are different
 
 >>> test()
 """
+from typing import Optional
+
 import torch
 from torch_scatter import scatter
 
@@ -47,15 +49,15 @@ class Convolution(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_node_input,
-        irreps_node_output,
-        irreps_node_attr_input,
-        irreps_node_attr_output,
-        irreps_edge_attr,
-        num_edge_scalar_attr,
-        radial_layers,
-        radial_neurons,
-        num_neighbors,
+        irreps_node_input: o3.Irreps,
+        irreps_node_output: Optional[o3.Irreps],
+        irreps_node_attr_input: o3.Irreps,
+        irreps_node_attr_output: o3.Irreps,
+        irreps_edge_attr: o3.Irreps,
+        num_edge_scalar_attr: int,
+        radial_layers: int,
+        radial_neurons: int,
+        num_neighbors: float,
     ) -> None:
         super().__init__()
         self.irreps_node_input = o3.Irreps(irreps_node_input)
