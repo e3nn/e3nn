@@ -129,7 +129,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
     """
     # pylint: disable=abstract-method
 
-    def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps: float = 1e-9, **irreps):
+    def __init__(self, formula, filter_ir_out=None, filter_ir_mid=None, eps: float = 1e-9, **irreps) -> None:
         super().__init__()
 
         if filter_ir_out is not None:
@@ -281,7 +281,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         self._codegen_register({"main": graphmod})
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"ReducedTensorProducts(\n"
             f"    in: {' times '.join(map(repr, self.irreps_in))}\n"

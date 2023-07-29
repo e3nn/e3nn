@@ -112,7 +112,7 @@ class Convolution(torch.nn.Module):
         return self.lin2(node_output, node_attr_output)
 
 
-def test():
+def test() -> None:
     from torch_cluster import radius
     from e3nn.math import soft_one_hot_linspace
 

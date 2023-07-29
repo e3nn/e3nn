@@ -19,7 +19,7 @@ We define a simple module that includes data-dependent control flow:
     from e3nn.o3 import Norm, Irreps
 
     class MyModule(torch.nn.Module):
-        def __init__(self, irreps_in):
+        def __init__(self, irreps_in) -> None:
             super().__init__()
             self.norm = Norm(irreps_in)
 
@@ -69,7 +69,7 @@ Say we define:
 
     @compile_mode('script')
     class MyModule(torch.nn.Module):
-        def __init__(self, irreps_in):
+        def __init__(self, irreps_in) -> None:
             super().__init__()
             self.norm = Norm(irreps_in)
 
@@ -81,7 +81,7 @@ Say we define:
             return norm
 
     class AnotherModule(torch.nn.Module):
-        def __init__(self, irreps_in):
+        def __init__(self, irreps_in) -> None:
             super().__init__()
             self.mymod = MyModule(irreps_in)
 
@@ -190,7 +190,7 @@ Sometimes you may write modules that use features unsupported by TorchScript reg
         pass
 
     class Supermod(torch.nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.child = ChildMod()
 

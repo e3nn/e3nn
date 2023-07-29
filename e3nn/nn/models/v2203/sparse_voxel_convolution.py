@@ -36,7 +36,7 @@ class Convolution(torch.nn.Module):
         size of the pixel in physical units
     """
 
-    def __init__(self, irreps_in, irreps_out, irreps_sh, diameter, num_radial_basis, steps=(1.0, 1.0, 1.0)):
+    def __init__(self, irreps_in, irreps_out, irreps_sh, diameter, num_radial_basis, steps=(1.0, 1.0, 1.0)) -> None:
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
@@ -93,7 +93,7 @@ class Convolution(torch.nn.Module):
 
         self.conv_fn = MinkowskiConvolutionFunction()
 
-    def kernel(self):
+    def kernel(self) -> torch.Tensor:
         weight = self.emb @ self.weight
         weight = weight / (self.sh.shape[0] * self.sh.shape[1] * self.sh.shape[2])
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]

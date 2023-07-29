@@ -6,7 +6,7 @@ from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, Tensor
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
-def test_fully_connected():
+def test_fully_connected() -> None:
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
@@ -18,7 +18,7 @@ def test_fully_connected():
     assert_auto_jitable(m)
 
 
-def test_fully_connected_normalization():
+def test_fully_connected_normalization() -> None:
     m = FullyConnectedTensorProduct("10x0e", "10x0e", "0e")
     for p in m.parameters():
         p.data.fill_(1.0)
@@ -31,7 +31,7 @@ def test_fully_connected_normalization():
     assert torch.allclose(m(x1, x2), n(x1, x2))
 
 
-def test_id():
+def test_id() -> None:
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
     m = Identity(irreps_in, irreps_out)
@@ -42,7 +42,7 @@ def test_id():
     assert_auto_jitable(m, strict_shapes=False)
 
 
-def test_full():
+def test_full() -> None:
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2x2e + 2x3o")
     m = FullTensorProduct(irreps_in1, irreps_in2)
@@ -52,7 +52,7 @@ def test_full():
     assert_auto_jitable(m)
 
 
-def test_norm():
+def test_norm() -> None:
     irreps_in = o3.Irreps("3x0e + 5x1o")
     scalars = torch.randn(3)
     vecs = torch.randn(5, 3)
@@ -67,7 +67,7 @@ def test_norm():
     assert_auto_jitable(norm)
 
 
-def test_square_normalization():
+def test_square_normalization() -> None:
     irreps = o3.Irreps("0e + 1e + 2e")
     tp = TensorSquare(irreps, irrep_normalization="norm")
     x = irreps.randn(1_000_000, -1, normalization="norm")
@@ -97,7 +97,7 @@ def test_square_normalization():
     assert (y.pow(2).mean([0, 1]).log().abs().exp() < 1.1).all()
 
 
-def test_square_elasticity_tensor():
+def test_square_elasticity_tensor() -> None:
     tp = TensorSquare("1o")
     tp = TensorSquare(tp.irreps_out)
     assert tp.irreps_out.simplify() == o3.Irreps("2x0e + 2x2e + 4e")

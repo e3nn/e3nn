@@ -6,7 +6,7 @@ from e3nn.nn._gate import _Sortcut
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
 
 
-def test_gate():
+def test_gate() -> None:
     irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated = (
         Irreps("16x0o"),
         [torch.tanh],

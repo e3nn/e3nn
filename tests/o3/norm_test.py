@@ -8,7 +8,7 @@ from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irrep
 
 @pytest.mark.parametrize("irreps_in", ["", "5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4))
 @pytest.mark.parametrize("squared", [True, False])
-def test_norm(irreps_in, squared):
+def test_norm(irreps_in, squared) -> None:
     m = o3.Norm(irreps_in, squared=squared)
     m(torch.randn(m.irreps_in.dim))
     if m.irreps_in.dim == 0:
@@ -18,7 +18,7 @@ def test_norm(irreps_in, squared):
 
 
 @pytest.mark.parametrize("squared", [True, False])
-def test_grad(squared):
+def test_grad(squared) -> None:
     """Confirm has zero grad at zero"""
     irreps_in = o3.Irreps("2x0e + 3x0o")
     norm = o3.Norm(irreps_in, squared=squared)
@@ -33,7 +33,7 @@ def test_grad(squared):
 
 
 @pytest.mark.parametrize("squared", [True, False])
-def test_vector_norm(squared):
+def test_vector_norm(squared) -> None:
     n = 10
     batch = 3
     irreps_in = o3.Irreps([(n, (1, -1))])

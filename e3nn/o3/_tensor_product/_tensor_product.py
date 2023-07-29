@@ -209,7 +209,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         normalization=None,  # for backward compatibility
         _specialized_code: Optional[bool] = None,
         _optimize_einsums: Optional[bool] = None,
-    ):
+    ) -> None:
         # === Setup ===
         super().__init__()
 
@@ -426,7 +426,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         # For TorchScript, this needs to be done in advance:
         self._profiling_str = str(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         npath = sum(prod(i.path_shape) for i in self.instructions)
         return (
             f"{self.__class__.__name__}"
@@ -742,7 +742,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         padding = 3
         fontsize = 10
 
-        def format_ir(mul_ir):
+        def format_ir(mul_ir) -> str:
             if mul_ir.mul == 1:
                 return f"${mul_ir.ir}$"
             return f"${mul_ir.mul} \\times {mul_ir.ir}$"

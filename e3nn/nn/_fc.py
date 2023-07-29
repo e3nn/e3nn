@@ -14,7 +14,7 @@ class _Layer(torch.nn.Module):
     var_out: float
     _profiling_str: str
 
-    def __init__(self, h_in, h_out, act, var_in, var_out):
+    def __init__(self, h_in, h_out, act, var_in, var_out) -> None:
         super().__init__()
         self.weight = torch.nn.Parameter(torch.randn(h_in, h_out))
         self.act = act
@@ -26,7 +26,7 @@ class _Layer(torch.nn.Module):
 
         self._profiling_str = repr(self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         act = self.act
         if hasattr(act, "__name__"):
             act = act.__name__
@@ -66,7 +66,7 @@ class FullyConnectedNet(torch.nn.Sequential):
     """
     hs: List[int]
 
-    def __init__(self, hs, act=None, variance_in: int = 1, variance_out: int = 1, out_act: bool = False):
+    def __init__(self, hs, act=None, variance_in: int = 1, variance_out: int = 1, out_act: bool = False) -> None:
         super().__init__()
         self.hs = list(hs)
         if act is not None:
@@ -86,5 +86,5 @@ class FullyConnectedNet(torch.nn.Sequential):
 
             var_in = var_out
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}{self.hs}"

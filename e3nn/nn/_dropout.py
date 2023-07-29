@@ -28,12 +28,12 @@ class Dropout(torch.nn.Module):
         probability to drop
     """
 
-    def __init__(self, irreps, p):
+    def __init__(self, irreps, p) -> None:
         super().__init__()
         self.irreps = o3.Irreps(irreps)
         self.p = p
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.irreps}, p={self.p})"
 
     def forward(self, x):

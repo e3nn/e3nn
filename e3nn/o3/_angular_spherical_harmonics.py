@@ -22,7 +22,7 @@ class SphericalHarmonicsAlphaBeta(torch.nn.Module):
     _ls_list: List[int]
     _lmax: int
 
-    def __init__(self, l, normalization: str = "integral"):
+    def __init__(self, l, normalization: str = "integral") -> None:
         super().__init__()
 
         if isinstance(l, o3.Irreps):
@@ -127,7 +127,7 @@ def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
 class Legendre(fx.GraphModule):
     # pylint: disable=abstract-method
 
-    def __init__(self, ls):
+    def __init__(self, ls) -> None:
         super().__init__(self, fx.Graph())
 
         # == generate code ==
@@ -171,7 +171,7 @@ def _poly_legendre(l, m):
     return Poly(_sympy_legendre(l, m), domain="R", gens=(z, y)).as_dict()
 
 
-def _sympy_legendre(l, m):
+def _sympy_legendre(l, m) -> float:
     r"""
     en.wikipedia.org/wiki/Associated_Legendre_polynomials
     - remove two times (-1)^m

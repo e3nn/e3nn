@@ -57,7 +57,7 @@ def tetris():
     return data, labels
 
 
-def mean_std(name, x):
+def mean_std(name, x) -> None:
     print(f"{name} \t{x.mean():.1f} ± ({x.var(0).mean().sqrt():.1f}|{x.std():.1f})")
 
 
@@ -129,7 +129,7 @@ class Network(torch.nn.Module):
         return scatter(x, data.batch, dim=0).div(num_nodes**0.5)
 
 
-def main():
+def main() -> None:
     data, labels = tetris()
     f = Network()
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     main()
 
 
-def test():
+def test() -> None:
     torch.set_default_dtype(torch.float64)
 
     data, labels = tetris()
@@ -204,7 +204,7 @@ def test():
     assert error.abs().max() < 1e-10
 
 
-def profile():
+def profile() -> None:
     data, labels = tetris()
     data = data.to(device="cuda")
     labels = labels.to(device="cuda")
@@ -216,7 +216,7 @@ def profile():
 
     called_num = [0]
 
-    def trace_handler(p):
+    def trace_handler(p) -> None:
         print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
         p.export_chrome_trace("test_trace_" + str(called_num[0]) + ".json")
         called_num[0] += 1

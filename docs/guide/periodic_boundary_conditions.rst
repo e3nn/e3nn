@@ -162,7 +162,7 @@ application.
     import torch_scatter
 
     class SimplePeriodicNetwork(SimpleNetwork):
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs) -> None:
             """The keyword `pool_nodes` is used by SimpleNetwork to determine
             whether we sum over all atom contributions per example. In this example,
             we want use a mean operations instead, so we will override this behavior.
@@ -220,5 +220,3 @@ When we apply the network to our data, we get one scalar per example.
 
     for data in dataloader:
         print(net(data).shape)  # One scalar per example
-
-

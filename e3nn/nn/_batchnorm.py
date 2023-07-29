@@ -38,14 +38,14 @@ class BatchNorm(nn.Module):
 
     def __init__(
         self,
-        irreps,
+        irreps: o3.Irreps,
         eps: float = 1e-5,
         momentum: float = 0.1,
         affine: bool = True,
         reduce: str = "mean",
         instance: bool = False,
         normalization: str = "component",
-    ):
+    ) -> None:
         super().__init__()
 
         self.irreps = o3.Irreps(irreps)
@@ -83,13 +83,13 @@ class BatchNorm(nn.Module):
         assert normalization in ["norm", "component"], "normalization needs to be 'norm' or 'component'"
         self.normalization = normalization
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.irreps}, eps={self.eps}, momentum={self.momentum})"
 
-    def _roll_avg(self, curr, update):
+    def _roll_avg(self, curr, update) -> float:
         return (1 - self.momentum) * curr + self.momentum * update.detach()
 
-    def forward(self, input):
+    def forward(self, input) -> torch.Tensor:
         """evaluate
 
         Parameters
@@ -145,14 +145,14 @@ class BatchNorm(nn.Module):
                 elif self.normalization == "component":
                     field_norm = field.pow(2).mean(3)  # [batch, sample, mul]
                 else:
-                    raise ValueError("Invalid normalization option {}".format(self.normalization))
+                    raise ValueError(f"Invalid normalization option {self.normalization}")
 
                 if self.reduce == "mean":
                     field_norm = field_norm.mean(1)  # [batch, mul]
                 elif self.reduce == "max":
                     field_norm = field_norm.max(1).values  # [batch, mul]
                 else:
-                    raise ValueError("Invalid reduce option {}".format(self.reduce))
+                    raise ValueError(f"Invalid reduce option {self.reduce}")
 
                 if not self.instance:
                     field_norm = field_norm.mean(0)  # [mul]

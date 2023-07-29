@@ -89,7 +89,7 @@ class Irrep(tuple):
         r"""The parity of the representation, :math:`p = \pm 1`."""
         return self[1]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         p = {+1: "e", -1: "o"}[self.p]
         return f"{self.l}{p}"
 
@@ -110,7 +110,7 @@ class Irrep(tuple):
             if l == lmax:
                 break
 
-    def D_from_angles(self, alpha, beta, gamma, k=None):
+    def D_from_angles(self, alpha, beta, gamma, k=None) -> torch.Tensor:
         r"""Matrix :math:`p^k D^l(\alpha, \beta, \gamma)`
 
         (matrix) Representation of :math:`O(3)`. :math:`D` is the representation of :math:`SO(3)`, see `wigner_D`.
@@ -149,7 +149,7 @@ class Irrep(tuple):
         alpha, beta, gamma, k = torch.broadcast_tensors(alpha, beta, gamma, k)
         return _wigner.wigner_D(self.l, alpha, beta, gamma) * self.p ** k[..., None, None]
 
-    def D_from_quaternion(self, q, k=None):
+    def D_from_quaternion(self, q, k=None) -> torch.Tensor:
         r"""Matrix of the representation, see `Irrep.D_from_angles`
 
         Parameters
@@ -167,7 +167,7 @@ class Irrep(tuple):
         """
         return self.D_from_angles(*_rotation.quaternion_to_angles(q), k)
 
-    def D_from_matrix(self, R):
+    def D_from_matrix(self, R) -> torch.Tensor:
         r"""Matrix of the representation, see `Irrep.D_from_angles`
 
         Parameters
@@ -196,7 +196,7 @@ class Irrep(tuple):
         k = (1 - d) / 2
         return self.D_from_angles(*_rotation.matrix_to_angles(R), k)
 
-    def D_from_axis_angle(self, axis, angle):
+    def D_from_axis_angle(self, axis, angle) -> torch.Tensor:
         r"""Matrix of the representation, see `Irrep.D_from_angles`
 
         Parameters
@@ -282,7 +282,7 @@ class _MulIr(tuple):
     def dim(self) -> int:
         return self.mul * self.ir.dim
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.mul}x{self.ir}"
 
     def __getitem__(self, item) -> Union[int, Irrep]:  # pylint: disable=useless-super-delegation
@@ -396,7 +396,7 @@ class Irreps(tuple):
         return super().__new__(cls, out)
 
     @staticmethod
-    def spherical_harmonics(lmax, p: int = -1):
+    def spherical_harmonics(lmax: int, p: int = -1) -> "Irreps":
         r"""representation of the spherical harmonics
 
         Parameters
@@ -439,7 +439,9 @@ class Irreps(tuple):
             i += mul_ir.dim
         return s
 
-    def randn(self, *size: int, normalization: str = "component", requires_grad: bool = False, dtype=None, device=None):
+    def randn(
+        self, *size: int, normalization: str = "component", requires_grad: bool = False, dtype=None, device=None
+    ) -> torch.Tensor:
         r"""Random tensor.
 
         Parameters
@@ -509,11 +511,11 @@ class Irreps(tuple):
     def index(self, _object):
         raise NotImplementedError
 
-    def __add__(self, irreps):
+    def __add__(self, irreps) -> "Irreps":
         irreps = Irreps(irreps)
         return Irreps(super().__add__(irreps))
 
-    def __mul__(self, other):
+    def __mul__(self, other) -> "Irreps":
         r"""
         >>> (Irreps('2x1e') * 3).simplify()
         6x1e
@@ -522,7 +524,7 @@ class Irreps(tuple):
             raise NotImplementedError("Use o3.TensorProduct for this, see the documentation")
         return Irreps(super().__mul__(other))
 
-    def __rmul__(self, other):
+    def __rmul__(self, other) -> "Irreps":
         r"""
         >>> 2 * Irreps('0e + 1e')
         1x0e+1x1e+1x0e+1x1e
@@ -557,7 +559,7 @@ class Irreps(tuple):
                 out.append((mul, ir))
         return Irreps(out)
 
-    def remove_zero_multiplicities(self):
+    def remove_zero_multiplicities(self) -> "Irreps":
         """Remove any irreps with multiplicities of zero.
 
         Returns
@@ -621,7 +623,7 @@ class Irreps(tuple):
             raise ValueError("Cannot get lmax of empty Irreps")
         return max(self.ls)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "+".join(f"{mul_ir}" for mul_ir in self)
 
     def D_from_angles(self, alpha, beta, gamma, k=None):

@@ -170,13 +170,13 @@ class NetworkForAGraphWithAttributes(torch.nn.Module):
             return node_outputs
 
 
-def test_simple_network():
+def test_simple_network() -> None:
     net = SimpleNetwork("3x0e + 2x1o", "4x0e + 1x1o", max_radius=2.0, num_neighbors=3.0, num_nodes=5.0)
 
     net({"pos": torch.randn(5, 3), "x": net.irreps_in.randn(5, -1)})
 
 
-def test_network_for_a_graph_with_attributes():
+def test_network_for_a_graph_with_attributes() -> None:
     net = NetworkForAGraphWithAttributes(
         "3x0e + 2x1o", "4x0e + 1x1o", "1e", "3x0o + 1e", max_radius=2.0, num_neighbors=3.0, num_nodes=5.0
     )

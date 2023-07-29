@@ -164,7 +164,7 @@ def project_2d_on_sphere(signal, grid, projection_origin=None):
     return sample
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--bandwidth", help="the bandwidth of the S2 signal", type=int, default=30, required=False)

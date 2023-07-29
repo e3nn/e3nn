@@ -9,7 +9,7 @@ from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 @pytest.mark.parametrize("do_bias", [True, False])
 @pytest.mark.parametrize("nonlin", [torch.tanh, torch.sigmoid])
-def test_norm_activation(float_tolerance, do_bias, nonlin):
+def test_norm_activation(float_tolerance, do_bias, nonlin) -> None:
     irreps_in = e3nn.o3.Irreps("4x0e + 5x1o")
     N_batch = 3
     in_features = torch.randn(N_batch, irreps_in.dim)
@@ -70,7 +70,7 @@ def test_norm_activation(float_tolerance, do_bias, nonlin):
 
 @pytest.mark.parametrize("do_bias", [True, False])
 @pytest.mark.parametrize("nonlin", [torch.tanh, torch.sigmoid])
-def test_norm_activation_equivariant(do_bias, nonlin):
+def test_norm_activation_equivariant(do_bias, nonlin) -> None:
     irreps_in = e3nn.o3.Irreps(
         # test lots of different irreps
         "2x0e + 3x0o + 5x1o + 1x1e + 2x2e + 1x2o + 1x3e + 1x3o + 1x5e + 1x6o"
@@ -90,7 +90,7 @@ def test_norm_activation_equivariant(do_bias, nonlin):
 
 @pytest.mark.parametrize("do_bias", [True, False])
 @pytest.mark.parametrize("nonlin", [torch.tanh, torch.sigmoid])
-def test_zeros(do_bias, nonlin):
+def test_zeros(do_bias, nonlin) -> None:
     """Confirm that `epsilon` gives non-NaN grads"""
     irreps_in = e3nn.o3.Irreps("2x0e + 3x0o")
     norm_act = NormActivation(

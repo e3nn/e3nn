@@ -11,7 +11,7 @@ from torch import fx
 from ._instruction import Instruction
 
 
-def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor):
+def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor) -> torch.Tensor:
     if len(xs) > 0:
         out = xs[0]
         for x in xs[1:]:

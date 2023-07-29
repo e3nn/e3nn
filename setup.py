@@ -5,12 +5,12 @@ from setuptools import find_packages, setup
 
 
 # Recommendations from https://packaging.python.org/
-here = os.path.abspath(os.path.dirname(__file__))
+here: str = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 
-def read(*parts):
+def read(*parts) -> str:
     with open(os.path.join(here, *parts), "r") as fp:
         return fp.read()
 

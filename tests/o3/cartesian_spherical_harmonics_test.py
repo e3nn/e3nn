@@ -6,11 +6,11 @@ from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
 
 
-def test_weird_call():
+def test_weird_call() -> None:
     o3.spherical_harmonics([4, 1, 2, 3, 3, 1, 0], torch.randn(2, 1, 2, 3), False)
 
 
-def test_weird_irreps():
+def test_weird_irreps() -> None:
     # string input
     o3.spherical_harmonics("0e + 1o", torch.randn(1, 3), False)
 
@@ -37,13 +37,13 @@ def test_weird_irreps():
         _ = o3.SphericalHarmonics(irreps_in="1e + 3o", irreps_out="1x0e + 4x1e + 3x2e", normalize=True)  # invalid
 
 
-def test_zeros():
+def test_zeros() -> None:
     assert torch.allclose(
         o3.spherical_harmonics([0, 1], torch.zeros(1, 3), False, normalization="norm"), torch.tensor([[1, 0, 0, 0.0]])
     )
 
 
-def test_equivariance(float_tolerance):
+def test_equivariance(float_tolerance) -> None:
     lmax = 5
     irreps = o3.Irreps.spherical_harmonics(lmax)
     x = torch.randn(2, 3)
@@ -54,7 +54,7 @@ def test_equivariance(float_tolerance):
     assert (y1 - y2).abs().max() < 10 * float_tolerance
 
 
-def test_backwardable():
+def test_backwardable() -> None:
     lmax = 3
     ls = list(range(lmax + 1))
 
@@ -76,7 +76,7 @@ def test_backwardable():
 
 
 @pytest.mark.parametrize("l", range(10 + 1))
-def test_normalization(float_tolerance, l):
+def test_normalization(float_tolerance, l) -> None:
 
     n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization="integral").pow(2).mean()
     assert abs(n - 1 / (4 * math.pi)) < float_tolerance
@@ -88,7 +88,7 @@ def test_normalization(float_tolerance, l):
     assert abs(n - 1) < float_tolerance
 
 
-def test_closure():
+def test_closure() -> None:
     r"""
     integral of Ylm * Yjn = delta_lj delta_mn
     integral of 1 over the unit sphere = 4 pi
@@ -107,7 +107,7 @@ def test_closure():
 
 
 @pytest.mark.parametrize("l", range(11 + 1))
-def test_parity(float_tolerance, l):
+def test_parity(float_tolerance, l) -> None:
     r"""
     (-1)^l Y(x) = Y(-x)
     """
@@ -118,7 +118,7 @@ def test_parity(float_tolerance, l):
 
 
 @pytest.mark.parametrize("l", range(9 + 1))
-def test_recurrence_relation(float_tolerance, l):
+def test_recurrence_relation(float_tolerance, l) -> None:
     if torch.get_default_dtype() != torch.float64 and l > 6:
         pytest.xfail("we expect this to fail for high l and single precision")
 
@@ -144,7 +144,7 @@ def test_recurrence_relation(float_tolerance, l):
 
 @pytest.mark.parametrize("normalization", ["integral", "component", "norm"])
 @pytest.mark.parametrize("normalize", [True, False])
-def test_module(normalization, normalize):
+def test_module(normalization, normalize) -> None:
     l = o3.Irreps("0e + 1o + 3o")
     sp = o3.SphericalHarmonics(l, normalize, normalization)
     sp_jit = assert_auto_jitable(sp)

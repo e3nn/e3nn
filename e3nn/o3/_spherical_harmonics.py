@@ -32,7 +32,7 @@ class SphericalHarmonics(torch.nn.Module):
         normalize: bool,
         normalization: str = "integral",
         irreps_in: Any = None,
-    ):
+    ) -> None:
         super().__init__()
         self.normalize = normalize
         self.normalization = normalization
@@ -1943,7 +1943,7 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
     )
 
 
-def _generate_spherical_harmonics(lmax, device=None):  # pragma: no cover
+def _generate_spherical_harmonics(lmax, device=None) -> None:  # pragma: no cover
     r"""code used to generate the code above
 
     based on `wigner_3j`

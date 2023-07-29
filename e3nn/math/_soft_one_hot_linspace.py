@@ -4,7 +4,7 @@ import torch
 from e3nn.math import soft_unit_step
 
 
-def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutoff=None):
+def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutoff=None) -> torch.Tensor:
     r"""Projection on a basis of functions
 
     Returns a set of :math:`\{y_i(x)\}_{i=1}^N`,

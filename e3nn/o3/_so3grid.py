@@ -5,7 +5,7 @@ from ._wigner import wigner_D
 from ._s2grid import _quadrature_weights, s2_grid
 
 
-def flat_wigner(lmax, alpha, beta, gamma):
+def flat_wigner(lmax: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
     return torch.cat([(2 * l + 1) ** 0.5 * wigner_D(l, alpha, beta, gamma).flatten(-2) for l in range(lmax + 1)], dim=-1)
 
 
@@ -27,7 +27,7 @@ class SO3Grid(torch.nn.Module):  # pylint: disable=abstract-method
         default value (2) should be optimal
     """
 
-    def __init__(self, lmax, resolution, *, normalization: str = "component", aspect_ratio: int = 2):
+    def __init__(self, lmax, resolution, *, normalization: str = "component", aspect_ratio: int = 2) -> None:
         super().__init__()
 
         assert normalization == "component"
@@ -48,10 +48,10 @@ class SO3Grid(torch.nn.Module):  # pylint: disable=abstract-method
         self.res_beta = nb
         self.res_gamma = na
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.lmax})"
 
-    def to_grid(self, features):
+    def to_grid(self, features) -> torch.Tensor:
         r"""evaluate
 
         Parameters
@@ -67,7 +67,7 @@ class SO3Grid(torch.nn.Module):  # pylint: disable=abstract-method
         """
         return torch.einsum("...i,abci->...abc", features, self.D) / self.D.shape[-1] ** 0.5
 
-    def from_grid(self, features):
+    def from_grid(self, features) -> torch.Tensor:
         r"""evaluate
 
         Parameters

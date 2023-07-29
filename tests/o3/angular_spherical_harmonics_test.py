@@ -6,7 +6,7 @@ from e3nn import o3
 from e3nn.util.test import assert_auto_jitable
 
 
-def test_jit(float_tolerance):
+def test_jit(float_tolerance) -> None:
     sh = o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
     jited = assert_auto_jitable(sh)
 
@@ -15,7 +15,7 @@ def test_jit(float_tolerance):
     return (sh(a, b) - jited(a, b)).abs().max() < float_tolerance
 
 
-def test_sh_equivariance1(float_tolerance):
+def test_sh_equivariance1(float_tolerance) -> None:
     r"""test
     - compose
     - spherical_harmonics_alpha_beta
@@ -34,7 +34,7 @@ def test_sh_equivariance1(float_tolerance):
         assert (Yrx - DrY).abs().max() < float_tolerance * Y.abs().max()
 
 
-def test_sh_is_in_irrep(float_tolerance):
+def test_sh_is_in_irrep(float_tolerance) -> None:
     for l in range(4 + 1):
         a, b, _ = o3.rand_angles()
         Y = o3.spherical_harmonics_alpha_beta(l, a, b) * math.sqrt(4 * math.pi) / math.sqrt(2 * l + 1)
@@ -42,7 +42,7 @@ def test_sh_is_in_irrep(float_tolerance):
         assert (Y - D[:, l]).abs().max() < float_tolerance
 
 
-def test_sh_same(float_tolerance):
+def test_sh_same(float_tolerance) -> None:
     for l in range(4 + 1):
         x = torch.randn(10, 3)
         a, b = o3.xyz_to_angles(x)

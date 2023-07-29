@@ -1,3 +1,5 @@
+from typing import Dict, List, Tuple
+
 import torch
 
 from e3nn.util import explicit_default_types
@@ -27,7 +29,7 @@ class normalize2mom(torch.nn.Module):
         f,
         dtype=None,
         device=None,
-    ):
+    ) -> None:
         super().__init__()
 
         # Try to infer a device:
@@ -58,7 +60,7 @@ class normalize2mom(torch.nn.Module):
     def _make_tracing_inputs(
         # pylint: disable=unused-argument
         n: int,
-    ):
+    ) -> List[Dict[str, Tuple[torch.Tensor]]]:
         # No reason to trace this with more than one tiny input,
         # since f is assumed by `moment` to be an elementwise scalar
         # function

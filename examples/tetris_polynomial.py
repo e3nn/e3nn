@@ -63,7 +63,7 @@ def tetris():
 class InvariantPolynomial(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.irreps_sh = o3.Irreps.spherical_harmonics(3)
+        self.irreps_sh: o3.Irreps = o3.Irreps.spherical_harmonics(3)
         irreps_mid = o3.Irreps("64x0e + 24x1e + 24x1o + 16x2e + 16x2o")
         irreps_out = o3.Irreps("0o + 6x0e")
 
@@ -106,7 +106,7 @@ class InvariantPolynomial(torch.nn.Module):
         return scatter(node_features, data.batch, dim=0).div(num_nodes**0.5)
 
 
-def main():
+def main() -> None:
     data, labels = tetris()
     f = InvariantPolynomial()
 
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     main()
 
 
-def test():
+def test() -> None:
     data, labels = tetris()
     f = InvariantPolynomial()
 

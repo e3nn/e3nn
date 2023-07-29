@@ -23,7 +23,7 @@ class Convolution(torch.nn.Module):
     steps : tuple of int
     """
 
-    def __init__(self, irreps_in, irreps_out, irreps_sh, size, steps=(1, 1, 1), **kwargs):
+    def __init__(self, irreps_in, irreps_out, irreps_sh, size, steps=(1, 1, 1), **kwargs) -> None:
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
@@ -94,7 +94,7 @@ class Convolution(torch.nn.Module):
 
 
 class LowPassFilter(torch.nn.Module):
-    def __init__(self, scale, stride: int = 1, transposed: bool = False, steps=(1, 1, 1)):
+    def __init__(self, scale, stride: int = 1, transposed: bool = False, steps=(1, 1, 1)) -> None:
         super().__init__()
 
         sigma = 0.5 * (scale**2 - 1) ** 0.5
@@ -151,7 +151,7 @@ class LowPassFilter(torch.nn.Module):
         return out
 
 
-def test():
+def test() -> None:
     conv = Convolution("0e + 1e", "0e + 1e + 1o + 2e + 2o", o3.Irreps.spherical_harmonics(lmax=3), 5)
 
     x = torch.randn(10, 4, 32, 32, 32)

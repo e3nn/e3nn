@@ -40,7 +40,9 @@ class S2Activation(torch.nn.Module):
     >>> m = S2Activation(io.SphericalTensor(5, p_val=+1, p_arg=-1), torch.tanh, 100)
     """
 
-    def __init__(self, irreps: o3.Irreps, act, res, normalization: str = "component", lmax_out=None, random_rot: bool = False):
+    def __init__(
+        self, irreps: o3.Irreps, act, res, normalization: str = "component", lmax_out=None, random_rot: bool = False
+    ) -> None:
         super().__init__()
 
         irreps = o3.Irreps(irreps).simplify()
@@ -80,7 +82,7 @@ class S2Activation(torch.nn.Module):
         self.act = normalize2mom(act)
         self.random_rot = random_rot
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.irreps_in} -> {self.irreps_out})"
 
     def forward(self, features):

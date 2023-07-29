@@ -4,7 +4,7 @@ from e3nn import o3
 from e3nn.o3 import irrep
 
 
-def test_creation():
+def test_creation() -> None:
     o3.Irrep(3, 1)
     ir = o3.Irrep("3e")
     o3.Irrep(ir)
@@ -26,7 +26,7 @@ def test_creation():
     assert l1y == o3.Irrep("1y")
 
 
-def test_properties():
+def test_properties() -> None:
     irrep = o3.Irrep("3e")
     assert irrep.l == 3
     assert irrep.p == 1
@@ -52,7 +52,7 @@ def test_properties():
     assert o3.Irreps(repr(irreps)) == irreps
 
 
-def test_arithmetic():
+def test_arithmetic() -> None:
     assert 3 * o3.Irrep("6o") == o3.Irreps("3x6o")
     products = list(o3.Irrep("1o") * o3.Irrep("2e"))
     assert products == [o3.Irrep("1o"), o3.Irrep("2o"), o3.Irrep("3o")]
@@ -65,7 +65,7 @@ def test_arithmetic():
     assert o3.Irreps("1o + 4o") + o3.Irreps("1o + 7e") == o3.Irreps("1o + 4o + 1o + 7e")
 
 
-def test_empty_irreps():
+def test_empty_irreps() -> None:
     assert o3.Irreps() == o3.Irreps("") == o3.Irreps([])
     assert len(o3.Irreps()) == 0
     assert o3.Irreps().dim == 0
@@ -73,7 +73,7 @@ def test_empty_irreps():
     assert o3.Irreps().num_irreps == 0
 
 
-def test_getitem():
+def test_getitem() -> None:
     irreps = o3.Irreps("16x1e + 3e + 2e + 5o")
     assert irreps[0] == (16, o3.Irrep("1e"))
     assert irreps[3] == (1, o3.Irrep("5o"))
@@ -84,7 +84,7 @@ def test_getitem():
     assert sliced == o3.Irreps("2e + 5o")
 
 
-def test_cat():
+def test_cat() -> None:
     irreps = o3.Irreps("4x1e + 6x2e + 12x2o") + o3.Irreps("1x1e + 2x2e + 12x4o")
     assert len(irreps) == 6
     assert irreps.ls == [1] * 4 + [2] * 6 + [2] * 12 + [1] * 1 + [2] * 2 + [4] * 12
@@ -92,12 +92,12 @@ def test_cat():
     assert irreps.num_irreps == 4 + 6 + 12 + 1 + 2 + 12
 
 
-def test_contains():
+def test_contains() -> None:
     assert o3.Irrep("2e") in o3.Irreps("3x0e + 2x2e + 1x3o")
     assert o3.Irrep("2o") not in o3.Irreps("3x0e + 2x2e + 1x3o")
 
 
-def test_errors():
+def test_errors() -> None:
     """Test invalid irrep specifications"""
     # Irrep
     with pytest.raises(ValueError):
@@ -121,5 +121,5 @@ def test_errors():
 
 
 @pytest.mark.xfail()
-def test_fail1():
+def test_fail1() -> None:
     o3.Irreps([(32, 1)])

@@ -17,7 +17,7 @@ class SlowLinear(torch.nn.Module):
         irreps_out,
         internal_weights=None,
         shared_weights=None,
-    ):
+    ) -> None:
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in)
@@ -48,7 +48,7 @@ class SlowLinear(torch.nn.Module):
         return self.tp(features, ones, weight)
 
 
-def test_linear():
+def test_linear() -> None:
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
     m = o3.Linear(irreps_in, irreps_out)
@@ -59,7 +59,7 @@ def test_linear():
     assert_normalized(m, n_weight=100, n_input=10_000, atol=0.5)
 
 
-def test_bias():
+def test_bias() -> None:
     irreps_in = o3.Irreps("2x0e + 1e + 2x0e + 0o")
     irreps_out = o3.Irreps("3x0e + 1e + 3x0e + 5x0e + 0o")
     m = o3.Linear(irreps_in, irreps_out, biases=[True, False, False, True, False])
@@ -79,7 +79,7 @@ def test_bias():
     assert_normalized(m, n_weight=100, n_input=10_000, atol=0.5, weights=[m.weight])
 
 
-def test_single_out():
+def test_single_out() -> None:
     l1 = o3.Linear("5x0e", "5x0e")
     l2 = o3.Linear("5x0e", "5x0e + 3x0o")
     with torch.no_grad():
@@ -96,7 +96,7 @@ def test_single_out():
 # We want to be sure to test a multiple-same L case, a single irrep case, and an empty irrep case
 @pytest.mark.parametrize("irreps_in", ["5x0e", "1e + 2e + 4x1e + 3x3o", "2x1o + 0x3e"] + random_irreps(n=4))
 @pytest.mark.parametrize("irreps_out", ["5x0e", "1e + 2e + 3x3o + 3x1e", "2x1o + 0x3e"] + random_irreps(n=4))
-def test_linear_like_tp(irreps_in, irreps_out):
+def test_linear_like_tp(irreps_in, irreps_out) -> None:
     """Test that Linear gives the same results as the corresponding TensorProduct."""
     m = o3.Linear(irreps_in, irreps_out)
     m_true = SlowLinear(irreps_in, irreps_out)
@@ -110,14 +110,14 @@ def test_linear_like_tp(irreps_in, irreps_out):
     )
 
 
-def test_output_mask():
+def test_output_mask() -> None:
     irreps_in = o3.Irreps("1e + 2e")
     irreps_out = o3.Irreps("3e + 5x2o")
     m = o3.Linear(irreps_in, irreps_out)
     assert torch.all(m.output_mask == torch.zeros(m.irreps_out.dim, dtype=torch.bool))
 
 
-def test_instructions_parameter():
+def test_instructions_parameter() -> None:
     m = o3.Linear("4x0e + 3x4o", "1x2e + 4x0o")
     assert len(m.instructions) == 0
     assert not torch.any(m.output_mask)
@@ -134,7 +134,7 @@ def test_instructions_parameter():
         m = o3.Linear("4x0e + 3x4o", "1x2e + 4x0e", instructions=[(4, 0)])
 
 
-def test_empty_instructions():
+def test_empty_instructions() -> None:
     m = o3.Linear(o3.Irreps.spherical_harmonics(3), o3.Irreps.spherical_harmonics(3), instructions=[])
     assert len(m.instructions) == 0
     assert not torch.any(m.output_mask)
@@ -143,7 +143,7 @@ def test_empty_instructions():
     assert torch.all(out == 0.0)
 
 
-def test_default_instructions():
+def test_default_instructions() -> None:
     m = o3.Linear(
         "4x0e + 3x1o + 2x0e",
         "2x1o + 8x0e",
@@ -155,7 +155,7 @@ def test_default_instructions():
     assert set(ins.path_shape for ins in m.instructions) == {(4, 8), (2, 8), (3, 2)}
 
 
-def test_instructions():
+def test_instructions() -> None:
     m = o3.Linear("4x0e + 3x1o + 2x0e", "2x1o + 8x0e", instructions=[(0, 1), (1, 0)])
     inp = m.irreps_in.randn(3, -1)
     inp[:, : m.irreps_in[:2].dim] = 0.0
@@ -163,7 +163,7 @@ def test_instructions():
     assert torch.allclose(out, torch.zeros(1))
 
 
-def test_weight_view():
+def test_weight_view() -> None:
     m = o3.Linear("4x0e + 3x1o + 2x0e", "2x1o + 8x0e", instructions=[(0, 1), (1, 0)])
     inp = m.irreps_in.randn(3, -1)
     assert m.weight_view_for_instruction(0).shape == (4, 8)
@@ -181,7 +181,7 @@ def test_weight_view():
         assert (w - 2.0).norm() == 0.0
 
 
-def test_weight_view_unshared():
+def test_weight_view_unshared() -> None:
     m = o3.Linear("4x0e + 3x1o + 2x0e", "2x1o + 8x0e", instructions=[(0, 1), (1, 0)], shared_weights=False)
     batchdim = 7
     inp = m.irreps_in.randn(batchdim, -1)
@@ -195,7 +195,7 @@ def test_weight_view_unshared():
     assert torch.allclose(out[:, :6], torch.zeros(1))
 
 
-def test_f():
+def test_f() -> None:
     m = o3.Linear("0e + 1e + 2e", "0e + 2x1e + 2e", f_in=44, f_out=25, _optimize_einsums=False)
     assert_equivariant(m, args_in=[torch.randn(10, 44, 9)])
     m = assert_auto_jitable(m)

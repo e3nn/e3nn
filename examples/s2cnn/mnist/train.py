@@ -23,7 +23,7 @@ def s2_near_identity_grid(max_beta: float = math.pi / 8, n_alpha: int = 8, n_bet
 
 def so3_near_identity_grid(
     max_beta: float = math.pi / 8, max_gamma: float = 2 * math.pi, n_alpha: int = 8, n_beta: int = 3, n_gamma=None
-):
+) -> torch.Tensor:
     """
     :return: rings of rotations around the identity, all points (rotations) in
     a ring are at the same distance from the identity
@@ -55,7 +55,7 @@ def flat_wigner(lmax: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch
 
 
 class S2Convolution(torch.nn.Module):
-    def __init__(self, f_in, f_out, lmax, kernel_grid):
+    def __init__(self, f_in, f_out, lmax, kernel_grid) -> None:
         super().__init__()
         self.register_parameter(
             "w", torch.nn.Parameter(torch.randn(f_in, f_out, kernel_grid.shape[1]))
@@ -71,7 +71,7 @@ class S2Convolution(torch.nn.Module):
 
 
 class SO3Convolution(torch.nn.Module):
-    def __init__(self, f_in, f_out, lmax, kernel_grid):
+    def __init__(self, f_in, f_out, lmax, kernel_grid) -> None:
         super().__init__()
         self.register_parameter(
             "w", torch.nn.Parameter(torch.randn(f_in, f_out, kernel_grid.shape[1]))
@@ -85,7 +85,7 @@ class SO3Convolution(torch.nn.Module):
 
 
 class S2ConvNet_original(torch.nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         f1 = 20
@@ -158,7 +158,7 @@ def load_data(path, batch_size):
     return train_loader, test_loader, train_dataset, test_dataset
 
 
-def main():
+def main() -> None:
     train_loader, test_loader, train_dataset, _ = load_data(MNIST_PATH, BATCH_SIZE)
 
     classifier = S2ConvNet_original()

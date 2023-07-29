@@ -7,7 +7,7 @@ from e3nn.util.jit import compile_mode
 
 @compile_mode("script")
 class _Sortcut(torch.nn.Module):
-    def __init__(self, *irreps_outs):
+    def __init__(self, *irreps_outs) -> None:
         super().__init__()
         self.irreps_outs = tuple(o3.Irreps(irreps).simplify() for irreps in irreps_outs)
         irreps_in = sum(self.irreps_outs, o3.Irreps([]))
@@ -82,7 +82,7 @@ class Gate(torch.nn.Module):
     16x0o+16x1o+16x1e
     """
 
-    def __init__(self, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated):
+    def __init__(self, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated) -> None:
         super().__init__()
         irreps_scalars = o3.Irreps(irreps_scalars)
         irreps_gates = o3.Irreps(irreps_gates)
@@ -113,7 +113,7 @@ class Gate(torch.nn.Module):
 
         self._irreps_out = irreps_scalars + irreps_gated
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.irreps_in} -> {self.irreps_out})"
 
     def forward(self, features):

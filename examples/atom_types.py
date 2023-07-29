@@ -82,7 +82,7 @@ class InvariantPolynomial(torch.nn.Module):
         return scatter(node_features, data.batch, dim=0).div(num_nodes**0.5)
 
 
-def test():
+def test() -> None:
     torch.set_default_dtype(torch.float64)
 
     pos = torch.tensor(
