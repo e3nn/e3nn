@@ -117,7 +117,7 @@ class Convolution(torch.nn.Module):
 
 
 class LowPassFilter(torch.nn.Module):
-    def __init__(self, scale, stride=1, transposed=False, steps=(1, 1, 1)):
+    def __init__(self, scale, stride: int = 1, transposed: bool = False, steps=(1, 1, 1)):
         super().__init__()
 
         sigma = 0.5 * (scale**2 - 1) ** 0.5

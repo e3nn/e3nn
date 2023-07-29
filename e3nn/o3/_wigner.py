@@ -2,12 +2,13 @@ r"""Core functions of :math:`SO(3)`
 """
 import functools
 import math
+from typing import Union
 
 import torch
 from e3nn.util import explicit_default_types
 
 
-def su2_generators(j) -> torch.Tensor:
+def su2_generators(j: int) -> torch.Tensor:
     m = torch.arange(-j, j)
     raising = torch.diag(-torch.sqrt(j * (j + 1) - m * (m + 1)), diagonal=-1)
 
@@ -56,7 +57,7 @@ def so3_generators(l) -> torch.Tensor:
     return torch.real(X)
 
 
-def wigner_D(l, alpha, beta, gamma):
+def wigner_D(l: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
     r"""Wigner D matrix representation of :math:`SO(3)`.
 
     It satisfies the following properties:
@@ -96,7 +97,7 @@ def wigner_D(l, alpha, beta, gamma):
     return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
 
 
-def wigner_3j(l1, l2, l3, dtype=None, device=None):
+def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None):
     r"""Wigner 3j symbols :math:`C_{lmn}`.
 
     It satisfies the following two properties:
@@ -145,7 +146,7 @@ def wigner_3j(l1, l2, l3, dtype=None, device=None):
 
 
 @functools.lru_cache(maxsize=None)
-def _so3_clebsch_gordan(l1, l2, l3):
+def _so3_clebsch_gordan(l1: int, l2: int, l3: int):
     Q1 = change_basis_real_to_complex(l1, dtype=torch.float64)
     Q2 = change_basis_real_to_complex(l2, dtype=torch.float64)
     Q3 = change_basis_real_to_complex(l3, dtype=torch.float64)
@@ -198,7 +199,7 @@ def _so3_clebsch_gordan(l1, l2, l3):
 
 
 @functools.lru_cache(maxsize=None)
-def _su2_clebsch_gordan(j1, j2, j3):
+def _su2_clebsch_gordan(j1: Union[int, float], j2: Union[int, float], j3: Union[int, float]):
     """Calculates the Clebsch-Gordon matrix
     for SU(2) coupling j1 and j2 to give j3.
     Parameters
@@ -262,7 +263,7 @@ def _su2_clebsch_gordan_coeff(idx1, idx2, idx3):
     vmin = int(max([-j1 + j2 + m3, -j1 + m1, 0]))
     vmax = int(min([j2 + j3 + m1, j3 - j1 + j2, j3 + m3]))
 
-    def f(n):
+    def f(n: int) -> int:
         assert n == round(n)
         return factorial(round(n))
 

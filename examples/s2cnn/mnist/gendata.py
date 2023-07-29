@@ -12,7 +12,7 @@ from e3nn.o3 import s2_grid
 NORTHPOLE_EPSILON = 1e-3
 
 
-def rand_rotation_matrix(deflection=1.0, randnums=None):
+def rand_rotation_matrix(deflection: float = 1.0, randnums=None):
     """
     Creates a random rotation matrix.
 
@@ -200,7 +200,7 @@ def main():
 
     for label, data in zip(["train", "test"], [mnist_train, mnist_test]):
 
-        print("projecting {0} data set".format(label))
+        print(f"projecting {label} data set")
         current = 0
         signals = data["images"].reshape(-1, 28, 28).astype(np.float64)
         n_signals = signals.shape[0]
@@ -218,7 +218,7 @@ def main():
             chunk = signals[idxs]
             projections[idxs] = project_2d_on_sphere(chunk, rotated_grid)
             current += args.chunk_size
-            print("\r{0}/{1}".format(current, n_signals), end="")
+            print(f"\r{current}/{n_signals}", end="")
         print("")
         dataset[label] = {"images": projections, "labels": data["labels"]}
     print("writing pickle")

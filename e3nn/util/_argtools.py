@@ -8,7 +8,7 @@ import torch
 from e3nn.o3 import Irreps
 
 
-def _transform(dat, irreps_dat, rot_mat, translation=0.0, output_transform_dtype: bool = False):
+def _transform(dat, irreps_dat, rot_mat, translation: float = 0.0, output_transform_dtype: bool = False):
     """Transform ``dat`` by ``rot_mat`` and ``translation`` according to ``irreps_dat``."""
     out = []
     transform_dtype = rot_mat.dtype

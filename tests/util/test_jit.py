@@ -9,7 +9,7 @@ from e3nn.util.jit import script, trace_module, compile_mode, compile
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
 
-def test_submod_tracing():
+def test_submod_tracing() -> None:
     """Check that tracing actually occurs"""
 
     @compile_mode("trace")
@@ -40,7 +40,7 @@ def test_submod_tracing():
             script(parent)
 
 
-def test_submod_scripting():
+def test_submod_scripting() -> None:
     """Check that scripting actually occurs"""
 
     @compile_mode("script")
@@ -71,7 +71,7 @@ def test_submod_scripting():
     assert torch.allclose(parent_trace(x), x)
 
 
-def test_compilation():
+def test_compilation() -> None:
     class Supermod(torch.nn.Module):
         def forward(self, x):
             return x * 2.0
@@ -105,7 +105,7 @@ def test_compilation():
     assert torch.allclose(mod(x), mod_script(x))
 
 
-def test_equivariant():
+def test_equivariant() -> None:
     # Confirm that a compiled tensorproduct is still equivariant
     irreps_in = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
@@ -119,7 +119,7 @@ def test_equivariant():
     )
 
 
-def test_unsupported():
+def test_unsupported() -> None:
     @compile_mode("unsupported")
     class ChildMod(torch.nn.Module):
         pass
@@ -134,7 +134,7 @@ def test_unsupported():
         mod = script(mod)
 
 
-def test_trace_dtypes():
+def test_trace_dtypes() -> None:
     # FullyConnectedNet is traced
     fc = FullyConnectedNet([8, 16, 8])
     # compile in a dtype other than the default

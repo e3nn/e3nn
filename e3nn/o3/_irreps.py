@@ -396,7 +396,7 @@ class Irreps(tuple):
         return super().__new__(cls, out)
 
     @staticmethod
-    def spherical_harmonics(lmax, p=-1):
+    def spherical_harmonics(lmax, p: int = -1):
         r"""representation of the spherical harmonics
 
         Parameters
@@ -439,7 +439,7 @@ class Irreps(tuple):
             i += mul_ir.dim
         return s
 
-    def randn(self, *size, normalization="component", requires_grad=False, dtype=None, device=None):
+    def randn(self, *size: int, normalization: str = "component", requires_grad: bool = False, dtype=None, device=None):
         r"""Random tensor.
 
         Parameters
@@ -529,7 +529,7 @@ class Irreps(tuple):
         """
         return Irreps(super().__rmul__(other))
 
-    def simplify(self) -> 'Irreps':
+    def simplify(self) -> "Irreps":
         """Simplify the representations.
 
         Returns

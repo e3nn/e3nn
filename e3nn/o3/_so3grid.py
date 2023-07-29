@@ -27,7 +27,7 @@ class SO3Grid(torch.nn.Module):  # pylint: disable=abstract-method
         default value (2) should be optimal
     """
 
-    def __init__(self, lmax, resolution, *, normalization="component", aspect_ratio=2):
+    def __init__(self, lmax, resolution, *, normalization: str = "component", aspect_ratio: int = 2):
         super().__init__()
 
         assert normalization == "component"

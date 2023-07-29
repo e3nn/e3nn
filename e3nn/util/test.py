@@ -203,9 +203,9 @@ def equivariance_error(
     args_in,
     irreps_in=None,
     irreps_out=None,
-    ntrials=1,
-    do_parity=True,
-    do_translation=True,
+    ntrials: int = 1,
+    do_parity: bool = True,
+    do_translation: bool = True,
     transform_dtype=torch.float64,
 ):
     r"""Get the maximum equivariance error for ``func`` over ``ntrials``
@@ -313,9 +313,9 @@ def equivariance_error(
 # Make something else for general script/traceability
 def assert_auto_jitable(
     func,
-    error_on_warnings=True,
-    n_trace_checks=2,
-    strict_shapes=True,
+    error_on_warnings: bool = True,
+    n_trace_checks: int = 2,
+    strict_shapes: bool = True,
 ):
     r"""Assert that submodule ``func`` is automatically JITable.
 

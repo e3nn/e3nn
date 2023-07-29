@@ -36,7 +36,16 @@ class BatchNorm(nn.Module):
 
     __constants__ = ["instance", "normalization", "irs", "affine"]
 
-    def __init__(self, irreps, eps=1e-5, momentum=0.1, affine=True, reduce="mean", instance=False, normalization="component"):
+    def __init__(
+        self,
+        irreps,
+        eps: float = 1e-5,
+        momentum: float = 0.1,
+        affine: bool = True,
+        reduce: str = "mean",
+        instance: bool = False,
+        normalization: str = "component",
+    ):
         super().__init__()
 
         self.irreps = o3.Irreps(irreps)

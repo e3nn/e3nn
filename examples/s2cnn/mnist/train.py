@@ -8,7 +8,7 @@ from e3nn import o3
 from e3nn.nn import SO3Activation
 
 
-def s2_near_identity_grid(max_beta=math.pi / 8, n_alpha=8, n_beta=3):
+def s2_near_identity_grid(max_beta: float = math.pi / 8, n_alpha: int = 8, n_beta: int = 3) -> torch.Tensor:
     """
     :return: rings around the north pole
     size of the kernel = n_alpha * n_beta
@@ -21,7 +21,9 @@ def s2_near_identity_grid(max_beta=math.pi / 8, n_alpha=8, n_beta=3):
     return torch.stack((a, b))
 
 
-def so3_near_identity_grid(max_beta=math.pi / 8, max_gamma=2 * math.pi, n_alpha=8, n_beta=3, n_gamma=None):
+def so3_near_identity_grid(
+    max_beta: float = math.pi / 8, max_gamma: float = 2 * math.pi, n_alpha: int = 8, n_beta: int = 3, n_gamma=None
+):
     """
     :return: rings of rotations around the identity, all points (rotations) in
     a ring are at the same distance from the identity
@@ -40,15 +42,15 @@ def so3_near_identity_grid(max_beta=math.pi / 8, max_gamma=2 * math.pi, n_alpha=
     return torch.stack((A, B, C))
 
 
-def s2_irreps(lmax):
+def s2_irreps(lmax: int) -> o3.Irreps:
     return o3.Irreps([(1, (l, 1)) for l in range(lmax + 1)])
 
 
-def so3_irreps(lmax):
+def so3_irreps(lmax: int) -> o3.Irreps:
     return o3.Irreps([(2 * l + 1, (l, 1)) for l in range(lmax + 1)])
 
 
-def flat_wigner(lmax, alpha, beta, gamma):
+def flat_wigner(lmax: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
     return torch.cat([(2 * l + 1) ** 0.5 * o3.wigner_D(l, alpha, beta, gamma).flatten(-2) for l in range(lmax + 1)], dim=-1)
 
 
@@ -202,7 +204,7 @@ def main():
                 total += labels.size(0)
                 correct += (predicted == labels).long().sum().item()
 
-        print("Test Accuracy: {0}".format(100 * correct / total))
+        print(f"Test Accuracy: {100 * correct / total}")
 
 
 if __name__ == "__main__":

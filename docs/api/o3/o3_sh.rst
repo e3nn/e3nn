@@ -90,7 +90,7 @@ As a consequence, the spherical harmonics are equivariant,
         beta, alpha = torch.meshgrid(betas, alphas, indexing='ij')
         return o3.angles_to_xyz(alpha, beta)
 
-    def trace(r, f, c, radial_abs=True):
+    def trace(r, f, c, radial_abs: bool = True):
         if radial_abs:
             a = f.abs()
         else:
@@ -102,7 +102,7 @@ As a consequence, the spherical harmonics are equivariant,
             surfacecolor=f
         )
 
-    def plot(data, radial_abs=True):
+    def plot(data, radial_abs: bool = True):
         r = s2_grid()
         n = data.shape[-1]
         traces = [

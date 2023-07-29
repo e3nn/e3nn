@@ -35,7 +35,7 @@ def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: b
         return None
 
 
-def random_params(n=25):
+def random_params(n: int = 25):
     params = set()
     while len(params) < n:
         l1 = random.randint(0, 2)

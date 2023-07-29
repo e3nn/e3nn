@@ -5,7 +5,7 @@ import torch
 # matrix
 
 
-def rand_matrix(*shape, requires_grad=False, dtype=None, device=None):
+def rand_matrix(*shape, requires_grad: bool = False, dtype=None, device=None):
     r"""random rotation matrix
 
     Parameters
@@ -24,7 +24,7 @@ def rand_matrix(*shape, requires_grad=False, dtype=None, device=None):
 # angles
 
 
-def identity_angles(*shape, requires_grad=False, dtype=None, device=None):
+def identity_angles(*shape, requires_grad: bool = False, dtype=None, device=None):
     r"""angles of the identity rotation
 
     Parameters
@@ -46,7 +46,7 @@ def identity_angles(*shape, requires_grad=False, dtype=None, device=None):
     return abc[0].requires_grad_(requires_grad), abc[1].requires_grad_(requires_grad), abc[2].requires_grad_(requires_grad)
 
 
-def rand_angles(*shape, requires_grad=False, dtype=None, device=None):
+def rand_angles(*shape, requires_grad: bool = False, dtype=None, device=None):
     r"""random rotation angles
 
     Parameters
@@ -143,7 +143,7 @@ def inverse_angles(a, b, c):
 # quaternions
 
 
-def identity_quaternion(*shape, requires_grad=False, dtype=None, device=None):
+def identity_quaternion(*shape, requires_grad: bool = False, dtype=None, device=None):
     r"""quaternion of identity rotation
 
     Parameters
@@ -161,7 +161,7 @@ def identity_quaternion(*shape, requires_grad=False, dtype=None, device=None):
     return q
 
 
-def rand_quaternion(*shape, requires_grad=False, dtype=None, device=None):
+def rand_quaternion(*shape, requires_grad: bool = False, dtype=None, device=None):
     r"""generate random quaternion
 
     Parameters
@@ -229,7 +229,7 @@ def inverse_quaternion(q):
 # axis-angle
 
 
-def rand_axis_angle(*shape, requires_grad=False, dtype=None, device=None):
+def rand_axis_angle(*shape, requires_grad: bool = False, dtype=None, device=None):
     r"""generate random rotation as axis-angle
 
     Parameters
