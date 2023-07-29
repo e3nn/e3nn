@@ -12,6 +12,6 @@ float_tolerance = test.float_tolerance
 
 
 @pytest.fixture(autouse=True)
-def set_random_seed():
+def set_random_seed() -> None:
     """Set the random seeds to try to get some reproducibility"""
     test.set_random_seeds()

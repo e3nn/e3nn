@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 # https://stackoverflow.com/a/15008806/1008938
-def t_or_f(arg):
+def t_or_f(arg) -> bool:
     ua = str(arg).upper()
     if "TRUE".startswith(ua):
         return True
@@ -22,7 +22,7 @@ def t_or_f(arg):
         raise ValueError(str(arg))
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(prog="tensor_product_benchmark")
     parser.add_argument("--jit", type=t_or_f, default=True)
     parser.add_argument("--irreps", type=str, default="8x0e + 8x1e + 8x2e + 8x3o")

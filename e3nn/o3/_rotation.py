@@ -178,7 +178,7 @@ def rand_quaternion(*shape, requires_grad: bool = False, dtype=None, device=None
     return q
 
 
-def compose_quaternion(q1, q2):
+def compose_quaternion(q1, q2) -> torch.Tensor:
     r"""compose two quaternions: :math:`q_1 \circ q_2`
 
     Parameters
@@ -359,7 +359,7 @@ def matrix_z(angle: torch.Tensor) -> torch.Tensor:
     )
 
 
-def angles_to_matrix(alpha, beta, gamma):
+def angles_to_matrix(alpha, beta, gamma) -> torch.Tensor:
     r"""conversion from angles to matrix
 
     Parameters
@@ -409,7 +409,7 @@ def matrix_to_angles(R):
     return a, b, c
 
 
-def angles_to_quaternion(alpha, beta, gamma):
+def angles_to_quaternion(alpha, beta, gamma) -> torch.Tensor:
     r"""conversion from angles to quaternion
 
     Parameters
@@ -435,7 +435,7 @@ def angles_to_quaternion(alpha, beta, gamma):
     return compose_quaternion(qa, compose_quaternion(qb, qc))
 
 
-def matrix_to_quaternion(R):
+def matrix_to_quaternion(R) -> torch.Tensor:
     r"""conversion from matrix :math:`R` to quaternion :math:`q`
 
     Parameters
@@ -451,7 +451,7 @@ def matrix_to_quaternion(R):
     return axis_angle_to_quaternion(*matrix_to_axis_angle(R))
 
 
-def axis_angle_to_quaternion(xyz, angle):
+def axis_angle_to_quaternion(xyz, angle) -> torch.Tensor:
     r"""convertion from axis-angle to quaternion
 
     Parameters
@@ -551,7 +551,7 @@ def angles_to_axis_angle(alpha, beta, gamma):
     return matrix_to_axis_angle(angles_to_matrix(alpha, beta, gamma))
 
 
-def axis_angle_to_matrix(axis, angle):
+def axis_angle_to_matrix(axis, angle) -> torch.Tensor:
     r"""conversion from axis-angle to matrix
 
     Parameters
@@ -574,7 +574,7 @@ def axis_angle_to_matrix(axis, angle):
     return R @ Ry @ R.transpose(-2, -1)
 
 
-def quaternion_to_matrix(q):
+def quaternion_to_matrix(q) -> torch.Tensor:
     r"""convertion from quaternion to matrix
 
     Parameters
@@ -640,7 +640,7 @@ def axis_angle_to_angles(axis, angle):
 # point on the sphere
 
 
-def angles_to_xyz(alpha, beta):
+def angles_to_xyz(alpha, beta) -> torch.Tensor:
     r"""convert :math:`(\alpha, \beta)` into a point :math:`(x, y, z)` on the sphere
 
     Parameters

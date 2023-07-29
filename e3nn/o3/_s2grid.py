@@ -192,7 +192,7 @@ def _expand_matrix(ls, like=None, dtype=None, device=None):
     return m
 
 
-def rfft(x, l):
+def rfft(x, l) -> torch.Tensor:
     r"""Real fourier transform
 
     Parameters
@@ -325,7 +325,7 @@ class ToS2Grid(torch.nn.Module):
         positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
     """
 
-    def __init__(self, lmax=None, res=None, normalization: str = "component", dtype=None, device=None):
+    def __init__(self, lmax=None, res=None, normalization: str = "component", dtype=None, device=None) -> None:
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
@@ -365,11 +365,11 @@ class ToS2Grid(torch.nn.Module):
         self.register_buffer("sha", sha)
         self.register_buffer("shb", shb)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
 
     @property
-    def grid(self):
+    def grid(self) -> torch.Tensor:
         beta, alpha = torch.meshgrid(self.betas, self.alphas, indexing="ij")
         return o3.angles_to_xyz(alpha, beta)
 
@@ -445,7 +445,7 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    def __init__(self, res=None, lmax=None, normalization: str = "component", lmax_in=None, dtype=None, device=None):
+    def __init__(self, res=None, lmax=None, normalization: str = "component", lmax_in=None, dtype=None, device=None) -> None:
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
@@ -487,15 +487,15 @@ class FromS2Grid(torch.nn.Module):
         self.register_buffer("sha", sha)
         self.register_buffer("shb", shb)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}(lmax={self.lmax} res={self.res_beta}x{self.res_alpha} (beta x alpha))"
 
     @property
-    def grid(self):
+    def grid(self) -> torch.Tensor:
         beta, alpha = torch.meshgrid(self.betas, self.alphas, indexing="ij")
         return o3.angles_to_xyz(alpha, beta)
 
-    def forward(self, x):
+    def forward(self, x) -> torch.Tensor:
         r"""Evaluate
 
         Parameters

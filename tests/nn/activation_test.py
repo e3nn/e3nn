@@ -11,7 +11,7 @@ from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_norma
     "irreps_in,acts",
     [("256x0o", [torch.abs]), ("37x0e", [torch.tanh]), ("4x0e + 3x0o", [torch.nn.functional.silu, torch.abs])],
 )
-def test_activation(irreps_in, acts):
+def test_activation(irreps_in, acts) -> None:
     irreps_in = o3.Irreps(irreps_in)
     a = Activation(irreps_in, acts)
     assert_auto_jitable(a)

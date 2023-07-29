@@ -106,8 +106,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in,
-        irreps_out,
+        irreps_in: o3.Irreps,
+        irreps_out: o3.Irreps,
         *,
         f_in: Optional[int] = None,
         f_out: Optional[int] = None,
@@ -117,7 +117,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         biases: Union[bool, List[bool]] = False,
         path_normalization: str = "element",
         _optimize_einsums: Optional[bool] = None,
-    ):
+    ) -> None:
         super().__init__()
 
         assert path_normalization in ["element", "path"]
@@ -144,7 +144,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
             for i_in, i_out in instructions
         ]
 
-        def alpha(ins):
+        def alpha(ins) -> float:
             x = sum(
                 irreps_in[i.i_in if path_normalization == "element" else ins.i_in].mul
                 for i in instructions
@@ -246,7 +246,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
             output_mask = torch.ones(0)
         self.register_buffer("output_mask", output_mask)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"
 
     def forward(self, features, weight: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None):

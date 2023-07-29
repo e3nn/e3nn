@@ -7,7 +7,7 @@ from e3nn.util.test import assert_auto_jitable
 
 @pytest.mark.parametrize("act", [None, torch.tanh])
 @pytest.mark.parametrize("var_in, var_out, out_act", [(1, 1, False), (1, 1, True), (0.1, 10.0, False), (0.1, 0.05, True)])
-def test_variance(act, var_in, var_out, out_act):
+def test_variance(act, var_in, var_out, out_act) -> None:
     hs = (1000, 500, 1500, 4)
 
     f = FullyConnectedNet(hs, act, var_in, var_out, out_act)
@@ -24,7 +24,7 @@ def test_variance(act, var_in, var_out, out_act):
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires cuda")
-def test_data_parallel():
+def test_data_parallel() -> None:
     fc = torch.nn.DataParallel(FullyConnectedNet([10, 20, 30]).cuda())
     y = fc(torch.randn(32, 10).cuda())
     y.sum().backward()

@@ -25,7 +25,7 @@ def test_submod_tracing() -> None:
             return {"forward": torch.randn(8, 3)}
 
     class ParentMod(torch.nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.child = BadTrace()
 
@@ -52,7 +52,7 @@ def test_submod_scripting() -> None:
                 return x
 
     class ParentMod(torch.nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.child = ScriptSubmod()
 
@@ -86,7 +86,7 @@ def test_compilation() -> None:
 
     # This module can't be compiled directly by TorchScript, since ChildMod is a subclass and calls super() in forward()
     class ContainerMod(torch.nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.submod = ChildMod()
             self.alpha = torch.randn(1).squeeze()
@@ -125,7 +125,7 @@ def test_unsupported() -> None:
         pass
 
     class Supermod(torch.nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self.child = ChildMod()
 

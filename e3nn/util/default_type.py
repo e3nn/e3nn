@@ -11,7 +11,7 @@ import torch.jit
 
 
 # class torch_default_tensor_type(AbstractContextDecoratorManager):
-#     def __init__(self, dtype, device):
+#     def __init__(self, dtype, device) -> None:
 #         super().__init__()
 #         self.saved_ttype = None
 #         self.dtype = dtype
@@ -33,7 +33,7 @@ import torch.jit
 
 
 # class torch_default_dtype(AbstractContextDecoratorManager):
-#     def __init__(self, dtype):
+#     def __init__(self, dtype) -> None:
 #         super().__init__()
 #         self.saved_dtype = None
 #         self.dtype = dtype
@@ -50,7 +50,7 @@ import torch.jit
 
 
 # class torch_default_device(torch_default_tensor_type):
-#     def __init__(self, device):
+#     def __init__(self, device) -> None:
 #         super().__init__(None, device)
 
 
@@ -59,7 +59,7 @@ import torch.jit
 # - dtype and device keyword arguments will be passed to torch_default_tensor_type()
 # """
 #
-#     def __init__(self, dtype=None, device=None):
+#     def __init__(self, dtype=None, device=None) -> None:
 #         super().__init__()
 #         self.dtype = dtype
 #         self.device = device
@@ -78,7 +78,7 @@ import torch.jit
 #         return wrapper
 
 
-def torch_get_default_tensor_type():
+def torch_get_default_tensor_type() -> str:
     return torch.empty(0).type()
 
 

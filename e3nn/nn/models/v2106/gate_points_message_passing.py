@@ -8,7 +8,7 @@ from e3nn.nn import Gate
 from .points_convolution import Convolution
 
 
-def tp_path_exists(irreps_in1, irreps_in2, ir_out):
+def tp_path_exists(irreps_in1, irreps_in2, ir_out) -> bool:
     irreps_in1 = o3.Irreps(irreps_in1).simplify()
     irreps_in2 = o3.Irreps(irreps_in2).simplify()
     ir_out = o3.Irrep(ir_out)
@@ -21,7 +21,7 @@ def tp_path_exists(irreps_in1, irreps_in2, ir_out):
 
 
 class Compose(torch.nn.Module):
-    def __init__(self, first, second):
+    def __init__(self, first, second) -> None:
         super().__init__()
         self.first = first
         self.second = second
@@ -143,13 +143,13 @@ class MessagePassing(torch.nn.Module):
         return node_features
 
 
-def radius_graph(pos, r_max):
+def radius_graph(pos, r_max) -> torch.Tensor:
     # naive version of torch_cluster.radius_graph
     r = torch.cdist(pos, pos)
     return ((r < r_max) & (r > 0)).nonzero().T
 
 
-def test():
+def test() -> None:
     from e3nn.util.test import assert_equivariant, assert_auto_jitable
 
     mp = MessagePassing(

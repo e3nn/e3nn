@@ -7,7 +7,7 @@ from e3nn.util.jit import compile_mode
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized, random_irreps
 
 
-def test_assert_equivariant():
+def test_assert_equivariant() -> None:
     def not_equivariant(x1, x2):
         return x1 * x2
 
@@ -20,7 +20,7 @@ def test_assert_equivariant():
         assert_equivariant(not_equivariant)
 
 
-def test_jit_trace():
+def test_jit_trace() -> None:
     @compile_mode("trace")
     class NotTracable(torch.nn.Module):
         def forward(self, param):
@@ -37,8 +37,8 @@ def test_jit_trace():
         assert_auto_jitable(not_tracable)
 
 
-def test_bad_normalize():
-    def not_normal(x1):
+def test_bad_normalize() -> None:
+    def not_normal(x1) -> float:
         return 870.0 * x1.square().relu()
 
     not_normal.irreps_in = random_irreps(clean=True, allow_empty=False)
@@ -47,7 +47,7 @@ def test_bad_normalize():
         assert_normalized(not_normal)
 
 
-def test_normalized_ident():
+def test_normalized_ident() -> None:
     def ident(x1):
         return x1
 

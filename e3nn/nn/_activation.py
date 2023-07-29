@@ -31,7 +31,7 @@ class Activation(torch.nn.Module):
     256x0o+16x1e
     """
 
-    def __init__(self, irreps_in, acts):
+    def __init__(self, irreps_in, acts) -> None:
         super().__init__()
         irreps_in = o3.Irreps(irreps_in)
         if len(irreps_in) != len(acts):
@@ -74,7 +74,7 @@ class Activation(torch.nn.Module):
         self.acts = torch.nn.ModuleList(acts)
         assert len(self.irreps_in) == len(self.acts)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         acts = "".join(["x" if a is not None else " " for a in self.acts])
         return f"{self.__class__.__name__} [{acts}] ({self.irreps_in} -> {self.irreps_out})"
 

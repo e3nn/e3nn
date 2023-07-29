@@ -38,13 +38,13 @@ def network():
     return f, random_graph
 
 
-def test_convolution_jit(network):
+def test_convolution_jit(network) -> None:
     f, _ = network
     # Get a convolution from the network
     assert_auto_jitable(f.layers[0].first)
 
 
-def test_gate_points_2102_equivariant(network):
+def test_gate_points_2102_equivariant(network) -> None:
     f, random_graph = network
 
     # -- Test equivariance: --
@@ -59,7 +59,7 @@ def test_gate_points_2102_equivariant(network):
     )
 
 
-def test_copy(network):
+def test_copy(network) -> None:
     f, random_graph = network
     fcopy = copy.deepcopy(f)
     g = random_graph()

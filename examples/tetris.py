@@ -12,7 +12,7 @@ from e3nn import o3
 from e3nn.nn.models.v2106.gate_points_networks import SimpleNetwork
 
 
-def tetris():
+def tetris() -> None:
     pos = [
         [(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)],  # chiral_shape_1
         [(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, -1, 0)],  # chiral_shape_2
@@ -52,7 +52,7 @@ def make_batch(pos):
     return next(iter(DataLoader(dataset, batch_size=len(dataset))))
 
 
-def Network():
+def Network() -> None:
     return SimpleNetwork(
         irreps_in="0e",
         irreps_out="0o + 6x0e",
@@ -62,7 +62,7 @@ def Network():
     )
 
 
-def main():
+def main() -> None:
     x, y = tetris()
     train_x, train_y = make_batch(x[1:]), y[1:]  # dont train on both chiral shapes
 
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     main()
 
 
-def test():
+def test() -> None:
     torch.set_default_dtype(torch.float64)
 
     data, labels = tetris()
@@ -120,7 +120,7 @@ def test():
     assert error.abs().max() < 1e-10
 
 
-def profile():
+def profile() -> None:
     data, labels = tetris()
     data = make_batch(data)
     data = data.to(device="cuda")
@@ -133,7 +133,7 @@ def profile():
 
     called_num = [0]
 
-    def trace_handler(p):
+    def trace_handler(p) -> None:
         print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
         p.export_chrome_trace("test_trace_" + str(called_num[0]) + ".json")
         called_num[0] += 1

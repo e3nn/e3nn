@@ -1,7 +1,7 @@
 import e3nn
 
 
-def test_opt_defaults():
+def test_opt_defaults() -> None:
     a = e3nn.o3.FullyConnectedTensorProduct("4x1o", "4x1o", "4x1o")
     b = e3nn.o3.Linear("4x1o", "4x1o")
     assert a._specialized_code

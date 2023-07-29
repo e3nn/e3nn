@@ -45,7 +45,7 @@ class FullyConnectedTensorProduct(TensorProduct):
 
     def __init__(
         self, irreps_in1, irreps_in2, irreps_out, irrep_normalization: str = None, path_normalization: str = None, **kwargs
-    ):
+    ) -> None:
         irreps_in1 = o3.Irreps(irreps_in1)
         irreps_in2 = o3.Irreps(irreps_in2)
         irreps_out = o3.Irreps(irreps_out)
@@ -101,7 +101,7 @@ class ElementwiseTensorProduct(TensorProduct):
 
     """
 
-    def __init__(self, irreps_in1, irreps_in2, filter_ir_out=None, irrep_normalization: str = None, **kwargs):
+    def __init__(self, irreps_in1, irreps_in2, filter_ir_out=None, irrep_normalization: str = None, **kwargs) -> None:
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -178,7 +178,7 @@ class FullTensorProduct(TensorProduct):
         filter_ir_out: Iterator[o3.Irrep] = None,
         irrep_normalization: str = None,
         **kwargs,
-    ):
+    ) -> None:
 
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
@@ -373,7 +373,7 @@ class TensorSquare(TensorProduct):
         filter_ir_out: Iterator[o3.Irrep] = None,
         irrep_normalization: str = None,
         **kwargs,
-    ):
+    ) -> None:
 
         if irrep_normalization is None:
             irrep_normalization = "component"
@@ -401,7 +401,7 @@ class TensorSquare(TensorProduct):
 
         super().__init__(irreps_in, irreps_in, irreps_out, instr, irrep_normalization="none", **kwargs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         npath = sum(prod(i.path_shape) for i in self.instructions)
         return (
             f"{self.__class__.__name__}"

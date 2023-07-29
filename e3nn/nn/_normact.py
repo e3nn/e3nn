@@ -40,12 +40,12 @@ class NormActivation(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in,
+        irreps_in: o3.Irreps,
         scalar_nonlinearity: Callable,
         normalize: bool = True,
         epsilon: Optional[float] = None,
         bias: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         self.irreps_in = o3.Irreps(irreps_in)
         self.irreps_out = o3.Irreps(irreps_in)

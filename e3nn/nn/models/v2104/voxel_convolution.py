@@ -35,7 +35,7 @@ class Convolution(torch.nn.Module):
         size of the pixel in physical units
     """
 
-    def __init__(self, irreps_in, irreps_out, irreps_sh, diameter, num_radial_basis, steps=(1.0, 1.0, 1.0), **kwargs):
+    def __init__(self, irreps_in, irreps_out, irreps_sh, diameter, num_radial_basis, steps=(1.0, 1.0, 1.0), **kwargs) -> None:
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in)
@@ -92,7 +92,7 @@ class Convolution(torch.nn.Module):
 
         self.weight = torch.nn.Parameter(torch.randn(self.num_radial_basis, self.tp.weight_numel))
 
-    def kernel(self):
+    def kernel(self) -> torch.Tensor:
         weight = self.emb @ self.weight
         weight = weight / (self.sh.shape[0] * self.sh.shape[1] * self.sh.shape[2])
         kernel = self.tp.right(self.sh, weight)  # [x, y, z, irreps_in.dim, irreps_out.dim]
@@ -117,7 +117,7 @@ class Convolution(torch.nn.Module):
 
 
 class LowPassFilter(torch.nn.Module):
-    def __init__(self, scale, stride: int = 1, transposed: bool = False, steps=(1, 1, 1)):
+    def __init__(self, scale, stride: int = 1, transposed: bool = False, steps=(1, 1, 1)) -> None:
         super().__init__()
 
         sigma = 0.5 * (scale**2 - 1) ** 0.5
@@ -174,7 +174,7 @@ class LowPassFilter(torch.nn.Module):
         return out
 
 
-def test():
+def test() -> None:
     conv = Convolution(
         "0e + 1e",
         "0e + 1e + 1o + 2e + 2o",

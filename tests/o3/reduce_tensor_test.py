@@ -5,7 +5,7 @@ from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
 
 
-def test_save_load():
+def test_save_load() -> None:
     tp1 = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp1, tmp.name)
@@ -17,7 +17,7 @@ def test_save_load():
     assert torch.allclose(tp1.change_of_basis, tp2.change_of_basis)
 
 
-def test_antisymmetric_matrix(float_tolerance):
+def test_antisymmetric_matrix(float_tolerance) -> None:
     tp = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
@@ -30,7 +30,7 @@ def test_antisymmetric_matrix(float_tolerance):
     assert (Q + torch.einsum("xij->xji", Q)).abs().max() < float_tolerance
 
 
-def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
+def test_reduce_tensor_Levi_Civita_symbol(float_tolerance) -> None:
     tp = o3.ReducedTensorProducts("ijk=-ikj=-jik", i="1e")
     assert tp.irreps_out == o3.Irreps("0e")
 
@@ -45,7 +45,7 @@ def test_reduce_tensor_Levi_Civita_symbol(float_tolerance):
     assert (Q + torch.einsum("xijk->xjik", Q)).abs().max() < float_tolerance
 
 
-def test_reduce_tensor_antisymmetric_L2(float_tolerance):
+def test_reduce_tensor_antisymmetric_L2(float_tolerance) -> None:
     tp = o3.ReducedTensorProducts("ijk=-ikj=-jik", i="2e")
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
@@ -59,7 +59,7 @@ def test_reduce_tensor_antisymmetric_L2(float_tolerance):
     assert (Q + torch.einsum("xijk->xjik", Q)).abs().max() < float_tolerance
 
 
-def test_reduce_tensor_elasticity_tensor(float_tolerance):
+def test_reduce_tensor_elasticity_tensor(float_tolerance) -> None:
     tp = o3.ReducedTensorProducts("ijkl=jikl=klij", i="1e")
     assert tp.irreps_out.dim == 21
 
@@ -75,7 +75,7 @@ def test_reduce_tensor_elasticity_tensor(float_tolerance):
     assert (Q - torch.einsum("xijkl->xklij", Q)).abs().max() < float_tolerance
 
 
-def test_reduce_tensor_elasticity_tensor_parity(float_tolerance):
+def test_reduce_tensor_elasticity_tensor_parity(float_tolerance) -> None:
     tp = o3.ReducedTensorProducts("ijkl=jikl=klij", i="1o")
     assert tp.irreps_out.dim == 21
     assert all(ir.p == 1 for _, ir in tp.irreps_out)

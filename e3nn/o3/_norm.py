@@ -26,7 +26,7 @@ class Norm(torch.nn.Module):
     """
     squared: bool
 
-    def __init__(self, irreps_in, squared: bool = False):
+    def __init__(self, irreps_in, squared: bool = False) -> None:
         super().__init__()
 
         irreps_in = o3.Irreps(irreps_in).simplify()
@@ -40,7 +40,7 @@ class Norm(torch.nn.Module):
         self.irreps_out = irreps_out.simplify()
         self.squared = squared
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.irreps_in})"
 
     def forward(self, features):

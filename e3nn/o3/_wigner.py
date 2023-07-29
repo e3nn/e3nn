@@ -97,7 +97,7 @@ def wigner_D(l: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tenso
     return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
 
 
-def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None):
+def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None) -> torch.Tensor:
     r"""Wigner 3j symbols :math:`C_{lmn}`.
 
     It satisfies the following two properties:
@@ -146,7 +146,7 @@ def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None):
 
 
 @functools.lru_cache(maxsize=None)
-def _so3_clebsch_gordan(l1: int, l2: int, l3: int):
+def _so3_clebsch_gordan(l1: int, l2: int, l3: int) -> torch.Tensor:
     Q1 = change_basis_real_to_complex(l1, dtype=torch.float64)
     Q2 = change_basis_real_to_complex(l2, dtype=torch.float64)
     Q3 = change_basis_real_to_complex(l3, dtype=torch.float64)
@@ -199,7 +199,7 @@ def _so3_clebsch_gordan(l1: int, l2: int, l3: int):
 
 
 @functools.lru_cache(maxsize=None)
-def _su2_clebsch_gordan(j1: Union[int, float], j2: Union[int, float], j3: Union[int, float]):
+def _su2_clebsch_gordan(j1: Union[int, float], j2: Union[int, float], j3: Union[int, float]) -> torch.Tensor:
     """Calculates the Clebsch-Gordon matrix
     for SU(2) coupling j1 and j2 to give j3.
     Parameters

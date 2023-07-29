@@ -15,7 +15,7 @@ class Identity(torch.nn.Module):
     irreps_out : `e3nn.o3.Irreps`
     """
 
-    def __init__(self, irreps_in, irreps_out):
+    def __init__(self, irreps_in, irreps_out) -> None:
         super().__init__()
 
         self.irreps_in = o3.Irreps(irreps_in).simplify()
@@ -26,7 +26,7 @@ class Identity(torch.nn.Module):
         output_mask = torch.cat([torch.ones(mul * (2 * l + 1)) for mul, (l, _p) in self.irreps_out])
         self.register_buffer("output_mask", output_mask)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out})"
 
     def forward(

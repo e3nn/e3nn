@@ -25,7 +25,7 @@ class SO3Activation(torch.nn.Module):
     normalization : {'norm', 'component'}
     """
 
-    def __init__(self, lmax_in, lmax_out, act, resolution, *, normalization: str = "component", aspect_ratio: int = 2):
+    def __init__(self, lmax_in, lmax_out, act, resolution, *, normalization: str = "component", aspect_ratio: int = 2) -> None:
         super().__init__()
 
         self.grid_in = SO3Grid(lmax_in, resolution, normalization=normalization, aspect_ratio=aspect_ratio)
@@ -35,10 +35,10 @@ class SO3Activation(torch.nn.Module):
         self.lmax_in = lmax_in
         self.lmax_out = lmax_out
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__} ({self.lmax_in} -> {self.lmax_out})"
 
-    def forward(self, features):
+    def forward(self, features) -> torch.Tensor:
         r"""evaluate
 
         Parameters

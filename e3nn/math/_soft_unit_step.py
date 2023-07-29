@@ -5,7 +5,7 @@ class _SoftUnitStep(torch.autograd.Function):
     # pylint: disable=arguments-differ
 
     @staticmethod
-    def forward(ctx, x):
+    def forward(ctx, x) -> torch.Tensor:
         ctx.save_for_backward(x)
         y = torch.zeros_like(x)
         m = x > 0.0
@@ -13,7 +13,7 @@ class _SoftUnitStep(torch.autograd.Function):
         return y
 
     @staticmethod
-    def backward(ctx, dy):
+    def backward(ctx, dy) -> torch.Tensor:
         (x,) = ctx.saved_tensors
         dx = torch.zeros_like(x)
         m = x > 0.0

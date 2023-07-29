@@ -491,7 +491,7 @@ def assert_normalized(
             )
 
 
-def set_random_seeds():
+def set_random_seeds() -> None:
     """Set the random seeds to try to get some reproducibility"""
     torch.manual_seed(0)
     random.seed(0)

@@ -37,7 +37,7 @@ def rotate_sparse_tensor(x, irreps, abc):
 
 
 @pytest.mark.parametrize("abc", rotations)
-def test_equivariance(abc):
+def test_equivariance(abc) -> None:
     pytest.importorskip("MinkowskiEngine")
 
     from MinkowskiEngine import SparseTensor

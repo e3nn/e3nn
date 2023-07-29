@@ -12,7 +12,7 @@ from e3nn import o3
 class Extract(CodeGenMixin, torch.nn.Module):
     # pylint: disable=abstract-method
 
-    def __init__(self, irreps_in, irreps_outs, instructions, squeeze_out: bool = False):
+    def __init__(self, irreps_in, irreps_outs, instructions, squeeze_out: bool = False) -> None:
         r"""Extract sub sets of irreps
 
         Parameters
@@ -81,7 +81,7 @@ class Extract(CodeGenMixin, torch.nn.Module):
 class ExtractIr(Extract):
     # pylint: disable=abstract-method
 
-    def __init__(self, irreps_in, ir):
+    def __init__(self, irreps_in, ir) -> None:
         r"""Extract ``ir`` from irreps
 
         Parameters

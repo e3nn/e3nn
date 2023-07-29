@@ -3,7 +3,7 @@ import torch
 from e3nn import o3
 
 
-def test_xyz(float_tolerance):
+def test_xyz(float_tolerance) -> None:
     R = o3.rand_matrix(10)
     assert (R @ R.transpose(-1, -2) - torch.eye(3)).abs().max() < float_tolerance
 
@@ -17,7 +17,7 @@ def test_xyz(float_tolerance):
     assert (b - b2).abs().max() < float_tolerance
 
 
-def test_conversions(float_tolerance):
+def test_conversions(float_tolerance) -> None:
     def wrap(f):
         def g(x):
             if isinstance(x, tuple):
@@ -48,7 +48,7 @@ def test_conversions(float_tolerance):
     assert (R1 - R2).abs().median() < float_tolerance
 
 
-def test_compose(float_tolerance):
+def test_compose(float_tolerance) -> None:
     q1 = o3.rand_quaternion(10)
     q2 = o3.rand_quaternion(10)
 
@@ -79,7 +79,7 @@ def test_compose(float_tolerance):
     assert (R1 - R4).abs().max().median() < float_tolerance
 
 
-def test_inverse_angles(float_tolerance):
+def test_inverse_angles(float_tolerance) -> None:
     a = o3.rand_angles()
     b = o3.inverse_angles(*a)
     c = o3.compose_angles(*a, *b)
@@ -93,7 +93,7 @@ def test_inverse_angles(float_tolerance):
     assert e[0].grad is not None
 
 
-def test_rand_axis_angle():
+def test_rand_axis_angle() -> None:
     axis, angle = o3.rand_axis_angle(1_000_000)
     x = o3.axis_angle_to_matrix(axis, angle) @ torch.tensor([0.2, 0.5, 0.3])
     assert x[:, 0].mean().max() < 0.005
@@ -101,7 +101,7 @@ def test_rand_axis_angle():
     assert x[:, 2].mean().max() < 0.005
 
 
-def test_matrix_xyz(float_tolerance):
+def test_matrix_xyz(float_tolerance) -> None:
     x = torch.randn(100, 3)
 
     y = torch.einsum("zij,zj->zi", o3.matrix_x(torch.randn(100)), x)

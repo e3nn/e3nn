@@ -88,7 +88,7 @@ class CodeGenMixin:
             out["__codegen__"] = codegen_state
         return out
 
-    def __setstate__(self, d):
+    def __setstate__(self, d) -> None:
         d = d.copy()
         # We don't want to add this to the object when we call super's __setstate__
         codegen_state = d.pop("__codegen__", None)

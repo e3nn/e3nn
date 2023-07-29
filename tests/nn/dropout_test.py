@@ -6,7 +6,7 @@ from e3nn.nn import Dropout
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
 
 
-def test_dropout():
+def test_dropout() -> None:
     c = Dropout(irreps="10x1e + 10x0e", p=0.75)
     x = c.irreps.randn(5, 2, -1)
 
@@ -25,6 +25,6 @@ def test_dropout():
         assert_equivariant(wrap, args_in=[x], irreps_in=[c.irreps], irreps_out=[c.irreps])
 
 
-def test_copy():
+def test_copy() -> None:
     c = Dropout(irreps="0e + 1e", p=0.5)
     _ = copy.deepcopy(c)

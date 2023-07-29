@@ -1,5 +1,6 @@
 from math import pi
 from collections import namedtuple
+from typing import Tuple
 
 import scipy.signal
 import torch
@@ -263,7 +264,7 @@ class SphericalTensor(o3.Irreps):
 
         return s2(val)
 
-    def norms(self, signal):
+    def norms(self, signal) -> torch.Tensor:
         r"""The norms of each l component
 
         Parameters
@@ -291,7 +292,7 @@ class SphericalTensor(o3.Irreps):
             i += ir.dim
         return torch.stack(norms, dim=-1)
 
-    def signal_xyz(self, signal, r):
+    def signal_xyz(self, signal, r) -> torch.Tensor:
         r"""Evaluate the signal on given points on the sphere
 
         .. math::
@@ -352,18 +353,18 @@ class SphericalTensor(o3.Irreps):
         for signal, center in zip(signals, centers):
             r, f = self.plot(signal, center, res, radius, relu, normalization)
             traces += [
-                dict(
-                    x=r[:, :, 0].numpy(),
-                    y=r[:, :, 1].numpy(),
-                    z=r[:, :, 2].numpy(),
-                    surfacecolor=f.numpy(),
-                )
+                {
+                    "x": r[:, :, 0].numpy(),
+                    "y": r[:, :, 1].numpy(),
+                    "z": r[:, :, 2].numpy(),
+                    "surfacecolor": f.numpy(),
+                }
             ]
         return traces
 
     def plot(
         self, signal, center=None, res: int = 100, radius: bool = True, relu: bool = False, normalization: str = "integral"
-    ):
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""Create surface in order to make a plot"""
         assert signal.dim() == 1
 
@@ -388,7 +389,7 @@ class SphericalTensor(o3.Irreps):
 
         return r, f
 
-    def find_peaks(self, signal, res: int = 100):
+    def find_peaks(self, signal, res: int = 100) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""Locate peaks on the sphere
 
         Examples

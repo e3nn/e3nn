@@ -3,7 +3,7 @@ import torch
 from e3nn.math import soft_unit_step
 
 
-def test_grad():
+def test_grad() -> None:
     torch.set_default_dtype(torch.float64)
     x = torch.linspace(-1, 1, 1000, requires_grad=True)
 
@@ -13,7 +13,7 @@ def test_grad():
     assert torch.autograd.gradcheck(f, (x,), check_undefined_grad=False)
 
 
-def test_grads():
+def test_grads() -> None:
     x = torch.linspace(-1, 1, 1000, requires_grad=True)
 
     y0 = soft_unit_step(x)

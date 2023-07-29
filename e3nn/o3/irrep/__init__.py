@@ -16,7 +16,7 @@ True
 from .._irreps import Irrep
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Irrep:
     r"""Creates an Irreps obeject by reflection
 
     Parameters

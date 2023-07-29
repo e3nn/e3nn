@@ -52,7 +52,7 @@ def random_params(n: int = 25):
 
 
 @pytest.mark.parametrize("l1, p1, l2, p2, lo, po, mode, weight", random_params())
-def test_bilinear_right_variance_equivariance(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight):
+def test_bilinear_right_variance_equivariance(float_tolerance, l1, p1, l2, p2, lo, po, mode, weight) -> None:
     eps = float_tolerance
     n = 1_500
     tol = 3.0
@@ -97,7 +97,7 @@ def test_bilinear_right_variance_equivariance(float_tolerance, l1, p1, l2, p2, l
 # This is a fairly expensive test, so we don't run too many configs
 @pytest.mark.parametrize("path_normalization", ["element", "path"])
 @pytest.mark.parametrize("l1, p1, l2, p2, lo, po, mode, weight", random_params(n=8))
-def test_normalized(l1, p1, l2, p2, lo, po, mode, weight, path_normalization):
+def test_normalized(l1, p1, l2, p2, lo, po, mode, weight, path_normalization) -> None:
     if torch.get_default_dtype() != torch.float32:
         pytest.skip("No reason to run expensive normalization tests again at float64 expense.")
     # Explicit fixed path weights screw with the output normalization,
@@ -109,7 +109,7 @@ def test_normalized(l1, p1, l2, p2, lo, po, mode, weight, path_normalization):
     assert_normalized(m, n_weight=100, n_input=10_000, atol=0.5)
 
 
-def test_empty():
+def test_empty() -> None:
     m = TensorProduct(
         "0x0e + 1o + 2e",
         "0e + 1o + 2e",
@@ -142,7 +142,7 @@ def test_empty():
         ("uuw", False),
     ],
 )
-def test_specialized_code(normalization, mode, weighted, float_tolerance):
+def test_specialized_code(normalization, mode, weighted, float_tolerance) -> None:
     irreps_in1 = Irreps("4x0e + 4x1e + 4x2e")
     irreps_in2 = Irreps("5x0e + 5x1e + 5x2e")
     irreps_out = Irreps("6x0e + 6x1e + 6x2e")
@@ -198,13 +198,13 @@ def test_specialized_code(normalization, mode, weighted, float_tolerance):
     assert (tp1.right(y) - tp2.right(y)).abs().max() < float_tolerance
 
 
-def test_empty_irreps():
+def test_empty_irreps() -> None:
     tp = FullyConnectedTensorProduct("0e + 1e", Irreps([]), "0e + 1e")
     out = tp(torch.randn(1, 2, 4), torch.randn(2, 1, 0))
     assert out.shape == (2, 2, 4)
 
 
-def test_single_out():
+def test_single_out() -> None:
     tp1 = TensorProduct("5x0e", "5x0e", "5x0e", [(0, 0, 0, "uvw", True, 1.0)])
     tp2 = TensorProduct("5x0e", "5x0e", "5x0e + 3x0o", [(0, 0, 0, "uvw", True, 1.0)])
     with torch.no_grad():
@@ -218,7 +218,7 @@ def test_single_out():
     assert torch.all(out2[:, 5:] == 0)
 
 
-def test_empty_inputs():
+def test_empty_inputs() -> None:
     tp = FullyConnectedTensorProduct("0e + 1e", "0e + 1e", "0e + 1e", compile_right=True)
     out = tp(torch.randn(2, 1, 0, 1, 4), torch.randn(1, 2, 0, 3, 4))
     assert out.shape == (2, 2, 0, 3, 4)
@@ -230,7 +230,7 @@ def test_empty_inputs():
 @pytest.mark.parametrize("l1, p1, l2, p2, lo, po, mode, weight", random_params(n=2))
 @pytest.mark.parametrize("special_code", [True, False])
 @pytest.mark.parametrize("opt_ein", [True, False])
-def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
+def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein) -> None:
     """Test the JIT.
 
     This test is seperate from test_optimizations to ensure that just jitting a model has minimal error if any.
@@ -259,7 +259,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein):
 @pytest.mark.parametrize("special_code", [True, False])
 @pytest.mark.parametrize("opt_ein", [True, False])
 @pytest.mark.parametrize("jit", [True, False])
-def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance):
+def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance) -> None:
     orig_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=False, _optimize_einsums=False)
     opt_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
     # We don't use state_dict here since that contains things like wigners that
@@ -293,7 +293,7 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
     assert opt_tp(x1, x2).dtype == other_dtype
 
 
-def test_input_weights_python():
+def test_input_weights_python() -> None:
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
@@ -313,7 +313,7 @@ def test_input_weights_python():
     m(x1, x2, w)
 
 
-def test_input_weights_jit():
+def test_input_weights_jit() -> None:
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
@@ -371,7 +371,7 @@ def test_input_weights_jit():
     assert torch.allclose(m(x1, x2, w), traced(x1, x2, w))
 
 
-def test_weight_view_for_instruction():
+def test_weight_view_for_instruction() -> None:
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
@@ -390,7 +390,7 @@ def test_weight_view_for_instruction():
     assert torch.any(out[:, 1:] > 0.0)
 
 
-def test_weight_views():
+def test_weight_views() -> None:
     irreps_in1 = Irreps("1e + 2e + 3x3o")
     irreps_in2 = Irreps("1e + 2e + 3x3o")
     irreps_out = Irreps("1e + 2e + 3x3o")
@@ -414,7 +414,7 @@ def test_weight_views():
 
 
 @pytest.mark.parametrize("l1, p1, l2, p2, lo, po, mode, weight", random_params(n=1))
-def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
+def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
     x1 = torch.randn(2, tp.irreps_in1.dim)
     x2 = torch.randn(2, tp.irreps_in2.dim)
@@ -425,7 +425,7 @@ def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight):
 
 
 @pytest.mark.parametrize("l1, p1, l2, p2, lo, po, mode, weight", random_params(n=1))
-def test_save(l1, p1, l2, p2, lo, po, mode, weight):
+def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
@@ -451,7 +451,7 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight):
     assert torch.allclose(res1, res4)
 
 
-def test_triu_mode():
+def test_triu_mode() -> None:
     tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
     tp(torch.randn(2, 10), torch.randn(2, 10))
 
