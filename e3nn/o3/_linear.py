@@ -51,8 +51,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
         explicitly set to ``False``, for consistancy with `e3nn.o3.TensorProduct`.
 
     shared_weights : bool
-        whether the `e3nn.o3.Linear` should be weighted individually for each input in a batch. Defaults to ``False``.
-        Cannot be ``True`` if ``internal_weights`` is ``True``.
+        whether the `e3nn.o3.Linear` should be weighted individually for each input in a batch. Defaults to ``True``.
+        Cannot be ``False`` if ``internal_weights`` is ``True``.
 
     instructions : list of 2-tuples, optional
         list of tuples ``(i_in, i_out)`` indicating which irreps in ``irreps_in`` should contribute to which irreps in
