@@ -102,7 +102,6 @@ class ElementwiseTensorProduct(TensorProduct):
     """
 
     def __init__(self, irreps_in1, irreps_in2, filter_ir_out=None, irrep_normalization: str = None, **kwargs) -> None:
-
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         if filter_ir_out is not None:
@@ -135,7 +134,6 @@ class ElementwiseTensorProduct(TensorProduct):
         for i, ((mul, ir_1), (mul_2, ir_2)) in enumerate(zip(irreps_in1, irreps_in2)):
             assert mul == mul_2
             for ir in ir_1 * ir_2:
-
                 if filter_ir_out is not None and ir not in filter_ir_out:
                     continue
 
@@ -179,7 +177,6 @@ class FullTensorProduct(TensorProduct):
         irrep_normalization: str = None,
         **kwargs,
     ) -> None:
-
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
         if filter_ir_out is not None:
@@ -193,7 +190,6 @@ class FullTensorProduct(TensorProduct):
         for i_1, (mul_1, ir_1) in enumerate(irreps_in1):
             for i_2, (mul_2, ir_2) in enumerate(irreps_in2):
                 for ir_out in ir_1 * ir_2:
-
                     if filter_ir_out is not None and ir_out not in filter_ir_out:
                         continue
 
@@ -238,7 +234,6 @@ def _square_instructions_full(irreps_in, filter_ir_out=None, irrep_normalization
     for i_1, (mul_1, ir_1) in enumerate(irreps_in):
         for i_2, (mul_2, ir_2) in enumerate(irreps_in):
             for ir_out in ir_1 * ir_2:
-
                 if filter_ir_out is not None and ir_out not in filter_ir_out:
                     continue
 
@@ -311,7 +306,6 @@ def _square_instructions_fully_connected(irreps_in, irreps_out, irrep_normalizat
         for i_2, (_mul_2, ir_2) in enumerate(irreps_in):
             for i_out, (_mul_out, ir_out) in enumerate(irreps_out):
                 if ir_out in ir_1 * ir_2:
-
                     if irrep_normalization == "component":
                         alpha = ir_out.dim
                     if irrep_normalization == "norm":
@@ -374,7 +368,6 @@ class TensorSquare(TensorProduct):
         irrep_normalization: str = None,
         **kwargs,
     ) -> None:
-
         if irrep_normalization is None:
             irrep_normalization = "component"
 

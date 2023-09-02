@@ -199,7 +199,6 @@ def main() -> None:
     no_rotate = {"train": args.no_rotate_train, "test": args.no_rotate_test}
 
     for label, data in zip(["train", "test"], [mnist_train, mnist_test]):
-
         print(f"projecting {label} data set")
         current = 0
         signals = data["images"].reshape(-1, 28, 28).astype(np.float64)
@@ -207,7 +206,6 @@ def main() -> None:
         projections = np.ndarray((signals.shape[0], 2 * args.bandwidth, 2 * args.bandwidth), dtype=np.uint8)
 
         while current < n_signals:
-
             if not no_rotate[label]:
                 rot = rand_rotation_matrix(deflection=args.noise)
                 rotated_grid = rotate_grid(rot, grid)
