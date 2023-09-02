@@ -135,7 +135,6 @@ LEARNING_RATE = 5e-3
 
 
 def load_data(path, batch_size):
-
     with gzip.open(path, "rb") as f:
         dataset = pickle.load(f)
 
@@ -192,7 +191,6 @@ def main() -> None:
         correct = 0
         total = 0
         for images, labels in test_loader:
-
             classifier.eval()
 
             with torch.no_grad():

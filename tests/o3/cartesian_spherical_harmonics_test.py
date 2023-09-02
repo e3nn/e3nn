@@ -77,7 +77,6 @@ def test_backwardable() -> None:
 
 @pytest.mark.parametrize("l", range(10 + 1))
 def test_normalization(float_tolerance, l) -> None:
-
     n = o3.spherical_harmonics(l, torch.randn(3), normalize=True, normalization="integral").pow(2).mean()
     assert abs(n - 1 / (4 * math.pi)) < float_tolerance
 
