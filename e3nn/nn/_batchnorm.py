@@ -32,6 +32,12 @@ class BatchNorm(nn.Module):
 
     instance : bool
         apply instance norm instead of batch norm
+
+    include_bias : bool
+        include a bias term for batch norm of scalars
+
+    normalization : str
+        which normalization method to apply (i.e., `norm` or `component`)
     """
 
     __constants__ = ["instance", "normalization", "irs", "affine"]
@@ -44,6 +50,7 @@ class BatchNorm(nn.Module):
         affine: bool = True,
         reduce: str = "mean",
         instance: bool = False,
+        include_bias: bool = True,
         normalization: str = "component",
     ) -> None:
         super().__init__()
@@ -53,6 +60,7 @@ class BatchNorm(nn.Module):
         self.momentum = momentum
         self.affine = affine
         self.instance = instance
+        self.include_bias = include_bias
 
         num_scalar = sum(mul for mul, ir in self.irreps if ir.is_scalar())
         num_features = self.irreps.num_irreps
@@ -67,10 +75,12 @@ class BatchNorm(nn.Module):
 
         if affine:
             self.weight = nn.Parameter(torch.ones(num_features))
-            self.bias = nn.Parameter(torch.zeros(num_scalar))
+            if self.include_bias:
+                self.bias = nn.Parameter(torch.zeros(num_scalar))
         else:
             self.register_parameter("weight", None)
-            self.register_parameter("bias", None)
+            if self.include_bias:
+                self.register_parameter("bias", None)
 
         assert isinstance(reduce, str), "reduce should be passed as a string value"
         assert reduce in ["mean", "max"], "reduce needs to be 'mean' or 'max'"
@@ -171,7 +181,7 @@ class BatchNorm(nn.Module):
 
             field = field * field_norm.reshape(-1, 1, mul, 1)  # [batch, sample, mul, repr]
 
-            if self.affine and is_scalar:
+            if self.affine and self.include_bias and is_scalar:
                 bias = self.bias[ib : ib + mul]  # [mul]
                 ib += mul
                 field += bias.reshape(mul, 1)  # [batch, sample, mul, repr]
@@ -185,7 +195,8 @@ class BatchNorm(nn.Module):
             torch._assert(irv == self.running_var.size(0), "irv == self.running_var.size(0)")
         if self.affine:
             torch._assert(iw == self.weight.size(0), "iw == self.weight.size(0)")
-            torch._assert(ib == self.bias.numel(), "ib == self.bias.numel()")
+            if self.include_bias:
+                torch._assert(ib == self.bias.numel(), "ib == self.bias.numel()")
 
         if self.training and not self.instance:
             if len(new_means) > 0:
