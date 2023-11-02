@@ -146,7 +146,7 @@ def get_B(max_degree, device: str = "cpu", dtype=torch.float64):
         torch.Tensor: A tensor representing the 'B' coefficients.
     """
     # Retrieve cached values
-    k, l, m, _, _ = get_klm(max_degree, device=device, dtype=torch.long)  # Use abs(m)
+    _, l, m, _, _ = get_klm(max_degree, device=device, dtype=torch.long)  # Use abs(m)
     factorial = get_factorial(2 * max_degree, device=device, dtype=dtype)
     A = get_A(max_degree, device=device, dtype=dtype)
 
@@ -171,8 +171,8 @@ def calc_Ylm_jit(x: torch.Tensor, B: torch.Tensor, m: torch.Tensor, power: torch
     """
     # Preliminary calculations
     r = torch.norm(x, dim=1, keepdim=True)
-    cos_theta = x[..., 2:3] / r
-    phi = torch.atan2(x[..., 1:2], x[..., 0:1])
+    cos_theta = x[..., 1:2] / r
+    phi = torch.atan2(x[..., 0:1], x[..., 2:3])
 
     # Calcuate coeff * Associated Legndre Polynomial
     cos_pows = cos_theta ** power.unsqueeze(1)
@@ -201,10 +201,10 @@ def calc_Ylm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
     # Retrieve cached values
     device = x.device
     dtype = x.dtype
-    len_x = len(x)
     B = get_B(max_degree, device=device, dtype=dtype)
     _, _, m, power, mask = get_klm(max_degree, device=device, dtype=torch.long)
 
     # Calculate
+    x = x[:[2, 0, 1]]
     Ylm = calc_Ylm_jit(x, B, m, power, mask)
     return Ylm
