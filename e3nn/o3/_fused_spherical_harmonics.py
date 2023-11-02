@@ -128,9 +128,10 @@ def calc_Plm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
     # Retrieve cached values
     device = x.device
     dtype = x.dtype
-    B = get_A(max_degree, device=device, dtype=dtype)
+    A = get_A(max_degree, device=device, dtype=dtype)
     _, _, m, power, _ = get_klm(max_degree, device=device, dtype=torch.long)
-
+    Plm = calc_Plm_jit(x, A, m, power)
+    return Plm
 
 @cache
 def get_B(max_degree, device: str = "cpu", dtype=torch.float64):
