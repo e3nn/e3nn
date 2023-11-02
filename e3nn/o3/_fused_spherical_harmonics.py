@@ -11,7 +11,6 @@ are stored for repeated use. The JIT-compiled functions offer optimized computat
 for these mathematical constructs essential in fields such as quantum mechanics,
 electromagnetics, and computer graphics.
 """
-
 from functools import cache
 import math
 from typing import Tuple
@@ -133,6 +132,7 @@ def calc_Plm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
     Plm = calc_Plm_jit(x, A, m, power)
     return Plm
 
+
 @cache
 def get_B(max_degree, device: str = "cpu", dtype=torch.float64):
     """Calculate and cache the 'B' coefficients used in the spherical harmonics calculation.
@@ -169,26 +169,6 @@ def calc_Ylm_jit(x: torch.Tensor, B: torch.Tensor, m: torch.Tensor, power: torch
     Returns:
         torch.Tensor: The computed spherical harmonics for the input tensor 'x'.
     """
-    # Preliminary calculations
-    r = torch.norm(x, dim=1, keepdim=True)
-    cos_theta = x[..., 2:3] / r
-    phi = torch.atan2(x[..., 1:2], x[..., 0:1])
-
-    # Calcuate coeff * Associated Legndre Polynomial
-    cos_pows = cos_theta ** power.unsqueeze(1)
-    pre_Plm = (cos_pows @ B.unsqueeze(2)).squeeze(2).T
-    sin_pows = torch.sqrt(1 - cos_theta**2) ** m.T
-    Plm = pre_Plm * sin_pows
-
-    # Do the cases
-    m_phi = m.T * phi
-    cos_values = torch.cos(m_phi)
-    sin_values = torch.sin(m_phi)
-    cases = torch.where(mask.T, cos_values, sin_values)
-    return Plm * cases
-
-
-def calc_Ylm_jit(x: torch.Tensor, B: torch.Tensor, m: torch.Tensor, power: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     # Preliminary calculations
     r = torch.norm(x, dim=1, keepdim=True)
     cos_theta = x[..., 2:3] / r
