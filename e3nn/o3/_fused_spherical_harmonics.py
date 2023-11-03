@@ -19,19 +19,19 @@ import torch
 
 
 @cache
-def get_klm(max_deg: int, device: str = "cpu", dtype=torch.long) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def get_klm(degree: int, device: str = "cpu", dtype=torch.long) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Calculate and cache the values of k, l, and m for the spherical harmonics calculation.
 
     Args:
-        max_deg (int): The maximum degree for the spherical harmonics.
+        degree (int): The maximum degree -1 for the spherical harmonics.
         device (str, optional): The device on which to perform calculations. Default is 'cpu'.
         dtype (torch.dtype, optional): The data type for the tensors. Default is torch.long.
 
     Returns:
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Tensors representing k, l, m, power, and mask.
     """
-    k = torch.arange(max_deg + 1, device=device, dtype=dtype).unsqueeze(0)
-    lm_list = [[d, m] for d in range(max_deg + 1) for m in range(-d, d + 1)]
+    k = torch.arange(degree, device=device, dtype=dtype).unsqueeze(0)
+    lm_list = [[d, m] for d in range(degree) for m in range(-d, d + 1)]
     l, m = torch.tensor(lm_list, device=device, dtype=dtype).T.reshape(2, -1, 1)
     mask = m >= 0
     m = torch.abs(m)
@@ -53,7 +53,7 @@ def get_factorial(N, nan=False, device: str = "cpu", dtype=torch.float64):
     Returns:
         torch.Tensor: A tensor of factorials from 0 to N, with optional NaN appended.
     """
-    ints = torch.arange(N + 1, device=device, dtype=dtype)
+    ints = torch.arange(N, device=device, dtype=dtype)
     ints[0] = 1  # Make sure that factorial(0) = 1
     factorial = torch.cumprod(ints, dim=0)
     if not nan:
@@ -63,12 +63,12 @@ def get_factorial(N, nan=False, device: str = "cpu", dtype=torch.float64):
 
 
 @cache
-def get_A(max_degree: int, device: str = "cpu", dtype=torch.float64) -> torch.tensor:
+def get_A(degree: int, device: str = "cpu", dtype=torch.float64) -> torch.tensor:
     """Calculate and cache the 'A' coefficients used in the spherical harmonics and
     associated Legendre polynomials calculations.
 
     Args:
-        max_degree (int): The maximum degree for the spherical harmonics and associated
+        degree (int): The maximum degree -1 for the spherical harmonics and associated
                           Legendre polynomials.
         device (str, optional): The device on which to perform calculations. Default is 'cpu'.
         dtype (torch.dtype, optional): The data type for the tensors. Default is torch.float64.
@@ -78,8 +78,8 @@ def get_A(max_degree: int, device: str = "cpu", dtype=torch.float64) -> torch.te
                       and associated Legendre polynomials.
     """
     # Retrieve cached values
-    k, l, m, _, _ = get_klm(max_degree, device=device, dtype=torch.long)  # Use abs_m
-    factorial = get_factorial(2 * max_degree, nan=True, device=device, dtype=dtype)  # dtype!=long for nan=True
+    k, l, m, _, _ = get_klm(degree, device=device, dtype=torch.long)  # Use abs_m
+    factorial = get_factorial(2 * degree, nan=True, device=device, dtype=dtype)  # dtype!=long for nan=True
 
     # Calculate
     A = (
@@ -112,12 +112,12 @@ def calc_Plm_jit(x: torch.Tensor, A: torch.Tensor, m: torch.Tensor, power: torch
     return Plm
 
 
-def calc_Plm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
-    """Compute the associated Legendre polynomials of degree up to `max_degree` for
+def calc_Plm(degree: int, x: torch.Tensor) -> torch.Tensor:
+    """Compute the associated Legendre polynomials of degree up to `degree` for
     a batch of cos(theta) values `x`.
 
     Args:
-        max_degree (int): The maximum degree for the associated Legendre polynomials calculation.
+        degree (int): The maximum degree -1 for the associated Legendre polynomials calculation.
         x (torch.Tensor): The input tensor containing the cos(theta) values for which to
                           calculate the associated Legendre polynomials.
 
@@ -127,18 +127,18 @@ def calc_Plm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
     # Retrieve cached values
     device = x.device
     dtype = x.dtype
-    A = get_A(max_degree, device=device, dtype=dtype)
-    _, _, m, power, _ = get_klm(max_degree, device=device, dtype=torch.long)
+    A = get_A(degree, device=device, dtype=dtype)
+    _, _, m, power, _ = get_klm(degree, device=device, dtype=torch.long)
     Plm = calc_Plm_jit(x, A, m, power)
     return Plm
 
 
 @cache
-def get_B(max_degree, device: str = "cpu", dtype=torch.float64):
+def get_B(degree, device: str = "cpu", dtype=torch.float64):
     """Calculate and cache the 'B' coefficients used in the spherical harmonics calculation.
 
     Args:
-        max_degree (int): The maximum degree for the spherical harmonics.
+        degree (int): The maximum degree -1 for the spherical harmonics.
         device (str, optional): The device on which to perform calculations. Default is 'cpu'.
         dtype (torch.dtype, optional): The data type for the tensors. Default is torch.float64.
 
@@ -146,9 +146,9 @@ def get_B(max_degree, device: str = "cpu", dtype=torch.float64):
         torch.Tensor: A tensor representing the 'B' coefficients.
     """
     # Retrieve cached values
-    _, l, m, _, _ = get_klm(max_degree, device=device, dtype=torch.long)  # Use abs(m)
-    factorial = get_factorial(2 * max_degree, device=device, dtype=dtype)
-    A = get_A(max_degree, device=device, dtype=dtype)
+    _, l, m, _, _ = get_klm(degree, device=device, dtype=torch.long)  # Use abs(m)
+    factorial = get_factorial(2 * degree, device=device, dtype=dtype)
+    A = get_A(degree, device=device, dtype=dtype)
 
     # Calculate
     B = A * (-1) ** m * 2 ** ((m != 0) / 2) * torch.sqrt((2 * l + 1) / (4 * math.pi) * factorial[l - m] / factorial[l + m])
@@ -188,11 +188,11 @@ def calc_Ylm_jit(x: torch.Tensor, B: torch.Tensor, m: torch.Tensor, power: torch
     return Plm * cases
 
 
-def calc_Ylm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
-    """Compute the spherical harmonics of degree up to `max_degree` for a batch of points `x`.
+def calc_Ylm(degree: int, x: torch.Tensor) -> torch.Tensor:
+    """Compute the spherical harmonics of degree up to `degree` for a batch of points `x`.
 
     Args:
-        max_degree (int): The maximum degree for the spherical harmonics calculation.
+        degree (int): The maximum degree -1 for the spherical harmonics calculation.
         x (torch.Tensor): The input tensor containing the 3D points for which to calculate the spherical harmonics.
 
     Returns:
@@ -201,8 +201,8 @@ def calc_Ylm(max_degree: int, x: torch.Tensor) -> torch.Tensor:
     # Retrieve cached values
     device = x.device
     dtype = x.dtype
-    B = get_B(max_degree, device=device, dtype=dtype)
-    _, _, m, power, mask = get_klm(max_degree, device=device, dtype=torch.long)
+    B = get_B(degree, device=device, dtype=dtype)
+    _, _, m, power, mask = get_klm(degree, device=device, dtype=torch.long)
 
     # Calculate
     x = x[:[2, 0, 1]]
