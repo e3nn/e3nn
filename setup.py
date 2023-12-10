@@ -34,6 +34,7 @@ setup(
     packages=find_packages(exclude=["tests.*", "tests"]),
     install_requires=[
         "sympy",
+        "matplotlib",
         "scipy",  # only for SphericalTensor.find_peaks
         "torch>=1.8.0",  # >= 1.8 is required for FX
         "opt_einsum_fx>=0.1.4",  # optimization of TensorProduct FX code
