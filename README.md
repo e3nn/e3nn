@@ -2,7 +2,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/e3nn/e3nn/badge.svg?branch=main)](https://coveralls.io/github/e3nn/e3nn?branch=main)
 [![DOI](https://zenodo.org/badge/237431920.svg)](https://zenodo.org/badge/latestdoi/237431920)
 
-**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[ChangeLog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md)** | **[Colab](https://colab.research.google.com/drive/1Gps7mMOmzLe3Rt_b012xsz4UyuexTKAf?usp=sharing)**
+**[Documentation](https://docs.e3nn.org)** | **[Code](https://github.com/e3nn/e3nn)** | **[CHANGELOG](https://github.com/e3nn/e3nn/blob/main/.github/CHANGELOG.md)** | **[Colab](https://colab.research.google.com/drive/1Gps7mMOmzLe3Rt_b012xsz4UyuexTKAf?usp=sharing)**
 
 The aim of this library is to help the development of [E(3)](https://en.wikipedia.org/wiki/Euclidean_group) equivariant neural networks.
 It contains fundamental mathematical operations such as [tensor products](https://docs.e3nn.org/en/stable/api/o3/o3_tp.html) and [spherical harmonics](https://docs.e3nn.org/en/stable/api/o3/o3_sh.html).
@@ -35,7 +35,7 @@ We are happy to help! The best way to get help on `e3nn` is to submit a [Questio
 If you want to get involved in and contribute to the development, improvement, and application of `e3nn`, introduce yourself in the [discussions](https://github.com/e3nn/e3nn/discussions/new).
 
 ## Code of conduct
-Our community abides by the [Contributor Covenant Code of Conduct](https://github.com/e3nn/e3nn/blob/main/code_of_conduct.md).
+Our community abides by the [Contributor Covenant Code of Conduct](./github/CODE_OF_CONDUCT.md).
 
 ## Citing
 ```
@@ -43,7 +43,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](https://githu
     doi = {10.48550/ARXIV.2207.09453},
     url = {https://arxiv.org/abs/2207.09453},
     author = {Geiger, Mario and Smidt, Tess},
-    keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), Neural and Evolutionary Computing (cs.NE), FOS: Computer and information sciences, FOS: Computer and information sciences}, 
+    keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), Neural and Evolutionary Computing (cs.NE), FOS: Computer and information sciences, FOS: Computer and information sciences},
     title = {e3nn: Euclidean Neural Networks},
     publisher = {arXiv},
     year = {2022},
