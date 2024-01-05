@@ -1,8 +1,0 @@
-[run]
-source=e3nn
-[report]
-exclude_lines =
-    pragma: no cover
-    torch.jit.script
-    raise
-    except

@@ -26,7 +26,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install flake8
       run: |
-        pip install flake8
+        pip install flake8 Flake8-pyproject
     - name: Lint with flake8
       run: |
         # Stop the build if there are style issues, Python syntax errors, or undefined names

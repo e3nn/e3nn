@@ -15,3 +15,64 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.flake8]
+max-line-length = 127
+max-complexity = 21
+select = ["B", "C", "E", "F", "W", "T4", "B9"]
+ignore = [
+    "E741",
+    "E203",
+    "W503",
+    "C901"
+]
+exclude = [
+  ".eggs",
+  "*.egg",
+  "build",
+  "dist",
+  "docs/_build",
+  "notebook"
+]
+per-file-ignores = [
+  "e3nn/o3/cartesian_spherical_harmonics.py: E226",
+]
+
+[tool.coverage.run]
+source = ["e3nn"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "torch.jit.script",
+    "raise",
+    "except",
+]
+
+[tool.pylint.typecheck]
+generated-members = "numpy.*,torch.*"
+
+[tool.pylint."messages control"]
+disable = [
+  "protected-access",
+  "no-else-return",
+  "raise-missing-from",
+  "invalid-name",
+  "duplicate-code",
+  "import-outside-toplevel",
+  "missing-docstring",
+  "bad-continuation",
+  "locally-disabled",
+  "too-few-public-methods",
+  "too-many-arguments",
+  "too-many-instance-attributes",
+  "too-many-local-variables",
+  "too-many-locals",
+  "too-many-branches",
+  "too-many-statements",
+  "too-many-return-statements",
+  "redefined-builtin",
+  "redefined-outer-name",
+  "line-too-long",
+  "fixme",
+]

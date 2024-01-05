@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- move `pylint`, `coverage` and `flake8` configuration to `pyproject.toml`
 - Optional scalar bias term in `_batchnorm.py`
 
 ## [0.5.1] - 2022-12-12
