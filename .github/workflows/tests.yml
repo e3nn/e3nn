@@ -21,9 +21,12 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+        cache: "pip"
+        cache-dependency-path: |
+          pyproject.toml
     - name: Install flake8
       run: |
         pip install flake8 Flake8-pyproject
