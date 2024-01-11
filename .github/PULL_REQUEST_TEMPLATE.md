@@ -16,9 +16,9 @@ Resolves: #???
 ## Checklist:
 <!-- Put an `x` in all the boxes that apply. If you're unsure about any of
      these, don't hesitate to ask. We're here to help! -->
-- [ ] I have read the [**CONTRIBUTING**](https://github.com/e3nn/e3nn/blob/main/CONTRIBUTING.md) document.
+- [ ] I have read the [**CONTRIBUTING**](https://github.com/e3nn/e3nn/blob/main/.github/CONTRIBUTING.md) document.
 - [ ] My code follows the code style of this project.
 - [ ] I have updated the documentation (if relevant).
 - [ ] I have added tests that cover my changes (if relevant).
 - [ ] The modified code is cuda compatible (github tests don't test cuda) (if relevant).
-- [ ] I have updated the [Changelog](https://github.com/e3nn/e3nn/blob/main/ChangeLog.md).
+- [ ] I have updated the [CHANGELOG](https://github.com/e3nn/e3nn/blob/main/.github/CHANGELOG.md).
