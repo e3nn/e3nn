@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- enable `pip` caching in CI
 - refactor to use `pyproject.toml` for packaging
 - refactor `gh` community files
 - move `pylint`, `coverage` and `flake8` configuration to `pyproject.toml`
