@@ -1,3 +1,54 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name="e3nn"
+requires-python = ">=3.7"
+dynamic = ["version", "readme"]
+license = {text = "MIT"}
+description = "Equivariant convolutional neural networks for the group E(3) of 3 dimensional rotations, translations, and mirrors."
+classifiers = [
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX",
+  "Operating System :: MacOS",
+]
+dependencies = [
+  "sympy",
+  "scipy",
+  "torch>=1.8.0",
+  "opt_einsum_fx>=0.1.4"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pre-commit",
+]
+
+[project.urls]
+homepage = "https://e3nn.org"
+documentation = "https://docs.e3nn.org/"
+repository = "https://github.com/e3nn/e3nn.git"
+changelog = "https://github.com/e3nn/e3nn/blob/main/.github/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+exclude = [
+  "tests",
+  "tests.*",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "e3nn.__version__"}
+readme = {file = ["README.md"]}
+
 [tool.black]
 line-length = 127
 target-version = ['py37']
