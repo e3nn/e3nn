@@ -57,7 +57,7 @@ from ._s2grid import (
 from ._so3grid import SO3Grid
 from ._linear import Linear
 from ._norm import Norm
-
+from .experimental import *
 
 __all__ = [
     "rand_matrix",
