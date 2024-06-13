@@ -38,6 +38,8 @@ from ._tensor_product import (
     FullTensorProduct,
     TensorSquare,
 )
+from .experimental import FullTensorProductv2
+
 from ._spherical_harmonics import SphericalHarmonics, spherical_harmonics
 from ._angular_spherical_harmonics import (
     SphericalHarmonicsAlphaBeta,
@@ -101,7 +103,7 @@ __all__ = [
     "FullyConnectedTensorProduct",
     "ElementwiseTensorProduct",
     "FullTensorProduct",
-    "TensorSquare",
+    "FullTensorProductv2" "TensorSquare",
     "SphericalHarmonics",
     "spherical_harmonics",
     "SphericalHarmonicsAlphaBeta",
