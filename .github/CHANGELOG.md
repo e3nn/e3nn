@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `o3.experimental.FullTensorProductv2` for compatibility with `torch.compile(..., fulgraph=True)`
 - enable `pip` caching in CI
 - refactor to use `pyproject.toml` for packaging
 - refactor `gh` community files
