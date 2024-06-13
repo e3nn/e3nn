@@ -19,9 +19,7 @@ import time
 
 LMAX = 8
 CHANNEL = 128
-BATCH = 1000
-STEPS = 100
-
+BATCH = 100
 
 def main():
     for lmax in range(1, LMAX + 1):
