@@ -1,4 +1,4 @@
-from e3nn.util.datatypes import Paths, Path
+from e3nn.util.datatypes import Path, Chunk
 from e3nn import o3
 
 import torch
@@ -35,7 +35,7 @@ class FullTensorProduct(nn.Module):
             irreps_in1 = o3.Irreps(irreps_in1).regroup()
             irreps_in2 = o3.Irreps(irreps_in2).regroup()
 
-        partitions = {}
+        paths = {}
         irreps_out = []
         for (mul_1, ir_1), slice_1 in zip(irreps_in1, irreps_in1.slices()):
             for (mul_2, ir_2), slice_2 in zip(irreps_in2, irreps_in2.slices()):
@@ -50,11 +50,11 @@ class FullTensorProduct(nn.Module):
                     else:
                         raise ValueError(f"irrep_normalization={irrep_normalization} not supported")
                     self.register_buffer(f"cg_{ir_1.l}_{ir_2.l}_{ir_out.l}", cg)
-                    partitions[(ir_1.l, ir_2.l, ir_out.l)] = Paths(
-                        Path(mul_1, ir_1.dim, slice_1), Path(mul_2, ir_2.dim, slice_2), Path(mul_1 * mul_2, ir_out.dim)
+                    paths[(ir_1.l, ir_2.l, ir_out.l)] = Path(
+                        Chunk(mul_1, ir_1.dim, slice_1), Chunk(mul_2, ir_2.dim, slice_2), Chunk(mul_1 * mul_2, ir_out.dim)
                     )
                     irreps_out.append((mul_1 * mul_2, ir_out))
-        self.partitions = partitions
+        self.paths = paths
         irreps_out = o3.Irreps(irreps_out)
         self.irreps_out, _, self.inv = irreps_out.sort()
         self.irreps_in1 = irreps_in1
@@ -71,7 +71,7 @@ class FullTensorProduct(nn.Module):
             (mul_1, input_dim1, slice_1),
             (mul_2, input_dim2, slice_2),
             (output_mul, output_dim, _),
-        ) in self.partitions.items():
+        ) in self.paths.items():
             x1 = input1[..., slice_1].reshape(
                 leading_shape
                 + (

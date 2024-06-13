@@ -38,6 +38,8 @@ from ._tensor_product import (
     FullTensorProduct,
     TensorSquare,
 )
+from .experimental import FullTensorProductv2
+
 from ._spherical_harmonics import SphericalHarmonics, spherical_harmonics
 from ._angular_spherical_harmonics import (
     SphericalHarmonicsAlphaBeta,
@@ -57,7 +59,7 @@ from ._s2grid import (
 from ._so3grid import SO3Grid
 from ._linear import Linear
 from ._norm import Norm
-from .experimental import *
+
 
 __all__ = [
     "rand_matrix",
@@ -101,7 +103,7 @@ __all__ = [
     "FullyConnectedTensorProduct",
     "ElementwiseTensorProduct",
     "FullTensorProduct",
-    "TensorSquare",
+    "FullTensorProductv2" "TensorSquare",
     "SphericalHarmonics",
     "spherical_harmonics",
     "SphericalHarmonicsAlphaBeta",
