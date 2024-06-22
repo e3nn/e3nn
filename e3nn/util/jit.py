@@ -138,8 +138,9 @@ def compile(
                     "ignore",
                     # warnings treats this argument as a regex, but we want to match a string literal exactly, so escape it:
                     message=re.escape(
-                        "The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. "
-                        "Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`."
+                        "The TorchScript type system doesn't support instance-level annotations on empty non-base types "
+                        "in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type "
+                        "in `torch.jit.Attribute`."
                     ),
                     # Being specific is good form, even though matching the message should be enough:
                     category=UserWarning,
