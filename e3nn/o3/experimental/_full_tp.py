@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from e3nn.util.datatypes import Path, Chunk
 from e3nn import o3
 

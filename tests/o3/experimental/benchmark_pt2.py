@@ -1,3 +1,5 @@
+# flake8: noqa
+
 import torch
 from torch._inductor.utils import print_performance
 
