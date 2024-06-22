@@ -1,30 +1,32 @@
 # flake8: noqa
 
-import torch
-from torch._inductor.utils import print_performance
-
-# Borrowed from https://github.com/pytorch-labs/gpt-fast/blob/db7b273ab86b75358bd3b014f1f022a19aba4797/generate.py#L16-L18
-torch.set_float32_matmul_precision("high")
-import torch._dynamo.config
-import torch._inductor.config
-
-torch._inductor.config.coordinate_descent_tuning = True
-torch._inductor.config.triton.unique_kernel_names = True
-
-device = "cuda"
-compile_mode = "max-autotune"  # Bringing out all of the tricks that Torch 2.0 has but "reduce-overhead" should work as well
-
-from e3nn import o3, util
-import numpy as np
-from torch import nn
-import time
-
-LMAX = 8
-CHANNEL = 128
-BATCH = 100
-
 
 def main():
+    import torch
+    from torch._inductor.utils import print_performance
+
+    # Borrowed from https://github.com/pytorch-labs/gpt-fast/blob/db7b273ab86b75358bd3b014f1f022a19aba4797/generate.py#L16-L18
+    torch.set_float32_matmul_precision("high")
+    import torch._dynamo.config
+    import torch._inductor.config
+
+    torch._inductor.config.coordinate_descent_tuning = True
+    torch._inductor.config.triton.unique_kernel_names = True
+
+    device = "cuda"
+    compile_mode = (
+        "max-autotune"  # Bringing out all of the tricks that Torch 2.0 has but "reduce-overhead" should work as well
+    )
+
+    from e3nn import o3, util
+    import numpy as np
+    from torch import nn
+    import time
+
+    LMAX = 8
+    CHANNEL = 128
+    BATCH = 100
+
     for lmax in range(1, LMAX + 1):
         irreps = o3.Irreps.spherical_harmonics(lmax)
         irreps_x = (CHANNEL * irreps).regroup()
