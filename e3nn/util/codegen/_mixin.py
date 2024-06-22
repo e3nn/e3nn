@@ -3,7 +3,6 @@ from typing import Dict
 
 import e3nn.util.jit
 import torch
-from opt_einsum_fx import jitable
 from torch import fx
 
 
