@@ -1,6 +1,7 @@
 import copy
 import inspect
 import warnings
+import re
 from typing import Optional
 
 import torch
@@ -59,6 +60,7 @@ def compile(
     script_options: dict = None,
     trace_options: dict = None,
     in_place: bool = True,
+    recurse: bool = True,
 ):
     """Recursively compile a module and all submodules according to their decorators.
 
@@ -76,6 +78,10 @@ def compile(
             Extra kwargs for ``torch.jit.script``.
         trace_options : dict, default = {}
             Extra kwargs for ``torch.jit.trace``.
+        in_place : bool, default True
+            Whether to insert the recursively compiled submodules in-place, or do a deepcopy first.
+        recurse : bool, default True
+            Whether to recurse through the module's children before passing the parent to TorchScript
 
     Returns
     -------
@@ -92,25 +98,56 @@ def compile(
         mod = copy.deepcopy(mod)
     # TODO: debug logging
     assert n_trace_checks >= 1
-    # == recurse to children ==
-    # This allows us to trace compile submodules of modules we are going to script
-    for submod_name, submod in mod.named_children():
-        setattr(
-            mod,
-            submod_name,
-            compile(
-                submod,
-                n_trace_checks=n_trace_checks,
-                script_options=script_options,
-                trace_options=trace_options,
-                in_place=True,  # since we deepcopied the module above, we can do inplace
-            ),
-        )
+
+    if recurse:
+        # == recurse to children ==
+        # This allows us to trace compile submodules of modules we are going to script
+        for submod_name, submod in mod.named_children():
+            setattr(
+                mod,
+                submod_name,
+                compile(
+                    submod,
+                    n_trace_checks=n_trace_checks,
+                    script_options=script_options,
+                    trace_options=trace_options,
+                    in_place=True,  # since we deepcopied the module above, we can do inplace
+                    recurse=recurse,  # always true in this branch
+                ),
+            )
+
     # == Compile this module now ==
     if mode == "script":
         if isinstance(mod, fx.GraphModule):
             mod = jitable(mod)
-        mod = torch.jit.script(mod, **script_options)
+            # In recent PyTorch versions (probably >1.12, definitely >=2.0), PyTorch's implementation of fx.GraphModule
+            # causes a warning to be raised when fx.GraphModules are compiled to TorchScript with `torch.jit.script`:
+            #
+            #   torch/jit/_check.py:177: UserWarning: The TorchScript type system doesn't support instance-level
+            #   annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the
+            #   class body, or 2) wrap the type in `torch.jit.Attribute`.
+            #
+            # Using the debugger traces this back to the following line in PyTorch:
+            # https://github.com/pytorch/pytorch/blob/v2.3.1/torch/fx/graph_module.py#L446
+            # Because the metadata stored by GraphModule is not relevant to the compiled TorchScript module
+            # we need, it should be safe to ignore this warning. The below code suppresses this warning as
+            # narrowly as possible to ensure it can still be raised from user code.
+            # See also: https://github.com/pytorch/pytorch/issues/89064
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    # warnings treats this argument as a regex, but we want to match a string literal exactly, so escape it:
+                    message=re.escape(
+                        "The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. "
+                        "Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`."
+                    ),
+                    # Being specific is good form, even though matching the message should be enough:
+                    category=UserWarning,
+                    module="torch",
+                )
+                mod = torch.jit.script(mod, **script_options)
+        else:
+            mod = torch.jit.script(mod, **script_options)
     elif mode == "trace":
         # These are always modules, so we're always using trace_module
         # We need tracing inputs:
