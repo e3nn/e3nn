@@ -12,7 +12,7 @@ def test_jit(float_tolerance) -> None:
 
     a = torch.randn(5, 4)
     b = torch.randn(5, 4)
-    return (sh(a, b) - jited(a, b)).abs().max() < float_tolerance
+    assert (sh(a, b) - jited(a, b)).abs().max() < float_tolerance
 
 
 def test_sh_equivariance1(float_tolerance) -> None:

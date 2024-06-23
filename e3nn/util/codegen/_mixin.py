@@ -1,9 +1,8 @@
 import io
 from typing import Dict
 
-import e3nn
+import e3nn.util.jit
 import torch
-from opt_einsum_fx import jitable
 from torch import fx
 
 
@@ -40,7 +39,9 @@ class CodeGenMixin:
             assert isinstance(graphmod, fx.GraphModule)
 
             if opt_defaults["jit_script_fx"]:
-                scriptmod = torch.jit.script(jitable(graphmod))
+                # With recurse=False, this more or less is equivalent to
+                # torch.jit.script(jitable(graphmod))
+                scriptmod = e3nn.util.jit.compile(graphmod, recurse=False)
                 assert isinstance(scriptmod, torch.jit.ScriptModule)
             else:
                 scriptmod = graphmod
@@ -73,7 +74,7 @@ class CodeGenMixin:
                 # Get the module
                 smod = getattr(self, fname)
                 if isinstance(smod, fx.GraphModule):
-                    smod = torch.jit.script(jitable(smod))
+                    smod = e3nn.util.jit.compile(smod, recurse=False)
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Save the compiled code as TorchScript IR
                 buffer = io.BytesIO()
