@@ -21,6 +21,7 @@ classifiers = [
   "Operating System :: MacOS",
 ]
 dependencies = [
+  "numpy<2.0",
   "sympy",
   "scipy",
   "torch>=1.8.0",

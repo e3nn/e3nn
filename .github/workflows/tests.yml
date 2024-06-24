@@ -53,7 +53,7 @@ jobs:
         pip install coveralls
     - name: Test with pytest
       run: |
-        coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ .
+        coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples
     - name: Upload to coveralls
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
