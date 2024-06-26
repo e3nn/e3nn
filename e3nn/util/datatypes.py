@@ -8,6 +8,6 @@ class Chunk(NamedTuple):
 
 
 class Path(NamedTuple):
-    input_1_slice: Chunk
-    input_2_slice: Chunk
-    output_slice: Chunk
+    input_1_chunk: Chunk
+    input_2_chunk: Chunk
+    output_chunk: Chunk
