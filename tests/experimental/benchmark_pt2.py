@@ -16,7 +16,7 @@ def run_benchmark(irreps_type):
     device = "cuda"
     compile_mode = "max-autotune"  # Use reduce-overhead for quick compile times
 
-    from e3nn import o2, o3, experimental
+    from e3nn import o2, experimental
     import numpy as np
     from torch import nn
     import time
