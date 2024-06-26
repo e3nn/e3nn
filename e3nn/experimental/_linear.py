@@ -24,7 +24,7 @@ class Linear(nn.Module):
         internal_weights: Optional[bool] = None,
         shared_weights: Optional[bool] = None,
         instructions: Optional[List[Tuple[int, int]]] = None,
-        biases: Optional[Union[List[bool], bool]] = None,
+        biases: Optional[Union[List[bool], bool]] = False,
         path_normalization: str = "element",
     ):
         super(Linear, self).__init__()
@@ -135,6 +135,8 @@ class Linear(nn.Module):
             self.weight = torch.nn.Parameter(
                 torch.ones(*((channel_in, channel_out) if channel_in is not None else ()), self.weight_numel)
             )
+        else:
+            self.register_buffer('weight', torch.Tensor())
 
         # == Generate biases ==
         if internal_weights and self.bias_numel > 0:
@@ -142,7 +144,9 @@ class Linear(nn.Module):
             self.bias = torch.nn.Parameter(
                 torch.zeros(*((channel_out,) if channel_out is not None else ()), self.bias_numel)
             )  # see appendix C.1 and Eq.5 of https://arxiv.org/pdf/2011.14522.pdf
-
+        else:
+            self.register_buffer('bias', torch.Tensor())
+    
         if irreps_out.dim > 0:
             output_mask = torch.concatenate(
                 [
@@ -159,7 +163,8 @@ class Linear(nn.Module):
 
         self.irreps_in = o3.Irreps(irreps_in).simplify()
         self.irreps_out = o3.Irreps(irreps_out).simplify()
-        self.irreps_out_dim = self.irreps_out.dim
+        self._irreps_out_dim = self.irreps_out.dim
+        self._irreps_in_dim = self.irreps_in.dim
         self.instructions = instructions
         self.channel_in = channel_in
         self.channel_out = channel_out
@@ -168,7 +173,7 @@ class Linear(nn.Module):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"
 
-    def forward(self, features, weight: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, input, weight: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None) -> torch.Tensor:
         if weight is None:
             if self.weight_numel > 0 and not self.internal_weights:
                 raise RuntimeError("Weights must be provided when internal_weights = False")
@@ -180,12 +185,12 @@ class Linear(nn.Module):
 
         if self.channel_in is None:
             size = input.shape[:-1]
-            outsize = size + (self.irreps_out_dim,)
+            outsize = size + (self._irreps_out_dim,)
         else:
             size = input.shape[:-2]
             outsize = size + (
                 self.channel_out,
-                self.irreps_out_dim,
+                self._irreps_out_dim,
             )
 
         if len(self.instructions) == 0 and self.bias_numel == 0:
@@ -198,20 +203,20 @@ class Linear(nn.Module):
 
         batch_out = input.shape[0]
         if self.weight_numel > 0:
-            ws = (
-                ws.reshape(-1, self.weight_numel)
+            weight = (
+                weight.reshape(-1, self.weight_numel)
                 if self.channel_in is None
-                else ws.reshape(-1, self.channel_in, self.channel_out, self.weight_numel)
+                else weight.reshape(-1, self.channel_in, self.channel_out, self.weight_numel)
             )
 
         if self.bias_numel > 0:
             if self.channel_out is None:
-                bs = bs.reshape(-1, self.bias_numel)
+                bias = bias.reshape(-1, self.bias_numel)
             else:
-                bs = bs.reshape(-1, self.channel_out, self.bias_numel)
+                bias = bias.reshape(-1, self.channel_out, self.bias_numel)
 
         # = extract individual input irreps =
-        if len(self.instructionns) == 1:
+        if len(self.instructions) == 1:
             input_list = [
                 input.reshape(
                     batch_out, *(() if self.channel_in is None else (self.channel_in,)), ins.chunk_in.mul, ins.chunk_in.dim
@@ -231,7 +236,7 @@ class Linear(nn.Module):
 
             if ins.i_in == -1:
                 # = bias =
-                b = bs.narrow(-1, flat_bias_index, prod(ins.path_shape))
+                b = bias.narrow(-1, flat_bias_index, prod(ins.path_shape))
                 flat_bias_index += prod(ins.path_shape)
                 out_list += [
                     (ins.path_weight * b).reshape(
@@ -239,7 +244,7 @@ class Linear(nn.Module):
                     )
                 ]
             else:
-                mul_ir_in = self.chunk_in.mul
+                mul_ir_in = ins.chunk_in.mul
 
                 # Short-circut for empty irreps
                 if ins.chunk_in.dim == 0 or ins.chunk_out.dim == 0:
@@ -249,9 +254,9 @@ class Linear(nn.Module):
                 path_nweight = prod(ins.path_shape)
                 if len(self.instructions) == 1:
                     # Avoid unnecessary view when there is only one weight
-                    w = ws
+                    w = weight
                 else:
-                    w = ws.narrow(-1, flat_weight_index, path_nweight)
+                    w = weight.narrow(-1, flat_weight_index, path_nweight)
                 w = w.reshape(
                     (() if self.shared_weights else (-1,))
                     + (() if self.channel_in is None else (self.channel_in, self.channel_out))
@@ -266,7 +271,7 @@ class Linear(nn.Module):
 
                 ein_out = ins.path_weight * ein_out
                 out_list += [
-                    ein_out.reshape(batch_out, *(() if self.channel_out is None else (self.channel_out,)), mul_ir_out.dim)
+                    ein_out.reshape(batch_out, *(() if self.channel_out is None else (self.channel_out,)), ins.chunk.dim)
                 ]
 
         # = Return the result =

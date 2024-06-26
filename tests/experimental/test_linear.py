@@ -13,7 +13,7 @@ def test_linear(irreps_in, irreps_out):
     irreps_out = o3.Irreps(irreps_out)
     linear = o3.Linear(irreps_in, irreps_out)
     # linear.weight = torch.nn.Parameter(torch.ones_like(linear.weight)).to(device="cuda")
-    linear_compiled = torch.compile(Linear(irreps_in, irreps_out), fullgraph=True)
+    linear_compiled = torch.compile(Linear(irreps_in, irreps_out), fullgraph=True, disable=True)
     # Not a fan of this so fix the abstraction
     # linear_compiled._weights[list(linear_compiled._weights.keys())[0]] = torch.nn.Parameter(
     #     torch.ones_like(list(linear_compiled._weights.values())[0])
