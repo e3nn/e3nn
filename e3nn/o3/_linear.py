@@ -218,7 +218,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         # == Generate weights ==
         if internal_weights and self.weight_numel > 0:
             assert self.shared_weights, "Having internal weights impose shared weights"
-            self.weight = torch.nn.Parameter(torch.randn(*((f_in, f_out) if f_in is not None else ()), self.weight_numel))
+            self.weight = torch.nn.Parameter(torch.ones(*((f_in, f_out) if f_in is not None else ()), self.weight_numel))
         else:
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer("weight", torch.Tensor())
