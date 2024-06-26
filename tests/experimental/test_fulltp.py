@@ -1,5 +1,5 @@
 import torch
-from e3nn import o3, o2, experimental
+from e3nn import o3, experimental
 import pytest
 
 

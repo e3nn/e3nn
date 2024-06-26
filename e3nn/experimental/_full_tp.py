@@ -53,10 +53,10 @@ class FullTensorProduct(nn.Module):
         if isinstance(irreps_in1, o3.Irreps):
             self.context = O3Context()
         else:
-            raise ValueError(f"Must be instances of o3.Irreps")
+            raise ValueError("Must be instances of o3.Irreps")
 
-        if type(irreps_in1) != type(irreps_in2):
-            raise ValueError(f"Both irreps_in1 and irreps_in2 must be of the same Irreps type")
+        if not isinstance(irreps_in1, type(irreps_in2)):
+            raise ValueError("Both irreps_in1 and irreps_in2 must be of the same Irreps type")
 
         self.irrep_normalization = irrep_normalization
         self.regroup_output = regroup_output
