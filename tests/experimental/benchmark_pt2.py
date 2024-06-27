@@ -16,7 +16,7 @@ def run_benchmark(irreps_type):
     device = "cuda"
     compile_mode = "max-autotune"  # Use reduce-overhead for quick compile times
 
-    from e3nn import o2, experimental
+    from e3nn import o3, experimental
     import numpy as np
     from torch import nn
     import time
@@ -25,13 +25,10 @@ def run_benchmark(irreps_type):
     CHANNEL = 128
     BATCH = 100
 
-    module = o2 if irreps_type == "o2" else o3
+    module = o3
 
     for lmax in range(1, LMAX + 1):
-        if irreps_type == "o2":
-            irreps = module.Irreps.circular_harmonics(lmax)
-        else:
-            irreps = module.Irreps.spherical_harmonics(lmax)
+        irreps = module.Irreps.spherical_harmonics(lmax)
 
         irreps_x = (CHANNEL * irreps).regroup()
         x = irreps_x.randn(BATCH, -1).to(device=device)
