@@ -40,9 +40,9 @@ class Linear(nn.Module):
         # if isinstance(gradient_normalization, str):
         #     gradient_normalization = {"element": 0.0, "path": 1.0}[gradient_normalization]
 
-        irreps_in = o3.Irreps(irreps_in).simplify()
+        irreps_in = o3.Irreps(irreps_in)
         irreps_in_slices = irreps_in.slices()
-        irreps_out = o3.Irreps(irreps_out).simplify()
+        irreps_out = o3.Irreps(irreps_out)
         irreps_out_slices = irreps_out.slices()
 
         if instructions is None:
@@ -66,11 +66,15 @@ class Linear(nn.Module):
             for (i_in, i_out) in instructions
         ]
 
-        def alpha(this):
-            x = irreps_in[this.i_in].mul ** path_normalization * sum(
-                irreps_in[other.i_in].mul ** (1.0 - path_normalization) for other in instructions if other.i_out == this.i_out
+        def alpha(ins):
+            x = sum(
+                irreps_in[i.i_in if path_normalization == "element" else ins.i_in].mul
+                for i in instructions
+                if i.i_out == ins.i_out
             )
-            return 1 / x if x > 0 else 1.0
+            if channel_in is not None:
+                x *= channel_in
+            return 1.0 if x == 0 else x
 
         instructions = [
             Instruction(
@@ -133,10 +137,10 @@ class Linear(nn.Module):
         if internal_weights and self.weight_numel > 0:
             assert self.shared_weights, "Having internal weights impose shared weights"
             self.weight = torch.nn.Parameter(
-                torch.ones(*((channel_in, channel_out) if channel_in is not None else ()), self.weight_numel)
+                torch.randn(*((channel_in, channel_out) if channel_in is not None else ()), self.weight_numel)
             )
         else:
-            self.register_buffer('weight', torch.Tensor())
+            self.register_buffer("weight", torch.Tensor())
 
         # == Generate biases ==
         if internal_weights and self.bias_numel > 0:
@@ -145,8 +149,9 @@ class Linear(nn.Module):
                 torch.zeros(*((channel_out,) if channel_out is not None else ()), self.bias_numel)
             )  # see appendix C.1 and Eq.5 of https://arxiv.org/pdf/2011.14522.pdf
         else:
-            self.register_buffer('bias', torch.Tensor())
-    
+            self.register_buffer("bias", torch.Tensor())
+
+        # == Compute output mask ==
         if irreps_out.dim > 0:
             output_mask = torch.concatenate(
                 [
@@ -163,8 +168,10 @@ class Linear(nn.Module):
 
         self.irreps_in = o3.Irreps(irreps_in).simplify()
         self.irreps_out = o3.Irreps(irreps_out).simplify()
+        self.irreps_out_count = [i for i, _ in enumerate(self.irreps_out)]
         self._irreps_out_dim = self.irreps_out.dim
         self._irreps_in_dim = self.irreps_in.dim
+        self._irreps_in_len = len(self.irreps_in)
         self.instructions = instructions
         self.channel_in = channel_in
         self.channel_out = channel_out
@@ -193,6 +200,12 @@ class Linear(nn.Module):
                 self._irreps_out_dim,
             )
 
+        if self.bias_numel > 0:
+            if self.channel_out is None:
+                bias = bias.reshape(-1, self.bias_numel)
+            else:
+                bias = bias.reshape(-1, self.channel_out, self.bias_numel)
+
         if len(self.instructions) == 0 and self.bias_numel == 0:
             return input.new_zeros(outsize)
 
@@ -209,21 +222,23 @@ class Linear(nn.Module):
                 else weight.reshape(-1, self.channel_in, self.channel_out, self.weight_numel)
             )
 
-        if self.bias_numel > 0:
-            if self.channel_out is None:
-                bias = bias.reshape(-1, self.bias_numel)
-            else:
-                bias = bias.reshape(-1, self.channel_out, self.bias_numel)
-
         # = extract individual input irreps =
-        if len(self.instructions) == 1:
+        if self._irreps_in_len == 1:
             input_list = [
                 input.reshape(
-                    batch_out, *(() if self.channel_in is None else (self.channel_in,)), ins.chunk_in.mul, ins.chunk_in.dim
+                    batch_out,
+                    *(() if self.channel_in is None else (self.channel_in,)),
+                    self.instructions[0].chunk_in.mul,
+                    self.instructions[0].chunk_in.dim,
                 )
             ]
         else:
-            input_list = [input.narrow(-1, ins.chunk_in.slice.start, ins.chunk_in.dim) for ins in self.instructions]
+            input_list = [
+                input.narrow(-1, ins.chunk_in.slice.start, ins.chunk_in.mul * ins.chunk_in.dim).reshape(
+                    batch_out, *(() if self.channel_in is None else (self.channel_in,)), ins.chunk_in.mul, ins.chunk_in.dim
+                )
+                for ins in self.instructions
+            ]
 
         z = "" if self.shared_weights else "z"
 
@@ -263,6 +278,7 @@ class Linear(nn.Module):
                     + ins.path_shape
                 )
                 flat_weight_index += path_nweight
+
                 if self.channel_in is None:
                     ein_out = torch.einsum(f"{z}uw,zui->zwi", w, input_list[ins.i_in])
 
@@ -271,17 +287,25 @@ class Linear(nn.Module):
 
                 ein_out = ins.path_weight * ein_out
                 out_list += [
-                    ein_out.reshape(batch_out, *(() if self.channel_out is None else (self.channel_out,)), ins.chunk.dim)
+                    ein_out.reshape(
+                        batch_out,
+                        *(() if self.channel_out is None else (self.channel_out,)),
+                        ins.chunk_out.mul * ins.chunk_out.dim,
+                    )
                 ]
 
         # = Return the result =
         out = [
             _sum_tensors(
                 [out for ins, out in zip(self.instructions, out_list) if ins.i_out == i_out],
-                shape=(batch_out, *(() if self.channel_out is None else (self.channel_out,)), ins.chunk_out.dim),
-                empty_return_none=True,
+                shape=(
+                    batch_out,
+                    *(() if self.channel_out is None else (self.channel_out,)),
+                    ins.chunk_out.mul * ins.chunk_out.dim,
+                ),
+                like=input,
             )
-            for i_out, _ in enumerate(self.irreps_out)
+            for i_out in self.irreps_out_count
             if ins.chunk_out.mul > 0
         ]
         if len(out) > 1:
@@ -291,195 +315,3 @@ class Linear(nn.Module):
 
         out = out.reshape(outsize)
         return out
-
-    # @property
-    # def num_weights(self) -> int:
-    #     return sum(np.prod(i.path_shape) for i in self.instructions)
-
-    # def split_weights(self, weights: torch.Tensor) -> List[torch.Tensor]:
-    #     # This code is not functional
-    #     ws = []
-    #     cursor = 0
-    #     for i in self.instructions:
-    #         ws += [weights[cursor : cursor + np.prod(i.path_shape)].reshape(i.path_shape)]
-    #         cursor += np.prod(i.path_shape)
-    #     return ws
-
-    # def matrix(self, ws: List[torch.Tensor]) -> torch.Tensor:
-    #     r"""Compute the matrix representation of the linear operator.
-
-    #     Args:
-    #         ws: List of weights.
-
-    #     Returns:
-    #         The matrix representation of the linear operator. The matrix is shape ``(irreps_in.dim, irreps_out.dim)``.
-    #     """
-    #     dtype = ws[0].dtype  # Assuming that all ws have same dtype
-    #     output = torch.zeros((self.irreps_in.dim, self.irreps_out.dim), dtype)
-    #     for ins, w in zip(self.instructions, ws):
-    #         assert ins.i_in != -1
-    #         mul_in, ir_in = self.irreps_in[ins.i_in]
-    #         mul_out, ir_out = self.irreps_out[ins.i_out]
-    #         output[self.irreps_in.slices()[ins.i_in], self.irreps_out.slices()[ins.i_out]] += ins.path_weight * torch.einsum(
-    #             "uw,ij->uiwj", w, torch.eye(ir_in.dim, dtype=dtype)
-    #         ).reshape((mul_in * ir_in.dim, mul_out * ir_out.dim))
-    #     return output
-
-    # def __repr__(self):
-    #     return (
-    #         f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out}, "
-    #         f"{len(self.instructions)} instructions, {self.num_weights} weights)"
-    #     )
-
-
-# def _get_gradient_normalization(gradient_normalization: Optional[Union[float, str]]) -> float:
-#     """Get the gradient normalization from the config or from the argument."""
-#     if gradient_normalization is None:
-#         gradient_normalization = config("gradient_normalization")
-#     if isinstance(gradient_normalization, str):
-#         return {"element": 0.0, "path": 1.0}[gradient_normalization]
-#     return gradient_normalization
-
-
-# class Linear(nn.Module):
-#     r"""Equivariant Linear torch module
-
-#     Args:
-#         irreps_out (`Irreps`): output representations, if allowed bu Schur's lemma.
-#         channel_out (optional int): if specified, the last axis before the irreps
-#             is assumed to be the channel axis and is mixed with the irreps.
-#         irreps_in (`Irreps`): input representations. If not specified,
-#             the input representations is obtained when calling the module.
-#         channel_in (optional int): required when using 'mixed_per_channel' linear_type,
-#             indicating the size of the last axis before the irreps in the input.
-#         biases (bool): whether to add a bias to the output.
-#         path_normalization (str or float): Normalization of the paths, ``element`` or ``path``.
-#             0/1 corresponds to a normalization where each element/path has an equal contribution to the forward.
-#         gradient_normalization (str or float): Normalization of the gradients, ``element`` or ``path``.
-#             0/1 corresponds to a normalization where each element/path has an equal contribution to the learning.
-#         num_indexed_weights (optional int): number of indexed weights. See example below.
-#         weights_per_channel (bool): whether to have one set of weights per channel.
-#         force_irreps_out (bool): whether to force the output irreps to be the one specified in ``irreps_out``.
-
-#     Due to how nn.Module is implemented, irreps_in and irreps_out must be supplied at initialization.
-#     The type of the linear layer must also be supplied at initialization:
-#     'vanilla', 'indexed', 'mixed', 'mixed_per_channel'
-#     Also, depending on what type of linear layer is used, additional options
-#     (eg. 'num_indexed_weights', 'weights_per_channel', 'weights_dim', 'channel_in')
-#     must be supplied.
-#     """
-
-#     def __init__(
-#         self,
-#         irreps_in: o3.Irreps,
-#         irreps_out: o3.Irreps,
-#         *,
-#         channel_out: Optional[int] = None,
-#         channel_in: Optional[int] = None,
-#         biases: bool = False,
-#         path_normalization: Optional[Union[str, float]] = None,
-#         gradient_normalization: Optional[Union[str, float]] = None,
-#         num_indexed_weights: Optional[int] = None,
-#         weights_per_channel: bool = False,
-#         force_irreps_out: bool = False,
-#         weights_dim: Optional[int] = None,
-#         input_dtype: torch.dtype = torch.get_default_dtype(),
-#         linear_type: str = "vanilla",
-#     ):
-#         super(Linear, self).__init__()
-#         irreps_in_regrouped = o3.Irreps(irreps_in).regroup()
-#         irreps_out = o3.Irreps(irreps_out)
-
-#         self.irreps_in = irreps_in_regrouped
-#         self.channel_in = channel_in
-#         self.channel_out = channel_out
-#         self.biases = biases
-#         self.path_normalization = path_normalization
-#         self.num_indexed_weights = num_indexed_weights
-#         self.weights_per_channel = weights_per_channel
-#         self.force_irreps_out = force_irreps_out
-#         self.linear_type = linear_type
-#         self.weights_dim = weights_dim
-#         self._input_dtype = input_dtype
-
-#         self.gradient_normalization = _get_gradient_normalization(gradient_normalization)
-
-#         channel_irrep_multiplier = 1
-#         if self.channel_out is not None:
-#             assert not self.weights_per_channel
-#             channel_irrep_multiplier = self.channel_out
-
-#         if not self.force_irreps_out:
-#             irreps_out = irreps_out.filter(keep=irreps_in_regrouped)
-#             irreps_out = irreps_out.simplify()
-#         # This should factor in mul_to_axis somewhere
-#         self.irreps_out = irreps_out
-
-#         self._linear = FunctionalLinear(
-#             irreps_in_regrouped,
-#             channel_irrep_multiplier * irreps_out,
-#             channel_out=self.channel_out,
-#             channel_in=self.channel_in,
-#             biases=self.biases,
-#             path_normalization=self.path_normalization,
-#             gradient_normalization=self.gradient_normalization,
-#         )
-#         self.device = device
-#         self.weight_numel = self._linear.num_weights
-#         self._weights = self._get_weights()
-
-# def _get_weights(self):
-#     """Constructs the weights for the linear module."""
-#     irreps_in = self._linear.irreps_in
-#     irreps_out = self._linear.irreps_out
-
-#     weights = {}
-#     instructions = []
-#     for ins in self._linear.instructions:
-
-#         if ins.i_in == -1:
-#             name = f"b[{ins.i_out}]"
-#         else:
-#             name = f"w[{ins.i_in},{ins.i_out}] {irreps_in[ins.i_in]},{irreps_out[ins.i_out]}"
-
-#         weight_shape = ins.path_shape
-#         weight_std = ins.weight_std
-
-#         weight = torch.nn.Parameter(
-#             weight_std
-#             * torch.randn(
-#                 *weight_shape,
-#                 dtype=self._input_dtype,
-#             )
-#         )
-#         weights[name] = weight
-#         instructions.append(
-#             Instruction(
-#                 i_in=ins.i_in,
-#                 slice_in=ins.slice_in,
-#                 i_out=ins.i_out,
-#                 slice_out=ins.slice_out,
-#                 path_shape=ins.path_shape,
-#                 path_weight=ins.path_weight,
-#                 weight_std=ins.weight_std,
-#                 weight=weight.to(device=self.device),  # TODO (mit): This should not be happening
-#             )
-#         )
-#     self._linear.instructions = instructions
-#     return weights
-
-# def forward(self, input) -> torch.Tensor:
-#     """Apply the linear operator.
-
-#     Args:
-#         weights (optional IrrepsArray or jax.Array): scalar weights that are contracted with free parameters.
-#             An array of shape ``(..., contracted_axis)``. Broadcasting with `input` is supported.
-#         input (IrrepsArray): input irreps-array of shape ``(..., [channel_in,] irreps_in.dim)``.
-#             Broadcasting with `weights` is supported.
-
-#     Returns:
-#         IrrepsArray: output irreps-array of shape ``(..., [channel_out,] irreps_out.dim)``.
-#             Properly normalized assuming that the weights and input are properly normalized.
-#     """
-#     # Currently only supporting e3nn_jax.linear_vanilla
-#     return self._linear(list(self._weights.values()), input)

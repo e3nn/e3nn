@@ -218,7 +218,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         # == Generate weights ==
         if internal_weights and self.weight_numel > 0:
             assert self.shared_weights, "Having internal weights impose shared weights"
-            self.weight = torch.nn.Parameter(torch.ones(*((f_in, f_out) if f_in is not None else ()), self.weight_numel))
+            self.weight = torch.nn.Parameter(torch.randn(*((f_in, f_out) if f_in is not None else ()), self.weight_numel))
         else:
             # For TorchScript, there always has to be some kind of defined .weight
             self.register_buffer("weight", torch.Tensor())
@@ -236,7 +236,7 @@ class Linear(CodeGenMixin, torch.nn.Module):
         if self.irreps_out.dim > 0:
             output_mask = torch.cat(
                 [
-                    torch.ones(mul_ir.dim)
+                    torch.randn(mul_ir.dim)
                     if any((ins.i_out == i_out) and (0 not in ins.path_shape) for ins in self.instructions)
                     else torch.zeros(mul_ir.dim)
                     for i_out, mul_ir in enumerate(self.irreps_out)
