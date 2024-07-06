@@ -1,6 +1,7 @@
 from e3nn.util.datatypes import Path, Chunk
 from typing import Union, Callable, Optional
 from e3nn import o3
+from ._basic import from_chunks
 
 import torch
 from torch import nn
@@ -110,4 +111,4 @@ class FullTensorProduct(nn.Module):
             chunk = torch.reshape(chunk, chunk.shape[:-3] + (path.output_chunk.mul * path.output_chunk.dim,))
             chunks.append(chunk)
 
-        return torch.cat([chunks[i] for i in self.inv], dim=-1)
+        return from_chunks(chunks, self.inv)
