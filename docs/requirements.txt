@@ -6,12 +6,11 @@ sympy
 
 ipykernel
 plotly
-matplotlib==3.7.3
 jupyter-sphinx
 ase
 
 --find-links https://download.pytorch.org/whl/cpu
-torch
+torch==2.*
 
 --find-links https://data.pyg.org/whl/torch-2.0.0+cpu.html
 torch-scatter
