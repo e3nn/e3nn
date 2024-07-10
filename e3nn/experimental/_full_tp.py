@@ -2,6 +2,7 @@ from e3nn.util.datatypes import Path, Chunk
 from typing import Union, Callable, Optional
 from e3nn import o3
 from e3nn.util.datatypes import O3Context
+from ._basic import from_chunks
 
 import torch
 from torch import nn
