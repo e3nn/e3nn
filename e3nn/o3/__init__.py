@@ -30,6 +30,8 @@ from ._rotation import (
 )
 from ._wigner import wigner_D, wigner_3j, change_basis_real_to_complex, su2_generators, so3_generators
 from ._irreps import Irrep, Irreps
+from ._irreps_array import IrrepsArray, _standardize_axis
+from ._basic import from_chunks, zeros, sum, mean, norm
 from ._tensor_product import (
     Instruction,
     TensorProduct,
@@ -97,7 +99,14 @@ __all__ = [
     "so3_generators",
     "Irrep",
     "Irreps",
+    "IrrepsArray",
+    "zeros",
+    "from_chunks",
+    "sum",
+    "mean",
+    "norm",
     "irrep",
+    "_standardize_axis",
     "Instruction",
     "TensorProduct",
     "FullyConnectedTensorProduct",
