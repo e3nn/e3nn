@@ -2,14 +2,15 @@ import torch
 import torch.utils._pytree as pytree
 from torch.utils._python_dispatch import return_and_correct_aliasing
 from e3nn import o3
-from ._irreps import _MulIr, Irreps
+from e3nn.o3._irreps import _MulIr, Irreps
 from torch._inductor.utils import print_performance
 from attr import attrs, attrib
 from copy import copy
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple, Union, List, Any
 from torch.utils._pytree import tree_map
 import warnings
 import operator
+import numpy as np
 
 
 def _is_ellipse(x):
@@ -24,11 +25,11 @@ class IrrepsArray(object):
     def __init__(
         self,
         irreps: Irreps,
-        input: torch.Tensor,
+        array: torch.Tensor,
         zero_flags: Optional[Tuple] = None,
         chunks: Optional[List[Optional[torch.Tensor]]] = None,
     ):
-        self.array = torch.as_tensor(input)
+        self.array = torch.as_tensor(array)
         self.irreps = Irreps(irreps)
         self._zero_flags = zero_flags
         self._chunks = chunks
@@ -72,7 +73,7 @@ class IrrepsArray(object):
             "IrrepsArray.from_list is deprecated, use e3nn.from_chunks instead.",
             DeprecationWarning,
         )
-        return o3.from_chunks(irreps, chunks, leading_shape, dtype, backend=backend)
+        return o3.experimental.from_chunks(irreps, chunks, leading_shape, dtype, backend=backend)
 
     @property
     def chunks(self) -> List[Optional[torch.Tensor]]:
@@ -92,6 +93,93 @@ class IrrepsArray(object):
                 None if zero else torch.reshape(self.array[..., i], leading_shape + (mul, ir.dim))
                 for zero, i, (mul, ir) in zip(zeros, self.irreps.slices(), self.irreps)
             ]
+
+    def simplify(self) -> "IrrepsArray":
+        r"""Simplify the irreps.
+
+        Examples:
+            >>> IrrepsArray("0e + 0e + 0e", torch.ones(3)).simplify()
+            3x0e [1. 1. 1.]
+
+            >>> IrrepsArray("0e + 0x1e + 0e", torch.ones(2)).simplify()
+            2x0e [1. 1.]
+        """
+        return self.rechunk(self.irreps.simplify())
+
+    def sort(self) -> "IrrepsArray":
+        r"""Sort the irreps.
+
+        Examples:
+            >>> IrrepsArray("0e + 1o + 2x0e", torch.arange(6)).sort()
+            1x0e+2x0e+1x1o [0 4 5 1 2 3]
+        """
+        irreps, p, inv = self.irreps.sort()
+        return o3.experimental.from_chunks(irreps, [self.chunks[i] for i in inv], self.shape[:-1], self.dtype)
+
+    def regroup(self) -> "IrrepsArray":
+        r"""Regroup the same irreps together.
+
+        Equivalent to :meth:`sorted` followed by :meth:`simplify`.
+
+        Examples:
+            >>> IrrepsArray("0e + 1o + 2x0e", torch.arange(6)).regroup()
+            3x0e+1x1o [0 4 5 1 2 3]
+        """
+        return self.sort().simplify()
+
+    @property
+    def __setitem__(self):
+        return _IndexUpdateHelper(self)
+
+    def to(self, dtype) -> "IrrepsArray":
+        r"""Change the dtype of the array.
+
+        Args:
+            dtype (dtype): new dtype
+
+        Returns:
+            IrrepsArray: new IrrepsArray
+        """
+        return IrrepsArray(
+            irreps=self.irreps,
+            array=self.array.to(dtype),
+            zero_flags=self.zero_flags,
+            chunks=tree_map(lambda x: x if x is None else x.to(dtype), self._chunks),
+        )
+
+    def sorted(self) -> "IrrepsArray":
+        warnings.warn(
+            "IrrepsArray.sorted is deprecated, use IrrepsArray.sort instead.",
+            DeprecationWarning,
+        )
+        return self.sort()
+
+    @property
+    def slice_by_mul(self):
+        r"""Return the slice with respect to the multiplicities.
+
+        See also:
+            :meth:`Irreps.slice_by_mul`
+        """
+        return _MulIndexSliceHelper(self)
+
+    @property
+    def slice_by_dim(self):
+        r"""Same as ``__getitem__`` in the irreps dimension.
+
+        See also:
+            :meth:`Irreps.slice_by_dim`
+        """
+        return _DimIndexSliceHelper(self)
+
+    @property
+    def slice_by_chunk(self):
+        r"""Return the slice with respect to the chunks.
+
+        See also:
+            :meth:`Irreps.slice_by_chunk`
+        """
+        return _ChunkIndexSliceHelper(self)
 
     @property
     def zero_flags(self):
@@ -137,9 +225,9 @@ class IrrepsArray(object):
                 return torch.all(x == y, axis=-1)
 
             chunks = [eq(mul, x, y)[..., None] for (mul, ir), x, y in zip(self.irreps, self.chunks, other.chunks)]
-            return o3.from_chunks([(mul, "0e") for mul, _ in self.irreps], chunks, leading_shape, bool)
+            return o3.experimental.from_chunks([(mul, "0e") for mul, _ in self.irreps], chunks, leading_shape, bool)
 
-        other = torch.Tensor(other)
+        other = torch.from_numpy(np.asarray(other))
         if self.irreps.lmax > 0 or (other.ndim > 0 and other.shape[-1] != 1):
             raise ValueError(
                 f"IrrepsArray({self.irreps}, shape={self.shape}) == scalar(shape={other.shape}) is not equivariant."
@@ -158,10 +246,10 @@ class IrrepsArray(object):
         if isinstance(other, (float, int)) and other == 0:
             return self
 
-        if not isinstance(other, o3.IrrepsArray):
+        if not isinstance(other, IrrepsArray):
             if all(ir == "0e" for _, ir in self.irreps):
-                other = torch.Tensor(other)
-                return o3.IrrepsArray(self.irreps, self.array + other)
+                other = torch.from_numpy(np.asarray(other))
+                return IrrepsArray(self.irreps, self.array + other)
             raise ValueError(f"IrrepsArray({self.irreps}, shape={self.shape}) + scalar is not equivariant.")
 
         if self.irreps != other.irreps:
@@ -174,7 +262,7 @@ class IrrepsArray(object):
         if self._chunks is not None and other._chunks is not None:
             chunks = [y if x is None else x if y is None else x + y for x, y in zip(self._chunks, other._chunks)]
 
-        return o3.IrrepsArray(self.irreps, self.array + other.array, zero_flags=zero_flags, chunks=chunks)
+        return IrrepsArray(self.irreps, self.array + other.array, zero_flags=zero_flags, chunks=chunks)
 
     def __radd__(self: "IrrepsArray", other: Union[torch.Tensor, float, int]) -> "IrrepsArray":
         return self + other
@@ -185,7 +273,7 @@ class IrrepsArray(object):
 
         if not isinstance(other, IrrepsArray):
             if all(ir == "0e" for _, ir in self.irreps):
-                other = torch.Tensor(other)
+                other = torch.from_numpy(np.asarray(other))
                 return IrrepsArray(irreps=self.irreps, array=self.array - other)
             raise ValueError(f"IrrepsArray({self.irreps}, shape={self.shape}) - scalar is not equivariant.")
 
@@ -204,99 +292,81 @@ class IrrepsArray(object):
     def __rsub__(self: "IrrepsArray", other: Union[torch.Tensor, float, int]) -> "IrrepsArray":
         return -self + other
 
-    # def __mul__(
-    #     self: "IrrepsArray", other: Union["IrrepsArray", jax.Array]
-    # ) -> "IrrepsArray":  # noqa: D105
-    #     jnp = _infer_backend(self.array)
+    def __mul__(self: "IrrepsArray", other: Union["IrrepsArray", torch.Tensor]) -> "IrrepsArray":  # noqa: D105
+        if isinstance(other, IrrepsArray):
+            if self.irreps.num_irreps != other.irreps.num_irreps:
+                raise ValueError(
+                    f"IrrepsArray({self.irreps}, shape={self.shape}) * IrrepsArray({other.irreps}) "
+                    "only works if the number of irreps is the same."
+                )
+            irreps_out = o3.experimental.elementwise_tensor_product(self.irreps, other.irreps)
+            if irreps_out.num_irreps != self.irreps.num_irreps:
+                raise ValueError(
+                    f"IrrepsArray({self.irreps}, shape={self.shape}) * IrrepsArray({other.irreps}) "
+                    "is only supported for scalar * irreps and irreps * scalar. "
+                    "To perform irreps * irreps use e3nn.elementwise_tensor_product or e3nn.tensor_product."
+                )
+            return o3.experimental.elementwise_tensor_product(self, other)
 
-    #     if isinstance(other, IrrepsArray):
-    #         if self.irreps.num_irreps != other.irreps.num_irreps:
-    #             raise ValueError(
-    #                 f"IrrepsArray({self.irreps}, shape={self.shape}) * IrrepsArray({other.irreps}) "
-    #                 "only works if the number of irreps is the same."
-    #             )
-    #         irreps_out = e3nn.elementwise_tensor_product(self.irreps, other.irreps)
-    #         if irreps_out.num_irreps != self.irreps.num_irreps:
-    #             raise ValueError(
-    #                 f"IrrepsArray({self.irreps}, shape={self.shape}) * IrrepsArray({other.irreps}) "
-    #                 "is only supported for scalar * irreps and irreps * scalar. "
-    #                 "To perform irreps * irreps use e3nn.elementwise_tensor_product or e3nn.tensor_product."
-    #             )
-    #         return e3nn.elementwise_tensor_product(self, other)
+        other = torch.from_numpy(np.asarray(other))
+        if other.ndim > 0 and other.shape[-1] == self.irreps.num_irreps:
+            other = IrrepsArray(f"{other.shape[-1]}x0e", other)
+            return o3.experimental.elementwise_tensor_product(self, other)
 
-    #     other = jnp.asarray(other)
-    #     if other.ndim > 0 and other.shape[-1] == self.irreps.num_irreps:
-    #         other = IrrepsArray(f"{other.shape[-1]}x0e", other)
-    #         return e3nn.elementwise_tensor_product(self, other)
+        if self.irreps.lmax > 0 and other.ndim > 0 and other.shape[-1] != 1:
+            raise ValueError(
+                f"IrrepsArray({self.irreps}, shape={self.shape}) * scalar(shape={other.shape}) is not equivariant."
+            )
 
-    #     if self.irreps.lmax > 0 and other.ndim > 0 and other.shape[-1] != 1:
-    #         raise ValueError(
-    #             f"IrrepsArray({self.irreps}, shape={self.shape}) * scalar(shape={other.shape}) is not equivariant."
-    #         )
+        return IrrepsArray(
+            self.irreps,
+            self.array * other,
+            zero_flags=self.zero_flags,
+            chunks=tree_map(lambda x: None if x is None else x * other[..., None], self._chunks),
+        )
 
-    #     return IrrepsArray(
-    #         self.irreps,
-    #         self.array * other,
-    #         zero_flags=self.zero_flags,
-    #         chunks=tree_map(lambda x: x * other[..., None], self._chunks),
-    #     )
+    def __rmul__(self: "IrrepsArray", other: torch.Tensor) -> "IrrepsArray":  # noqa: D105
+        return self * other
 
-    # def __rmul__(self: "IrrepsArray", other: jax.Array) -> "IrrepsArray":  # noqa: D105
-    #     return self * other
+    def __truediv__(self: "IrrepsArray", other: Union["IrrepsArray", torch.Tensor]) -> "IrrepsArray":  # noqa: D105
+        if isinstance(other, IrrepsArray):
+            if len(other.irreps) == 0 or other.irreps.lmax > 0 or self.irreps.num_irreps != other.irreps.num_irreps:
+                raise ValueError(
+                    f"IrrepsArray({self.irreps}, shape={self.shape}) / IrrepsArray({other.irreps}) is not equivariant."
+                )
 
-    # def __truediv__(
-    #     self: "IrrepsArray", other: Union["IrrepsArray", jax.Array]
-    # ) -> "IrrepsArray":  # noqa: D105
+            if any(x is None for x in other.chunks):
+                raise ValueError("There are deterministic Zeros in the array of the lhs. Cannot divide by Zero.")
+            other = 1.0 / other
+            return o3.experimental.elementwise_tensor_product(self, other)
 
-    #     if isinstance(other, IrrepsArray):
-    #         if (
-    #             len(other.irreps) == 0
-    #             or other.irreps.lmax > 0
-    #             or self.irreps.num_irreps != other.irreps.num_irreps
-    #         ):
-    #             raise ValueError(
-    #                 f"IrrepsArray({self.irreps}, shape={self.shape}) / IrrepsArray({other.irreps}) is not equivariant."
-    #             )
+        other = torch.from_numpy(np.asarray(other))
+        if other.ndim > 0 and other.shape[-1] == self.irreps.num_irreps:
+            other = IrrepsArray(f"{other.shape[-1]}x0e", 1.0 / other)
+            return o3.experimental.elementwise_tensor_product(self, other)
 
-    #         if any(x is None for x in other.chunks):
-    #             raise ValueError(
-    #                 "There are deterministic Zeros in the array of the lhs. Cannot divide by Zero."
-    #             )
-    #         other = 1.0 / other
-    #         return o3.elementwise_tensor_product(self, other)
+        if self.irreps.lmax > 0 and other.ndim > 0 and other.shape[-1] != 1:
+            raise ValueError(
+                f"IrrepsArray({self.irreps}, shape={self.shape}) / scalar(shape={other.shape}) is not equivariant."
+            )
 
-    #     other = torch.Tensor(other)
-    #     if other.ndim > 0 and other.shape[-1] == self.irreps.num_irreps:
-    #         other = IrrepsArray(f"{other.shape[-1]}x0e", 1.0 / other)
-    #         return o3.elementwise_tensor_product(self, other)
+        return IrrepsArray(
+            self.irreps,
+            self.array / other,
+            zero_flags=self.zero_flags,
+            chunks=tree_map(lambda x: None if x is None else x / other[..., None], self._chunks),
+        )
 
-    #     if self.irreps.lmax > 0 and other.ndim > 0 and other.shape[-1] != 1:
-    #         raise ValueError(
-    #             f"IrrepsArray({self.irreps}, shape={self.shape}) / scalar(shape={other.shape}) is not equivariant."
-    #         )
+    def __rtruediv__(self: "IrrepsArray", other: torch.Tensor) -> "IrrepsArray":  # noqa: D105
+        other = torch.from_numpy(np.asarray(other))
+        if self.irreps.lmax > 0:
+            raise ValueError(
+                f"scalar(shape={other.shape}) / IrrepsArray({self.irreps}, shape={self.shape}) is not equivariant."
+            )
+        if any(x is None for x in self.chunks):
+            raise ValueError("There are deterministic Zeros in the array of the lhs. Cannot divide by Zero.")
 
-    #     return IrrepsArray(
-    #         self.irreps,
-    #         self.array / other,
-    #         zero_flags=self.zero_flags,
-    #         chunks=tree_map(lambda x: x / other[..., None], self._chunks),
-    #     )
-
-    # def __rtruediv__(
-    #     self: "IrrepsArray", other: torch.Tensor
-    # ) -> "IrrepsArray":  # noqa: D105
-
-    #     other = torch.Tensor(other)
-    #     if self.irreps.lmax > 0:
-    #         raise ValueError(
-    #             f"scalar(shape={other.shape}) / IrrepsArray({self.irreps}, shape={self.shape}) is not equivariant."
-    #         )
-    #     if any(x is None for x in self.chunks):
-    #         raise ValueError(
-    #             "There are deterministic Zeros in the array of the lhs. Cannot divide by Zero."
-    #         )
-
-    #     return IrrepsArray(self.irreps, other / self.array)
+        return IrrepsArray(self.irreps, other / self.array)
 
     def rechunk(self, irreps: Irreps) -> "IrrepsArray":
         r"""Rechunk the array with new (equivalent) irreps.
@@ -308,7 +378,7 @@ class IrrepsArray(object):
             `IrrepsArray`: new IrrepsArray
 
         Examples:
-            >>> x = e3nn.from_chunks("6x0e + 4x0e", [None, jnp.ones((4, 1))], ())
+            >>> x = e3nn.from_chunks("6x0e + 4x0e", [None, torch.ones((4, 1))], ())
             >>> x.rechunk("5x0e + 5x0e").chunks
             [None, Array([[0.],
                    [1.],
@@ -414,6 +484,16 @@ class IrrepsArray(object):
                     assert x.shape[-2:] == (mul, ir.dim)
 
         return IrrepsArray(irreps, self.array, zero_flags=zero_flags, chunks=new_chunks)
+
+    def broadcast_to(self, shape) -> "IrrepsArray":
+        """Broadcast the array to a new shape."""
+
+        assert isinstance(shape, tuple)
+        assert shape[-1] == self.irreps.dim or shape[-1] == -1
+        leading_shape = shape[:-1]
+        array = torch.broadcast_to(self.array, leading_shape + (self.irreps.dim,))
+        chunks = [None if x is None else torch.broadcast_to(x, leading_shape + x.shape[-2:]) for x in self.chunks]
+        return IrrepsArray(self.irreps, array, zero_flags=self.zero_flags, chunks=chunks)
 
     def __getitem__(self, index) -> "IrrepsArray":  # noqa: D105
         if not isinstance(index, tuple):
@@ -532,3 +612,173 @@ def _standardize_axis(axis: Union[None, int, Tuple[int, ...]], result_ndim: int)
     axis = tuple(i % result_ndim for i in axis)
 
     return tuple(sorted(set(axis)))
+
+
+class _IndexUpdateHelper:
+    def __init__(self, irreps_array) -> None:
+        self.irreps_array = irreps_array
+
+    def __getitem__(self, index):
+        return _IndexUpdateRef(self.irreps_array, index)
+
+
+class _IndexUpdateRef:
+    def __init__(self, irreps_array, index) -> None:
+        self.irreps_array = irreps_array
+        self.index = index
+
+    def set(self, values: Any) -> IrrepsArray:
+        index = self.index
+        self = self.irreps_array
+
+        if not isinstance(index, tuple):
+            index = (index,)
+
+        # Support of x[..., "1e + 2e"]
+        if isinstance(index[-1], (o3.Irrep, _MulIr, Irreps, str)):
+            raise NotImplementedError('x[..., "1e + 2e"] is not implemented')
+
+        # Support of x[..., 3:32]
+        if (
+            (any(map(_is_ellipse, index[:-1])) or len(index) == self.ndim)
+            and isinstance(index[-1], slice)
+            and isinstance(index[-1].start, (int, type(None)))
+            and isinstance(index[-1].stop, (int, type(None)))
+            and index[-1].step is None
+            and (index[-1].start is not None or index[-1].stop is not None)
+        ):
+            raise NotImplementedError("x.at[..., 3:32] is not implemented")
+
+        if len(index) == self.ndim or any(map(_is_ellipse, index)):
+            if not (_is_ellipse(index[-1]) or _is_none_slice(index[-1])):
+                raise IndexError(f"Indexing with {index[-1]} in the irreps dimension is not supported.")
+
+        # Support of x.at[index, :].set(0)
+        if isinstance(values, (int, float)) and values == 0:
+            return IrrepsArray(
+                self.irreps,
+                array=self.array.at[index].set(0),
+                zero_flags=self.zero_flags,
+            )
+
+        # Support of x.at[index, :].set(IrrArray(...))
+        if isinstance(values, IrrepsArray):
+            if self.irreps.simplify() != values.irreps.simplify():
+                raise ValueError("The irreps of the array and the values to set must be the same.")
+
+            values = values.rechunk(self.irreps)
+
+            zero_flags = tuple(x and y for x, y in zip(self.zero_flags, values.zero_flags))
+            return IrrepsArray(
+                self.irreps,
+                self.array.at[index].set(values.array),
+                zero_flags=zero_flags,
+            )
+
+        raise NotImplementedError(f"x.at[i].set(v) with v={type(values)} is not implemented.")
+
+    def add(self, values: Any) -> IrrepsArray:
+        index = self.index
+        self = self.irreps_array
+
+        if not isinstance(index, tuple):
+            index = (index,)
+
+        # Support of x[..., "1e + 2e"]
+        if isinstance(index[-1], (o3.Irrep, _MulIr, Irreps, str)):
+            raise NotImplementedError('x.at[..., "1e + 2e"] is not implemented')
+
+        # Support of x[..., 3:32]
+        if (
+            (any(map(_is_ellipse, index[:-1])) or len(index) == self.ndim)
+            and isinstance(index[-1], slice)
+            and index[-1].step is None
+            and isinstance(index[-1].start, (int, type(None)))
+            and isinstance(index[-1].stop, (int, type(None)))
+            and (index[-1].start is not None or index[-1].stop is not None)
+        ):
+            raise NotImplementedError("x.at[..., 3:32] is not implemented")
+
+        if len(index) == self.ndim or any(map(_is_ellipse, index)):
+            if not (_is_ellipse(index[-1]) or _is_none_slice(index[-1])):
+                raise IndexError(f"Indexing with {index[-1]} in the irreps dimension is not supported.")
+
+        # Support of x.at[index, :].add(IrrArray(...))
+        if isinstance(values, IrrepsArray):
+            if self.irreps.simplify() != values.irreps.simplify():
+                raise ValueError("The irreps of the array and the values to add must be the same.")
+
+            values = values.rechunk(self.irreps)
+
+            zero_flags = tuple(x and y for x, y in zip(self.zero_flags, values.zero_flags))
+            return IrrepsArray(
+                self.irreps,
+                self.array.at[index].add(values.array),
+                zero_flags=zero_flags,
+            )
+
+        raise NotImplementedError(f"x.at[i].add(v) with v={type(values)} is not implemented.")
+
+
+class _MulIndexSliceHelper:
+    irreps_array: IrrepsArray
+
+    def __init__(self, irreps_array) -> None:
+        self.irreps_array = irreps_array
+
+    def __getitem__(self, index: slice) -> Irreps:
+        if not isinstance(index, slice):
+            raise IndexError("IrrepsArray.slice_by_mul only supports one slices (like IrrepsArray.slice_by_mul[2:4]).")
+        start, stop, stride = index.indices(self.irreps_array.irreps.num_irreps)
+        if stride != 1:
+            raise NotImplementedError("IrrepsArray.slice_by_mul does not support strides.")
+
+        irreps = []
+        list = []
+        i = 0
+        for (mul, ir), x in zip(self.irreps_array.irreps, self.irreps_array.chunks):
+            if start <= i and i + mul <= stop:
+                irreps.append((mul, ir))
+                list.append(x)
+            elif start < i + mul and i < stop:
+                irreps.append((min(stop, i + mul) - max(start, i), ir))
+                list.append(x[..., max(start, i) - i : min(stop, i + mul) - i, :])
+
+            i += mul
+        return o3.experimental.from_chunks(
+            irreps,
+            list,
+            self.irreps_array.shape[:-1],
+            self.irreps_array.dtype,
+        )
+
+
+class _DimIndexSliceHelper:
+    irreps_array: IrrepsArray
+
+    def __init__(self, irreps_array) -> None:
+        self.irreps_array = irreps_array
+
+    def __getitem__(self, index: slice) -> Irreps:
+        if not isinstance(index, slice):
+            raise IndexError("IrrepsArray.slice_by_dim only supports slices (like IrrepsArray.slice_by_dim[2:4]).")
+        return self.irreps_array[..., index]
+
+
+class _ChunkIndexSliceHelper:
+    irreps_array: IrrepsArray
+
+    def __init__(self, irreps_array) -> None:
+        self.irreps_array = irreps_array
+
+    def __getitem__(self, index: slice) -> Irreps:
+        if not isinstance(index, slice):
+            raise IndexError("IrrepsArray.slice_by_chunk only supports slices (like IrrepsArray.slice_by_chunk[2:4]).")
+        start, stop, stride = index.indices(len(self.irreps_array.irreps))
+
+        return o3.experimental.from_chunks(
+            self.irreps_array.irreps[start:stop:stride],
+            self.irreps_array.chunks[start:stop:stride],
+            self.irreps_array.shape[:-1],
+            self.irreps_array.dtype,
+        )

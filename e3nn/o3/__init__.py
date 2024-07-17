@@ -30,8 +30,6 @@ from ._rotation import (
 )
 from ._wigner import wigner_D, wigner_3j, change_basis_real_to_complex, su2_generators, so3_generators
 from ._irreps import Irrep, Irreps
-from ._irreps_array import IrrepsArray, _standardize_axis
-from ._basic import from_chunks, zeros, sum, mean, norm
 from ._tensor_product import (
     Instruction,
     TensorProduct,
@@ -41,6 +39,11 @@ from ._tensor_product import (
     TensorSquare,
 )
 from .experimental import FullTensorProductv2
+from .experimental import (
+    IrrepsArray, zeros, from_chunks,
+    sum, mean,
+    norm, _standardize_axis
+)
 
 from ._spherical_harmonics import SphericalHarmonics, spherical_harmonics
 from ._angular_spherical_harmonics import (
@@ -105,8 +108,8 @@ __all__ = [
     "sum",
     "mean",
     "norm",
-    "irrep",
     "_standardize_axis",
+    "irrep",
     "Instruction",
     "TensorProduct",
     "FullyConnectedTensorProduct",
