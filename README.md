@@ -39,7 +39,7 @@ Our community abides by the [Contributor Covenant Code of Conduct](./github/CODE
 
 ## Citing
 
-- Eucledian Neural Networks
+- Euclidean Neural Networks
 ```
 @misc{thomas2018tensorfieldnetworksrotation,
       title={Tensor field networks: Rotation- and translation-equivariant neural networks for 3D point clouds}, 
