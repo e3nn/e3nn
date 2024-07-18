@@ -18,6 +18,7 @@ def _validate_filter_ir_out(filter_ir_out):
         filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
     return filter_ir_out
 
+CG_COEFFS = {}
 
 def tensor_product(
     input1: IrrepsArray,
@@ -83,19 +84,9 @@ def tensor_product(
                 irreps_out.append((mul_1 * mul_2, ir_out))
 
                 if x1 is not None and x2 is not None:
-                    cg = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l)
-
-                    if irrep_normalization == "component":
-                        cg = cg * np.sqrt(ir_out.dim)
-                    elif irrep_normalization == "norm":
-                        cg = cg * np.sqrt(ir_1.dim * ir_2.dim)
-                    elif irrep_normalization == "none":
-                        pass
-                    else:
-                        raise ValueError(f"irrep_normalization={irrep_normalization} not supported")
-
-                    cg = cg.to(x1.dtype)
-                    chunk = torch.einsum("...ui , ...vj , ijk -> ...uvk", x1, x2, cg)
+                    if f"{ir_1.l}_{ir_2.l}_{ir_out.l}" not in CG_COEFFS:
+                        CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"] = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l).to(device=x1.device)
+                    chunk = torch.einsum("...ui , ...vj , ijk -> ...uvk", x1, x2, CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"])
                     chunk = torch.reshape(chunk, chunk.shape[:-3] + (mul_1 * mul_2, ir_out.dim))
                 else:
                     chunk = None

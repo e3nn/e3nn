@@ -1,16 +1,11 @@
 import torch
-import torch.utils._pytree as pytree
-from torch.utils._python_dispatch import return_and_correct_aliasing
 from e3nn import o3
 from e3nn.o3._irreps import _MulIr, Irreps
-from torch._inductor.utils import print_performance
-from attr import attrs, attrib
-from copy import copy
 from typing import Optional, Tuple, Union, List, Any
 from torch.utils._pytree import tree_map
-import warnings
 import operator
 import numpy as np
+import warnings
 
 
 def _is_ellipse(x):
@@ -127,8 +122,7 @@ class IrrepsArray(object):
         """
         return self.sort().simplify()
 
-    @property
-    def __setitem__(self):
+    def at(self):
         return _IndexUpdateHelper(self)
 
     def to(self, dtype) -> "IrrepsArray":
@@ -508,7 +502,7 @@ class IrrepsArray(object):
 
             irreps = Irreps(index[-1])
 
-            ii = [i for i in range(len(self.irreps)) if self.irreps[i : i + len(irreps)] == irreps]
+            ii = [i for i in range(len(self.irreps)) if self.irreps[i: i + len(irreps)] == irreps]
             if len(ii) != 1:
                 raise IndexError(
                     f"Error in IrrepsArray.__getitem__, Can't slice with {irreps} "
@@ -519,8 +513,8 @@ class IrrepsArray(object):
             return IrrepsArray(
                 irreps,
                 self.array[..., self.irreps[:i].dim : self.irreps[: i + len(irreps)].dim],
-                zero_flags=self.zero_flags[i : i + len(irreps)],
-                chunks=self.chunks[i : i + len(irreps)],
+                zero_flags=self.zero_flags[i: i + len(irreps)],
+                chunks=self.chunks[i: i + len(irreps)],
             )[index[:-1] + (slice(None),)]
 
         # Support of x[..., 3:32]

@@ -293,6 +293,7 @@ def normal(
     irreps: o3.Irreps,
     leading_shape: Tuple[int, ...] = (),
     *,
+    device = 'cpu',
     normalize: bool = False,
     normalization: Optional[str] = "component",
     dtype: Optional[torch.dtype] = None,
@@ -314,7 +315,7 @@ def normal(
     if normalize:
         list = []
         for mul, ir in irreps:
-            r = torch.randn(leading_shape + (mul, ir.dim), dtype=dtype)
+            r = torch.randn(leading_shape + (mul, ir.dim), dtype=dtype, device=device)
             r = r / torch.linalg.norm(r, axis=-1, keepdims=True)
             list.append(r)
         return o3.experimental.from_chunks(irreps, list, leading_shape, dtype)
@@ -322,12 +323,12 @@ def normal(
         if normalization == "component":
             return IrrepsArray(
                 irreps,
-                torch.randn(leading_shape + (irreps.dim,), dtype=dtype),
+                torch.randn(leading_shape + (irreps.dim,), dtype=dtype, device=device),
             )
         elif normalization == "norm":
             list = []
             for mul, ir in irreps:
-                r = torch.randn(leading_shape + (mul, ir.dim), dtype=dtype)
+                r = torch.randn(leading_shape + (mul, ir.dim), dtype=dtype, device=device)
                 r = r / np.sqrt(ir.dim)
                 list.append(r)
             return o3.experimental.from_chunks(irreps, list, leading_shape, dtype)

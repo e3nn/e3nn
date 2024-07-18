@@ -140,27 +140,27 @@ def test_operators():
     torch.set_default_dtype(torch.float32)
 
 
-def test_set():
+def test_at_set():
     x = o3.experimental.IrrepsArray("0e + 1e", torch.arange(3 * 4 * 4).reshape((3, 4, 4)))
 
-    x[0, 1] = 0
-    assert x.shape == x.shape
-    np.testing.assert_allclose(y[0, 1].array, 0)
-    np.testing.assert_allclose(y[0, 1].chunks[0], 0)
-    np.testing.assert_allclose(y[0, 1].chunks[1], 0)
-    np.testing.assert_allclose(y[0, 2].array, x[0, 2].array)
-    np.testing.assert_allclose(y[0, 2].chunks[0], x[0, 2].chunks[0])
-    np.testing.assert_allclose(y[0, 2].chunks[1], x[0, 2].chunks[1])
+    y = x.at[0, 1].set(0)
+    assert y.shape == x.shape
+    torch.testing.assert_allclose(y[0, 1].array, 0)
+    torch.testing.assert_allclose(y[0, 1].chunks[0], 0)
+    torch.testing.assert_allclose(y[0, 1].chunks[1], 0)
+    torch.testing.assert_allclose(y[0, 2].array, x[0, 2].array)
+    torch.testing.assert_allclose(y[0, 2].chunks[0], x[0, 2].chunks[0])
+    torch.testing.assert_allclose(y[0, 2].chunks[1], x[0, 2].chunks[1])
 
     v = o3.experimental.IrrepsArray("0e + 1e", torch.arange(4 * 4).reshape((4, 4)))
-    x[1] = v
+    y = x.at[1].set(v)
     assert y.shape == x.shape
-    torch.testing.assert_allclose(x[1].array, v.array)
-    torch.testing.assert_allclose(x[1].chunks[0], v.chunks[0])
-    torch.testing.assert_allclose(x[1].chunks[1], v.chunks[1])
-    torch.testing.assert_allclose(x[0].array, x[0].array)
-    torch.testing.assert_allclose(x[0].chunks[0], x[0].chunks[0])
-    torch.testing.assert_allclose(x[0].chunks[1], x[0].chunks[1])
+    np.testing.assert_allclose(y[1].array, v.array)
+    np.testing.assert_allclose(y[1].chunks[0], v.chunks[0])
+    np.testing.assert_allclose(y[1].chunks[1], v.chunks[1])
+    np.testing.assert_allclose(y[0].array, x[0].array)
+    np.testing.assert_allclose(y[0].chunks[0], x[0].chunks[0])
+    np.testing.assert_allclose(y[0].chunks[1], x[0].chunks[1])
 
 
 def test_at_add():
@@ -173,7 +173,7 @@ def test_at_add():
         (2,),
     )
     v = o3.experimental.from_chunks("1e + 0e + 0e + 0e", [None, f(1, 1), None, f(1, 1)], ())
-    x[0] += v
+    y1 = x.at[0].add(v)
     y2 = o3.experimental.IrrepsArray(x.irreps, x.array.at[0].add(v.array))
     np.testing.assert_array_equal(y1.array, y2.array)
     assert y1.chunks[0] is None
