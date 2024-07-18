@@ -258,7 +258,7 @@ class Irrep(tuple):
         raise NotImplementedError
 
     def __len__(self):
-        raise NotImplementedError
+        return NotImplementedError
 
 
 class _MulIr(tuple):
