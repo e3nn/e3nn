@@ -9,5 +9,5 @@ class Chunk(NamedTuple):
 
 class Path(NamedTuple):
     input_1_slice: Chunk
-    input_2_slice: Chunk
-    output_slice: Chunk
+    input_2_slice: Optional[Chunk] = None
+    output_slice: Optional[Chunk] = None
