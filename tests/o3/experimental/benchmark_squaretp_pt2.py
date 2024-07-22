@@ -23,11 +23,11 @@ def main():
     from torch import nn
     import time
 
-    LMAX = 8
-    CHANNEL = 128
+    LMAX = 3
+    CHANNEL = 32
     BATCH = 100
 
-    for lmax in range(1, LMAX + 1):
+    for lmax in range(LMAX, LMAX + 1):
         irreps = o3.Irreps.spherical_harmonics(lmax)
         irreps_x = (CHANNEL * irreps).regroup()
         x = irreps_x.randn(BATCH, -1).to(device=device)
