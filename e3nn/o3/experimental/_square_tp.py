@@ -143,7 +143,7 @@ class TensorSquare(nn.Module):
         for (l1, l2, l3), ((mul_in, input_dim, slice_in), _, (output_mul, output_dim, _)) in self.paths_uk.items():
             x = input[..., slice_in].reshape(-1, mul_in, input_dim)
             cg = getattr(self, f"cg_{l1}_{l2}_{l3}")
-            chunk = torch.einsum("...ui, ...vj, ijk -> ...uk", x, x, cg)
+            chunk = torch.einsum("...ui, ...uj, ijk -> ...uk", x, x, cg)
             chunk = torch.reshape(chunk, chunk.shape[:-2] + (output_mul * output_dim,))
             chunks.append(chunk)
 
