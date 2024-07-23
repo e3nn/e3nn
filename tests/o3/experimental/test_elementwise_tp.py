@@ -3,8 +3,7 @@ from e3nn import o3
 import pytest
 
 
-@pytest.mark.parametrize("irreps_in1", ["2x0e + 1e"])
-@pytest.mark.parametrize("irreps_in2", ["2x0o + 1e"])
+@pytest.mark.parametrize("irreps_in1, irreps_in2", [("10x0e", "5x0e + 5x1o"), ("2x0e + 1x1e", "2x0o + 1e")])
 def test_elementwise_tp(irreps_in1, irreps_in2):
 
     irreps_in1 = o3.Irreps(irreps_in1)

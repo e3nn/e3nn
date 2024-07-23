@@ -1,5 +1,6 @@
 # flake8: noqa
 
+from typing import Tuple
 from e3nn.util.datatypes import Path, Chunk
 from e3nn import o3
 
@@ -7,6 +8,31 @@ import torch
 from torch import nn
 import numpy as np
 from ._full_tp import _prepare_inputs
+
+
+def _align_two_irreps(irreps1: o3.Irreps, irreps2: o3.Irreps) -> Tuple[o3.Irreps, o3.Irreps]:
+    assert irreps1.num_irreps == irreps2.num_irreps
+
+    irreps1 = list(irreps1)
+    irreps2 = list(irreps2)
+
+    i = 0
+    while i < min(len(irreps1), len(irreps2)):
+        mul_1, ir_1 = irreps1[i]
+        mul_2, ir_2 = irreps2[i]
+
+        if mul_1 < mul_2:
+            irreps2[i] = (mul_1, ir_2)
+            irreps2.insert(i + 1, (mul_2 - mul_1, ir_2))
+
+        if mul_2 < mul_1:
+            irreps1[i] = (mul_2, ir_1)
+            irreps1.insert(i + 1, (mul_1 - mul_2, ir_1))
+
+        i += 1
+
+    assert [mul for mul, _ in irreps1] == [mul for mul, _ in irreps2]
+    return o3.Irreps(irreps1), o3.Irreps(irreps2)
 
 
 class ElementwiseTensorProduct(nn.Module):
@@ -26,6 +52,8 @@ class ElementwiseTensorProduct(nn.Module):
                 "o3.ElementwiseTensorProductv2: inputs must have the same number of irreps, "
                 f"got {irreps_in1.num_irreps} and {irreps_in2.num_irreps}"
             )
+
+        irreps_in1, irreps_in2 = _align_two_irreps(irreps_in1, irreps_in2)
 
         paths = {}
         irreps_out = []
@@ -59,8 +87,6 @@ class ElementwiseTensorProduct(nn.Module):
         input2: torch.Tensor,
     ) -> torch.Tensor:
         input1, input2, leading_shape = _prepare_inputs(input1, input2)
-
-        # Assumes that input1 and input2 are aligned
 
         chunks = []
         for (l1, l2, l3), (
