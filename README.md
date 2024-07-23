@@ -38,6 +38,40 @@ If you want to get involved in and contribute to the development, improvement, a
 Our community abides by the [Contributor Covenant Code of Conduct](./github/CODE_OF_CONDUCT.md).
 
 ## Citing
+
+- Euclidean Neural Networks
+```
+@misc{thomas2018tensorfieldnetworksrotation,
+      title={Tensor field networks: Rotation- and translation-equivariant neural networks for 3D point clouds}, 
+      author={Nathaniel Thomas and Tess Smidt and Steven Kearnes and Lusann Yang and Li Li and Kai Kohlhoff and Patrick Riley},
+      year={2018},
+      eprint={1802.08219},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/1802.08219}, 
+}
+
+@misc{weiler20183dsteerablecnnslearning,
+      title={3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data}, 
+      author={Maurice Weiler and Mario Geiger and Max Welling and Wouter Boomsma and Taco Cohen},
+      year={2018},
+      eprint={1807.02547},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/1807.02547}, 
+}
+
+@misc{kondor2018clebschgordannetsfullyfourier,
+      title={Clebsch-Gordan Nets: a Fully Fourier Space Spherical Convolutional Neural Network}, 
+      author={Risi Kondor and Zhen Lin and Shubhendu Trivedi},
+      year={2018},
+      eprint={1806.09231},
+      archivePrefix={arXiv},
+      primaryClass={stat.ML},
+      url={https://arxiv.org/abs/1806.09231}, 
+}
+```
+- e3nn
 ```
 @misc{e3nn_paper,
     doi = {10.48550/ARXIV.2207.09453},
