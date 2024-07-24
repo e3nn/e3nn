@@ -12,4 +12,5 @@ def test_fulltp(irreps_in1, irreps_in2):
     tp_pt2 = torch.compile(o3.experimental.FullTensorProductv2(irreps_in1, irreps_in2), fullgraph=True)
     tp = o3.FullTensorProduct(irreps_in1, irreps_in2)
 
+    assert tp_pt2.irreps_out == tp.irreps_out
     torch.testing.assert_close(tp_pt2(x, y), tp(x, y))

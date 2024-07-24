@@ -17,4 +17,5 @@ def test_elementwise_tp(irreps_in1, irreps_in2):
     result_tp = tp(x1, x2)
     result_tp2 = tp_pt2(x1, x2)
 
+    assert tp.irreps_out == tp_pt2.irreps_out
     torch.testing.assert_close(result_tp, result_tp2)
