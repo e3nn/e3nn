@@ -1,7 +1,10 @@
 # flake8: noqa
 
 
-def main():
+from e3nn import o3
+
+
+def run_benchmark(irreps_type):
     import torch
     from torch._inductor.utils import print_performance
 
@@ -14,11 +17,9 @@ def main():
     torch._inductor.config.triton.unique_kernel_names = True
 
     device = "cuda"
-    compile_mode = (
-        "max-autotune"  # Bringing out all of the tricks that Torch 2.0 has but "reduce-overhead" should work as well
-    )
+    compile_mode = "max-autotune"  # Use reduce-overhead for quick compile times
 
-    from e3nn import o3, util
+    from e3nn import o3
     import numpy as np
     from torch import nn
     import time
@@ -27,32 +28,36 @@ def main():
     CHANNEL = 128
     BATCH = 100
 
+    module = o3
+
     for lmax in range(1, LMAX + 1):
-        irreps = o3.Irreps.spherical_harmonics(lmax)
+        irreps = module.Irreps.spherical_harmonics(lmax)
+
         irreps_x = (CHANNEL * irreps).regroup()
         x = irreps_x.randn(BATCH, -1).to(device=device)
-        irreps_y = irreps
+        irreps_y = (irreps).regroup()
         y = irreps_y.randn(BATCH, -1).to(device=device)
-        print(f"{irreps_x} \otimes {irreps_y}")
+        print(f"{irreps_type.upper()}: {irreps_x} \otimes {irreps_y}")
 
-        tp = o3.FullTensorProduct(irreps_x, irreps_y)  # Doesnt work with fullgraph=True
-
-        tp_jit_compile = util.jit.compile(tp).to(device=device)
+        tp = module.FullTensorProduct(irreps_x, irreps_y)
 
         tp_compile = torch.compile(tp, mode=compile_mode).to(device=device)
         print(
-            f"TP JIT lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_jit_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
-        )
-
-        print(
-            f"TP Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
+            f"{irreps_type.upper()} TP lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
         )
 
         tp_experimental = o3.experimental.FullTensorProductv2(irreps_x, irreps_y)
+
         tp_experimental_compile = torch.compile(tp_experimental, mode=compile_mode, fullgraph=True).to(device=device)
         print(
-            f"TP Experimental Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_experimental_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
+            f"{irreps_type.upper()} TP Experimental lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_experimental_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
         )
+
+
+def main():
+    for irreps_type in ["o3"]:
+        print(f"\nRunning benchmark for {irreps_type.upper()}")
+        run_benchmark(irreps_type)
 
 
 if __name__ == "__main__":

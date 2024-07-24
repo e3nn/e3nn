@@ -1,7 +1,8 @@
-# flake8: noqa
-
 from e3nn.util.datatypes import Path, Chunk
+from typing import Union, Callable, Optional
 from e3nn import o3
+from e3nn.util.datatypes import O3Context
+from ._basic import from_chunks
 
 import torch
 from torch import nn
@@ -10,10 +11,8 @@ import numpy as np
 
 def _prepare_inputs(input1, input2):
     dtype = torch.promote_types(input1.dtype, input2.dtype)
-
     input1 = input1.to(dtype=dtype)
     input2 = input2.to(dtype=dtype)
-
     leading_shape = torch.broadcast_shapes(input1.shape[:-1], input2.shape[:-1])
     input1 = input1.broadcast_to(leading_shape + (-1,))
     input2 = input2.broadcast_to(leading_shape + (-1,))
@@ -23,74 +22,72 @@ def _prepare_inputs(input1, input2):
 class FullTensorProduct(nn.Module):
     def __init__(
         self,
-        irreps_in1: o3.Irreps,
-        irreps_in2: o3.Irreps,
+        irreps_in1: Union[o3.Irreps],
+        irreps_in2: Union[o3.Irreps],
         *,
-        filter_ir_out: o3.Irreps = None,
+        filter_ir_out: Optional[Callable] = None,
         irrep_normalization: str = "component",
         regroup_output: bool = True,
     ):
-        """Tensor Product adapted from https://github.com/e3nn/e3nn-jax/blob/cf37f3e95264b34587b3a202ea4c3eb82597307e/e3nn_jax/_src/tensor_products.py#L40-L135"""
-        super(FullTensorProduct, self).__init__()
+        super().__init__()
+        if isinstance(irreps_in1, o3.Irreps):
+            self.context = O3Context()
+        else:
+            raise ValueError("Must be instances of o3.Irreps")
 
-        if regroup_output:
-            irreps_in1 = o3.Irreps(irreps_in1).regroup()
-            irreps_in2 = o3.Irreps(irreps_in2).regroup()
+        if not isinstance(irreps_in1, type(irreps_in2)):
+            raise ValueError("Both irreps_in1 and irreps_in2 must be of the same Irreps type")
+
+        self.irrep_normalization = irrep_normalization
+        self.regroup_output = regroup_output
+        self.filter_ir_out = filter_ir_out
+
+        if self.regroup_output:
+            self.irreps_in1 = self.context._Irreps(irreps_in1).regroup()
+            self.irreps_in2 = self.context._Irreps(irreps_in2).regroup()
 
         paths = {}
         irreps_out = []
-        for (mul_1, ir_1), slice_1 in zip(irreps_in1, irreps_in1.slices()):
-            for (mul_2, ir_2), slice_2 in zip(irreps_in2, irreps_in2.slices()):
+        for (mul_1, ir_1), slice_1 in zip(self.irreps_in1, self.irreps_in1.slices()):
+            for (mul_2, ir_2), slice_2 in zip(self.irreps_in2, self.irreps_in2.slices()):
                 for ir_out in ir_1 * ir_2:
                     if filter_ir_out is not None and ir_out not in filter_ir_out:
                         continue
-                    cg = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l)
-                    if irrep_normalization == "component":
+                    cg = self.context.clebsch_gordan(ir_1, ir_2, ir_out)
+                    if self.irrep_normalization == "component":
                         cg *= np.sqrt(ir_out.dim)
-                    elif irrep_normalization == "norm":
+                    elif self.irrep_normalization == "norm":
                         cg *= np.sqrt(ir_1.dim * ir_2.dim)
                     else:
-                        raise ValueError(f"irrep_normalization={irrep_normalization} not supported")
-                    self.register_buffer(f"cg_{ir_1.l}_{ir_2.l}_{ir_out.l}", cg)
-                    paths[(ir_1.l, ir_2.l, ir_out.l)] = Path(
-                        Chunk(mul_1, ir_1.dim, slice_1), Chunk(mul_2, ir_2.dim, slice_2), Chunk(mul_1 * mul_2, ir_out.dim)
-                    )
-                    irreps_out.append((mul_1 * mul_2, ir_out))
-        self.paths = paths
-        irreps_out = o3.Irreps(irreps_out)
-        self.irreps_out, _, self.inv = irreps_out.sort()
-        self.irreps_in1 = irreps_in1
-        self.irreps_in2 = irreps_in2
+                        raise ValueError(f"irrep_normalization={self.irrep_normalization} not supported")
 
-    def forward(
-        self,
-        input1: torch.Tensor,
-        input2: torch.Tensor,
-    ) -> torch.Tensor:
+                    path_hash = self.context.path_hash(ir_1, ir_2, ir_out)
+                    self.register_buffer(f"cg_{path_hash}", cg)
+
+                    paths[path_hash] = Path(
+                        input_1_chunk=Chunk(mul_1, ir_1.dim, slice_1),
+                        input_2_chunk=Chunk(mul_2, ir_2.dim, slice_2),
+                        output_chunk=Chunk(mul_1 * mul_2, ir_out.dim, ir_out.dim),
+                    )
+
+                    irreps_out.append((mul_1 * mul_2, ir_out))
+
+        self.paths = paths
+        self.irreps_out, _, self.inv = self.context._Irreps(irreps_out).sort()
+
+    def forward(self, input1: torch.Tensor, input2: torch.Tensor) -> torch.Tensor:
         input1, input2, leading_shape = _prepare_inputs(input1, input2)
         chunks = []
-        for (l1, l2, l3), (
-            (mul_1, input_dim1, slice_1),
-            (mul_2, input_dim2, slice_2),
-            (output_mul, output_dim, _),
-        ) in self.paths.items():
-            x1 = input1[..., slice_1].reshape(
-                leading_shape
-                + (
-                    mul_1,
-                    input_dim1,
-                )
+        for path_hash, path in self.paths.items():
+            x1 = input1[..., path.input_1_chunk.slice].reshape(
+                leading_shape + (path.input_1_chunk.mul, path.input_1_chunk.dim)
             )
-            x2 = input2[..., slice_2].reshape(
-                leading_shape
-                + (
-                    mul_2,
-                    input_dim2,
-                )
+            x2 = input2[..., path.input_2_chunk.slice].reshape(
+                leading_shape + (path.input_2_chunk.mul, path.input_2_chunk.dim)
             )
-            cg = getattr(self, f"cg_{l1}_{l2}_{l3}")
+            cg = getattr(self, f"cg_{path_hash}")
             chunk = torch.einsum("...ui, ...vj, ijk -> ...uvk", x1, x2, cg)
-            chunk = torch.reshape(chunk, chunk.shape[:-3] + (output_mul * output_dim,))
+            chunk = torch.reshape(chunk, chunk.shape[:-3] + (path.output_chunk.mul * path.output_chunk.dim,))
             chunks.append(chunk)
 
-        return torch.cat([chunks[i] for i in self.inv], dim=-1)
+        return from_chunks(chunks, self.inv)
