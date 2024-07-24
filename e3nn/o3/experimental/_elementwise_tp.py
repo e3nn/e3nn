@@ -57,7 +57,7 @@ class ElementwiseTensorProduct(nn.Module):
 
         paths = {}
         irreps_out = []
-        for (mul_1, ir_1), slice_1, (mul_2, ir_2), slice_2 in zip(
+        for (mul_1, ir_1), slice_1, (_, ir_2), slice_2 in zip(
             irreps_in1, irreps_in1.slices(), irreps_in2, irreps_in2.slices()
         ):
             for ir_out in ir_1 * ir_2:
@@ -74,7 +74,7 @@ class ElementwiseTensorProduct(nn.Module):
                 paths[(ir_1.l, ir_2.l, ir_out.l)] = Path(
                     Chunk(mul_1, ir_1.dim, slice_1), Chunk(mul_1, ir_2.dim, slice_2), Chunk(mul_1, ir_out.dim)
                 )
-                irreps_out.append((mul_1 * mul_2, ir_out))
+                irreps_out.append((mul_1, ir_out))
         self.paths = paths
         irreps_out = o3.Irreps(irreps_out)
         self.irreps_out, _, self.inv = irreps_out.sort()
