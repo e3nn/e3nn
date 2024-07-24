@@ -51,7 +51,7 @@ class FullTensorProduct(nn.Module):
         for (mul_1, ir_1), slice_1 in zip(self.irreps_in1, self.irreps_in1.slices()):
             for (mul_2, ir_2), slice_2 in zip(self.irreps_in2, self.irreps_in2.slices()):
                 for ir_out in ir_1 * ir_2:
-                    if self.filter_ir_out and not self.filter_ir_out(ir_out):
+                    if filter_ir_out is not None and ir_out not in filter_ir_out:
                         continue
                     cg = self.context.clebsch_gordan(ir_1, ir_2, ir_out)
                     if self.irrep_normalization == "component":
