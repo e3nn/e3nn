@@ -1,6 +1,9 @@
 # flake8: noqa
 
 
+from e3nn import o3
+
+
 def run_benchmark(irreps_type):
     import torch
     from torch._inductor.utils import print_performance
@@ -16,7 +19,7 @@ def run_benchmark(irreps_type):
     device = "cuda"
     compile_mode = "max-autotune"  # Use reduce-overhead for quick compile times
 
-    from e3nn import o3, experimental
+    from e3nn import o3
     import numpy as np
     from torch import nn
     import time
@@ -43,7 +46,7 @@ def run_benchmark(irreps_type):
             f"{irreps_type.upper()} TP lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
         )
 
-        tp_experimental = experimental.FullTensorProductv2(irreps_x, irreps_y)
+        tp_experimental = o3.experimental.FullTensorProductv2(irreps_x, irreps_y)
 
         tp_experimental_compile = torch.compile(tp_experimental, mode=compile_mode, fullgraph=True).to(device=device)
         print(

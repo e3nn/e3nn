@@ -5,7 +5,7 @@ from e3nn import o3
 from e3nn.util.datatypes import Chunk
 
 
-class Linearv2(nn.Module):
+class Linear(nn.Module):
     def __init__(
         self,
         irreps_in: o3.Irreps,

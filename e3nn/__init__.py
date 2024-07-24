@@ -33,4 +33,3 @@ def get_optimization_defaults() -> Dict[str, bool]:
 from e3nn import o3 as o3  # noqa: F401, E402
 from e3nn import nn as nn  # noqa: F401, E402
 from e3nn import io as io  # noqa: F401, E402
-from e3nn import experimental as experimental  # noqa: F401, E402

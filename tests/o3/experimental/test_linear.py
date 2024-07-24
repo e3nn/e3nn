@@ -2,7 +2,7 @@ import e3nn_jax
 import jax
 import numpy as np
 import torch
-from e3nn.experimental import Linearv2
+from e3nn import o3
 import pytest
 
 
@@ -25,6 +25,6 @@ def test_linear(irreps_in, irreps_out):
     output = linear.apply(weight, input)
 
     weight_c = np.concatenate([w.ravel() for w in weight["params"].values()])
-    linear = Linearv2(irreps_in, irreps_out)
+    linear = o3.experimental.Linearv2(irreps_in, irreps_out)
     output_torch = linear(torch.from_numpy(np.asarray(input.array)), torch.from_numpy(weight_c))
     assert np.allclose(output_torch.numpy(), output.array, rtol=1e-5, atol=1e-6)
