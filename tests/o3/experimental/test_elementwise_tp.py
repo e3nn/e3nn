@@ -3,7 +3,7 @@ from e3nn import o3
 import pytest
 
 
-@pytest.mark.parametrize("irreps_in1, irreps_in2", [("10x0e", "5x0e + 5x1o"), ("2x0e + 1x1e", "2x0o + 1x1e")])
+@pytest.mark.parametrize("irreps_in1, irreps_in2", [("15x0e", "5x0e + 5x1o + 5x1e"), ("2x0e + 1x1e", "2x0o + 1x1e")])
 def test_elementwise_tp(irreps_in1, irreps_in2):
 
     irreps_in1 = o3.Irreps(irreps_in1)
@@ -17,4 +17,5 @@ def test_elementwise_tp(irreps_in1, irreps_in2):
     result_tp = tp(x1, x2)
     result_tp2 = tp_pt2(x1, x2)
 
+    assert tp.irreps_out == tp_pt2.irreps_out
     torch.testing.assert_close(result_tp, result_tp2)
