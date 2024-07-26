@@ -5,13 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.5.2] - 2024-07
 ### Added
 - `o3.experimental.FullTensorProductv2` for compatibility with `torch.compile(..., fulgraph=True)`
 - enable `pip` caching in CI
+- Optional scalar bias term in `_batchnorm.py`
+
+### Changed
 - refactor to use `pyproject.toml` for packaging
 - refactor `gh` community files
 - move `pylint`, `coverage` and `flake8` configuration to `pyproject.toml`
-- Optional scalar bias term in `_batchnorm.py`
+
+### Fixed
+- Fix TorchScript warning "doesn't support instance-level annotations" (#437)
 
 ## [0.5.1] - 2022-12-12
 ### Added
