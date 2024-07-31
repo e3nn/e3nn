@@ -24,7 +24,7 @@ def main():
     import time
 
     LMAX = 3
-    CHANNEL = 32
+    CHANNEL = 128
     BATCH = 100
 
     for lmax in range(LMAX, LMAX + 1):
