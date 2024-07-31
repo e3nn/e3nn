@@ -25,9 +25,9 @@ class TensorSquare(nn.Module):
         if regroup_output:
             irreps_in = o3.Irreps(irreps_in).regroup()
 
-        paths_uvk = {}
-        paths_wk = {}
-        paths_uk = {}
+        paths_uvuv = {}
+        paths_uvw = {}
+        paths_uuu = {}
         irreps_out = []
         for i_1, ((mul_1, ir_1), slice_1) in enumerate(zip(irreps_in, irreps_in.slices())):
             for i_2, ((mul_2, ir_2), slice_2) in enumerate(zip(irreps_in, irreps_in.slices())):
@@ -52,7 +52,7 @@ class TensorSquare(nn.Module):
                             raise ValueError(f"irrep_normalization={irrep_normalization}")
 
                     if i_1 < i_2:
-                        paths_uvk[(ir_1.l, ir_2.l, ir_out.l)] = Path(
+                        paths_uvw[(ir_1.l, ir_1.p, ir_2.l, ir_2.p, ir_out.l, ir_out.p)] = Path(
                             Chunk(mul_1, ir_1.dim, slice_1), Chunk(mul_2, ir_2.dim, slice_2), Chunk(mul_1 * mul_2, ir_out.dim)
                         )
                         irreps_out.append((mul_1 * mul_2, ir_out))
@@ -62,7 +62,7 @@ class TensorSquare(nn.Module):
                             uvw = torch.zeros((mul_1, mul_1, mul_1 * (mul_1 - 1) // 2))
                             i, j = zip(*itertools.combinations(range(mul_1), 2))
                             uvw[i, j, torch.arange(len(i))] = 1
-                            paths_wk[(ir_1.l, ir_2.l, ir_out.l)] = Path(
+                            paths_uvuv[(ir_1.l, ir_1.p, ir_2.l, ir_2.p, ir_out.l, ir_out.p)] = Path(
                                 input_1_slice=Chunk(mul_1, ir_1.dim, slice_1),
                                 output_slice=Chunk(int(uvw.shape[-1]), ir_out.dim),
                             )
@@ -100,7 +100,7 @@ class TensorSquare(nn.Module):
                                 else:
                                     raise ValueError(f"irrep_normalization={irrep_normalization}")
                             irreps_out.append((mul_1, ir_out))
-                            paths_uk[(ir_1.l, ir_2.l, ir_out.l)] = Path(
+                            paths_uuu[(ir_1.l, ir_1.p, ir_2.l, ir_2.p, ir_out.l, ir_out.p)] = Path(
                                 input_1_slice=Chunk(mul_1, ir_1.dim, slice_1), output_slice=Chunk(mul_1, ir_out.dim)
                             )
 
@@ -108,9 +108,9 @@ class TensorSquare(nn.Module):
                     cg *= np.sqrt(alpha)
                     self.register_buffer(f"cg_{ir_1.l}_{ir_2.l}_{ir_out.l}", cg)
 
-        self.paths_uvk = paths_uvk
-        self.paths_wk = paths_wk
-        self.paths_uk = paths_uk
+        self.paths_uvuv = paths_uvuv
+        self.paths_uvw = paths_uvw
+        self.paths_uuu = paths_uuu
         irreps_out = o3.Irreps(irreps_out)
         self.irreps_out, _, self.inv = irreps_out.sort()
         self.irreps_in = irreps_in
@@ -120,11 +120,11 @@ class TensorSquare(nn.Module):
         input: torch.Tensor,
     ) -> torch.Tensor:
         chunks = []
-        for (l1, l2, l3), (
+        for (l1, _, l2, _, l3, _), (
             (mul_1, input_dim1, slice_1),
             (mul_2, input_dim2, slice_2),
             (output_mul, output_dim, _),
-        ) in self.paths_uvk.items():
+        ) in self.paths_uvw.items():
             x1 = input[..., slice_1].reshape(-1, mul_1, input_dim1)
             x2 = input[..., slice_2].reshape(-1, mul_2, input_dim2)
             cg = getattr(self, f"cg_{l1}_{l2}_{l3}")
@@ -132,7 +132,7 @@ class TensorSquare(nn.Module):
             chunk = torch.reshape(chunk, chunk.shape[:-3] + (output_mul * output_dim,))
             chunks.append(chunk)
 
-        for (l1, l2, l3), ((mul_in, input_dim, slice_in), _, (output_mul, output_dim, _)) in self.paths_wk.items():
+        for (l1, _, l2, _, l3, _), ((mul_in, input_dim, slice_in), _, (output_mul, output_dim, _)) in self.paths_uvuv.items():
             x = input[..., slice_in].reshape(-1, mul_in, input_dim)
             cg = getattr(self, f"cg_{l1}_{l2}_{l3}")
             uvw = getattr(self, f"uvw_{l1}_{l2}_{l3}")
@@ -140,7 +140,7 @@ class TensorSquare(nn.Module):
             chunk = torch.reshape(chunk, chunk.shape[:-2] + (output_mul * output_dim,))
             chunks.append(chunk)
 
-        for (l1, l2, l3), ((mul_in, input_dim, slice_in), _, (output_mul, output_dim, _)) in self.paths_uk.items():
+        for (l1, _, l2, _, l3, _), ((mul_in, input_dim, slice_in), _, (output_mul, output_dim, _)) in self.paths_uuu.items():
             x = input[..., slice_in].reshape(-1, mul_in, input_dim)
             cg = getattr(self, f"cg_{l1}_{l2}_{l3}")
             chunk = torch.einsum("...ui, ...uj, ijk -> ...uk", x, x, cg)
