@@ -7,9 +7,10 @@ class Chunk(NamedTuple):
     slice: Optional[slice] = None
 
 class TensorProductMode(Enum):
-    UUU = auto()
-    UVUV = auto()
-    UVW = auto()
+    UUU = "uuu"
+    UVUV = "uvuv"
+    UVW = "uvw"
+    UVU_V = "uvu<v"
 
 class Path(NamedTuple):
     input_1_slice: Chunk
