@@ -16,4 +16,4 @@ class Path(NamedTuple):
     input_1_slice: Chunk
     input_2_slice: Optional[Chunk] = None
     output_slice: Optional[Chunk] = None
-    tensor_product_mode: TensorProductMode = TensorProductMode.UUU
+    tensor_product_mode: TensorProductMode = TensorProductMode.UVW
