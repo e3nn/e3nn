@@ -54,21 +54,21 @@ class TensorSquare(nn.Module):
                             Chunk(mul_1, ir_1.dim, slice_1),
                             Chunk(mul_2, ir_2.dim, slice_2),
                             Chunk(mul_1 * mul_2, ir_out.dim),
-                            tensor_product_mode=TensorProductMode.UVW
+                            tensor_product_mode=TensorProductMode.UVUV
                         )
                         irreps_out.append((mul_1 * mul_2, ir_out))
                     elif i_1 == i_2:
                         if mul_1 > 1:
                             irreps_out.append((mul_1 * (mul_1 - 1) // 2, ir_out))
-                            uvw = torch.zeros((mul_1, mul_1, mul_1 * (mul_1 - 1) // 2))
+                            uvu_v = torch.zeros((mul_1, mul_1, mul_1 * (mul_1 - 1) // 2))
                             i, j = zip(*itertools.combinations(range(mul_1), 2))
-                            uvw[i, j, torch.arange(len(i))] = 1
+                            uvu_v[i, j, torch.arange(len(i))] = 1
                             paths[(ir_1.l, ir_1.p, ir_2.l, ir_2.p, ir_out.l, ir_out.p)] = Path(
                                 input_1_slice=Chunk(mul_1, ir_1.dim, slice_1),
-                                output_slice=Chunk(int(uvw.shape[-1]), ir_out.dim),
-                                tensor_product_mode=TensorProductMode.UVUV
+                                output_slice=Chunk(int(uvu_v.shape[-1]), ir_out.dim),
+                                tensor_product_mode=TensorProductMode.UVU_V
                             )
-                            self.register_buffer(f"uvw_{ir_1.l}_{ir_2.l}_{ir_out.l}", uvw)
+                            self.register_buffer(f"uvu<v_{ir_1.l}_{ir_2.l}_{ir_out.l}", uvu_v)
 
                         if ir_out.l % 2 == 0:
                             if normalized_input:
@@ -124,7 +124,7 @@ class TensorSquare(nn.Module):
         chunks = []
         for (l1, _, l2, _, l3, _), path in self.paths.items():
             match path.tensor_product_mode:
-                case TensorProductMode.UVW:
+                case TensorProductMode.UVUV:
                     ((mul_1, input_dim1, slice_1),
                      (mul_2, input_dim2, slice_2),
                      (output_mul, output_dim, _), (_)) = path
@@ -135,11 +135,11 @@ class TensorSquare(nn.Module):
                     chunk = torch.reshape(chunk, chunk.shape[:-3] + (output_mul * output_dim,))
                     chunks.append(chunk)
 
-                case TensorProductMode.UVUV:
+                case TensorProductMode.UVU_V:
                     ((mul_in, input_dim, slice_in), _, (output_mul, output_dim, _), (_)) = path
                     x = input[..., slice_in].reshape(-1, mul_in, input_dim)
                     cg = getattr(self, f"cg_{l1}_{l2}_{l3}")
-                    uvw = getattr(self, f"uvw_{l1}_{l2}_{l3}")
+                    uvw = getattr(self, f"uvu<v_{l1}_{l2}_{l3}")
                     chunk = torch.einsum("...ui, ...vj, ijk, uvw -> ...wk", x, x, cg, uvw)
                     chunk = torch.reshape(chunk, chunk.shape[:-2] + (output_mul * output_dim,))
                     chunks.append(chunk)
