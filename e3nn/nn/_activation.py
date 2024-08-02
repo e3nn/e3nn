@@ -42,7 +42,7 @@ class Activation(torch.nn.Module):
 
         from e3nn.util._argtools import _get_device
 
-        paths = {}
+        paths = []
         irreps_out = []
         for (mul, (l_in, p_in)), act in zip(irreps_in, acts):
             if act is not None:
@@ -69,13 +69,11 @@ class Activation(torch.nn.Module):
                     )
             else:
                 irreps_out.append((mul, (l_in, p_in)))
-                
-            paths[f'{l_in}_{p_in}'] = (mul, (l_in, p_in), act)
 
-        self.paths = paths
         self.irreps_in = irreps_in
         self.irreps_out = o3.Irreps(irreps_out)
         self.acts = torch.nn.ModuleList(acts)
+        self.paths = [(mul, (l, p), act) for (mul, (l, p)), act in zip(self.irreps_in, self.acts)]
         assert len(self.irreps_in) == len(self.acts)
 
     def __repr__(self) -> str:
@@ -98,8 +96,8 @@ class Activation(torch.nn.Module):
         # - PROFILER - with torch.autograd.profiler.record_function(repr(self)):
         output = []
         index = 0
-        for mul, (l_in, _), act in self.paths.values():
-            ir_dim = (2*l_in + 1)*mul
+        for mul, (l, _), act in self.paths:
+            ir_dim = (2*l + 1)
             if act is not None:
                 output.append(act(features.narrow(dim, index, mul)))
             else:
