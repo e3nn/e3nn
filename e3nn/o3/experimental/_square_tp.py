@@ -51,6 +51,7 @@ class TensorSquare(nn.Module):
                             raise ValueError(f"irrep_normalization={irrep_normalization}")
 
                     if i_1 < i_2:
+                        i_out = len(irreps_out)
                         paths[(i_1, i_2, i_out)] = Path(
                             Chunk(mul_1, ir_1.dim, slice_1),
                             Chunk(mul_2, ir_2.dim, slice_2),
@@ -58,8 +59,13 @@ class TensorSquare(nn.Module):
                             tensor_product_mode=TensorProductMode.UVUV
                         )
                         irreps_out.append((mul_1 * mul_2, ir_out))
+                        cg = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l)
+                        cg *= np.sqrt(alpha)
+                        self.register_buffer(f"cg_{i_1}_{i_2}_{i_out}", cg)
+
                     elif i_1 == i_2:
                         if mul_1 > 1:
+                            i_out = len(irreps_out)
                             irreps_out.append((mul_1 * (mul_1 - 1) // 2, ir_out))
                             uvu_v = torch.zeros((mul_1, mul_1, mul_1 * (mul_1 - 1) // 2))
                             i, j = zip(*itertools.combinations(range(mul_1), 2))
@@ -70,6 +76,9 @@ class TensorSquare(nn.Module):
                                 tensor_product_mode=TensorProductMode.UVU_V
                             )
                             self.register_buffer(f"uvu<v_{i_1}_{i_2}_{i_out}", uvu_v)
+                            cg = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l)
+                            cg *= np.sqrt(alpha)
+                            self.register_buffer(f"cg_{i_1}_{i_2}_{i_out}", cg)
 
                         if ir_out.l % 2 == 0:
                             if normalized_input:
@@ -110,9 +119,9 @@ class TensorSquare(nn.Module):
                                 tensor_product_mode=TensorProductMode.UUU
                             )
 
-                    cg = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l)
-                    cg *= np.sqrt(alpha)
-                    self.register_buffer(f"cg_{i_1}_{i_2}_{i_out}", cg)
+                        cg = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l)
+                        cg *= np.sqrt(alpha)
+                        self.register_buffer(f"cg_{i_1}_{i_2}_{i_out}", cg)
 
         self.paths = paths
         irreps_out = o3.Irreps(irreps_out)
@@ -124,7 +133,7 @@ class TensorSquare(nn.Module):
         input: torch.Tensor,
     ) -> torch.Tensor:
         chunks = []
-        for (l1, _, l2, _, l3, _), path in self.paths.items():
+        for (l1, l2, l3), path in self.paths.items():
             match path.tensor_product_mode:
                 case TensorProductMode.UVUV:
                     ((mul_1, input_dim1, slice_1),
