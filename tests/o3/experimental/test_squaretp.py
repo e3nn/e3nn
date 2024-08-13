@@ -21,5 +21,4 @@ def test_square_normalization(irreps_in) -> None:
     x = irreps.randn(1_000_000, -1, normalization="norm")
     y = tp(x)
     n = o3.Norm(tp.irreps_out, squared=True)(y)
-    ## below test does not have the same compaison value (1.1)
-    assert (n.mean(0).log().abs().exp() < 4).all()
+    assert (n.mean(0).log().abs().exp() < 1.1).all()
