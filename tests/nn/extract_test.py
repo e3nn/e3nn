@@ -10,7 +10,10 @@ from e3nn.util.jit import prepare
 
 
 def test_extract() -> None:
-    build_module = lambda: Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
+
+    def build_module():
+        return Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
+
     c = build_module()
     c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))

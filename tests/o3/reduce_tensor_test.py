@@ -2,11 +2,11 @@ import tempfile
 
 import torch
 
-torch.manual_seed(10)
-
 from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
 from e3nn.util.jit import prepare
+
+torch.manual_seed(10)
 
 
 def test_save_load() -> None:
@@ -22,7 +22,10 @@ def test_save_load() -> None:
 
 
 def test_antisymmetric_matrix(float_tolerance) -> None:
-    build_module = lambda: o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
+
+    def build_module():
+        return o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
+
     tp = build_module()
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)

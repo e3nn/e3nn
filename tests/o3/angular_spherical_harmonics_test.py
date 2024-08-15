@@ -2,16 +2,18 @@ import math
 
 import torch
 
-torch.manual_seed(10)
-
 from e3nn import o3
 
 from e3nn.util.test import assert_auto_jitable
 from e3nn.util.jit import prepare
 
+torch.manual_seed(10)
+
 
 def test_jit(float_tolerance) -> None:
-    build_module = lambda: o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
+    def build_module():
+        return o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
+
     sh = build_module()
     jited = assert_auto_jitable(sh)
 

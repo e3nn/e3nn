@@ -1,19 +1,22 @@
 import torch
 
-torch.manual_seed(10)
-
 from e3nn import o3
 from e3nn.nn import Identity
 from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, TensorSquare
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 from e3nn.util.jit import prepare
 
+torch.manual_seed(10)
+
 
 def test_fully_connected() -> None:
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
-    build_module = lambda irreps_in1, irreps_in2, irreps_out: FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
+
+    def build_module(irreps_in1, irreps_in2, irreps_out):
+        return FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
+
     m = build_module(irreps_in1, irreps_in2, irreps_out)
     print(m)
     m(torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim))

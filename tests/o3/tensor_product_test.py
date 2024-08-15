@@ -5,11 +5,11 @@ import tempfile
 import pytest
 import torch
 
-torch.manual_seed(10)
-
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
 from e3nn.util.jit import prepare
+
+torch.manual_seed(10)
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: bool = True, **kwargs):
@@ -377,9 +377,9 @@ def test_input_weights_jit() -> None:
         )
 
     # - shared_weights = True -
-    build_module = lambda irreps_in1, irreps_in2, irreps_out: FullyConnectedTensorProduct(
-        irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True
-    )
+    def build_module(irreps_in1, irreps_in2, irreps_out):
+        return FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
+
     m = build_module(irreps_in1, irreps_in2, irreps_out)
     traced = assert_auto_jitable(m)
     w = torch.randn(m.weight_numel)
@@ -480,7 +480,10 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
 
 
 def test_triu_mode() -> None:
-    build_module = lambda: TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+
+    def build_module():
+        return TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+
     tp = build_module()
     tp(torch.randn(2, 10), torch.randn(2, 10))
 

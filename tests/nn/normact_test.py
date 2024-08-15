@@ -77,9 +77,10 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
         "2x0e + 3x0o + 5x1o + 1x1e + 2x2e + 1x2o + 1x3e + 1x3o + 1x5e + 1x6o"
     )
 
-    build_module = lambda irreps_in, nonlin, do_bias: NormActivation(
+    def build_module(irreps_in, nonlin, do_bias):
+        return NormActivation(
         irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias
-    )
+        )
     norm_act = build_module(irreps_in, nonlin, do_bias)
     norm_act2 = torch.compile(prepare(build_module)(irreps_in, nonlin, do_bias), fullgraph=True)
 

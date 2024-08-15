@@ -2,17 +2,20 @@ import pytest
 
 import torch
 
-torch.manual_seed(10)
-
 from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps
 from e3nn.util.jit import prepare
+
+torch.manual_seed(10)
 
 
 @pytest.mark.parametrize("irreps_in", ["", "5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4))
 @pytest.mark.parametrize("squared", [True, False])
 def test_norm(irreps_in, squared) -> None:
-    build_module = lambda irreps_in, squared: o3.Norm(irreps_in, squared=squared)
+
+    def build_module(irreps_in, squared):
+        return o3.Norm(irreps_in, squared=squared)
+
     m = build_module(irreps_in, squared=squared)
     m(torch.randn(m.irreps_in.dim))
     if m.irreps_in.dim == 0:

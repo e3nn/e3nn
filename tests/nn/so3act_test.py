@@ -22,7 +22,9 @@ def test_equivariance(act, lmax: int) -> None:
 def test_identity(aspect_ratio) -> None:
     irreps = o3.Irreps([(2 * l + 1, (l, 1)) for l in range(5 + 1)])
 
-    build_module = lambda: SO3Activation(5, 5, lambda x: x, 6, aspect_ratio=aspect_ratio)
+    def build_module():
+        return SO3Activation(5, 5, lambda x: x, 6, aspect_ratio=aspect_ratio)
+
     m = build_module()
     m = compile(m)
 

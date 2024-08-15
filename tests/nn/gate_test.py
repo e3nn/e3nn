@@ -19,9 +19,11 @@ def test_gate() -> None:
     sc = _Sortcut(irreps_scalars, irreps_gates)
     assert_auto_jitable(sc)
 
-    build_module = lambda irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated: Gate(
+    def build_module(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated):
+        return Gate(
         irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated
     )
+
     g = build_module(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated)
     assert_equivariant(g)
     assert_auto_jitable(g)

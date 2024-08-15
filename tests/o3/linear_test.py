@@ -4,12 +4,11 @@ from typing import Optional
 
 import torch
 
-torch.manual_seed(10)
-
-
 from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps, assert_normalized
 from e3nn.util.jit import prepare
+
+torch.manual_seed(10)
 
 
 class SlowLinear(torch.nn.Module):
@@ -55,7 +54,10 @@ class SlowLinear(torch.nn.Module):
 def test_linear() -> None:
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
-    build_module = lambda irreps_in, irreps_out: o3.Linear(irreps_in, irreps_out)
+
+    def build_module(irreps_in, irreps_out):
+        return o3.Linear(irreps_in, irreps_out)
+
     m = build_module(irreps_in, irreps_out)
     m(torch.randn(irreps_in.dim))
 

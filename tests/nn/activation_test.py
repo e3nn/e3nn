@@ -14,7 +14,10 @@ from e3nn.util.jit import prepare
 )
 def test_activation(irreps_in, acts) -> None:
     irreps_in = o3.Irreps(irreps_in)
-    build_module = lambda irreps_in, acts: Activation(irreps_in, acts)
+
+    def build_module(irreps_in, acts):
+        return Activation(irreps_in, acts)
+
     a = build_module(irreps_in, acts)
     a_pt2 = prepare(build_module)(irreps_in, acts)
     assert_auto_jitable(a)

@@ -8,7 +8,10 @@ from e3nn.util.jit import prepare
 
 
 def test_dropout() -> None:
-    build_module = lambda: Dropout(irreps="10x1e + 10x0e", p=0.75)
+
+    def build_module():
+        return Dropout(irreps="10x1e + 10x0e", p=0.75)
+
     c = build_module()
     c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
     x = c.irreps.randn(5, 2, -1)
