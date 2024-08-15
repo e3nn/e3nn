@@ -3,7 +3,7 @@ import torch
 from e3nn import o3
 from e3nn.nn import SO3Activation
 from e3nn.util.test import assert_equivariant
-from e3nn.util.jit import compile
+from e3nn.util.jit import compile, prepare
 
 
 def so3_irreps(lmax: int) -> o3.Irreps:
@@ -22,11 +22,17 @@ def test_equivariance(act, lmax: int) -> None:
 def test_identity(aspect_ratio) -> None:
     irreps = o3.Irreps([(2 * l + 1, (l, 1)) for l in range(5 + 1)])
 
-    m = SO3Activation(5, 5, lambda x: x, 6, aspect_ratio=aspect_ratio)
+    build_module = lambda: SO3Activation(5, 5, lambda x: x, 6, aspect_ratio=aspect_ratio)
+    m = build_module()
     m = compile(m)
+
+    m_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
 
     x = irreps.randn(-1)
     y = m(x)
+    y2 = m_pt2(x)
+
+    torch.allclose(y, y2)
 
     mse = (x - y).pow(2).mean()
     assert mse < 1e-5, mse

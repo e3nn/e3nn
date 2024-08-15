@@ -335,7 +335,7 @@ def disable_e3nn_codegen():
 
 
 def prepare(func: ModuleFactory, allow_autograd: bool = True) -> ModuleFactory:
-    """Function transform that prepares a MACE module for torch.compile
+    """Function transform that prepares a e3nn module for torch.compile
 
     Args:
         func (ModuleFactory): A function that creates an nn.Module

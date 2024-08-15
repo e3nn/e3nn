@@ -4,8 +4,12 @@ import tempfile
 
 import pytest
 import torch
+
+torch.manual_seed(10)
+
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
+from e3nn.util.jit import prepare
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: bool = True, **kwargs):
@@ -237,6 +241,10 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein) -> Non
     """
     orig_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
     opt_tp = assert_auto_jitable(orig_tp)
+    opt_tp2 = torch.compile(
+        prepare(make_tp)(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein),
+        fullgraph=True,
+    )
 
     # Confirm equivariance of optimized model
     assert_equivariant(opt_tp, irreps_in=[orig_tp.irreps_in1, orig_tp.irreps_in2], irreps_out=orig_tp.irreps_out)
@@ -248,6 +256,10 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein) -> Non
     assert torch.allclose(
         orig_tp(x1, x2),
         opt_tp(x1, x2),
+    )
+    assert torch.allclose(
+        orig_tp(x1, x2),
+        opt_tp2(x1, x2),
     )
     assert torch.allclose(
         orig_tp.right(x2),
@@ -262,10 +274,16 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein) -> Non
 def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance) -> None:
     orig_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=False, _optimize_einsums=False)
     opt_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
+    opt_tp2 = torch.compile(
+        prepare(make_tp)(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein),
+        fullgraph=True,
+    )
+
     # We don't use state_dict here since that contains things like wigners that
     # can differ between optimized and unoptimized TPs
     with torch.no_grad():
         opt_tp.weight[:] = orig_tp.weight
+        opt_tp2.weight[:] = orig_tp.weight
     assert opt_tp._specialized_code == special_code
     assert opt_tp._optimize_einsums == opt_ein
 
@@ -283,6 +301,7 @@ def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_e
         opt_tp(x1, x2),
         atol=float_tolerance,  # numerical optimizations can cause meaningful numerical error by changing operations
     )
+    assert torch.allclose(orig_tp(x1, x2), opt_tp2(x1, x2), atol=float_tolerance)
     assert torch.allclose(orig_tp.right(x2), opt_tp.right(x2), atol=float_tolerance)
 
     # We also test .to(), even if only with a dtype, to ensure that various optimizations still
@@ -358,7 +377,10 @@ def test_input_weights_jit() -> None:
         )
 
     # - shared_weights = True -
-    m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
+    build_module = lambda irreps_in1, irreps_in2, irreps_out: FullyConnectedTensorProduct(
+        irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True
+    )
+    m = build_module(irreps_in1, irreps_in2, irreps_out)
     traced = assert_auto_jitable(m)
     w = torch.randn(m.weight_numel)
     with pytest.raises((RuntimeError, torch.jit.Error)):
@@ -369,6 +391,9 @@ def test_input_weights_jit() -> None:
         traced(x1, x2, torch.randn(2, m.weight_numel))  # it should reject too many weights
     # Does the trace give right results?
     assert torch.allclose(m(x1, x2, w), traced(x1, x2, w))
+
+    m_pt2 = torch.compile(prepare(build_module)(irreps_in1, irreps_in2, irreps_out), fullgraph=True)
+    assert torch.allclose(m(x1, x2, w), m_pt2(x1, x2, w))
 
 
 def test_weight_view_for_instruction() -> None:
@@ -427,6 +452,7 @@ def test_deepcopy(l1, p1, l2, p2, lo, po, mode, weight) -> None:
 @pytest.mark.parametrize("l1, p1, l2, p2, lo, po, mode, weight", random_params(n=1))
 def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+    tp_pt2 = torch.compile(prepare(make_tp)(l1, p1, l2, p2, lo, po, mode, weight), fullgraph=True)
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp, tmp.name)
@@ -443,18 +469,24 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     x1 = torch.randn(2, tp.irreps_in1.dim)
     x2 = torch.randn(2, tp.irreps_in2.dim)
     res1 = tp(x1, x2)
+    res1_pt2 = tp_pt2(x1, x2)
     res2 = tp2(x1, x2)
     res3 = tp3(x1, x2)
     res4 = tp4(x1, x2)
     assert torch.allclose(res1, res2)
+    assert torch.allclose(res1, res1_pt2)
     assert torch.allclose(res1, res3)
     assert torch.allclose(res1, res4)
 
 
 def test_triu_mode() -> None:
-    tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+    build_module = lambda: TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+    tp = build_module()
     tp(torch.randn(2, 10), torch.randn(2, 10))
 
     m = assert_auto_jitable(tp)
 
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+    tp_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    tp_pt2(torch.randn(2, 10), torch.randn(2, 10))
