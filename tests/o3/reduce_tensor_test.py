@@ -38,7 +38,7 @@ def test_antisymmetric_matrix(float_tolerance) -> None:
     assert (Q + torch.einsum("xij->xji", Q)).abs().max() < float_tolerance
 
     tp_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
-    assert (tp(*x), tp_pt2(*x)).abs().max() < float_tolerance
+    assert (tp(*x) - tp_pt2(*x)).abs().max() < float_tolerance
 
 
 def test_reduce_tensor_Levi_Civita_symbol(float_tolerance) -> None:

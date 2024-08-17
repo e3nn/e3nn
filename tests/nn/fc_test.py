@@ -15,7 +15,7 @@ def test_variance(act, var_in, var_out, out_act) -> None:
         return FullyConnectedNet(hs, act, var_in, var_out, out_act)
 
     f = build_module(hs, act, var_in, var_out, out_act)
-    f_pt2 = torch.compile(prepare(build_module), fullgraph=True)
+    f_pt2 = torch.compile(prepare(build_module)(hs, act, var_in, var_out, out_act), fullgraph=True)
 
     x = torch.randn(2000, hs[0]) * var_in**0.5
     y = f(x) / var_out**0.5

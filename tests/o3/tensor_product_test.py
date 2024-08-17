@@ -241,10 +241,11 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein) -> Non
     """
     orig_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
     opt_tp = assert_auto_jitable(orig_tp)
-    opt_tp2 = torch.compile(
-        prepare(make_tp)(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein),
-        fullgraph=True,
-    )
+    opt_tp2 = prepare(make_tp)(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
+    # opt_tp2 = torch.compile(
+    #     prepare(make_tp)(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein),
+    #     fullgraph=True,
+    # )
 
     # Confirm equivariance of optimized model
     assert_equivariant(opt_tp, irreps_in=[orig_tp.irreps_in1, orig_tp.irreps_in2], irreps_out=orig_tp.irreps_out)

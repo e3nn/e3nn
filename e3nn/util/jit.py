@@ -17,7 +17,6 @@ import torch
 from torch import autograd, nn
 from torch import fx
 from opt_einsum_fx import jitable
-from torch.fx import symbolic_trace, wrap
 
 ModuleFactory = Callable[..., nn.Module]
 TypeTuple = Tuple[type, ...]

@@ -26,7 +26,10 @@ def test_extract() -> None:
 
 @pytest.mark.parametrize("squeeze", [True, False])
 def test_extract_single(squeeze) -> None:
-    build_module = lambda: Extract("1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze)
+
+    def build_module():
+        return Extract("1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze)
+
     c = build_module()
     c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
@@ -36,6 +39,8 @@ def test_extract_single(squeeze) -> None:
     else:
         assert len(out) == 1
         out = out[0]
+        assert len(out_pt2) == 1
+        out_pt2 = out_pt2[0]
     assert out == torch.Tensor([1.0])
     assert out_pt2 == torch.Tensor([1.0])
     assert_auto_jitable(c)

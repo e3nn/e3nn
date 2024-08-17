@@ -43,7 +43,10 @@ def test_fully_connected_normalization() -> None:
 def test_id() -> None:
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
-    build_module = lambda irreps_in, irreps_out: Identity(irreps_in, irreps_out)
+
+    def build_module(irreps_in, irreps_out):
+        return Identity(irreps_in, irreps_out)
+
     m = build_module(irreps_in, irreps_out)
     print(m)
     m(torch.randn(irreps_in.dim))
@@ -58,7 +61,10 @@ def test_id() -> None:
 def test_full() -> None:
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2x2e + 2x3o")
-    build_module = lambda irreps_in1, irreps_in2: FullTensorProduct(irreps_in1, irreps_in2)
+
+    def build_module(irreps_in1, irreps_in2):
+        return FullTensorProduct(irreps_in1, irreps_in2)
+
     m = build_module(irreps_in1, irreps_in2)
     print(m)
 
@@ -73,7 +79,10 @@ def test_norm() -> None:
     irreps_in = o3.Irreps("3x0e + 5x1o")
     scalars = torch.randn(3)
     vecs = torch.randn(5, 3)
-    build_module = lambda irreps_in: Norm(irreps_in=irreps_in)
+
+    def build_module(irreps_in):
+        return Norm(irreps_in=irreps_in)
+
     norm = build_module(irreps_in)
     out_norms = norm(torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1))
     true_scalar_norms = torch.abs(scalars)

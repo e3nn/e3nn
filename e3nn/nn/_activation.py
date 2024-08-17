@@ -42,7 +42,6 @@ class Activation(torch.nn.Module):
 
         from e3nn.util._argtools import _get_device
 
-        paths = []
         irreps_out = []
         for (mul, (l_in, p_in)), act in zip(irreps_in, acts):
             if act is not None:
@@ -97,7 +96,7 @@ class Activation(torch.nn.Module):
         output = []
         index = 0
         for mul, (l, _), act in self.paths:
-            ir_dim = (2*l + 1)
+            ir_dim = 2 * l + 1
             if act is not None:
                 output.append(act(features.narrow(dim, index, mul)))
             else:

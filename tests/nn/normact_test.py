@@ -78,9 +78,8 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
     )
 
     def build_module(irreps_in, nonlin, do_bias):
-        return NormActivation(
-        irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias
-        )
+        return NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
+
     norm_act = build_module(irreps_in, nonlin, do_bias)
     norm_act2 = torch.compile(prepare(build_module)(irreps_in, nonlin, do_bias), fullgraph=True)
 

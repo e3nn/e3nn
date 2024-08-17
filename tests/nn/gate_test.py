@@ -20,9 +20,7 @@ def test_gate() -> None:
     assert_auto_jitable(sc)
 
     def build_module(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated):
-        return Gate(
-        irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated
-    )
+        return Gate(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated)
 
     g = build_module(irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated)
     assert_equivariant(g)
