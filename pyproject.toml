@@ -1,9 +1,13 @@
-[build-system]
+[
+build-system
+]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-[project]
-name="e3nn"
+[
+project
+]
+name = "e3nn"
 requires-python = ">=3.7"
 dynamic = ["version", "readme"]
 license = {text = "MIT"}
@@ -27,35 +31,101 @@ dependencies = [
   "opt_einsum_fx>=0.1.4"
 ]
 
-[project.optional-dependencies]
+[
+project.optional-dependencies
+]
 dev = [
   "pytest",
   "pre-commit",
 ]
 
-[project.urls]
+[
+project.urls
+]
 homepage = "https://e3nn.org"
 documentation = "https://docs.e3nn.org/"
 repository = "https://github.com/e3nn/e3nn.git"
 changelog = "https://github.com/e3nn/e3nn/blob/main/.github/CHANGELOG.md"
 
-[tool.hatch.version]
+[
+tool.hatch.version
+]
 source = "vcs"
 
-[tool.hatch.build.targets.sdist]
+[
+tool.hatch.build.targets.sdist
+]
 exclude = [
   "tests",
   "tests.*",
 ]
 
-[tool.hatch.build.hooks.vcs]
+[
+tool.hatch.build.hooks.vcs
+]
 version-file = "e3nn/__version__.py"
 
-[tool.hatch.metadata]
+[
+tool.hatch.metadata
+]
 allow-direct-references = true
 
+[
+tool.hatch.envs.default
+]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "coveralls",
+]
 
-[tool.black]
+[
+tool.hatch.envs.lint
+]
+dependencies = [
+  "flake8",
+  "Flake8-pyproject",
+]
+
+[
+tool.hatch.envs.lint.scripts
+]
+style = "flake8 ."
+
+[
+tool.hatch.envs.test
+]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "coveralls",
+]
+
+[
+tool.hatch.envs.test.scripts
+]
+test = "pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples"
+coverage-run = "coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples"
+coverage-report = "coverage report"
+coveralls = "coveralls"
+
+[
+tool.hatch.envs.ci
+]
+dependencies = [
+  "torch",
+  "torchvision",
+  "torch-scatter",
+  "torch-sparse",
+  "torch-cluster",
+  "torch-spline-conv",
+  "torch-geometric",
+  "plotly",
+]
+
+[
+tool.black
+]
 line-length = 127
 target-version = ['py37']
 include = '\.pyi?$'
@@ -73,7 +143,9 @@ exclude = '''
 )/
 '''
 
-[tool.flake8]
+[
+tool.flake8
+]
 max-line-length = 127
 max-complexity = 21
 select = ["B", "C", "E", "F", "W", "T4", "B9"]
@@ -95,10 +167,14 @@ per-file-ignores = [
   "e3nn/o3/cartesian_spherical_harmonics.py: E226",
 ]
 
-[tool.coverage.run]
+[
+tool.coverage.run
+]
 source = ["e3nn"]
 
-[tool.coverage.report]
+[
+tool.coverage.report
+]
 exclude_lines = [
     "pragma: no cover",
     "torch.jit.script",
@@ -106,10 +182,14 @@ exclude_lines = [
     "except",
 ]
 
-[tool.pylint.typecheck]
+[
+tool.pylint.typecheck
+]
 generated-members = "numpy.*,torch.*"
 
-[tool.pylint."messages control"]
+[
+tool.pylint."messages control"
+]
 disable = [
   "protected-access",
   "no-else-return",
