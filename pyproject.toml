@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [project]
 name="e3nn"
@@ -39,15 +39,21 @@ documentation = "https://docs.e3nn.org/"
 repository = "https://github.com/e3nn/e3nn.git"
 changelog = "https://github.com/e3nn/e3nn/blob/main/.github/CHANGELOG.md"
 
-[tool.setuptools.packages.find]
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.sdist]
 exclude = [
   "tests",
   "tests.*",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "e3nn.__version__"}
-readme = {file = ["README.md"]}
+[tool.hatch.build.hooks.vcs]
+version-file = "e3nn/__version__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
 
 [tool.black]
 line-length = 127
