@@ -25,9 +25,13 @@ jobs:
     - name: Install Hatch
       run: |
         pip install hatch
-    - name: Lint with flake8
-      run: |
-        hatch run lint:style
+    - name: Install flake8
+       run: |
+         pip install flake8 Flake8-pyproject
+     - name: Lint with flake8
+       run: |
+         # Stop the build if there are style issues, Python syntax errors, or undefined names
+         flake8 . --count --show-source --statistics
     - name: Install dependencies
       env:
         TORCH: "${{ matrix.torch-version }}"
@@ -35,15 +39,20 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         hatch env create
-        hatch run pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu
-        hatch run pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
-        hatch run pip install plotly
+        pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu
+        pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
+        pip install plotly
+    - name: Install pytest
+      run: |
+        pip install pytest pytest-cov
+        pip install coveralls
     - name: Test with pytest
       run: |
-        hatch run test:cov
+        coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples
     - name: Upload to coveralls
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+      # Only send to coveralls if the token has been set and the user pushed
       if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
       run: |
-        hatch run coveralls
+        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
