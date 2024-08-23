@@ -184,7 +184,7 @@ def spherical_harmonics(
     return sh(x)
 
 
-@torch.jit.script
+@torch.jit.script_if_tracing
 def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sh_0_0 = torch.ones_like(x)
     if lmax == 0:
