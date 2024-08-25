@@ -101,6 +101,9 @@ class CodeGenMixin:
         else:
             self.__dict__.update(d)
 
+        # Find the location to which tensors must be mapped
+        map_location = getattr(torch._utils._thread_local_state, "map_location", None)
+
         if codegen_state is not None:
             for fname, buffer in codegen_state.items():
                 assert isinstance(fname, str)
@@ -108,7 +111,7 @@ class CodeGenMixin:
                 assert isinstance(buffer, bytes)
                 # Load the TorchScript IR buffer
                 buffer = io.BytesIO(buffer)
-                smod = torch.jit.load(buffer)
+                smod = torch.jit.load(buffer, map_location=map_location)
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Add the ScriptModule as a submodule
                 setattr(self, fname, smod)
