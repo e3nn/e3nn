@@ -72,6 +72,7 @@ class Activation(torch.nn.Module):
         self.irreps_in = irreps_in
         self.irreps_out = o3.Irreps(irreps_out)
         self.acts = torch.nn.ModuleList(acts)
+        self.paths = [(mul, (l, p), act) for (mul, (l, p)), act in zip(self.irreps_in, self.acts)]
         assert len(self.irreps_in) == len(self.acts)
 
     def __repr__(self) -> str:
@@ -94,12 +95,13 @@ class Activation(torch.nn.Module):
         # - PROFILER - with torch.autograd.profiler.record_function(repr(self)):
         output = []
         index = 0
-        for (mul, ir), act in zip(self.irreps_in, self.acts):
+        for mul, (l, _), act in self.paths:
+            ir_dim = 2 * l + 1
             if act is not None:
                 output.append(act(features.narrow(dim, index, mul)))
             else:
-                output.append(features.narrow(dim, index, mul * ir.dim))
-            index += mul * ir.dim
+                output.append(features.narrow(dim, index, mul * ir_dim))
+            index += mul * ir_dim
 
         if len(output) > 1:
             return torch.cat(output, dim=dim)
