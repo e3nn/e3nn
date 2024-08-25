@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.8', '3.10']
-        torch-version: ['2.0.0']
+        torch-version: ['2.4.0']
 
     steps:
     - uses: actions/checkout@v2
