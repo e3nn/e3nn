@@ -46,7 +46,9 @@ def test_extract_single(squeeze) -> None:
 
 
 def test_extract_ir() -> None:
-    build_module = lambda: ExtractIr("1e + 0e + 0e", "0e")
+    def build_module():
+        return ExtractIr("1e + 0e + 0e", "0e")
+
     c = build_module()
     c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))

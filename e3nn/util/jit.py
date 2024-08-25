@@ -16,6 +16,7 @@ from e3nn import get_optimization_defaults, set_optimization_defaults
 import torch
 from torch import autograd, nn
 from torch import fx
+from torch.fx import symbolic_trace
 from opt_einsum_fx import jitable
 
 ModuleFactory = Callable[..., nn.Module]
