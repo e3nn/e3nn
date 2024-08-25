@@ -8,7 +8,6 @@ from e3nn.util.jit import prepare
 
 
 def test_dropout() -> None:
-
     def build_module():
         return Dropout(irreps="10x1e + 10x0e", p=0.75)
 

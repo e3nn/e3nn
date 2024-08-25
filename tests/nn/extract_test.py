@@ -10,7 +10,6 @@ from e3nn.util.jit import prepare
 
 
 def test_extract() -> None:
-
     def build_module():
         return Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
 
@@ -26,7 +25,6 @@ def test_extract() -> None:
 
 @pytest.mark.parametrize("squeeze", [True, False])
 def test_extract_single(squeeze) -> None:
-
     def build_module():
         return Extract("1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze)
 

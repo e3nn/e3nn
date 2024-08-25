@@ -6,8 +6,6 @@ from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, Tensor
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 from e3nn.util.jit import prepare
 
-torch.manual_seed(10)
-
 
 def test_fully_connected() -> None:
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")

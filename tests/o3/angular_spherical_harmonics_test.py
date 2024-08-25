@@ -7,8 +7,6 @@ from e3nn import o3
 from e3nn.util.test import assert_auto_jitable
 from e3nn.util.jit import prepare
 
-torch.manual_seed(10)
-
 
 def test_jit(float_tolerance) -> None:
     def build_module():

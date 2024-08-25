@@ -7,8 +7,6 @@ from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
 from e3nn.util.jit import prepare
 
-torch.manual_seed(10)
-
 
 def test_weird_call() -> None:
     o3.spherical_harmonics([4, 1, 2, 3, 3, 1, 0], torch.randn(2, 1, 2, 3), False)

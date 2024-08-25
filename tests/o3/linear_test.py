@@ -8,8 +8,6 @@ from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps, assert_normalized
 from e3nn.util.jit import prepare
 
-torch.manual_seed(10)
-
 
 class SlowLinear(torch.nn.Module):
     r"""Inefficient implimentation of Linear relying on TensorProduct."""

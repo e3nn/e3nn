@@ -6,8 +6,6 @@ from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
 from e3nn.util.jit import prepare
 
-torch.manual_seed(10)
-
 
 def test_save_load() -> None:
     tp1 = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
@@ -22,7 +20,6 @@ def test_save_load() -> None:
 
 
 def test_antisymmetric_matrix(float_tolerance) -> None:
-
     def build_module():
         return o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
 
