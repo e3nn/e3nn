@@ -53,6 +53,7 @@ from ._s2grid import (
     spherical_harmonics_s2_grid,
     rfft,
     irfft,
+    s2_irreps,
     ToS2Grid,
     FromS2Grid,
 )

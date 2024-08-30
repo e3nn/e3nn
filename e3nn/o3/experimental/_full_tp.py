@@ -1,5 +1,6 @@
 # flake8: noqa
 
+from typing import Union, Sequence
 from e3nn.util.datatypes import Path, Chunk
 from e3nn import o3
 
@@ -19,6 +20,17 @@ def _prepare_inputs(input1, input2):
     input2 = input2.broadcast_to(leading_shape + (-1,))
     return input1, input2, leading_shape
 
+def _validate_filter_ir_out(
+    filter_ir_out: Union[str, o3.Irrep, Sequence[o3.Irrep], None]
+):
+    """Validates the filter_ir_out argument."""
+    if filter_ir_out is not None:
+        if isinstance(filter_ir_out, str):
+            filter_ir_out = o3.Irreps(filter_ir_out)
+        if isinstance(filter_ir_out, o3.Irrep):
+            filter_ir_out = [filter_ir_out]
+        filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+    return filter_ir_out
 
 class FullTensorProduct(nn.Module):
     def __init__(
@@ -33,6 +45,7 @@ class FullTensorProduct(nn.Module):
         """Tensor Product adapted from https://github.com/e3nn/e3nn-jax/blob/cf37f3e95264b34587b3a202ea4c3eb82597307e/e3nn_jax/_src/tensor_products.py#L40-L135"""
         super(FullTensorProduct, self).__init__()
 
+        filter_ir_out = _validate_filter_ir_out(filter_ir_out)
         if regroup_output:
             irreps_in1 = o3.Irreps(irreps_in1).regroup()
             irreps_in2 = o3.Irreps(irreps_in2).regroup()
