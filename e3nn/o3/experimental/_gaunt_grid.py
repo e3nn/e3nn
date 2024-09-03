@@ -3,8 +3,6 @@ from e3nn import o3
 import torch
 from torch import nn
 
-from ._full_tp import _validate_filter_ir_out
-
 
 class GauntTensorProductS2Grid(nn.Module):
     """Gaunt tensor product using signals on S2."""
@@ -26,9 +24,9 @@ class GauntTensorProductS2Grid(nn.Module):
         assert irreps_in1 == irreps_in2
         if filter_ir_out is None:
             filter_ir_out = o3.s2_irreps(irreps_in1.lmax + irreps_in2.lmax)
-        self.to_s2grid_in1 = o3.ToS2Grid(lmax=irreps_in1.lmax, res=(res_beta, res_alpha))
-        self.to_s2grid_in2 = o3.ToS2Grid(lmax=irreps_in2.lmax, res=(res_beta, res_alpha))
-        self.from_s2grid = o3.FromS2Grid(lmax=filter_ir_out.lmax, res=(res_beta, res_alpha))
+        self.to_s2grid_in1 = o3.ToS2Grid(lmax=irreps_in1.lmax, res=(res_beta, res_alpha), fft=False)
+        self.to_s2grid_in2 = o3.ToS2Grid(lmax=irreps_in2.lmax, res=(res_beta, res_alpha), fft=False)
+        self.from_s2grid = o3.FromS2Grid(lmax=filter_ir_out.lmax, res=(res_beta, res_alpha), fft=False)
         self.irreps_out = o3.Irreps.spherical_harmonics(filter_ir_out.lmax)
 
     def forward(self, input1: torch.Tensor, input2: torch.Tensor):
