@@ -285,21 +285,6 @@ def irfft(x, res):
     return x.reshape(*size, res)
 
 
-def s2_irreps(lmax: int, p_val: int = 1, p_arg: int = -1) -> o3.Irreps:
-    r"""The Irreps of coefficients of a spherical harmonics expansion.
-    .. math::
-        f(\vec x) = \sum_{l=0}^{L} \sum_{m=-l}^{l} c_l^m Y_{l,m}(\vec x)
-    When the inversion operator is applied to the signal, the new function :math:`I f` is given by
-    .. math::
-        [I f](\vec x) = p_{\text{val}} f(p_{\text{arg}} \vec x)
-    Args:
-        lmax (int): maximum degree of the expansion
-        p_val (int): parity of the value of the signal on the sphere (1 or -1)
-        p_arg (int): parity of the argument of the signal on the sphere (1 or -1)
-    """
-    return o3.Irreps([(1, (l, p_val * p_arg**l)) for l in range(lmax + 1)])
-
-
 @compile_mode("trace")
 class ToS2Grid(torch.nn.Module):
     r"""Transform spherical tensor into signal on the sphere
@@ -460,9 +445,7 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    def __init__(
-        self, res=None, lmax=None, normalization: str = "component", lmax_in=None, fft=True, dtype=None, device=None
-    ) -> None:
+    def __init__(self, res=None, lmax=None, normalization: str = "component", lmax_in=None, fft=True, dtype=None, device=None) -> None:
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
