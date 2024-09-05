@@ -1,5 +1,7 @@
 # flake8: noqa
 
+from typing import Tuple
+
 from e3nn.util.datatypes import Path, Chunk
 from e3nn import o3
 
@@ -18,15 +20,14 @@ def _prepare_inputs(input1, input2):
     input1 = input1.broadcast_to(leading_shape + (-1,))
     input2 = input2.broadcast_to(leading_shape + (-1,))
     return input1, input2, leading_shape
-
-
+        
 class FullTensorProductSparse(nn.Module):
     def __init__(
         self,
         irreps_in1: o3.Irreps,
         irreps_in2: o3.Irreps,
         *,
-        leading_shape=(),
+        leading_shape: Tuple = (),
         filter_ir_out: o3.Irreps = None,
         irrep_normalization: str = "component",
         regroup_output: bool = True,
@@ -80,7 +81,6 @@ class FullTensorProductSparse(nn.Module):
         self.paths = paths
         self.m3s = m3s
         self.m1m2s = m1m2s
-        self.leading_shape = leading_shape
         irreps_out = o3.Irreps(irreps_out)
         self.irreps_out, _, self.inv = irreps_out.sort()
         self.irreps_in1 = irreps_in1
@@ -121,7 +121,8 @@ class FullTensorProductSparse(nn.Module):
                     path *= cg_coeff
                     sum += path
                 chunk[l3 + m3, ...] = sum
-            chunk = torch.reshape(chunk, self.leading_shape + (output_mul * output_dim,))
+            chunk = torch.moveaxis(chunk, 0, -1)
+            chunk = torch.reshape(chunk, leading_shape + (output_mul * output_dim, ))
             chunks.append(chunk)
 
         return torch.cat([chunks[i] for i in self.inv], dim=-1)
