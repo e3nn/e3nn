@@ -9,9 +9,7 @@ def test_sparsefulltp(irreps_in1, irreps_in2):
     x = o3.Irreps(irreps_in1).randn(10, -1)
     y = o3.Irreps(irreps_in2).randn(10, -1)
 
-    tp_pt2 = torch.compile(
-        o3.experimental.FullTensorProductSparse(irreps_in1, irreps_in2), fullgraph=True, disable=True
-    )
+    tp_pt2 = torch.compile(o3.experimental.FullTensorProductSparse(irreps_in1, irreps_in2), fullgraph=True)
     tp = o3.FullTensorProduct(irreps_in1, irreps_in2)
 
     torch.testing.assert_close(tp_pt2(x, y), tp(x, y))

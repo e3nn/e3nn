@@ -23,7 +23,8 @@ def _prepare_inputs(input1, input2):
     input1 = input1.broadcast_to(leading_shape + (-1,))
     input2 = input2.broadcast_to(leading_shape + (-1,))
     return input1, input2, leading_shape
-        
+
+
 class FullTensorProductSparse(nn.Module):
     def __init__(
         self,
@@ -74,7 +75,7 @@ class FullTensorProductSparse(nn.Module):
         self.irreps_in1 = irreps_in1
         self.irreps_in2 = irreps_in2
 
-    def single_sample_forward(
+    def forward(
         self,
         input1: torch.Tensor,
         input2: torch.Tensor,
@@ -92,14 +93,14 @@ class FullTensorProductSparse(nn.Module):
             (mul_2, input_dim2, slice_2),
             (output_mul, output_dim, _),
         ) in self.paths.items():
-            x1  = input1[..., slice_1].reshape(leading_shape + (mul_1, input_dim1))
-            x1_t = x1.permute(2,1,0) # TODO: Breaks if batch + channel dim is more than one need a fix
+            x1 = input1[..., slice_1].reshape(leading_shape + (mul_1, input_dim1))
+            x1_t = x1.permute(2, 1, 0)  # TODO: Breaks if batch + channel dim is more than one need a fix
             x2 = input2[..., slice_2].reshape(leading_shape + (mul_2, input_dim2))
-            x2_t = x2.permute(2,1,0)
+            x2_t = x2.permute(2, 1, 0)
             chunk = torch.zeros((2 * l3 + 1, mul_1, mul_2) + leading_shape).to(input1.device)
-            for m3 in range(-l3, l3+1):
+            for m3 in range(-l3, l3 + 1):
                 sum = 0
-                for m1 in range(-l1, l1 +1):
+                for m1 in range(-l1, l1 + 1):
                     for m2 in set([m3 - m1, m3 + m1, -m3 + m1, -m3 - m1]):
                         if (m2 < -l2) or (m2 > l2):
                             continue
@@ -108,8 +109,8 @@ class FullTensorProductSparse(nn.Module):
                         path *= cg_coeff
                         sum += path
                 chunk[l3 + m3, ...] = sum
-            chunk = chunk.permute(3,1,2,0)
-            chunk = torch.reshape(chunk, chunk.shape[:-3] + (output_mul * output_dim, ))
+            chunk = chunk.permute(3, 1, 2, 0)
+            chunk = torch.reshape(chunk, chunk.shape[:-3] + (output_mul * output_dim,))
             chunks.append(chunk)
 
         output = torch.cat([chunks[i] for i in self.inv], dim=-1)
