@@ -445,7 +445,9 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    def __init__(self, res=None, lmax=None, normalization: str = "component", lmax_in=None, fft=True, dtype=None, device=None) -> None:
+    def __init__(
+        self, res=None, lmax=None, normalization: str = "component", lmax_in=None, fft=True, dtype=None, device=None
+    ) -> None:
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
