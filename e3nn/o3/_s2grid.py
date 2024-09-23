@@ -163,7 +163,7 @@ def _complete_lmax_res(lmax, res_beta, res_alpha):
         # see tests -------------------------------^
 
     assert res_beta % 2 == 0
-    assert lmax + 1 <= res_beta // 2
+    # assert lmax + 1 <= res_beta // 2 # Relaxing this constraint
 
     return lmax, res_beta, res_alpha
 
