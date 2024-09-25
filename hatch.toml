@@ -1,0 +1,43 @@
+[env]
+dependencies = [
+  "flake8",
+  "Flake8-pyproject",
+  "pytest",
+  "pytest-cov",
+  "coveralls",
+  "plotly",
+]
+
+[env.deps]
+scripts = [
+  "pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu",
+  "pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html",
+  "pip install .",
+]
+
+[env.lint]
+detached = true
+dependencies = [
+  "flake8",
+  "Flake8-pyproject",
+]
+
+[env.lint.scripts]
+style = "flake8 . --count --show-source --statistics"
+
+[env.test]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+]
+
+[env.test.scripts]
+cov = "coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples"
+
+[env.coverage]
+dependencies = [
+  "coveralls",
+]
+
+[env.coverage.scripts]
+upload = "coveralls"

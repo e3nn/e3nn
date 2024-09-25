@@ -1,17 +1,17 @@
-[
-build-system
-]
-requires = ["hatchling", "hatch-vcs"]
+[build-system]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[
-project
-]
+[project]
 name = "e3nn"
-requires-python = ">=3.7"
-dynamic = ["version", "readme"]
-license = {text = "MIT"}
+dynamic = ["version"]
 description = "Equivariant convolutional neural networks for the group E(3) of 3 dimensional rotations, translations, and mirrors."
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"},
+]
 classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
@@ -31,101 +31,51 @@ dependencies = [
   "opt_einsum_fx>=0.1.4"
 ]
 
-[
-project.optional-dependencies
-]
+[project.optional-dependencies]
 dev = [
   "pytest",
   "pre-commit",
 ]
 
-[
-project.urls
-]
+[project.urls]
 homepage = "https://e3nn.org"
 documentation = "https://docs.e3nn.org/"
 repository = "https://github.com/e3nn/e3nn.git"
 changelog = "https://github.com/e3nn/e3nn/blob/main/.github/CHANGELOG.md"
 
-[
-tool.hatch.version
-]
-source = "vcs"
+[tool.hatch.version]
+path = "e3nn/__init__.py"
 
-[
-tool.hatch.build.targets.sdist
-]
+[tool.hatch.build.targets.sdist]
 exclude = [
   "tests",
   "tests.*",
 ]
 
-[
-tool.hatch.build.hooks.vcs
-]
-version-file = "e3nn/__version__.py"
-
-[
-tool.hatch.metadata
-]
-allow-direct-references = true
-
-[
-tool.hatch.envs.default
-]
+[tool.hatch.envs.test]
 dependencies = [
   "pytest",
   "pytest-cov",
-  "coveralls",
 ]
 
-[
-tool.hatch.envs.lint
-]
+[tool.hatch.envs.test.scripts]
+test = "pytest {args:tests}"
+cov = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=e3nn {args:tests}"
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.8", "3.10"]
+
+[tool.hatch.envs.lint]
+detached = true
 dependencies = [
   "flake8",
   "Flake8-pyproject",
 ]
 
-[
-tool.hatch.envs.lint.scripts
-]
+[tool.hatch.envs.lint.scripts]
 style = "flake8 ."
 
-[
-tool.hatch.envs.test
-]
-dependencies = [
-  "pytest",
-  "pytest-cov",
-  "coveralls",
-]
-
-[
-tool.hatch.envs.test.scripts
-]
-test = "pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples"
-coverage-run = "coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples"
-coverage-report = "coverage report"
-coveralls = "coveralls"
-
-[
-tool.hatch.envs.ci
-]
-dependencies = [
-  "torch",
-  "torchvision",
-  "torch-scatter",
-  "torch-sparse",
-  "torch-cluster",
-  "torch-spline-conv",
-  "torch-geometric",
-  "plotly",
-]
-
-[
-tool.black
-]
+[tool.black]
 line-length = 127
 target-version = ['py37']
 include = '\.pyi?$'
@@ -143,9 +93,7 @@ exclude = '''
 )/
 '''
 
-[
-tool.flake8
-]
+[tool.flake8]
 max-line-length = 127
 max-complexity = 21
 select = ["B", "C", "E", "F", "W", "T4", "B9"]
@@ -167,14 +115,10 @@ per-file-ignores = [
   "e3nn/o3/cartesian_spherical_harmonics.py: E226",
 ]
 
-[
-tool.coverage.run
-]
+[tool.coverage.run]
 source = ["e3nn"]
 
-[
-tool.coverage.report
-]
+[tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
     "torch.jit.script",
@@ -182,14 +126,10 @@ exclude_lines = [
     "except",
 ]
 
-[
-tool.pylint.typecheck
-]
+[tool.pylint.typecheck]
 generated-members = "numpy.*,torch.*"
 
-[
-tool.pylint."messages control"
-]
+[tool.pylint."messages control"]
 disable = [
   "protected-access",
   "no-else-return",

@@ -17,35 +17,26 @@ jobs:
         torch-version: ['2.4.0']
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install Hatch
-      run: |
-        pip install hatch
+      run: pip install hatch
     - name: Lint with flake8
-      run: |
-        hatch run lint:style
+      run: hatch run lint:style
     - name: Install dependencies
       env:
         TORCH: "${{ matrix.torch-version }}"
         CUDA: "cpu"
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        hatch env create ci
-        hatch env create test
-        hatch run ci:pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu
-        hatch run ci:pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
-        hatch run ci:pip install plotly
-        pip install -e .
+        hatch env create
+        hatch run deps:install
     - name: Test with pytest
-      run: |
-        hatch run test:coverage
+      run: hatch run test:cov
     - name: Upload to coveralls
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
       if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
-      run: |
-        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} hatch run test:coveralls
+      run: hatch run coverage:upload
