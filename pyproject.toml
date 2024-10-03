@@ -75,6 +75,17 @@ dependencies = [
 [tool.hatch.envs.lint.scripts]
 style = "flake8 ."
 
+[tool.hatch.envs.deps]
+dependencies = [
+  "sympy",
+  "scipy",
+  "torch>=1.8.0",
+  "opt_einsum_fx>=0.1.4"
+]
+
+[tool.hatch.envs.deps.scripts]
+install = "pip install -e ."
+
 [tool.black]
 line-length = 127
 target-version = ['py37']
