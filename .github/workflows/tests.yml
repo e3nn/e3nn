@@ -30,13 +30,17 @@ jobs:
       env:
         TORCH: "${{ matrix.torch-version }}"
         CUDA: "cpu"
+        TMPDIR: "/var/tmp"
       run: |
         hatch env create
         hatch run deps:install
     - name: Test with pytest
+      env:
+        TMPDIR: "/var/tmp"
       run: hatch run test:cov
     - name: Upload to coveralls
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+        TMPDIR: "/var/tmp"
       if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
       run: hatch run coverage:upload
