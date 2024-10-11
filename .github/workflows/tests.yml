@@ -17,7 +17,7 @@ jobs:
         torch-version: ['2.4.0']
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
@@ -39,7 +39,7 @@ jobs:
     - name: Test with pytest
       env:
         TMPDIR: "/home/runner/work/_temp"
-      run: hatch run test:cov -- -v --cache-dir=/home/runner/work/_temp/.pytest_cache
+      run: hatch run test:cov
     
     - name: Upload to coveralls
       env:
