@@ -4,17 +4,16 @@ dependencies = [
   "Flake8-pyproject",
   "pytest",
   "pytest-cov",
-  "coveralls"
+  "coveralls",
 ]
 
 [env.deps]
 scripts = [
-  "python -m pip install --upgrade pip",
-  "pip install wheel",
-  "pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu",
-  "pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html",
-  "pip install .",
-  "pip install plotly",
+  "uv pip install wheel",
+  "uv pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu",
+  "uv pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html",
+  "uv pip install .",
+  "uv pip install plotly",
 ]
 
 [env.lint]
