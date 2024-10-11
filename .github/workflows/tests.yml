@@ -38,8 +38,9 @@ jobs:
         hatch run deps:install
     - name: Test with pytest
       env:
-        TMPDIR: "/var/tmp"
-      run: hatch run test:cov
+        TMPDIR: "/home/runner/work/_temp"
+      run: hatch run test:cov -- -v --cache-dir=/home/runner/work/_temp/.pytest_cache
+    
     - name: Upload to coveralls
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
