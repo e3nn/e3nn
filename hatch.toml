@@ -9,7 +9,9 @@ dependencies = [
 
 [env.deps]
 scripts = [
-  "pip install torch==${TORCH} --index-url https://download.pytorch.org/whl/cpu",
+  "python -m pip install --upgrade pip",
+  "pip install wheel",
+  "pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu",
   "pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html",
   "pip install .",
   "pip install plotly",
