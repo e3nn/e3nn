@@ -32,6 +32,8 @@ jobs:
         CUDA: "cpu"
         TMPDIR: "/var/tmp"
       run: |
+        export PIP_CACHE_DIR="/var/tmp/pip_cache"
+        mkdir -p $PIP_CACHE_DIR
         hatch env create
         hatch run deps:install
     - name: Test with pytest
@@ -43,4 +45,4 @@ jobs:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
         TMPDIR: "/var/tmp"
       if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
-      run: hatch run coverage:upload
+      run: hatch run coveralls
