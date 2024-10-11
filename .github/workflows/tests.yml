@@ -4,14 +4,12 @@ on:
   push:
     branches:
     - main
-
   pull_request:
     branches:
     - main
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -24,40 +22,28 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        cache: "pip"
-        cache-dependency-path: |
-          pyproject.toml
-    - name: Install flake8
-      run: |
-        pip install flake8 Flake8-pyproject
+    - name: Install Hatch
+      run: pip install hatch
     - name: Lint with flake8
-      run: |
-        # Stop the build if there are style issues, Python syntax errors, or undefined names
-        flake8 . --count --show-source --statistics
+      run: hatch run lint:style
     - name: Install dependencies
       env:
         TORCH: "${{ matrix.torch-version }}"
         CUDA: "cpu"
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TMPDIR: "/var/tmp"
       run: |
-        python -m pip install --upgrade pip
-        pip install wheel
-        pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu
-        pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
-        pip install .
-
-        pip install plotly
-    - name: Install pytest
-      run: |
-        pip install pytest pytest-cov
-        pip install coveralls
+        export PIP_CACHE_DIR="/var/tmp/pip_cache"
+        mkdir -p $PIP_CACHE_DIR
+        hatch env create
+        hatch run deps:install
     - name: Test with pytest
-      run: |
-        coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples
+      env:
+        TMPDIR: "/home/runner/work/_temp"
+      run: hatch run test:cov
+    
     - name: Upload to coveralls
       env:
         COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
-      # Only send to coveralls if the token has been set and the user pushed
+        TMPDIR: "/var/tmp"
       if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
-      run: |
-        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
+      run: hatch run coveralls
