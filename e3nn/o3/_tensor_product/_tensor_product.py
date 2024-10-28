@@ -708,7 +708,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                         path_weight.append(0)
                 path_weight = np.asarray(path_weight)
                 path_weight /= np.abs(path_weight).max()
-        cmap = matplotlib.cm.get_cmap("Blues")
+        cmap = matplotlib.colormaps["Blues"]
 
         for ins_index, ins in enumerate(self.instructions):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)
