@@ -88,6 +88,18 @@ class CodeGenMixin:
 
             out["__codegen__"] = codegen_state
         return out
+    
+    def _codegen_get_device(self):
+        """Retreives the device where the object is stored.
+
+        This is called in `__set_state__` right after setting the dictionary
+        of the object and before loading the codegen state.
+
+        The return of this function will be passed directly to the `map_location`
+        argument of `torch.jit.load`.
+        """
+        return None
+
 
     def __setstate__(self, d) -> None:
         d = d.copy()
@@ -108,7 +120,7 @@ class CodeGenMixin:
                 assert isinstance(buffer, bytes)
                 # Load the TorchScript IR buffer
                 buffer = io.BytesIO(buffer)
-                smod = torch.jit.load(buffer)
+                smod = torch.jit.load(buffer, map_location=self._codegen_get_device())
                 assert isinstance(smod, torch.jit.ScriptModule)
                 # Add the ScriptModule as a submodule
                 setattr(self, fname, smod)

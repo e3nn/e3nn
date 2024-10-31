@@ -1,6 +1,7 @@
 import random
 import copy
 import tempfile
+from pathlib import Path
 
 import pytest
 import torch
@@ -459,6 +460,14 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     assert torch.allclose(res1, res3)
     assert torch.allclose(res1, res4)
 
+def test_load_cpu_from_gpu():
+    tp_gpu_file = Path(__file__).parent / "files" / "tp_gpu.ckpt"
+    if torch.cuda.is_available():
+        # Skip test
+        pytest.skip("Loading with gpu available is not a problem")
+    else:
+        torch.load(tp_gpu_file, map_location="cpu")
+
 
 def test_triu_mode() -> None:
     def build_module():
@@ -473,3 +482,5 @@ def test_triu_mode() -> None:
 
     tp_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
     tp_pt2(torch.randn(2, 10), torch.randn(2, 10))
+
+
