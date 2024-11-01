@@ -9,6 +9,7 @@ from sympy.printing.pycode import pycode
 import torch
 
 from e3nn import o3
+from e3nn import get_optimization_defaults
 from e3nn.util.jit import compile_mode
 
 
@@ -84,12 +85,20 @@ class SphericalHarmonics(torch.nn.Module):
                 f"spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more"
             )
 
+        # TODO: Using this to turn off the torch.jit.script for torch.compile.
+        # Please remove this when torch.script is depracated
+        if get_optimization_defaults()["jit_script_fx"]:
+            self.sph_func = torch.jit.script(_spherical_harmonics)
+        else:
+            # Turn off for torch.compile
+            self.sph_func = _spherical_harmonics
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # - PROFILER - with torch.autograd.profiler.record_function(self._prof_str):
         if self.normalize:
             x = torch.nn.functional.normalize(x, dim=-1)  # forward 0's instead of nan for zero-radius
 
-        sh = _spherical_harmonics(self._lmax, x[..., 0], x[..., 1], x[..., 2])
+        sh = self.sph_func(self._lmax, x[..., 0], x[..., 1], x[..., 2])
 
         if not self._is_range_lmax:
             sh = torch.cat([sh[..., l * l : (l + 1) * (l + 1)] for l in self._ls_list], dim=-1)
@@ -184,7 +193,6 @@ def spherical_harmonics(
     return sh(x)
 
 
-@torch.jit.script
 def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
     sh_0_0 = torch.ones_like(x)
     if lmax == 0:
