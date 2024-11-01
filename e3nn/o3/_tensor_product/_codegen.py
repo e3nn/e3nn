@@ -39,14 +39,10 @@ def codegen_tensor_product_left_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
-    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device="cpu")), tracer=tracer)
     if shared_weights:
-        output_shape = torch.broadcast_tensors(empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]))[0].shape
+        output_shape = torch.broadcast_tensors(x1s[..., 0], x2s[..., 0])[0].shape
     else:
-        output_shape = torch.broadcast_tensors(
-            empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1])
-        )[0].shape
-    del empty
+        output_shape = torch.broadcast_tensors(x1s[..., 0], x2s[..., 0], weights[..., 0])[0].shape
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
@@ -415,12 +411,10 @@ def codegen_tensor_product_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
-    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device="cpu")), tracer=tracer)
     if shared_weights:
         output_shape = x2s.shape[:-1]
     else:
-        output_shape = torch.broadcast_tensors(empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1]))[0].shape
-    del empty
+        output_shape = torch.broadcast_tensors(x2s[..., 0], weights[..., 0])[0].shape
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
