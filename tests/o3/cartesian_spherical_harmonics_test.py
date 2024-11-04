@@ -157,7 +157,7 @@ def test_module(normalization, normalize) -> None:
     xyz = torch.randn(11, 3)
     assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)
-
+    torch._dynamo.reset()
     sp_pt2 = torch.compile(prepare(build_module)(l, normalize, normalization), fullgraph=True)
     assert torch.allclose(sp_pt2(xyz), sp(xyz))
 
@@ -167,8 +167,28 @@ def test_internal_jit_flag():
     sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
     # Turning off the JIT in _spherical_harmonics to enable torch.compile.
     # Note that this is a less invasive way then turning off jit_script_fx globally
-    set_optimization_defaults(jit_script_fx=False)
-    sp_pt2 = torch.compile(o3.SphericalHarmonics(l, normalization="integral", normalize=True), fullgraph=True)
+    try:
+        torch._dynamo.reset()
+        set_optimization_defaults(jit_script_fx=False)
+        sp_pt2 = torch.compile(o3.SphericalHarmonics(l, normalization="integral", normalize=True), fullgraph=True)
 
-    xyz = torch.randn(11, 3)
-    torch.testing.assert_close(sp(xyz), sp_pt2(xyz))
+        xyz = torch.randn(11, 3)
+        torch.testing.assert_close(sp(xyz), sp_pt2(xyz))
+    finally:
+        set_optimization_defaults(jit_script_fx=True)
+
+
+def test_picke():
+    l = o3.Irreps("0e + 1o + 3o")
+    sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
+    try:
+        torch._dynamo.reset()
+        set_optimization_defaults(jit_script_fx=False)
+        sp_pt2 = torch.compile(o3.SphericalHarmonics(l, normalization="integral", normalize=True), fullgraph=True)
+
+        import io
+
+        buffer = io.BytesIO()
+        torch.save(sp_pt2.state_dict(), buffer)
+    finally:
+        set_optimization_defaults(jit_script_fx=True)
