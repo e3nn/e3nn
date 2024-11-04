@@ -184,10 +184,10 @@ def test_internal_jit_flag():
 @pytest.mark.parametrize("jit_script_fx", [True, False])
 def test_pickle(jit_script_fx):
     l = o3.Irreps("0e + 1o + 3o")
-    sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
     jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
     try:
         set_optimization_defaults(jit_script_fx=jit_script_fx)
+        sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
         buffer = io.BytesIO()
         torch.save(sp, buffer)
     finally:
