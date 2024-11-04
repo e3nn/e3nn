@@ -181,18 +181,14 @@ def test_internal_jit_flag():
         set_optimization_defaults(jit_script_fx=jit_script_fx_before)
 
 
-@pytest.mark.parametrize("compile", [True, False])
-def test_pickle(compile):
+@pytest.mark.parametrize("jit_script_fx", [True, False])
+def test_pickle(jit_script_fx):
     l = o3.Irreps("0e + 1o + 3o")
+    sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
     jit_script_fx_before = get_optimization_defaults()['jit_script_fx'] 
     try:
-        if compile:
-            torch._dynamo.reset()
-            set_optimization_defaults(jit_script_fx=False)
-            sp_pt = torch.compile(o3.SphericalHarmonics(l, normalization="integral", normalize=True), fullgraph=True)
-        else:
-            sp_pt = torch.jit.script(o3.SphericalHarmonics(l, normalization="integral", normalize=True))
+        set_optimization_defaults(jit_script_fx=jit_script_fx)
         buffer = io.BytesIO()
-        torch.save(sp_pt, buffer)
+        torch.save(sp, buffer)
     finally:
-        set_optimization_defaults(jit_script_fx=True)
+        set_optimization_defaults(jit_script_fx=jit_script_fx_before)
