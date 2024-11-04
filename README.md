@@ -39,80 +39,20 @@ Our community abides by the [Contributor Covenant Code of Conduct](./github/CODE
 
 ## Citing
 
-- Euclidean Neural Networks
-```
-@misc{thomas2018tensorfieldnetworksrotation,
-      title={Tensor field networks: Rotation- and translation-equivariant neural networks for 3D point clouds}, 
-      author={Nathaniel Thomas and Tess Smidt and Steven Kearnes and Lusann Yang and Li Li and Kai Kohlhoff and Patrick Riley},
-      year={2018},
-      eprint={1802.08219},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/1802.08219}, 
-}
+If you use e3nn in your research, please cite the following papers:
 
-@misc{weiler20183dsteerablecnnslearning,
-      title={3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data}, 
-      author={Maurice Weiler and Mario Geiger and Max Welling and Wouter Boomsma and Taco Cohen},
-      year={2018},
-      eprint={1807.02547},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/1807.02547}, 
-}
+### Euclidean Neural Networks:
 
-@misc{kondor2018clebschgordannetsfullyfourier,
-      title={Clebsch-Gordan Nets: a Fully Fourier Space Spherical Convolutional Neural Network}, 
-      author={Risi Kondor and Zhen Lin and Shubhendu Trivedi},
-      year={2018},
-      eprint={1806.09231},
-      archivePrefix={arXiv},
-      primaryClass={stat.ML},
-      url={https://arxiv.org/abs/1806.09231}, 
-}
-```
-- e3nn
-```
-@misc{e3nn_paper,
-    doi = {10.48550/ARXIV.2207.09453},
-    url = {https://arxiv.org/abs/2207.09453},
-    author = {Geiger, Mario and Smidt, Tess},
-    keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), Neural and Evolutionary Computing (cs.NE), FOS: Computer and information sciences, FOS: Computer and information sciences},
-    title = {e3nn: Euclidean Neural Networks},
-    publisher = {arXiv},
-    year = {2022},
-    copyright = {Creative Commons Attribution 4.0 International}
-}
+- N. Thomas et al., "Tensor field networks: Rotation- and translation-equivariant neural networks for 3D point clouds" (2018). [arXiv:1802.08219](https://arxiv.org/abs/1802.08219)
+- M. Weiler et al., "3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data" (2018). [arXiv:1807.02547](https://arxiv.org/abs/1807.02547)
+- R. Kondor et al., "Clebsch-Gordan Nets: a Fully Fourier Space Spherical Convolutional Neural Network" (2018). [arXiv:1806.09231](https://arxiv.org/abs/1806.09231)
 
-@software{e3nn,
-  author       = {Mario Geiger and
-                  Tess Smidt and
-                  Alby M. and
-                  Benjamin Kurt Miller and
-                  Wouter Boomsma and
-                  Bradley Dice and
-                  Kostiantyn Lapchevskyi and
-                  Maurice Weiler and
-                  Michał Tyszkiewicz and
-                  Simon Batzner and
-                  Dylan Madisetti and
-                  Martin Uhrin and
-                  Jes Frellsen and
-                  Nuri Jung and
-                  Sophia Sanborn and
-                  Mingjian Wen and
-                  Josh Rackers and
-                  Marcel Rød and
-                  Michael Bailey},
-  title        = {Euclidean neural networks: e3nn},
-  month        = apr,
-  year         = 2022,
-  publisher    = {Zenodo},
-  version      = {0.5.0},
-  doi          = {10.5281/zenodo.6459381},
-  url          = {https://doi.org/10.5281/zenodo.6459381}
-}
-```
+### e3nn:
+
+- M. Geiger and T. Smidt, "e3nn: Euclidean Neural Networks" (2022). [arXiv:2207.09453](https://arxiv.org/abs/2207.09453)
+- M. Geiger et al., "Euclidean neural networks: e3nn" (2022). [Zenodo](https://doi.org/10.5281/zenodo.6459381)
+
+For BibTeX entries, please refer to the [CITATION.bib](CITATION.bib) file in this repository.
 
 ### Copyright
 

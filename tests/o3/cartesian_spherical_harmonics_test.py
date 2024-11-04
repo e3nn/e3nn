@@ -2,8 +2,10 @@ import math
 
 import pytest
 import torch
+
 from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
+from e3nn.util.jit import prepare
 
 
 def test_weird_call() -> None:
@@ -145,8 +147,15 @@ def test_recurrence_relation(float_tolerance, l) -> None:
 @pytest.mark.parametrize("normalize", [True, False])
 def test_module(normalization, normalize) -> None:
     l = o3.Irreps("0e + 1o + 3o")
-    sp = o3.SphericalHarmonics(l, normalize, normalization)
+
+    def build_module(l, normalize, normalization):
+        return o3.SphericalHarmonics(l, normalize, normalization)
+
+    sp = build_module(l, normalize, normalization)
     sp_jit = assert_auto_jitable(sp)
     xyz = torch.randn(11, 3)
     assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)
+
+    sp_pt2 = torch.compile(prepare(build_module)(l, normalize, normalization), fullgraph=True)
+    assert torch.allclose(sp_pt2(xyz), sp(xyz))

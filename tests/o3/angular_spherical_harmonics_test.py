@@ -1,18 +1,26 @@
 import math
 
 import torch
+
 from e3nn import o3
 
 from e3nn.util.test import assert_auto_jitable
+from e3nn.util.jit import prepare
 
 
 def test_jit(float_tolerance) -> None:
-    sh = o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
+    def build_module():
+        return o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
+
+    sh = build_module()
     jited = assert_auto_jitable(sh)
 
     a = torch.randn(5, 4)
     b = torch.randn(5, 4)
     assert (sh(a, b) - jited(a, b)).abs().max() < float_tolerance
+
+    m_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    assert (sh(a, b) - m_pt2(a, b)).abs().max() < float_tolerance
 
 
 def test_sh_equivariance1(float_tolerance) -> None:
