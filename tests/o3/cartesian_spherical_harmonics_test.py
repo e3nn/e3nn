@@ -168,8 +168,8 @@ def test_internal_jit_flag():
     sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
     # Turning off the JIT in _spherical_harmonics to enable torch.compile.
     # Note that this is a less invasive way then turning off jit_script_fx globally
-    jit_script_fx_before = get_optimization_defaults()['jit_script_fx'] 
-    #TODO: Have a more general purpose context manager
+    jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
+    # TODO: Have a more general purpose context manager
     try:
         torch._dynamo.reset()
         set_optimization_defaults(jit_script_fx=False)
@@ -185,7 +185,7 @@ def test_internal_jit_flag():
 def test_pickle(jit_script_fx):
     l = o3.Irreps("0e + 1o + 3o")
     sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
-    jit_script_fx_before = get_optimization_defaults()['jit_script_fx'] 
+    jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
     try:
         set_optimization_defaults(jit_script_fx=jit_script_fx)
         buffer = io.BytesIO()
