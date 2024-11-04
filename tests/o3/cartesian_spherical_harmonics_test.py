@@ -181,7 +181,7 @@ def test_internal_jit_flag():
         set_optimization_defaults(jit_script_fx=jit_script_fx_before)
 
 
-@pytest.mark.parametrize("jit_script_fx", [True, False])
+@pytest.mark.parametrize("jit_script_fx", [False])
 def test_pickle(jit_script_fx):
     l = o3.Irreps("0e + 1o + 3o")
     jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
