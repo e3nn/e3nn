@@ -158,7 +158,6 @@ def test_module(normalization, normalize) -> None:
     xyz = torch.randn(11, 3)
     assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)
-    torch._dynamo.reset()
     sp_pt2 = torch.compile(prepare(build_module)(l, normalize, normalization), fullgraph=True)
     assert torch.allclose(sp_pt2(xyz), sp(xyz))
 
@@ -171,7 +170,6 @@ def test_internal_jit_flag():
     jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
     # TODO: Have a more general purpose context manager
     try:
-        torch._dynamo.reset()
         set_optimization_defaults(jit_script_fx=False)
         sp_pt2 = torch.compile(o3.SphericalHarmonics(l, normalization="integral", normalize=True), fullgraph=True)
 
