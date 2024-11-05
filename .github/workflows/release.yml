@@ -6,24 +6,19 @@ on:
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install setuptools wheel twine build
+    - name: Install Hatch
+      run: pip install hatch
     - name: Build and publish
       env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD_V2 }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        HATCH_INDEX_USER: __token__
+        HATCH_INDEX_AUTH: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        python -m build
-        twine upload dist/*
+        hatch build
+        hatch publish
