@@ -14,7 +14,7 @@ def moment(f, n, dtype=None, device=None):
 
     dtype, device = explicit_default_types(dtype, device)
     gen = torch.Generator(device="cpu").manual_seed(0)
-    z = torch.randn(1_000_000, generator=gen, dtype=torch.float64).to(dtype=dtype, device=device)
+    z = torch.randn(1_000_000, generator=gen, dtype=torch.float64, device="cpu").to(dtype=dtype, device=device)
     return f(z).pow(n).mean()
 
 
