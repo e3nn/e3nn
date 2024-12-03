@@ -1,6 +1,7 @@
 import torch
 
 from e3nn import o3
+from e3nn.util.jit import script
 
 
 def test_xyz(float_tolerance) -> None:
@@ -112,3 +113,20 @@ def test_matrix_xyz(float_tolerance) -> None:
 
     y = torch.einsum("zij,zj->zi", o3.matrix_z(torch.randn(100)), x)
     assert (x[:, 2] - y[:, 2]).abs().max() < float_tolerance
+
+
+def test_script():
+    pos = torch.tensor([[0.0, 1.0, 1.0]])
+    angles = o3.xyz_to_angles(pos)
+    print(angles)
+
+    class XYZAngles(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, xyz):
+            return o3.xyz_to_angles(xyz)
+
+    mod = XYZAngles()
+    scripted = script(mod)
+    torch.testing.assert_close(mod(pos), scripted(pos))
