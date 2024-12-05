@@ -599,6 +599,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                     yield ins_i, ins, this_weight
                 else:
                     yield this_weight
+    
+    def _codegen_get_device(self):
+        # Make sure the codegen device is properly set.
+        # We retreive the device of the output mask, 
+        # because this is a buffer that is always present.
+        return self.output_mask.device
 
     def visualize(
         self, weight: Optional[torch.Tensor] = None, plot_weight: bool = True, aspect_ratio=1, ax=None
