@@ -39,6 +39,16 @@ def codegen_tensor_product_left_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
+    # Short circuit for zero-dimensional inputs
+    if len(irreps_in1) == 0 or len(irreps_in2) == 0:
+        if shared_weights:
+            output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1])[0].shape[:-1]
+        else:
+            output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1], weights[..., :1])[0].shape[:-1]
+        outputs = x1s.new_zeros(output_shape + (irreps_out.dim,))
+        graph.output(outputs.node, torch.Tensor)
+        return fx.GraphModule({}, graph, "tp_forward")
+
     if shared_weights:
         output_shape = torch.broadcast_tensors(x1s[..., 0], x2s[..., 0])[0].shape
     else:
