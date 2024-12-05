@@ -40,6 +40,8 @@ def codegen_tensor_product_left_right(
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
     if shared_weights:
+        # by broadcasting all but the final irrep dim, we broadcast any and all batch dimensions
+        # the use of `:1` is important, rather than `0`, to ensure the case with an empty irrep dimension doesn't error out
         output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1])[0].shape[:-1]
     else:
         output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1], weights[..., :1])[0].shape[:-1]
