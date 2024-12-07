@@ -205,7 +205,7 @@ class FullTensorProduct(TensorProduct):
         super().__init__(irreps_in1, irreps_in2, out, instr, irrep_normalization=irrep_normalization, **kwargs)
 
 
-class ChannelWiseTensorProduct(TensorProduct):
+class FullTensorProductSHWeighted(TensorProduct):
     r"""Nequip-like TensorProduct with weights.
 
     .. math::

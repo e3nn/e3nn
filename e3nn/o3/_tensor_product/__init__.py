@@ -3,7 +3,7 @@ from ._tensor_product import TensorProduct
 from ._sub import (
     ElementwiseTensorProduct,
     FullTensorProduct,
-    ChannelWiseTensorProduct,
+    FullTensorProductSHWeighted,
     FullyConnectedTensorProduct,
     TensorSquare,
 )
@@ -14,6 +14,6 @@ __all__ = [
     "FullyConnectedTensorProduct",
     "ElementwiseTensorProduct",
     "FullTensorProduct",
-    "ChannelWiseTensorProduct",
+    "FullTensorProductSHWeighted",
     "TensorSquare",
 ]
