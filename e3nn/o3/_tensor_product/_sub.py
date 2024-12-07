@@ -251,7 +251,7 @@ class ChannelWiseTensorProduct(TensorProduct):
         irreps_in1 = o3.Irreps(irreps_in1).simplify()
         irreps_in2 = o3.Irreps(irreps_in2).simplify()
 
-        # Borrowed from https://github.com/mir-group/nequip/blob/1e150cdc8614e640116d11e085d8e5e45b21e94d/nequip/nn/_interaction_block.py#L83-L112
+        # Borrowed from https://github.com/mir-group/nequip/blob/1e150cdc8614e640116d11e085d8e5e45b21e94d/nequip/nn/_interaction_block.py#L83-L112 # noqa: E501
         out = []
         instr = []
         for i_1, (mul, ir_1) in enumerate(irreps_in1):

@@ -1,4 +1,3 @@
-from e3nn_jax import Irrep
 import torch
 
 from e3nn import o3

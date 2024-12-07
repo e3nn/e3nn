@@ -181,6 +181,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
+
     instructions: List[Any]
     shared_weights: bool
     internal_weights: bool
@@ -410,12 +411,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if self.irreps_out.dim > 0:
             output_mask = torch.cat(
                 [
-                    torch.ones(mul * ir.dim)
-                    if any(
-                        (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
-                        for ins in self.instructions
+                    (
+                        torch.ones(mul * ir.dim)
+                        if any(
+                            (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
+                            for ins in self.instructions
+                        )
+                        else torch.zeros(mul * ir.dim)
                     )
-                    else torch.zeros(mul * ir.dim)
                     for i_out, (mul, ir) in enumerate(self.irreps_out)
                 ]
             )
