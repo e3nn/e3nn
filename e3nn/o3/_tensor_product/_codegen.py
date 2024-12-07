@@ -415,8 +415,7 @@ def codegen_tensor_product_right(
     if shared_weights:
         output_shape = x2s.shape[:-1]
     else:
-        # see broadcasting notes above
-        output_shape = torch.broadcast_tensors(x2s[..., :1], weights[..., :1])[0].shape
+        output_shape = torch.broadcast_tensors(x2s[..., 0], weights[..., 0])[0].shape
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
