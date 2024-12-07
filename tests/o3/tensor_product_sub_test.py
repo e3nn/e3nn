@@ -1,8 +1,9 @@
+from e3nn_jax import Irrep
 import torch
 
 from e3nn import o3
 from e3nn.nn import Identity
-from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, TensorSquare
+from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, TensorSquare, ChannelWiseTensorProduct
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
 from e3nn.util.jit import prepare
 
@@ -70,6 +71,24 @@ def test_full() -> None:
     assert_auto_jitable(m)
 
     m_pt2 = prepare(build_module)(irreps_in1, irreps_in2)
+    m_pt2(irreps_in1.randn(-1), irreps_in2.randn(-1))
+
+
+def test_channelwise() -> None:
+    irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
+    irreps_in2 = o3.Irreps("1e + 2e + 3x3o")
+    irreps_out = o3.Irreps("1e + 2e + 3x3o")
+
+    def build_module(irreps_in1, irreps_in2, irreps_out):
+        return ChannelWiseTensorProduct(irreps_in1, irreps_in2, irreps_out)
+
+    m = build_module(irreps_in1, irreps_in2, irreps_out)
+    print(m)
+
+    assert_equivariant(m)
+    assert_auto_jitable(m)
+
+    m_pt2 = prepare(build_module)(irreps_in1, irreps_in2, irreps_out)
     m_pt2(irreps_in1.randn(-1), irreps_in2.randn(-1))
 
 
