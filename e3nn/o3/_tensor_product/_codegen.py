@@ -39,16 +39,13 @@ def codegen_tensor_product_left_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
-    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device="cpu")), tracer=tracer)
     if shared_weights:
-        output_shape = torch.broadcast_tensors(empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]))[0].shape
+        # by broadcasting all but the final irrep dim, we broadcast any and all batch dimensions
+        # the use of `:1` is important, rather than `0`, to ensure the case with an empty irrep dimension doesn't error out
+        output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1])[0].shape[:-1]
     else:
-        output_shape = torch.broadcast_tensors(
-            empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1])
-        )[0].shape
-    del empty
+        output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1], weights[..., :1])[0].shape[:-1]
 
-    # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
     instructions = [ins for ins in instructions if 0 not in ins.path_shape]
 
@@ -415,12 +412,10 @@ def codegen_tensor_product_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
-    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device="cpu")), tracer=tracer)
     if shared_weights:
         output_shape = x2s.shape[:-1]
     else:
-        output_shape = torch.broadcast_tensors(empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1]))[0].shape
-    del empty
+        output_shape = torch.broadcast_tensors(x2s[..., 0], weights[..., 0])[0].shape
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions

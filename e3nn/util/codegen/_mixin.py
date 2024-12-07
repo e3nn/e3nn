@@ -1,4 +1,5 @@
 import io
+import pickle
 from typing import Dict
 
 import e3nn.util.jit
@@ -73,15 +74,24 @@ class CodeGenMixin:
             for fname in self.__codegen__:
                 # Get the module
                 smod = getattr(self, fname)
+                buffer_type: str
+                buffer: bytes
                 if isinstance(smod, fx.GraphModule):
-                    smod = e3nn.util.jit.compile(smod, recurse=False)
-                assert isinstance(smod, torch.jit.ScriptModule)
-                # Save the compiled code as TorchScript IR
-                buffer = io.BytesIO()
-                torch.jit.save(smod, buffer)
-                # Serialize that IR (just some `bytes`) instead of
-                # the ScriptModule
-                codegen_state[fname] = buffer.getvalue()
+                    buffer_type = "fx"
+                    # pickle the fx.GraphModule normally
+                    buffer = pickle.dumps(smod)
+                elif isinstance(smod, torch.jit.ScriptModule):
+                    buffer_type = "torchscript"
+                    # Save the compiled code as TorchScript IR
+                    buffer_io = io.BytesIO()
+                    torch.jit.save(smod, buffer_io)
+                    # Serialize that IR (just some `bytes`) instead of
+                    # the ScriptModule
+                    buffer = buffer_io.getvalue()
+                else:
+                    assert False
+                # Save the buffer and a note on what it is so we know how to load it
+                codegen_state[fname] = (buffer_type, buffer)
                 # Remove the compiled submodule from being a submodule
                 # of the saved module
                 del out["_modules"][fname]
@@ -102,14 +112,22 @@ class CodeGenMixin:
             self.__dict__.update(d)
 
         if codegen_state is not None:
-            for fname, buffer in codegen_state.items():
+            for fname, (buffer_type, buffer) in codegen_state.items():
                 assert isinstance(fname, str)
+                assert isinstance(buffer_type, str)
                 # Make sure bytes, not ScriptModules, got made
                 assert isinstance(buffer, bytes)
-                # Load the TorchScript IR buffer
-                buffer = io.BytesIO(buffer)
-                smod = torch.jit.load(buffer)
-                assert isinstance(smod, torch.jit.ScriptModule)
+                if buffer_type == "fx":
+                    smod = pickle.loads(buffer)
+                    assert isinstance(smod, fx.GraphModule)
+                elif buffer_type == "torchscript":
+                    # Load the TorchScript IR buffer
+                    buffer = io.BytesIO(buffer)
+                    smod = torch.jit.load(buffer)
+                    assert isinstance(smod, torch.jit.ScriptModule)
+                else:
+                    raise NotImplementedError
+
                 # Add the ScriptModule as a submodule
                 setattr(self, fname, smod)
             self.__codegen__ = list(codegen_state.keys())
