@@ -210,9 +210,10 @@ class FullTensorProductSHWeighted(TensorProduct):
 
     .. math::
 
-        z_{u} = w_{u} x_u \otimes y
+        `z_u = x_u \otimes (\sum_v w_{uv} y_v)`
 
-    where :math:`u` runs over the irreps.
+
+    where :math:`v` runs over the irreps.
     The output representation is determined by the two input representations.
 
     Parameters
