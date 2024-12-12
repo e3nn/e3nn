@@ -4,15 +4,12 @@ import torch
 
 from e3nn.nn import Dropout
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
-from e3nn.util.jit import prepare
 
 
 def test_dropout() -> None:
-    def build_module():
-        return Dropout(irreps="10x1e + 10x0e", p=0.75)
 
-    c = build_module()
-    c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    c = Dropout(irreps="10x1e + 10x0e", p=0.75)
+    c_pt2 = torch.compile(c, fullgraph=True)
     x = c.irreps.randn(5, 2, -1)
 
     for c in [c, c_pt2, assert_auto_jitable(c)]:

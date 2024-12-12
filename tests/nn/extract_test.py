@@ -6,15 +6,12 @@ import torch
 
 from e3nn.nn import Extract, ExtractIr
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
-from e3nn.util.jit import prepare
 
 
 def test_extract() -> None:
-    def build_module():
-        return Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
 
-    c = build_module()
-    c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    c = Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
+    c_pt2 = torch.compile(c, fullgraph=True)
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     out_pt2 = c_pt2(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     assert out == (torch.Tensor([1.0]), torch.Tensor([2.0]))
@@ -25,11 +22,9 @@ def test_extract() -> None:
 
 @pytest.mark.parametrize("squeeze", [True, False])
 def test_extract_single(squeeze) -> None:
-    def build_module():
-        return Extract("1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze)
 
-    c = build_module()
-    c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    c = Extract("1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze)
+    c_pt2 = torch.compile(c, fullgraph=True)
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     out_pt2 = c_pt2(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     if squeeze:
@@ -46,11 +41,9 @@ def test_extract_single(squeeze) -> None:
 
 
 def test_extract_ir() -> None:
-    def build_module():
-        return ExtractIr("1e + 0e + 0e", "0e")
 
-    c = build_module()
-    c_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    c = ExtractIr("1e + 0e + 0e", "0e")
+    c_pt2 = torch.compile(c, fullgraph=True)
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     out_pt2 = c_pt2(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     assert torch.all(out == torch.Tensor([1.0, 2.0]))

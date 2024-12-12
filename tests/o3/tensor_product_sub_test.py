@@ -4,7 +4,6 @@ from e3nn import o3
 from e3nn.nn import Identity
 from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, TensorSquare
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
-from e3nn.util.jit import prepare
 
 
 def test_fully_connected() -> None:
@@ -12,17 +11,16 @@ def test_fully_connected() -> None:
     irreps_in2 = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
 
-    def build_module(irreps_in1, irreps_in2, irreps_out):
-        return FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
-
-    m = build_module(irreps_in1, irreps_in2, irreps_out)
+    m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
     print(m)
     m(torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim))
 
+    torch._dynamo.reset()  # Clear cache from the previous run
+    m_pt2 = torch.compile(m, fullgraph=True)
+    m_pt2(torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim))
+
     assert_equivariant(m)
     assert_auto_jitable(m)
-    m_pt2 = torch.compile(prepare(build_module)(irreps_in1, irreps_in2, irreps_out), fullgraph=True)
-    m_pt2(torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim))
 
 
 def test_fully_connected_normalization() -> None:
@@ -42,35 +40,31 @@ def test_id() -> None:
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
 
-    def build_module(irreps_in, irreps_out):
-        return Identity(irreps_in, irreps_out)
-
-    m = build_module(irreps_in, irreps_out)
+    m = Identity(irreps_in, irreps_out)
     print(m)
     m(torch.randn(irreps_in.dim))
 
+    torch._dynamo.reset()  # Clear cache from the previous run
+    m_pt2 = torch.compile(m, fullgraph=True)
+    m_pt2(torch.randn(irreps_in.dim))
+
     assert_equivariant(m)
     assert_auto_jitable(m, strict_shapes=False)
-
-    m_pt2 = torch.compile(prepare(build_module)(irreps_in, irreps_out), fullgraph=True)
-    m_pt2(torch.randn(irreps_in.dim))
 
 
 def test_full() -> None:
     irreps_in1 = o3.Irreps("1e + 2e + 3x3o")
     irreps_in2 = o3.Irreps("1e + 2x2e + 2x3o")
 
-    def build_module(irreps_in1, irreps_in2):
-        return FullTensorProduct(irreps_in1, irreps_in2)
-
-    m = build_module(irreps_in1, irreps_in2)
+    m = FullTensorProduct(irreps_in1, irreps_in2)
     print(m)
+
+    torch._dynamo.reset()  # Clear cache from the previous run
+    m_pt2 = torch.compile(m, fullgraph=True)
+    m_pt2(irreps_in1.randn(-1), irreps_in2.randn(-1))
 
     assert_equivariant(m)
     assert_auto_jitable(m)
-
-    m_pt2 = prepare(build_module)(irreps_in1, irreps_in2)
-    m_pt2(irreps_in1.randn(-1), irreps_in2.randn(-1))
 
 
 def test_norm() -> None:
@@ -78,21 +72,19 @@ def test_norm() -> None:
     scalars = torch.randn(3)
     vecs = torch.randn(5, 3)
 
-    def build_module(irreps_in):
-        return Norm(irreps_in=irreps_in)
-
-    norm = build_module(irreps_in)
+    norm = Norm(irreps_in=irreps_in)
     out_norms = norm(torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1))
     true_scalar_norms = torch.abs(scalars)
     true_vec_norms = torch.linalg.norm(vecs, dim=-1)
     assert torch.allclose(out_norms[0, :3], true_scalar_norms)
     assert torch.allclose(out_norms[0, 3:], true_vec_norms)
 
+    torch._dynamo.reset()  # Clear cache from the previous run
+    norm_pt2 = torch.compile(norm, fullgraph=True)
+    norm_pt2(torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1))
+
     assert_equivariant(norm)
     assert_auto_jitable(norm)
-
-    norm_pt2 = torch.compile(prepare(build_module)(irreps_in), fullgraph=True)
-    norm_pt2(torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1))
 
 
 def test_square_normalization() -> None:

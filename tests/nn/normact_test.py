@@ -5,7 +5,6 @@ import torch
 import e3nn
 from e3nn.nn import NormActivation
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
-from e3nn.util.jit import prepare
 
 
 @pytest.mark.parametrize("do_bias", [True, False])
@@ -77,11 +76,8 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
         "2x0e + 3x0o + 5x1o + 1x1e + 2x2e + 1x2o + 1x3e + 1x3o + 1x5e + 1x6o"
     )
 
-    def build_module(irreps_in, nonlin, do_bias):
-        return NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
-
-    norm_act = build_module(irreps_in, nonlin, do_bias)
-    norm_act2 = torch.compile(prepare(build_module)(irreps_in, nonlin, do_bias), fullgraph=True)
+    norm_act = NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
+    norm_act2 = torch.compile(norm_act, fullgraph=True)
 
     if do_bias:
         # Set up some nonzero biases
@@ -89,9 +85,9 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
         with torch.no_grad():
             norm_act.biases[:] = torch.randn(norm_act.biases.shape)
 
+    norm_act2(irreps_in.randn(-1))
     assert_equivariant(norm_act)
     assert_auto_jitable(norm_act)
-    norm_act2(irreps_in.randn(-1))
 
 
 @pytest.mark.parametrize("do_bias", [True, False])

@@ -5,7 +5,6 @@ import torch
 from e3nn import o3
 from e3nn.nn import Activation
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
-from e3nn.util.jit import prepare
 
 
 @pytest.mark.parametrize(
@@ -15,24 +14,22 @@ from e3nn.util.jit import prepare
 def test_activation(irreps_in, acts) -> None:
     irreps_in = o3.Irreps(irreps_in)
 
-    def build_module(irreps_in, acts):
-        return Activation(irreps_in, acts)
+    a = Activation(irreps_in, acts)
+    inp = irreps_in.randn(13, -1)
 
-    a = build_module(irreps_in, acts)
-    a_pt2 = prepare(build_module)(irreps_in, acts)
+    a_pt2 = torch.compile(a, fullgraph=True)
+    out_pt2 = a_pt2(inp)
     assert_auto_jitable(a)
     assert_equivariant(a)
 
-    inp = irreps_in.randn(13, -1)
     out = a(inp)
-    out_pt2 = a_pt2(inp)
+
+    torch.testing.assert_close(out, out_pt2)
+
     for ir_slice, act in zip(irreps_in.slices(), acts):
         this_out = out[:, ir_slice]
-        this_out2 = out_pt2[:, ir_slice]
         true_up_to_factor = act(inp[:, ir_slice])
         factors = this_out / true_up_to_factor
-        factor_pt2 = this_out2 / true_up_to_factor
         assert torch.allclose(factors, factors[0])
-        assert torch.allclose(factor_pt2, factors[0])
 
     assert_normalized(a)
