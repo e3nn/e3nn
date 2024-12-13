@@ -8,7 +8,7 @@ from e3nn.util.test import assert_auto_jitable
 
 
 def test_jit(float_tolerance) -> None:
-
+    import e3nn
     sh = o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
 
     a = torch.randn(5, 4)
