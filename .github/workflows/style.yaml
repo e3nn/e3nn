@@ -24,4 +24,4 @@ jobs:
                   python -m pip install ruff==0.8.2
             - name: Style check
               run: |
-                  ruff check . E741
+                  ruff check . --ignore E741
