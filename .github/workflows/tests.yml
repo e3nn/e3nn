@@ -1,63 +1,55 @@
 name: Check Syntax and Run Tests
 
 on:
-  push:
-    branches:
-    - main
+    push:
+        branches:
+            - main
 
-  pull_request:
-    branches:
-    - main
+    pull_request:
+        branches:
+            - main
 
 jobs:
-  build:
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python-version: ["3.11"]
+                torch-version: ["2.4.0"]
 
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.11']
-        torch-version: ['2.4.0']
+        steps:
+            - uses: actions/checkout@v2
+            - name: Set up Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v4
+              with:
+                  python-version: ${{ matrix.python-version }}
+                  cache: "pip"
+                  cache-dependency-path: |
+                      pyproject.toml
+            - name: Install dependencies
+              env:
+                  TORCH: "${{ matrix.torch-version }}"
+                  CUDA: "cpu"
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install wheel
+                  pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu
+                  pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
+                  pip install .
 
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: "pip"
-        cache-dependency-path: |
-          pyproject.toml
-    - name: Install flake8
-      run: |
-        pip install flake8 Flake8-pyproject
-    - name: Lint with flake8
-      run: |
-        # Stop the build if there are style issues, Python syntax errors, or undefined names
-        flake8 . --count --show-source --statistics
-    - name: Install dependencies
-      env:
-        TORCH: "${{ matrix.torch-version }}"
-        CUDA: "cpu"
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        python -m pip install --upgrade pip
-        pip install wheel
-        pip install torch==${TORCH} torchvision --index-url https://download.pytorch.org/whl/cpu
-        pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
-        pip install .
-
-        pip install plotly
-    - name: Install pytest
-      run: |
-        pip install pytest pytest-cov
-        pip install coveralls
-    - name: Test with pytest
-      run: |
-        coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples
-    - name: Upload to coveralls
-      env:
-        COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
-      # Only send to coveralls if the token has been set and the user pushed
-      if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
-      run: |
-        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls
+                  pip install plotly
+            - name: Install pytest
+              run: |
+                  pip install pytest pytest-cov
+                  pip install coveralls
+            - name: Test with pytest
+              run: |
+                  coverage run --source=e3nn -m pytest --doctest-modules --ignore=docs/ --ignore-glob='**/experimental*' tests examples
+            - name: Upload to coveralls
+              env:
+                  COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+              # Only send to coveralls if the token has been set and the user pushed
+              if: env.COVERALLS_TOKEN != null && github.event_name == 'push'
+              run: |
+                  COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_TOKEN }} coveralls

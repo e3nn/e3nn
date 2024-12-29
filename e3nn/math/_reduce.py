@@ -78,7 +78,7 @@ def reduce_permutation(f0, formulas, dtype=None, device=None, **dims):
         xs = {(s, tuple(x[i] for i in p)) for s, p in formulas}
         # s * T[x] are all equal for all (s, x) in xs
         # if T[x] = -T[x] it is then equal to 0 and we lose this degree of freedom
-        if not (-1, x) in xs:
+        if (-1, x) not in xs:
             # the sign is arbitrary, put both possibilities
             base.add(frozenset({frozenset(xs), frozenset({(-s, x) for s, x in xs})}))
 
