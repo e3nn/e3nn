@@ -85,12 +85,11 @@ class SphericalHarmonics(torch.nn.Module):
                 f"spherical_harmonics maximum l implemented is {_lmax}, send us an email to ask for more"
             )
 
-        # TODO: Using this to turn off the torch.jit.script for torch.compile.
-        # Please remove this when torch.script is depracated
-        if get_optimization_defaults()["jit_script_fx"]:
+        if get_optimization_defaults()["jit_mode"] == "script":
             self.sph_func = torch.jit.script(_spherical_harmonics)
+        elif get_optimization_defaults()["jit_mode"] == "compile":
+            self.sph_func = torch.compile(_spherical_harmonics, fullgraph=True)
         else:
-            # Turn off for torch.compile
             self.sph_func = _spherical_harmonics
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

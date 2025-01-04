@@ -13,6 +13,7 @@ def so3_irreps(lmax: int) -> o3.Irreps:
 @pytest.mark.parametrize("lmax", [1, 2, 3, 4])
 @pytest.mark.parametrize("act", [torch.tanh, lambda x: x**2])
 def test_equivariance(act, lmax: int) -> None:
+    # TODO: torch.compile(fullgraph=True) not working
     m = SO3Activation(lmax, lmax, act, 6)
 
     assert_equivariant(m, ntrials=10, tolerance=0.04, irreps_in=so3_irreps(lmax), irreps_out=so3_irreps(lmax))

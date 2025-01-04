@@ -4,6 +4,7 @@ import torch
 
 from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps
+from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
 
 
 @pytest.mark.parametrize("irreps_in", ["", "5x0e", "1e + 2e + 4x1e + 3x3o"] + random_irreps(n=4))
@@ -15,12 +16,19 @@ def test_norm(irreps_in, squared) -> None:
     if m.irreps_in.dim == 0:
         return
     assert_equivariant(m)
-
-    torch._dynamo.reset()  # Clear cache from the previous run
-    m_pt2 = torch.compile(m, fullgraph=True)
-    m_pt2(torch.randn(m_pt2.irreps_in.dim))
-
     assert_auto_jitable(m)
+
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        m = o3.Norm(irreps_in, squared=squared)
+        torch._dynamo.reset() # Clear cache from the previous run
+        m_pt2 = torch.compile(m, fullgraph=True)
+        m_pt2(torch.randn(m_pt2.irreps_in.dim))
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
+
 
 
 @pytest.mark.parametrize("squared", [True, False])

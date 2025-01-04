@@ -17,12 +17,15 @@ def test_activation(irreps_in, acts) -> None:
     a = Activation(irreps_in, acts)
     inp = irreps_in.randn(13, -1)
 
-    a_pt2 = torch.compile(a, fullgraph=True)
-    out_pt2 = a_pt2(inp)
     assert_auto_jitable(a)
     assert_equivariant(a)
 
     out = a(inp)
+
+    a_pt2 = torch.compile(a, fullgraph=True)
+    out_pt2 = a_pt2(inp)
+
+    print(a_pt2)
 
     torch.testing.assert_close(out, out_pt2)
 

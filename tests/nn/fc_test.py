@@ -13,9 +13,6 @@ def test_variance(act, var_in, var_out, out_act) -> None:
     f = FullyConnectedNet(hs, act, var_in, var_out, out_act)
     x = torch.randn(2000, hs[0]) * var_in**0.5
 
-    f_pt2 = torch.compile(f, fullgraph=True)
-    f_pt2(x)
-
     y = f(x) / var_out**0.5
 
     if not out_act:
@@ -25,6 +22,9 @@ def test_variance(act, var_in, var_out, out_act) -> None:
     f = assert_auto_jitable(f)
     f(x)
 
+    f_new = FullyConnectedNet(hs, act, var_in, var_out, out_act)
+    f_pt2 = torch.compile(f_new, fullgraph=True)
+    f_pt2(x)
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires cuda")
 def test_data_parallel() -> None:

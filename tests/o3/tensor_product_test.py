@@ -7,6 +7,7 @@ import torch
 
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
+from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: bool = True, **kwargs):
@@ -363,8 +364,15 @@ def test_input_weights_jit() -> None:
     m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
     w = torch.randn(m.weight_numel)
 
-    m_pt2 = torch.compile(m, fullgraph=True)
-    assert torch.allclose(m(x1, x2, w), m_pt2(x1, x2, w))
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
+        m_pt2 = torch.compile(m, fullgraph=True)
+        assert torch.allclose(m(x1, x2, w), m_pt2(x1, x2, w))
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
 
     traced = assert_auto_jitable(m)
     with pytest.raises((RuntimeError, torch.jit.Error)):
@@ -464,9 +472,16 @@ def test_triu_mode() -> None:
     tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
     tp(torch.randn(2, 10), torch.randn(2, 10))
 
-    tp_pt2 = torch.compile(tp, fullgraph=True)
-    tp_pt2(torch.randn(2, 10), torch.randn(2, 10))
-
     m = assert_auto_jitable(tp)
 
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+        tp_pt2 = torch.compile(tp, fullgraph=True)
+        tp_pt2(torch.randn(2, 10), torch.randn(2, 10))
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)

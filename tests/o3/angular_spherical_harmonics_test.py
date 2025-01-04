@@ -5,22 +5,28 @@ import torch
 from e3nn import o3
 
 from e3nn.util.test import assert_auto_jitable
+from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
 
 
 def test_jit(float_tolerance) -> None:
-    import e3nn
     sh = o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
 
     a = torch.randn(5, 4)
     b = torch.randn(5, 4)
 
-    torch._dynamo.reset()  # Clear cache from the previous run
-    m_pt2 = torch.compile(sh, fullgraph=True)
-    assert (sh(a, b) - m_pt2(a, b)).abs().max() < float_tolerance
 
     jited = assert_auto_jitable(sh)
-
     assert (sh(a, b) - jited(a, b)).abs().max() < float_tolerance
+
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        sh = o3.SphericalHarmonicsAlphaBeta([0, 1, 2])
+        m_pt2 = torch.compile(sh, fullgraph=True)
+        assert (sh(a, b) - m_pt2(a, b)).abs().max() < float_tolerance
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
 
 
 def test_sh_equivariance1(float_tolerance) -> None:
