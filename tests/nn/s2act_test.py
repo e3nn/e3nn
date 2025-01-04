@@ -14,6 +14,7 @@ from e3nn.util.test import assert_equivariant
 def test_equivariance(float_tolerance, act, normalization, p_val, p_arg) -> None:
     irreps = io.SphericalTensor(3, p_val, p_arg)
 
+    # TODO: torch.compile(fullgraph=True) not working
     m = S2Activation(irreps, act, 120, normalization=normalization, lmax_out=6, random_rot=True)
 
     assert_equivariant(m, ntrials=10, tolerance=torch.sqrt(float_tolerance))
