@@ -3,14 +3,14 @@ import math
 import inspect
 import itertools
 import logging
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Callable
 import warnings
 
 import numpy as np
 import torch
 
 from e3nn import o3
-from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode, _MAKE_TRACING_INPUTS
+from e3nn.util.jit import compile, get_tracing_inputs, get_compile_mode, _MAKE_TRACING_INPUTS, get_optimization_defaults, set_optimization_defaults
 from ._argtools import _get_args_in, _get_io_irreps, _transform, _rand_args
 
 # pylint: disable=unused-variable
@@ -374,6 +374,31 @@ def assert_auto_jitable(
 
     return func_jit
 
+def assert_torch_compile(
+    compile_mode: str,
+    func: Callable,
+    *args,
+    **kwargs,
+) -> None:
+    r"""Assert that func is torch.compile(fullgraph=True)
+    
+    Parameters
+    ----------
+        func: Callable thats a functools.partial(torch.nn.Module)
+        *args: func's forward arguments
+        **kwargs: func's forward positional arguments
+    """
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode=compile_mode)
+        m = func()
+        torch._dynamo.reset() # Clear cache from previous runs
+        m_pt2 = torch.compile(m, fullgraph=True)
+        m_pt2(*args , **kwargs)
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
+    return m_pt2
 
 # TODO: custom in_vars, out_vars support
 def assert_normalized(

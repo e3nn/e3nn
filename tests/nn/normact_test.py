@@ -1,11 +1,12 @@
 import pytest
 
+import functools
+
 import torch
 
 import e3nn
 from e3nn.nn import NormActivation
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
-from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_torch_compile
 
 
 @pytest.mark.parametrize("do_bias", [True, False])
@@ -86,17 +87,12 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
             norm_act.biases[:] = torch.randn(norm_act.biases.shape)
 
     assert_equivariant(norm_act)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(NormActivation, irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias),
+        irreps_in.randn(-1)
+    )
     assert_auto_jitable(norm_act)
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        norm_act = NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
-        norm_act2 = torch.compile(norm_act, fullgraph=True)
-        norm_act2(irreps_in.randn(-1))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
 
 
 @pytest.mark.parametrize("do_bias", [True, False])

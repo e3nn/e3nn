@@ -8,7 +8,7 @@ _OPT_DEFAULTS: Dict[str, bool] = dict(
     specialized_code=True,
     optimize_einsums=True,
     jit_script_fx=True,
-    jit_mode="compile"
+    jit_mode="script"
 )
 
 def _handle_jit_script_fx_legacy(jit_script_fx: bool, current_jit_mode: str) -> str:

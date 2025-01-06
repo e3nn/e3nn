@@ -1,12 +1,14 @@
 import math
 import io
 
+import functools
+
 import pytest
 import torch
 
 from e3nn import o3
 from e3nn import set_optimization_defaults, get_optimization_defaults
-from e3nn.util.test import assert_auto_jitable, assert_equivariant
+from e3nn.util.test import assert_auto_jitable, assert_equivariant, assert_torch_compile
 
 
 def test_weird_call() -> None:
@@ -155,14 +157,17 @@ def test_module(normalization, normalize) -> None:
     sp_jit = assert_auto_jitable(sp)
     assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)
+    
+    sp_pt2 = assert_torch_compile(
+                    'inductor',
+                    functools.partial(o3.SphericalHarmonics, l, normalize, normalization),
+                    xyz)
+        
+    assert torch.allclose(sp_pt2(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
 
-    torch._dynamo.reset() # Clear cache from the previous run
-    sp_pt2 = torch.compile(sp, fullgraph=True)
-    assert torch.allclose(sp_pt2(xyz), sp(xyz))
 
-
-@pytest.mark.parametrize("jit_script_fx", [False])
-def test_pickle(jit_script_fx):
+@pytest.mark.parametrize("jit_mode", ["script", 'inductor', 'trace'])
+def test_pickle():
     l = o3.Irreps("0e + 1o + 3o")
     # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
     jit_mode_before = get_optimization_defaults()["jit_mode"]
@@ -173,4 +178,4 @@ def test_pickle(jit_script_fx):
         buffer = io.BytesIO()
         torch.save(sp, buffer)
     finally:
-        set_optimization_defaults(jit_script_fx=jit_mode_before)
+        set_optimization_defaults(jit_mode=jit_mode_before)

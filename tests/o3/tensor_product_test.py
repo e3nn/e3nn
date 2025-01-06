@@ -1,13 +1,13 @@
 import random
 import copy
 import tempfile
+import functools
 
 import pytest
 import torch
 
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
-from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
-from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized, assert_torch_compile
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: bool = True, **kwargs):
@@ -375,6 +375,11 @@ def test_input_weights_jit() -> None:
         set_optimization_defaults(jit_mode=jit_mode_before)
 
     traced = assert_auto_jitable(m)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(FullyConnectedTensorProduct, irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True),
+        x1, x2, w
+    )
     with pytest.raises((RuntimeError, torch.jit.Error)):
         m(x1, x2)  # it should require weights
     with pytest.raises((RuntimeError, torch.jit.Error)):
@@ -476,12 +481,8 @@ def test_triu_mode() -> None:
 
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
 
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
-        tp_pt2 = torch.compile(tp, fullgraph=True)
-        tp_pt2(torch.randn(2, 10), torch.randn(2, 10))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(TensorProduct, "10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)]),
+        torch.randn(2, 10), torch.randn(2, 10))
+

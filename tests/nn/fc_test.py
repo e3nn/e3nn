@@ -1,8 +1,10 @@
 import torch
 
+import functools
+
 import pytest
 from e3nn.nn import FullyConnectedNet
-from e3nn.util.test import assert_auto_jitable
+from e3nn.util.test import assert_auto_jitable, assert_torch_compile
 
 
 @pytest.mark.parametrize("act", [None, torch.tanh])
@@ -22,8 +24,11 @@ def test_variance(act, var_in, var_out, out_act) -> None:
     f = assert_auto_jitable(f)
     f(x)
 
-    f_new = FullyConnectedNet(hs, act, var_in, var_out, out_act)
-    f_pt2 = torch.compile(f_new, fullgraph=True)
+    f_pt2 = assert_torch_compile(
+        'inductor',
+        functools.partial(FullyConnectedNet, hs, act, var_in, var_out, out_act),
+        x
+    )
     f_pt2(x)
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires cuda")

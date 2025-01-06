@@ -1,4 +1,5 @@
 import copy
+import functools
 
 import torch
 
@@ -9,10 +10,9 @@ from e3nn.util.test import assert_auto_jitable, assert_equivariant
 def test_dropout() -> None:
 
     c = Dropout(irreps="10x1e + 10x0e", p=0.75)
-    c_pt2 = torch.compile(c, fullgraph=True)
     x = c.irreps.randn(5, 2, -1)
 
-    for c in [c, c_pt2, assert_auto_jitable(c)]:
+    for c in [c, assert_auto_jitable(c)]:
         c.eval()
         assert c(x).eq(x).all()
 

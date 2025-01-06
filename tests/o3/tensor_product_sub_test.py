@@ -1,10 +1,11 @@
 import torch
 
+import functools
+
 from e3nn import o3
 from e3nn.nn import Identity
 from e3nn.o3 import FullyConnectedTensorProduct, FullTensorProduct, Norm, TensorSquare
-from e3nn.util.test import assert_equivariant, assert_auto_jitable
-from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
+from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_torch_compile
 
 
 def test_fully_connected() -> None:
@@ -18,17 +19,11 @@ def test_fully_connected() -> None:
 
     assert_equivariant(m)
     assert_auto_jitable(m)
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out)
-        torch._dynamo.reset()  # Clear cache from the previous run
-        m_pt2 = torch.compile(m, fullgraph=True)
-        m_pt2(torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(FullyConnectedTensorProduct, irreps_in1, irreps_in2, irreps_out),
+        torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim)
+    )
 
 
 def test_fully_connected_normalization() -> None:
@@ -54,17 +49,11 @@ def test_id() -> None:
 
     assert_equivariant(m)
     assert_auto_jitable(m, strict_shapes=False)
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        m = Identity(irreps_in, irreps_out)
-        torch._dynamo.reset()  # Clear cache from the previous run
-        m_pt2 = torch.compile(m, fullgraph=True)
-        m_pt2(torch.randn(irreps_in.dim))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(Identity, irreps_in, irreps_out),
+        torch.randn(irreps_in.dim)
+    )
 
 
 def test_full() -> None:
@@ -76,17 +65,11 @@ def test_full() -> None:
 
     assert_equivariant(m)
     assert_auto_jitable(m)
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        m = FullTensorProduct(irreps_in1, irreps_in2)
-        torch._dynamo.reset()  # Clear cache from the previous run
-        m_pt2 = torch.compile(m, fullgraph=True)
-        m_pt2(irreps_in1.randn(-1), irreps_in2.randn(-1))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(FullTensorProduct, irreps_in1, irreps_in2),
+        irreps_in1.randn(-1), irreps_in2.randn(-1)
+    )
 
 def test_norm() -> None:
     irreps_in = o3.Irreps("3x0e + 5x1o")
@@ -102,17 +85,11 @@ def test_norm() -> None:
 
     assert_equivariant(norm)
     assert_auto_jitable(norm)
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        norm = Norm(irreps_in=irreps_in)
-        torch._dynamo.reset()  # Clear cache from the previous run
-        norm_pt2 = torch.compile(norm, fullgraph=True)
-        norm_pt2(torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(Norm, irreps_in=irreps_in),
+        torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1)
+    )
 
 
 def test_square_normalization() -> None:

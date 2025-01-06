@@ -1,13 +1,12 @@
 import pytest
 
 import copy
+import functools
 
 import torch
 
 from e3nn.nn import Extract, ExtractIr
-from e3nn.util.test import assert_auto_jitable, assert_equivariant
-from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
-
+from e3nn.util.test import assert_auto_jitable, assert_equivariant, assert_torch_compile
 
 def test_extract() -> None:
 
@@ -15,19 +14,13 @@ def test_extract() -> None:
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     assert out == (torch.Tensor([1.0]), torch.Tensor([2.0]))
     assert_auto_jitable(c)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(Extract, "1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)]),
+        torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0])
+        
+    )
     assert_equivariant(c, irreps_out=list(c.irreps_outs))
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        c_new = Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
-        c_pt2 = torch.compile(c_new, fullgraph=True)
-        out_pt2 = c_pt2(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
-        assert out == out_pt2
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
-
 
 @pytest.mark.parametrize("squeeze", [True, False])
 def test_extract_single(squeeze) -> None:
@@ -42,23 +35,12 @@ def test_extract_single(squeeze) -> None:
     assert out == torch.Tensor([1.0])
 
     assert_auto_jitable(c)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(Extract, "1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze),
+        torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0])
+    )
     assert_equivariant(c, irreps_out=list(c.irreps_outs))
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        c_new = Extract("1e + 0e + 0e", ["0e"], [(1,)], squeeze_out=squeeze)
-        c_pt2 = torch.compile(c_new, fullgraph=True)
-        out_pt2 = c_pt2(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
-        if squeeze:
-            assert isinstance(out_pt2, torch.Tensor)
-        else:
-            assert len(out_pt2) == 1
-            out_pt2 = out_pt2[0]
-        assert out_pt2 == torch.Tensor([1.0])
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
 
 def test_extract_ir() -> None:
 
@@ -66,19 +48,12 @@ def test_extract_ir() -> None:
     out = c(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
     assert torch.all(out == torch.Tensor([1.0, 2.0]))
     assert_auto_jitable(c)
+    assert_torch_compile(
+        'inductor',
+        functools.partial(ExtractIr, "1e + 0e + 0e", "0e"),
+        torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0])
+    )
     assert_equivariant(c)
-
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        c_new = ExtractIr("1e + 0e + 0e", "0e")
-        c_pt2 = torch.compile(c_new, fullgraph=True)
-        out_pt2 = c_pt2(torch.tensor([0.0, 0.0, 0.0, 1.0, 2.0]))
-        assert torch.all(out_pt2 == out)
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
-
 
 def test_copy() -> None:
     c = Extract("1e + 0e + 0e", ["0e", "0e"], [(1,), (2,)])
