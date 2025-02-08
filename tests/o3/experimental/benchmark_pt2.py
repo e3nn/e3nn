@@ -54,6 +54,14 @@ def main():
             f"TP Experimental Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_experimental_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
         )
 
+        tp_experimental_sparse = o3.experimental.FullTensorProductSparse(irreps_x, irreps_y)
+        tp_experimental_sparse_compile = torch.compile(tp_experimental_sparse, mode=compile_mode, fullgraph=True).to(
+            device=device
+        )
+        print(
+            f"TP Experimental Sparse Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_experimental_sparse_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
+        )
+
 
 if __name__ == "__main__":
     main()
