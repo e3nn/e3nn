@@ -39,11 +39,13 @@ class CodeGenMixin:
         for fname, graphmod in funcs.items():
             assert isinstance(graphmod, fx.GraphModule)
 
-            if opt_defaults["jit_script_fx"]:
+            if opt_defaults["jit_mode"] == "script":
                 # With recurse=False, this more or less is equivalent to
                 # torch.jit.script(jitable(graphmod))
                 scriptmod = e3nn.util.jit.compile(graphmod, recurse=False)
                 assert isinstance(scriptmod, torch.jit.ScriptModule)
+            elif opt_defaults["jit_mode"] == "compile":
+                scriptmod = torch.compile(graphmod, fullgraph=True)
             else:
                 scriptmod = graphmod
 

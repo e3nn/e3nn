@@ -6,7 +6,7 @@ import torch
 
 from e3nn import o3
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, random_irreps, assert_normalized
-from e3nn.util.jit import prepare
+from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
 
 
 class SlowLinear(torch.nn.Module):
@@ -53,18 +53,22 @@ def test_linear() -> None:
     irreps_in = o3.Irreps("1e + 2e + 3x3o")
     irreps_out = o3.Irreps("1e + 2e + 3x3o")
 
-    def build_module(irreps_in, irreps_out):
-        return o3.Linear(irreps_in, irreps_out)
-
-    m = build_module(irreps_in, irreps_out)
+    m = o3.Linear(irreps_in, irreps_out)
     m(torch.randn(irreps_in.dim))
 
     assert_equivariant(m)
     assert_auto_jitable(m)
     assert_normalized(m, n_weight=100, n_input=10_000, atol=0.5)
 
-    m_pt2 = torch.compile(prepare(build_module)(irreps_in, irreps_out), fullgraph=True)
-    m_pt2(torch.randn(irreps_in.dim))
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        m = o3.Linear(irreps_in, irreps_out)
+        m_pt2 = torch.compile(m, fullgraph=True)
+        m_pt2(torch.randn(irreps_in.dim))
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
 
 
 def test_bias() -> None:
