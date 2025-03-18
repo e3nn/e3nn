@@ -1,7 +1,7 @@
 from typing import Iterator, Optional
 
 import torch
-from e3nn import o3
+from e3nn.o3._irreps import Irrep, Irreps
 from e3nn.util import prod
 
 from ._tensor_product import TensorProduct
@@ -46,9 +46,9 @@ class FullyConnectedTensorProduct(TensorProduct):
     def __init__(
         self, irreps_in1, irreps_in2, irreps_out, irrep_normalization: str = None, path_normalization: str = None, **kwargs
     ) -> None:
-        irreps_in1 = o3.Irreps(irreps_in1)
-        irreps_in2 = o3.Irreps(irreps_in2)
-        irreps_out = o3.Irreps(irreps_out)
+        irreps_in1 = Irreps(irreps_in1)
+        irreps_in2 = Irreps(irreps_in2)
+        irreps_out = Irreps(irreps_out)
 
         instr = [
             (i_1, i_2, i_out, "uvw", True, 1.0)
@@ -102,11 +102,11 @@ class ElementwiseTensorProduct(TensorProduct):
     """
 
     def __init__(self, irreps_in1, irreps_in2, filter_ir_out=None, irrep_normalization: str = None, **kwargs) -> None:
-        irreps_in1 = o3.Irreps(irreps_in1).simplify()
-        irreps_in2 = o3.Irreps(irreps_in2).simplify()
+        irreps_in1 = Irreps(irreps_in1).simplify()
+        irreps_in2 = Irreps(irreps_in2).simplify()
         if filter_ir_out is not None:
             try:
-                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+                filter_ir_out = [Irrep(ir) for ir in filter_ir_out]
             except ValueError:
                 raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
 
@@ -171,17 +171,17 @@ class FullTensorProduct(TensorProduct):
 
     def __init__(
         self,
-        irreps_in1: o3.Irreps,
-        irreps_in2: o3.Irreps,
-        filter_ir_out: Iterator[o3.Irrep] = None,
+        irreps_in1: Irreps,
+        irreps_in2: Irreps,
+        filter_ir_out: Iterator[Irrep] = None,
         irrep_normalization: str = None,
         **kwargs,
     ) -> None:
-        irreps_in1 = o3.Irreps(irreps_in1).simplify()
-        irreps_in2 = o3.Irreps(irreps_in2).simplify()
+        irreps_in1 = Irreps(irreps_in1).simplify()
+        irreps_in2 = Irreps(irreps_in2).simplify()
         if filter_ir_out is not None:
             try:
-                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+                filter_ir_out = [Irrep(ir) for ir in filter_ir_out]
             except ValueError:
                 raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
 
@@ -197,7 +197,7 @@ class FullTensorProduct(TensorProduct):
                     out.append((mul_1 * mul_2, ir_out))
                     instr += [(i_1, i_2, i_out, "uvuv", False)]
 
-        out = o3.Irreps(out)
+        out = Irreps(out)
         out, p, _ = out.sort()
 
         instr = [(i_1, i_2, p[i_out], mode, train) for i_1, i_2, i_out, mode, train in instr]
@@ -273,7 +273,7 @@ def _square_instructions_full(irreps_in, filter_ir_out=None, irrep_normalization
                         irreps_out.append((mul, ir_out))
                         instr += [(i, i, i_out, "uuu", False, alpha)]
 
-    irreps_out = o3.Irreps(irreps_out)
+    irreps_out = Irreps(irreps_out)
     irreps_out, p, _ = irreps_out.sort()
 
     instr = [(i_1, i_2, p[i_out], mode, train, alpha) for i_1, i_2, i_out, mode, train, alpha in instr]
@@ -362,9 +362,9 @@ class TensorSquare(TensorProduct):
 
     def __init__(
         self,
-        irreps_in: o3.Irreps,
-        irreps_out: o3.Irreps = None,
-        filter_ir_out: Iterator[o3.Irrep] = None,
+        irreps_in: Irreps,
+        irreps_out: Irreps = None,
+        filter_ir_out: Iterator[Irrep] = None,
         irrep_normalization: str = None,
         **kwargs,
     ) -> None:
@@ -373,10 +373,10 @@ class TensorSquare(TensorProduct):
 
         assert irrep_normalization in ["component", "norm", "none"]
 
-        irreps_in = o3.Irreps(irreps_in).simplify()
+        irreps_in = Irreps(irreps_in).simplify()
         if filter_ir_out is not None:
             try:
-                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+                filter_ir_out = [Irrep(ir) for ir in filter_ir_out]
             except ValueError as exc:
                 raise ValueError(f"Error constructing filter_ir_out irrep: {exc}") from exc
 
@@ -386,7 +386,7 @@ class TensorSquare(TensorProduct):
             if filter_ir_out is not None:
                 raise ValueError("Both `irreps_out` and `filter_ir_out` are not None, this is ambiguous.")
 
-            irreps_out = o3.Irreps(irreps_out).simplify()
+            irreps_out = Irreps(irreps_out).simplify()
 
             instr = _square_instructions_fully_connected(irreps_in, irreps_out, irrep_normalization)
 

@@ -6,7 +6,7 @@ import math
 
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 from e3nn import get_optimization_defaults
 from e3nn.util.jit import compile_mode
 
@@ -27,7 +27,7 @@ class SphericalHarmonics(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_out: Union[int, List[int], str, o3.Irreps],
+        irreps_out: Union[int, List[int], str, Irreps],
         normalize: bool,
         normalization: str = "integral",
         irreps_in: Any = None,
@@ -38,16 +38,16 @@ class SphericalHarmonics(torch.nn.Module):
         assert normalization in ["integral", "component", "norm"]
 
         if isinstance(irreps_out, str):
-            irreps_out = o3.Irreps(irreps_out)
-        if isinstance(irreps_out, o3.Irreps) and irreps_in is None:
+            irreps_out = Irreps(irreps_out)
+        if isinstance(irreps_out, Irreps) and irreps_in is None:
             for mul, (l, p) in irreps_out:
                 if l % 2 == 1 and p == 1:
-                    irreps_in = o3.Irreps("1e")
+                    irreps_in = Irreps("1e")
         if irreps_in is None:
-            irreps_in = o3.Irreps("1o")
+            irreps_in = Irreps("1o")
 
-        irreps_in = o3.Irreps(irreps_in)
-        if irreps_in not in (o3.Irreps("1x1o"), o3.Irreps("1x1e")):
+        irreps_in = Irreps(irreps_in)
+        if irreps_in not in (Irreps("1x1o"), Irreps("1x1e")):
             raise ValueError(
                 f"irreps_in for SphericalHarmonics must be either a vector (`1x1o`) or a pseudovector (`1x1e`), "
                 f"not `{irreps_in}`"
@@ -55,7 +55,7 @@ class SphericalHarmonics(torch.nn.Module):
         self.irreps_in = irreps_in
         input_p = irreps_in[0].ir.p  # pylint: disable=no-member
 
-        if isinstance(irreps_out, o3.Irreps):
+        if isinstance(irreps_out, Irreps):
             ls = []
             for mul, (l, p) in irreps_out:
                 if p != input_p**l:
@@ -70,7 +70,7 @@ class SphericalHarmonics(torch.nn.Module):
         else:
             ls = list(irreps_out)
 
-        irreps_out = o3.Irreps([(1, (l, input_p**l)) for l in ls]).simplify()
+        irreps_out = Irreps([(1, (l, input_p**l)) for l in ls]).simplify()
         self.irreps_out = irreps_out
         self._ls_list = ls
         self._lmax = max(ls)
@@ -114,7 +114,7 @@ class SphericalHarmonics(torch.nn.Module):
 
 
 def spherical_harmonics(
-    l: Union[int, List[int], str, o3.Irreps], x: torch.Tensor, normalize: bool, normalization: str = "integral"
+    l: Union[int, List[int], str, Irreps], x: torch.Tensor, normalize: bool, normalization: str = "integral"
 ):
     r"""Spherical harmonics
 
