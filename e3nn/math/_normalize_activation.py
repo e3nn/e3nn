@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 
 import torch
 
-from e3nn.util import explicit_default_types
+from e3nn.util.default_type import explicit_default_types
 from e3nn.util.jit import compile_mode
 
 
