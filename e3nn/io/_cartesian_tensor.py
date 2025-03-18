@@ -2,10 +2,11 @@ from typing import Optional
 
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
+from e3nn.o3._reduce import ReducedTensorProducts
 
 
-class CartesianTensor(o3.Irreps):
+class CartesianTensor(Irreps):
     r"""representation of a cartesian tensor into irreps
 
     Parameters
@@ -33,6 +34,7 @@ class CartesianTensor(o3.Irreps):
     >>> torch.allclose(z, (t + t.T)/2, atol=1e-5)
     True
     """
+
     # pylint: disable=abstract-method
 
     # These are set in __new__
@@ -45,7 +47,7 @@ class CartesianTensor(o3.Irreps):
         formula,
     ):
         indices = formula.split("=")[0].replace("-", "")
-        rtp = o3.ReducedTensorProducts(formula, **{i: "1o" for i in indices})
+        rtp = ReducedTensorProducts(formula, **{i: "1o" for i in indices})
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
         ret.indices = indices
@@ -115,7 +117,7 @@ class CartesianTensor(o3.Irreps):
 
         return cartesian_tensor
 
-    def reduced_tensor_products(self, data: Optional[torch.Tensor] = None) -> o3.ReducedTensorProducts:
+    def reduced_tensor_products(self, data: Optional[torch.Tensor] = None) -> ReducedTensorProducts:
         r"""reduced tensor products
 
         Returns
@@ -123,7 +125,7 @@ class CartesianTensor(o3.Irreps):
         `e3nn.ReducedTensorProducts`
             reduced tensor products
         """
-        rtp = o3.ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
+        rtp = ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
         if data is not None:
             rtp = rtp.to(device=data.device, dtype=data.dtype)
         return rtp
