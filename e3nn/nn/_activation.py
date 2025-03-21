@@ -1,6 +1,6 @@
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
 
@@ -33,7 +33,7 @@ class Activation(torch.nn.Module):
 
     def __init__(self, irreps_in, acts) -> None:
         super().__init__()
-        irreps_in = o3.Irreps(irreps_in)
+        irreps_in = Irreps(irreps_in)
         if len(irreps_in) != len(acts):
             raise ValueError(f"Irreps in and number of activation functions does not match: {len(acts), (irreps_in, acts)}")
 
@@ -70,7 +70,7 @@ class Activation(torch.nn.Module):
                 irreps_out.append((mul, (l_in, p_in)))
 
         self.irreps_in = irreps_in
-        self.irreps_out = o3.Irreps(irreps_out)
+        self.irreps_out = Irreps(irreps_out)
         self.acts = torch.nn.ModuleList(acts)
         self.paths = [(mul, (l, p), act) for (mul, (l, p)), act in zip(self.irreps_in, self.acts)]
         assert len(self.irreps_in) == len(self.acts)
