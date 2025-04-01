@@ -1,13 +1,14 @@
 import torch
 import numpy as np
+import pytest
 
 from e3nn import o3
 
 
-def test_tensor_product():
-    x1 = o3.experimental.IrrepsArray("1o", torch.Tensor([1.0, 0.0, 0.0]))
-    x2 = o3.experimental.IrrepsArray("1o", torch.Tensor([0.0, 1.0, 0.0]))
-    x3 = o3.experimental.tensor_product(x1, x2, filter_ir_out=("1e",))
+def test_tensor_product(dtype=torch.float32):
+    x1 = o3.experimental.IrrepsArray("1o", torch.Tensor([1.0, 0.0, 0.0]).to(dtype=dtype))
+    x2 = o3.experimental.IrrepsArray("1o", torch.Tensor([0.0, 1.0, 0.0]).to(dtype=dtype))
+    x3 = torch.compile(o3.experimental.tensor_product)(x1, x2, filter_ir_out=("1e",))
     assert x3.irreps == o3.Irreps("1e")
     np.testing.assert_allclose(x3.array, torch.Tensor([0.0, 0.0, 1 / 2**0.5]))
 

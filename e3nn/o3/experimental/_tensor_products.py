@@ -85,7 +85,7 @@ def tensor_product(
 
                 if x1 is not None and x2 is not None:
                     if f"{ir_1.l}_{ir_2.l}_{ir_out.l}" not in CG_COEFFS:
-                        CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"] = o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l).to(device=x1.device)
+                        CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"] = np.sqrt(ir_out.dim) * o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l).to(device=x1.device, dtype=x1.dtype)
                     chunk = torch.einsum("...ui , ...vj , ijk -> ...uvk", x1, x2, CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"])
                     chunk = torch.reshape(chunk, chunk.shape[:-3] + (mul_1 * mul_2, ir_out.dim))
                 else:
