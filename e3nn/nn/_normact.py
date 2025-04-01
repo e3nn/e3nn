@@ -2,7 +2,9 @@ from typing import Callable, Optional
 
 import torch
 
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
+from e3nn.o3._norm import Norm
+from e3nn.o3._tensor_product._sub import ElementwiseTensorProduct
 from e3nn.util.jit import compile_mode
 
 
@@ -35,20 +37,21 @@ class NormActivation(torch.nn.Module):
     >>> print(n(feats).reshape(1, 2, 3).norm(dim=-1))
     tensor([[0.8497, 0.8497]])
     """
+
     epsilon: Optional[float]
     _eps_squared: float
 
     def __init__(
         self,
-        irreps_in: o3.Irreps,
+        irreps_in: Irreps,
         scalar_nonlinearity: Callable,
         normalize: bool = True,
         epsilon: Optional[float] = None,
         bias: bool = False,
     ) -> None:
         super().__init__()
-        self.irreps_in = o3.Irreps(irreps_in)
-        self.irreps_out = o3.Irreps(irreps_in)
+        self.irreps_in = Irreps(irreps_in)
+        self.irreps_out = Irreps(irreps_in)
 
         if epsilon is None and normalize:
             epsilon = 1e-8
@@ -63,14 +66,14 @@ class NormActivation(torch.nn.Module):
             self._eps_squared = 0.0  # doesn't matter
 
         # if we have an epsilon, use squared and do the sqrt ourselves
-        self.norm = o3.Norm(irreps_in, squared=(epsilon is not None))
+        self.norm = Norm(irreps_in, squared=(epsilon is not None))
         self.scalar_nonlinearity = scalar_nonlinearity
         self.normalize = normalize
         self.bias = bias
         if self.bias:
             self.biases = torch.nn.Parameter(torch.zeros(irreps_in.num_irreps))
 
-        self.scalar_multiplier = o3.ElementwiseTensorProduct(
+        self.scalar_multiplier = ElementwiseTensorProduct(
             irreps_in1=self.norm.irreps_out,
             irreps_in2=irreps_in,
         )

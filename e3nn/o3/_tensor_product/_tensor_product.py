@@ -6,7 +6,7 @@ import torch
 from torch import fx
 
 import e3nn
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
@@ -181,10 +181,12 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
     >>> assert vars.min() > 1 / 3
     >>> assert vars.max() < 3
     """
+
     instructions: List[Any]
     shared_weights: bool
     internal_weights: bool
     weight_numel: int
+    _did_compile_right: bool
     _specialized_code: bool
     _optimize_einsums: bool
     _profiling_str: str
@@ -193,9 +195,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in1: o3.Irreps,
-        irreps_in2: o3.Irreps,
-        irreps_out: o3.Irreps,
+        irreps_in1: Irreps,
+        irreps_in2: Irreps,
+        irreps_out: Irreps,
         instructions: List[tuple],
         in1_var: Optional[Union[List[float], torch.Tensor]] = None,
         in2_var: Optional[Union[List[float], torch.Tensor]] = None,
@@ -226,9 +228,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         assert irrep_normalization in ["component", "norm", "none"]
         assert path_normalization in ["element", "path", "none"]
 
-        self.irreps_in1 = o3.Irreps(irreps_in1)
-        self.irreps_in2 = o3.Irreps(irreps_in2)
-        self.irreps_out = o3.Irreps(irreps_out)
+        self.irreps_in1 = Irreps(irreps_in1)
+        self.irreps_in2 = Irreps(irreps_in2)
+        self.irreps_out = Irreps(irreps_out)
         del irreps_in1, irreps_in2, irreps_out
 
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
@@ -387,13 +389,13 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
             assert graphmod_right is not None
         else:
             graphmod_right = fx.Graph()
-            graphmod_right.placeholder("x2", torch.Tensor)
+            tmp = graphmod_right.placeholder("x2", torch.Tensor)
+            # Make a dummy no-op graph, it can't be empty or causes IndentationError on unpickle
             graphmod_right.placeholder("w", torch.Tensor)
-            graphmod_right.call_function(
-                torch._assert,
-                args=(False, "`right` method is not compiled, set `compile_right` to True when creating the TensorProduct"),
-            )
+            graphmod_right.output(tmp)
+            del tmp
             graphmod_right = fx.GraphModule(torch.nn.Module(), graphmod_right, class_name="tp_forward")
+        self._did_compile_right = compile_right
 
         self._codegen_register({"_compiled_main_left_right": graphmod_left_right, "_compiled_main_right": graphmod_right})
 
@@ -410,12 +412,14 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         if self.irreps_out.dim > 0:
             output_mask = torch.cat(
                 [
-                    torch.ones(mul * ir.dim)
-                    if any(
-                        (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
-                        for ins in self.instructions
+                    (
+                        torch.ones(mul * ir.dim)
+                        if any(
+                            (ins.i_out == i_out) and (ins.path_weight != 0) and (0 not in ins.path_shape)
+                            for ins in self.instructions
+                        )
+                        else torch.zeros(mul * ir.dim)
                     )
-                    else torch.zeros(mul * ir.dim)
                     for i_out, (mul, ir) in enumerate(self.irreps_out)
                 ]
             )
@@ -508,6 +512,10 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         `torch.Tensor`
             tensor of shape ``(..., irreps_in1.dim, irreps_out.dim)``
         """
+        torch._assert(
+            self._did_compile_right,
+            "`right` method is not compiled, set `compile_right` to True when creating the TensorProduct",
+        )
         torch._assert(y.shape[-1] == self._in2_dim, "Incorrect last dimension for y")
 
         # - PROFILER - with torch.autograd.profiler.record_function(self._profiling_str):
@@ -708,7 +716,7 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
                         path_weight.append(0)
                 path_weight = np.asarray(path_weight)
                 path_weight /= np.abs(path_weight).max()
-        cmap = matplotlib.cm.get_cmap("Blues")
+        cmap = matplotlib.colormaps["Blues"]
 
         for ins_index, ins in enumerate(self.instructions):
             y = _intersection(s_in1[ins.i_in1], c_in1, s_in2[ins.i_in2], c_in2)

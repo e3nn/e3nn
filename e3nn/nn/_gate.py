@@ -1,7 +1,9 @@
 import torch
 
-from e3nn import o3
-from e3nn.nn import Extract, Activation
+from e3nn.o3._irreps import Irreps
+from e3nn.o3._tensor_product._sub import ElementwiseTensorProduct
+from ._extract import Extract
+from ._activation import Activation
 from e3nn.util.jit import compile_mode
 
 
@@ -9,8 +11,8 @@ from e3nn.util.jit import compile_mode
 class _Sortcut(torch.nn.Module):
     def __init__(self, *irreps_outs) -> None:
         super().__init__()
-        self.irreps_outs = tuple(o3.Irreps(irreps).simplify() for irreps in irreps_outs)
-        irreps_in = sum(self.irreps_outs, o3.Irreps([]))
+        self.irreps_outs = tuple(Irreps(irreps).simplify() for irreps in irreps_outs)
+        irreps_in = sum(self.irreps_outs, Irreps([]))
 
         i = 0
         instructions = []
@@ -84,9 +86,9 @@ class Gate(torch.nn.Module):
 
     def __init__(self, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated) -> None:
         super().__init__()
-        irreps_scalars = o3.Irreps(irreps_scalars)
-        irreps_gates = o3.Irreps(irreps_gates)
-        irreps_gated = o3.Irreps(irreps_gated)
+        irreps_scalars = Irreps(irreps_scalars)
+        irreps_gates = Irreps(irreps_gates)
+        irreps_gated = Irreps(irreps_gated)
 
         if len(irreps_gates) > 0 and irreps_gates.lmax > 0:
             raise ValueError(f"Gate scalars must be scalars, instead got irreps_gates = {irreps_gates}")
@@ -108,7 +110,7 @@ class Gate(torch.nn.Module):
         self.act_gates = Activation(irreps_gates, act_gates)
         irreps_gates = self.act_gates.irreps_out
 
-        self.mul = o3.ElementwiseTensorProduct(irreps_gated, irreps_gates)
+        self.mul = ElementwiseTensorProduct(irreps_gated, irreps_gates)
         irreps_gated = self.mul.irreps_out
 
         self._irreps_out = irreps_scalars + irreps_gated

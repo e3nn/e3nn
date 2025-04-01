@@ -5,7 +5,7 @@ import warnings
 
 import torch
 
-from e3nn.o3 import Irreps
+from e3nn.o3._irreps import Irreps
 
 
 def _transform(dat, irreps_dat, rot_mat, translation: float = 0.0, output_transform_dtype: bool = False):

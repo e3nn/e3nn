@@ -10,13 +10,12 @@ jupyter-sphinx
 ase
 
 --find-links https://download.pytorch.org/whl/cpu
-torch==2.0.0
+torch==2.4.0
 
---find-links https://data.pyg.org/whl/torch-2.0.0+cpu.html
+--find-links https://data.pyg.org/whl/torch-2.4.0+cpu.html
 torch-scatter
 torch-sparse
 torch-cluster
 torch-spline-conv
 torch-geometric
-
 .

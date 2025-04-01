@@ -690,7 +690,7 @@ def xyz_to_angles(xyz):
     beta : `torch.Tensor`
         tensor of shape :math:`(...)`
     """
-    xyz = torch.nn.functional.normalize(xyz, p=2, dim=-1)  # forward 0's instead of nan for zero-radius
+    xyz = torch.nn.functional.normalize(xyz, p=2.0, dim=-1)  # forward 0's instead of nan for zero-radius
     xyz = xyz.clamp(-1, 1)
 
     beta = torch.acos(xyz[..., 1])

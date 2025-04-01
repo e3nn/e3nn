@@ -86,16 +86,16 @@ def is_group(g: Set[TY_PERM]) -> bool:
     for p in g:
         assert len(p) == n, p
 
-    if not identity(n) in g:
+    if identity(n) not in g:
         return False
 
     for p in g:
-        if not inverse(p) in g:
+        if inverse(p) not in g:
             return False
 
     for p1 in g:
         for p2 in g:
-            if not compose(p1, p2) in g:
+            if compose(p1, p2) not in g:
                 return False
 
     return True

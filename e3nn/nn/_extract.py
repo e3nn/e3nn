@@ -5,7 +5,7 @@ from torch import fx
 
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
-from e3nn import o3
+from e3nn.o3._irreps import Irrep, Irreps
 
 
 @compile_mode("script")
@@ -39,8 +39,8 @@ class Extract(CodeGenMixin, torch.nn.Module):
         (tensor([1.]), tensor([2.]))
         """
         super().__init__()
-        self.irreps_in = o3.Irreps(irreps_in)
-        self.irreps_outs = tuple(o3.Irreps(irreps) for irreps in irreps_outs)
+        self.irreps_in = Irreps(irreps_in)
+        self.irreps_outs = tuple(Irreps(irreps) for irreps in irreps_outs)
         self.instructions = instructions
 
         assert len(self.irreps_outs) == len(self.instructions)
@@ -92,9 +92,9 @@ class ExtractIr(Extract):
         ir : `e3nn.o3.Irrep`
             representation to extract
         """
-        ir = o3.Irrep(ir)
-        irreps_in = o3.Irreps(irreps_in)
-        self.irreps_out = o3.Irreps([mul_ir for mul_ir in irreps_in if mul_ir.ir == ir])
+        ir = Irrep(ir)
+        irreps_in = Irreps(irreps_in)
+        self.irreps_out = Irreps([mul_ir for mul_ir in irreps_in if mul_ir.ir == ir])
         instructions = [tuple(i for i, mul_ir in enumerate(irreps_in) if mul_ir.ir == ir)]
 
         super().__init__(irreps_in, [self.irreps_out], instructions, squeeze_out=True)

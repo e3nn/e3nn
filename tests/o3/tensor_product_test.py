@@ -4,8 +4,10 @@ import tempfile
 
 import pytest
 import torch
+
 from e3nn.o3 import TensorProduct, FullyConnectedTensorProduct, Irreps
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized
+from e3nn.util.jit import prepare
 
 
 def make_tp(l1, p1, l2, p2, lo, po, mode, weight, mul: int = 25, path_weights: bool = True, **kwargs):
@@ -262,6 +264,7 @@ def test_jit(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein) -> Non
 def test_optimizations(l1, p1, l2, p2, lo, po, mode, weight, special_code, opt_ein, jit, float_tolerance) -> None:
     orig_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=False, _optimize_einsums=False)
     opt_tp = make_tp(l1, p1, l2, p2, lo, po, mode, weight, _specialized_code=special_code, _optimize_einsums=opt_ein)
+
     # We don't use state_dict here since that contains things like wigners that
     # can differ between optimized and unoptimized TPs
     with torch.no_grad():
@@ -358,7 +361,10 @@ def test_input_weights_jit() -> None:
         )
 
     # - shared_weights = True -
-    m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
+    def build_module(irreps_in1, irreps_in2, irreps_out):
+        return FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
+
+    m = build_module(irreps_in1, irreps_in2, irreps_out)
     traced = assert_auto_jitable(m)
     w = torch.randn(m.weight_numel)
     with pytest.raises((RuntimeError, torch.jit.Error)):
@@ -369,6 +375,9 @@ def test_input_weights_jit() -> None:
         traced(x1, x2, torch.randn(2, m.weight_numel))  # it should reject too many weights
     # Does the trace give right results?
     assert torch.allclose(m(x1, x2, w), traced(x1, x2, w))
+
+    m_pt2 = torch.compile(prepare(build_module)(irreps_in1, irreps_in2, irreps_out), fullgraph=True)
+    assert torch.allclose(m(x1, x2, w), m_pt2(x1, x2, w))
 
 
 def test_weight_view_for_instruction() -> None:
@@ -452,9 +461,15 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
 
 
 def test_triu_mode() -> None:
-    tp = TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+    def build_module():
+        return TensorProduct("10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)])
+
+    tp = build_module()
     tp(torch.randn(2, 10), torch.randn(2, 10))
 
     m = assert_auto_jitable(tp)
 
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
+
+    tp_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
+    tp_pt2(torch.randn(2, 10), torch.randn(2, 10))

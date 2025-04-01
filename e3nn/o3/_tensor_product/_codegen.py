@@ -3,7 +3,8 @@ from math import sqrt
 from typing import List
 
 import torch
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
+from e3nn.o3._wigner import wigner_3j
 from e3nn.util import prod
 from opt_einsum_fx import optimize_einsums_full
 from torch import fx
@@ -21,9 +22,9 @@ def _sum_tensors(xs: List[torch.Tensor], shape: torch.Size, like: torch.Tensor) 
 
 
 def codegen_tensor_product_left_right(
-    irreps_in1: o3.Irreps,
-    irreps_in2: o3.Irreps,
-    irreps_out: o3.Irreps,
+    irreps_in1: Irreps,
+    irreps_in2: Irreps,
+    irreps_out: Irreps,
     instructions: List[Instruction],
     shared_weights: bool = False,
     specialized_code: bool = True,
@@ -39,16 +40,13 @@ def codegen_tensor_product_left_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
-    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device="cpu")), tracer=tracer)
     if shared_weights:
-        output_shape = torch.broadcast_tensors(empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]))[0].shape
+        # by broadcasting all but the final irrep dim, we broadcast any and all batch dimensions
+        # the use of `:1` is important, rather than `0`, to ensure the case with an empty irrep dimension doesn't error out
+        output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1])[0].shape[:-1]
     else:
-        output_shape = torch.broadcast_tensors(
-            empty.expand(x1s.shape[:-1]), empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1])
-        )[0].shape
-    del empty
+        output_shape = torch.broadcast_tensors(x1s[..., :1], x2s[..., :1], weights[..., :1])[0].shape[:-1]
 
-    # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
     instructions = [ins for ins in instructions if 0 not in ins.path_shape]
 
@@ -324,7 +322,7 @@ def codegen_tensor_product_left_right(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+                constants[w3j_name] = wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
     # = Return the result =
     outputs = [
@@ -398,9 +396,9 @@ def codegen_tensor_product_left_right(
 
 
 def codegen_tensor_product_right(
-    irreps_in1: o3.Irreps,
-    irreps_in2: o3.Irreps,
-    irreps_out: o3.Irreps,
+    irreps_in1: Irreps,
+    irreps_in2: Irreps,
+    irreps_out: Irreps,
     instructions: List[Instruction],
     shared_weights: bool = False,
     specialized_code: bool = True,
@@ -415,12 +413,10 @@ def codegen_tensor_product_right(
     x2s = fx.Proxy(graph.placeholder("x2", torch.Tensor), tracer=tracer)
     weights = fx.Proxy(graph.placeholder("w", torch.Tensor), tracer=tracer)
 
-    empty = fx.Proxy(graph.call_function(torch.empty, ((),), dict(device="cpu")), tracer=tracer)
     if shared_weights:
         output_shape = x2s.shape[:-1]
     else:
-        output_shape = torch.broadcast_tensors(empty.expand(x2s.shape[:-1]), empty.expand(weights.shape[:-1]))[0].shape
-    del empty
+        output_shape = torch.broadcast_tensors(x2s[..., 0], weights[..., 0])[0].shape
 
     # = Short-circut for zero dimensional =
     # We produce no code for empty instructions
@@ -642,7 +638,7 @@ def codegen_tensor_product_right(
             graph.erase_node(w3j.node)
         else:
             if w3j_name not in constants:
-                constants[w3j_name] = o3.wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
+                constants[w3j_name] = wigner_3j(mul_ir_in1.ir.l, mul_ir_in2.ir.l, mul_ir_out.ir.l)
 
     # = Return the result =
     outputs = [

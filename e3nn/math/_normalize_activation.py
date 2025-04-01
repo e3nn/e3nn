@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple
 
 import torch
 
-from e3nn.util import explicit_default_types
+from e3nn.util.default_type import explicit_default_types
 from e3nn.util.jit import compile_mode
 
 
@@ -13,8 +13,8 @@ def moment(f, n, dtype=None, device=None):
     """
 
     dtype, device = explicit_default_types(dtype, device)
-    gen = torch.Generator(device="cpu").manual_seed(0)
-    z = torch.randn(1_000_000, generator=gen, dtype=torch.float64).to(dtype=dtype, device=device)
+    gen = torch.Generator(device=device).manual_seed(0)
+    z = torch.randn(1_000_000, generator=gen, dtype=torch.float64, device=device).to(dtype=dtype, device=device)
     return f(z).pow(n).mean()
 
 
@@ -40,7 +40,7 @@ class normalize2mom(torch.nn.Module):
             device = _get_device(f)
 
         with torch.no_grad():
-            cst = moment(f, 2, dtype=torch.float64, device="cpu").pow(-0.5).item()
+            cst = moment(f, 2, dtype=torch.float64, device=device).pow(-0.5).item()
 
         if abs(cst - 1) < 1e-4:
             self._is_id = True

@@ -52,7 +52,7 @@ class FullTensorProduct(nn.Module):
                     else:
                         raise ValueError(f"irrep_normalization={irrep_normalization} not supported")
                     self.register_buffer(f"cg_{ir_1.l}_{ir_2.l}_{ir_out.l}", cg)
-                    paths[(ir_1.l, ir_2.l, ir_out.l)] = Path(
+                    paths[(ir_1.l, ir_1.p, ir_2.l, ir_2.p, ir_out.l, ir_out.p)] = Path(
                         Chunk(mul_1, ir_1.dim, slice_1), Chunk(mul_2, ir_2.dim, slice_2), Chunk(mul_1 * mul_2, ir_out.dim)
                     )
                     irreps_out.append((mul_1 * mul_2, ir_out))
@@ -69,7 +69,7 @@ class FullTensorProduct(nn.Module):
     ) -> torch.Tensor:
         input1, input2, leading_shape = _prepare_inputs(input1, input2)
         chunks = []
-        for (l1, l2, l3), (
+        for (l1, _, l2, _, l3, _), (
             (mul_1, input_dim1, slice_1),
             (mul_2, input_dim2, slice_2),
             (output_mul, output_dim, _),
