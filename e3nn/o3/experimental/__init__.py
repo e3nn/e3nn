@@ -1,5 +1,4 @@
 from ._full_tp import FullTensorProduct as FullTensorProductv2
-from ._irreps import Irrep, Irreps
 from ._irreps_array import IrrepsArray, _standardize_axis
 from ._basic import from_chunks, zeros, sum, mean, norm, _align_two_irreps_arrays, dot, as_irreps_array, normal
 from ._tensor_products import tensor_product, elementwise_tensor_product, tensor_square

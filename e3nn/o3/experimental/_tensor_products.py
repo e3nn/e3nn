@@ -18,8 +18,6 @@ def _validate_filter_ir_out(filter_ir_out):
         filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
     return filter_ir_out
 
-CG_COEFFS = {}
-
 def tensor_product(
     input1: IrrepsArray,
     input2: IrrepsArray,
@@ -66,8 +64,8 @@ def tensor_product(
         >>> e3nn.tensor_product("2x1e + 2e", "2e")
         1x0e+3x1e+3x2e+3x3e+1x4e
     """
-    input1, input2, leading_shape = _prepare_inputs(input1, input2)
-    filter_ir_out = _validate_filter_ir_out(filter_ir_out)
+    # input1, input2, leading_shape = _prepare_inputs(input1, input2)
+    # filter_ir_out = _validate_filter_ir_out(filter_ir_out)
 
     if regroup_output:
         input1 = input1.regroup()
@@ -82,18 +80,15 @@ def tensor_product(
                     continue
 
                 irreps_out.append((mul_1 * mul_2, ir_out))
-
                 if x1 is not None and x2 is not None:
-                    if f"{ir_1.l}_{ir_2.l}_{ir_out.l}" not in CG_COEFFS:
-                        CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"] = np.sqrt(ir_out.dim) * o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l).to(device=x1.device, dtype=x1.dtype)
-                    chunk = torch.einsum("...ui , ...vj , ijk -> ...uvk", x1, x2, CG_COEFFS[f"{ir_1.l}_{ir_2.l}_{ir_out.l}"])
+                    chunk = torch.einsum("...ui , ...vj , ijk -> ...uvk", x1, x2, np.sqrt(ir_out.dim) * o3.wigner_3j(ir_1.l, ir_2.l, ir_out.l).to(device=x1.device, dtype=x1.dtype))
                     chunk = torch.reshape(chunk, chunk.shape[:-3] + (mul_1 * mul_2, ir_out.dim))
                 else:
                     chunk = None
 
                 chunks.append(chunk)
 
-    output = from_chunks(irreps_out, chunks, leading_shape, input1.dtype)
+    output = from_chunks(irreps_out, chunks, (), input1.dtype)
     output = output.sort()
     if regroup_output:
         output = output.regroup()

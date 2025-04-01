@@ -11,8 +11,8 @@ import numpy as np
 def _prepare_inputs(input1, input2):
     dtype = torch.promote_types(input1.dtype, input2.dtype)
 
-    input1 = input1.to(dtype=dtype)
-    input2 = input2.to(dtype=dtype)
+    # input1 = input1.to(dtype=dtype)
+    # input2 = input2.to(dtype=dtype)
 
     leading_shape = torch.broadcast_shapes(input1.shape[:-1], input2.shape[:-1])
     input1 = input1.broadcast_to(leading_shape + (-1,))

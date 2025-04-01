@@ -592,6 +592,12 @@ class IrrepsArray(object):
             chunks=tree_map(lambda x: None if x is None else x[index + (slice(None),)], self._chunks),
         )
 
+# We purposefully do not register zero_flags
+torch.utils._pytree.register_pytree_node(
+    IrrepsArray,
+    lambda x: ((x.array,), x.irreps),
+    lambda irreps, data: IrrepsArray(irreps, data[0]),
+)
 
 def _standardize_axis(axis: Union[None, int, Tuple[int, ...]], result_ndim: int) -> Tuple[int, ...]:
     if axis is None:
