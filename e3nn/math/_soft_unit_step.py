@@ -8,19 +8,23 @@ class _SoftUnitStep(torch.autograd.Function):
     def forward(ctx, x) -> torch.Tensor:
         ctx.save_for_backward(x)
         y = torch.zeros_like(x)
-        m = x > 0.0
-        y[m] = (-1 / x[m]).exp()
+        mask = x > 0.0
+        safe_x = torch.where(mask, x, torch.ones_like(x))  # Avoid division by zero
+        y = torch.where(
+            mask, torch.exp(-1.0 / safe_x), torch.zeros_like(x)
+        )
         return y
 
     @staticmethod
     def backward(ctx, dy) -> torch.Tensor:
         (x,) = ctx.saved_tensors
-        dx = torch.zeros_like(x)
-        m = x > 0.0
-        xm = x[m]
-        dx[m] = (-1 / xm).exp() / xm.pow(2)
+        mask = x > 0.0
+        safe_x = torch.where(mask, x, torch.ones_like(x))  # Avoid division by zero
+        dx = torch.where(
+            mask, torch.exp(-1.0 / safe_x) / (safe_x * safe_x), torch.zeros_like(x)
+        )
         return dx * dy
-
+    
 
 def soft_unit_step(x):
     r"""smooth :math:`C^\infty` version of the unit step function
