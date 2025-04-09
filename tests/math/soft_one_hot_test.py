@@ -5,6 +5,28 @@ from e3nn.math import soft_one_hot_linspace
 
 
 @pytest.mark.parametrize("basis", ["gaussian", "cosine", "fourier", "bessel", "smooth_finite"])
+def test_with_compile(basis) -> None:
+    if torch.__version__ < "2.0.0":
+        pytest.skip("torch.compile is not available in this version")
+
+    # torch.compile recompiles for every basis and every dtype
+    torch._dynamo.config.cache_size_limit = 32
+
+    x = torch.linspace(-2.0, 3.0, 20)
+    kwargs = dict(start=-1.0, end=2.0, number=5, basis=basis, cutoff=True)
+
+    y = soft_one_hot_linspace(x, **kwargs)
+    y_compiled = torch.compile(soft_one_hot_linspace, fullgraph=True)(x, **kwargs)
+
+    assert y.shape == y_compiled.shape
+    assert y.dtype == y_compiled.dtype
+    assert y.device == y_compiled.device
+
+    assert torch.allclose(y, y_compiled, atol=1e-7)
+
+
+
+@pytest.mark.parametrize("basis", ["gaussian", "cosine", "fourier", "bessel", "smooth_finite"])
 def test_zero_out(basis) -> None:
     x1 = torch.linspace(-2.0, -1.1, 20)
     x2 = torch.linspace(2.1, 3.0, 20)
