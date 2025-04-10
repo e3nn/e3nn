@@ -1,61 +1,32 @@
 r"""Core functions of :math:`SO(3)`
 """
 import functools
-import math
+import os
 from typing import Union
 
 import torch
 from e3nn.util import explicit_default_types
 
 
-def su2_generators(j: int) -> torch.Tensor:
-    m = torch.arange(-j, j)
-    raising = torch.diag(-torch.sqrt(j * (j + 1) - m * (m + 1)), diagonal=-1)
+# https://github.com/FAIR-Chem/fairchem/blob/14acfc71e36a81525a028351748349f62cd1efde/src/fairchem/core/models/escn/so3_exportable.py#L14-L50
 
-    m = torch.arange(-j + 1, j + 1)
-    lowering = torch.diag(torch.sqrt(j * (j + 1) - m * (m - 1)), diagonal=1)
+# Borrowed from e3nn @ 0.4.0:
+# https://github.com/e3nn/e3nn/blob/0.4.0/e3nn/o3/_wigner.py#L10
+# _Jd is a list of tensors of shape (2l+1, 2l+1)
+__Jd = torch.load(os.path.join(os.path.dirname(__file__), "Jd.pt"), weights_only=False)
+@torch.compiler.assume_constant_result
+def get_jd() -> torch.Tensor:
+    return __Jd
 
-    m = torch.arange(-j, j + 1)
-    return torch.stack(
-        [
-            0.5 * (raising + lowering),  # x (usually)
-            torch.diag(1j * m),  # z (usually)
-            -0.5j * (raising - lowering),  # -y (usually)
-        ],
-        dim=0,
-    )
-
-
-def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tensor:
-    # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
-    q = torch.zeros((2 * l + 1, 2 * l + 1), dtype=torch.complex128)
-    for m in range(-l, 0):
-        q[l + m, l + abs(m)] = 1 / 2**0.5
-        q[l + m, l - abs(m)] = -1j / 2**0.5
-    q[l, l] = 1
-    for m in range(1, l + 1):
-        q[l + m, l + abs(m)] = (-1) ** m / 2**0.5
-        q[l + m, l - abs(m)] = 1j * (-1) ** m / 2**0.5
-    q = (-1j) ** l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
-
-    dtype, device = explicit_default_types(dtype, device)
-    dtype = {
-        torch.float32: torch.complex64,
-        torch.float64: torch.complex128,
-    }[dtype]
-    # make sure we always get:
-    # 1. a copy so mutation doesn't ruin the stored tensors
-    # 2. a contiguous tensor, regardless of what transpositions happened above
-    return q.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
-
-
-def so3_generators(l) -> torch.Tensor:
-    X = su2_generators(l)
-    Q = change_basis_real_to_complex(l)
-    X = torch.conj(Q.T) @ X @ Q
-    assert torch.all(torch.abs(torch.imag(X)) < 1e-5)
-    return torch.real(X)
-
+def _z_rot_mat(angle: torch.Tensor, lv: int) -> torch.Tensor:
+    shape, device, dtype = angle.shape, angle.device, angle.dtype
+    M = angle.new_zeros((*shape, 2 * lv + 1, 2 * lv + 1))
+    inds = torch.arange(0, 2 * lv + 1, 1, device=device)
+    reversed_inds = torch.arange(2 * lv, -1, -1, device=device)
+    frequencies = torch.arange(lv, -lv - 1, -1, dtype=dtype, device=device)
+    M[..., inds, reversed_inds] = torch.sin(frequencies * angle[..., None])
+    M[..., inds, inds] = torch.cos(frequencies * angle[..., None])
+    return M
 
 def wigner_D(l: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
     r"""Wigner D matrix representation of :math:`SO(3)`.
@@ -89,13 +60,62 @@ def wigner_D(l: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tenso
     `torch.Tensor`
         tensor :math:`D^l(\alpha, \beta, \gamma)` of shape :math:`(2l+1, 2l+1)`
     """
+    _Jd = get_jd()
+    assert l < len(_Jd), f"wigner D maximum l implemented is {len(_Jd) - 1}, send us an email to ask for more"
+    # Currently goes till lmax=10
     alpha, beta, gamma = torch.broadcast_tensors(alpha, beta, gamma)
-    alpha = alpha[..., None, None] % (2 * math.pi)
-    beta = beta[..., None, None] % (2 * math.pi)
-    gamma = gamma[..., None, None] % (2 * math.pi)
-    X = so3_generators(l)
-    return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
+    J = _Jd[l].to(dtype=alpha.dtype, device=alpha.device)
+    Xa = _z_rot_mat(alpha, l)
+    Xb = _z_rot_mat(beta, l)
+    Xc = _z_rot_mat(gamma, l)
+    return Xa @ J @ Xb @ J @ Xc
 
+def su2_generators(j: int) -> torch.Tensor:
+    m = torch.arange(-j, j)
+    raising = torch.diag(-torch.sqrt(j * (j + 1) - m * (m + 1)), diagonal=-1)
+
+    m = torch.arange(-j + 1, j + 1)
+    lowering = torch.diag(torch.sqrt(j * (j + 1) - m * (m - 1)), diagonal=1)
+
+    m = torch.arange(-j, j + 1)
+    return torch.stack(
+        [
+            0.5 * (raising + lowering),  # x (usually)
+            torch.diag(1j * m),  # z (usually)
+            -0.5j * (raising - lowering),  # -y (usually)
+        ],
+        dim=0,
+    )
+
+def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tensor:
+    # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
+    q = torch.zeros((2 * l + 1, 2 * l + 1), dtype=torch.complex128)
+    for m in range(-l, 0):
+        q[l + m, l + abs(m)] = 1 / 2**0.5
+        q[l + m, l - abs(m)] = -1j / 2**0.5
+    q[l, l] = 1
+    for m in range(1, l + 1):
+        q[l + m, l + abs(m)] = (-1) ** m / 2**0.5
+        q[l + m, l - abs(m)] = 1j * (-1) ** m / 2**0.5
+    q = (-1j) ** l * q  # Added factor of 1j**l to make the Clebsch-Gordan coefficients real
+
+    dtype, device = explicit_default_types(dtype, device)
+    dtype = {
+        torch.float32: torch.complex64,
+        torch.float64: torch.complex128,
+    }[dtype]
+    # make sure we always get:
+    # 1. a copy so mutation doesn't ruin the stored tensors
+    # 2. a contiguous tensor, regardless of what transpositions happened above
+    return q.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
+
+
+def so3_generators(l) -> torch.Tensor:
+    X = su2_generators(l)
+    Q = change_basis_real_to_complex(l)
+    X = torch.conj(Q.T) @ X @ Q
+    assert torch.all(torch.abs(torch.imag(X)) < 1e-5)
+    return torch.real(X)
 
 def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None) -> torch.Tensor:
     r"""Wigner 3j symbols :math:`C_{lmn}`.
@@ -143,7 +163,6 @@ def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None) -> torch.Tenso
     # 1. a copy so mutation doesn't ruin the stored tensors
     # 2. a contiguous tensor, regardless of what transpositions happened above
     return C.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
-
 
 @functools.lru_cache(maxsize=None)
 def _so3_clebsch_gordan(l1: int, l2: int, l3: int) -> torch.Tensor:
