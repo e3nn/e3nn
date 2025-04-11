@@ -4,7 +4,7 @@ import torch
 
 from e3nn import o3
 from e3nn.util.test import assert_auto_jitable, assert_equivariant
-from e3nn.util.jit import prepare
+from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
 
 
 def test_save_load() -> None:
@@ -20,22 +20,31 @@ def test_save_load() -> None:
 
 
 def test_antisymmetric_matrix(float_tolerance) -> None:
-    def build_module():
-        return o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
 
-    tp = build_module()
+    tp = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
+
+    Q = tp.change_of_basis
+    x = torch.randn(2, 5 + 3)
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
     assert_auto_jitable(tp)
 
-    Q = tp.change_of_basis
-    x = torch.randn(2, 5 + 3)
     assert (tp(*x) - torch.einsum("xij,i,j", Q, *x)).abs().max() < float_tolerance
 
     assert (Q + torch.einsum("xij->xji", Q)).abs().max() < float_tolerance
 
-    tp_pt2 = torch.compile(prepare(build_module)(), fullgraph=True)
-    assert (tp(*x) - tp_pt2(*x)).abs().max() < float_tolerance
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        tp = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
+        torch._dynamo.reset()  # Clear cache from the previous run
+        tp_pt2 = torch.compile(tp, fullgraph=True)
+        assert (tp(*x) - tp_pt2(*x)).abs().max() < float_tolerance
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
+
+
 
 
 def test_reduce_tensor_Levi_Civita_symbol(float_tolerance) -> None:

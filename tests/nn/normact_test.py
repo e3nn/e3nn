@@ -5,7 +5,7 @@ import torch
 import e3nn
 from e3nn.nn import NormActivation
 from e3nn.util.test import assert_equivariant, assert_auto_jitable
-from e3nn.util.jit import prepare
+from e3nn.util.jit import get_optimization_defaults, set_optimization_defaults
 
 
 @pytest.mark.parametrize("do_bias", [True, False])
@@ -77,11 +77,7 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
         "2x0e + 3x0o + 5x1o + 1x1e + 2x2e + 1x2o + 1x3e + 1x3o + 1x5e + 1x6o"
     )
 
-    def build_module(irreps_in, nonlin, do_bias):
-        return NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
-
-    norm_act = build_module(irreps_in, nonlin, do_bias)
-    norm_act2 = torch.compile(prepare(build_module)(irreps_in, nonlin, do_bias), fullgraph=True)
+    norm_act = NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
 
     if do_bias:
         # Set up some nonzero biases
@@ -91,7 +87,16 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
 
     assert_equivariant(norm_act)
     assert_auto_jitable(norm_act)
-    norm_act2(irreps_in.randn(-1))
+
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
+    try:
+        set_optimization_defaults(jit_mode="inductor")
+        norm_act = NormActivation(irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias)
+        norm_act2 = torch.compile(norm_act, fullgraph=True)
+        norm_act2(irreps_in.randn(-1))
+    finally:
+        set_optimization_defaults(jit_mode=jit_mode_before)
 
 
 @pytest.mark.parametrize("do_bias", [True, False])
