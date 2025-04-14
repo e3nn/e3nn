@@ -93,7 +93,7 @@ class Irrep(tuple):
         p = {+1: "e", -1: "o"}[self.p]
         return f"{self.l}{p}"
 
-    @classmethod
+    @torch._dynamo.nonstrict_trace
     def iterator(cls, lmax=None):
         r"""Iterator through all the irreps of :math:`O(3)`
 
@@ -258,8 +258,9 @@ class Irrep(tuple):
         raise NotImplementedError
 
     def __len__(self):
-        raise NotImplementedError
+        return NotImplementedError
 
+torch.utils._pytree.register_pytree_node(Irrep, lambda ir: ((), ir), lambda ir, _: ir)
 
 class _MulIr(tuple):
     def __new__(cls, mul, ir=None):
@@ -294,6 +295,9 @@ class _MulIr(tuple):
     def index(self, _value):
         raise NotImplementedError
 
+torch.utils._pytree.register_pytree_node(
+    _MulIr, lambda mulir: ((), mulir), lambda mulir, _: mulir
+)
 
 class Irreps(tuple):
     r"""Direct sum of irreducible representations of :math:`O(3)`
@@ -623,6 +627,7 @@ class Irreps(tuple):
         return self.sort().irreps.simplify()
 
     @property
+    @torch._dynamo.nonstrict_trace
     def dim(self) -> int:
         return sum(mul * ir.dim for mul, ir in self)
 
@@ -720,3 +725,7 @@ class Irreps(tuple):
             tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
         """
         return self.D_from_angles(*_rotation.axis_angle_to_angles(axis, angle))
+
+torch.utils._pytree.register_pytree_node(
+    Irreps, lambda irreps: ((), irreps), lambda irreps, _: irreps
+)

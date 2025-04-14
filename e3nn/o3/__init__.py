@@ -39,6 +39,11 @@ from ._tensor_product import (
     TensorSquare,
 )
 from .experimental import FullTensorProductv2
+from .experimental import (
+    IrrepsArray, zeros, from_chunks,
+    sum, mean,
+    norm, _standardize_axis
+)
 
 from ._spherical_harmonics import SphericalHarmonics, spherical_harmonics
 from ._angular_spherical_harmonics import (
@@ -97,6 +102,13 @@ __all__ = [
     "so3_generators",
     "Irrep",
     "Irreps",
+    "IrrepsArray",
+    "zeros",
+    "from_chunks",
+    "sum",
+    "mean",
+    "norm",
+    "_standardize_axis",
     "irrep",
     "Instruction",
     "TensorProduct",
