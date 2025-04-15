@@ -205,6 +205,72 @@ class FullTensorProduct(TensorProduct):
         super().__init__(irreps_in1, irreps_in2, out, instr, irrep_normalization=irrep_normalization, **kwargs)
 
 
+class FullTensorProductSHWeighted(TensorProduct):
+    r"""Nequip-like TensorProduct with weights.
+
+    .. math::
+
+        `z_u = x_u \otimes (\sum_v w_{uv} y_v)`
+
+
+    where :math:`v` runs over the irreps.
+    The output representation is determined by the two input representations.
+
+    Parameters
+    ----------
+    irreps_in1 : `e3nn.o3.Irreps`
+        representation of the first input
+
+    irreps_in2 : `e3nn.o3.Irreps`
+        representation of the second input
+
+    filter_ir_out : iterator of `e3nn.o3.Irrep`, optional
+        filter to select only specific `e3nn.o3.Irrep` of the output
+
+    irrep_normalization : {'component', 'norm'}
+        see `e3nn.o3.TensorProduct`
+
+    path_normalization : {'element', 'path'}
+        see `e3nn.o3.TensorProduct`
+
+    internal_weights : bool
+        see `e3nn.o3.TensorProduct`
+
+    shared_weights : bool
+        see `e3nn.o3.TensorProduct`
+    """
+
+    def __init__(
+        self,
+        irreps_in1: o3.Irreps,
+        irreps_in2: o3.Irreps,
+        irreps_out: o3.Irreps,
+        irrep_normalization: str = None,
+        path_normalization: str = None,
+        **kwargs,
+    ) -> None:
+        irreps_in1 = o3.Irreps(irreps_in1).simplify()
+        irreps_in2 = o3.Irreps(irreps_in2).simplify()
+
+        # Borrowed from https://github.com/mir-group/nequip/blob/1e150cdc8614e640116d11e085d8e5e45b21e94d/nequip/nn/_interaction_block.py#L83-L112 # noqa: E501
+        out = []
+        instr = []
+        for i_1, (mul, ir_1) in enumerate(irreps_in1):
+            for i_2, (_, ir_2) in enumerate(irreps_in2):
+                for ir_out in ir_1 * ir_2:
+                    if ir_out in irreps_out:
+                        i_out = len(out)
+                        out.append((mul, ir_out))
+                        instr += [(i_1, i_2, i_out, "uvu", True)]
+
+        out = o3.Irreps(out)
+        out, p, _ = out.sort()
+
+        instr = [(i_1, i_2, p[i_out], mode, train) for i_1, i_2, i_out, mode, train in instr]
+
+        super().__init__(irreps_in1, irreps_in2, out, instr, irrep_normalization=irrep_normalization, **kwargs)
+
+
 def _square_instructions_full(irreps_in, filter_ir_out=None, irrep_normalization=None):
     """Generate instructions for square tensor product.
 
