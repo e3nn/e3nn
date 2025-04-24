@@ -60,7 +60,7 @@ def test_linear() -> None:
     assert_equivariant(m)
     assert_auto_jitable(m)
     assert_torch_compile(
-        'inductor',
+        "inductor",
         functools.partial(o3.Linear, irreps_in, irreps_out),
         torch.randn(irreps_in.dim),
     )

@@ -1,5 +1,5 @@
-r"""Core functions of :math:`SO(3)`
-"""
+r"""Core functions of :math:`SO(3)`"""
+
 import functools
 import math
 from typing import Union

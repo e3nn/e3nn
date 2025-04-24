@@ -25,7 +25,6 @@ def test_with_compile(basis) -> None:
     assert torch.allclose(y, y_compiled, atol=1e-7)
 
 
-
 @pytest.mark.parametrize("basis", ["gaussian", "cosine", "fourier", "bessel", "smooth_finite"])
 def test_zero_out(basis) -> None:
     x1 = torch.linspace(-2.0, -1.1, 20)

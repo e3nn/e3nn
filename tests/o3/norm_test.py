@@ -17,11 +17,7 @@ def test_norm(irreps_in, squared) -> None:
     if m.irreps_in.dim == 0:
         return
     assert_equivariant(m)
-    assert_torch_compile(
-        'inductor',
-        functools.partial(o3.Norm, irreps_in, squared=squared),
-        torch.randn(m.irreps_in.dim)
-    )
+    assert_torch_compile("inductor", functools.partial(o3.Norm, irreps_in, squared=squared), torch.randn(m.irreps_in.dim))
     assert_auto_jitable(m)
 
 

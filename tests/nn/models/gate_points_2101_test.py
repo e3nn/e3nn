@@ -72,11 +72,11 @@ def test_save(network) -> None:
     # Get a saved, loaded network
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(f, tmp.name)
-        f2 = torch.load(tmp.name)
+        f2 = torch.load(tmp.name, weights_only=False)
     x = random_graph()
     assert torch.all(f(x) == f2(x))
     # Get a double-saved network
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(f2, tmp.name)
-        f3 = torch.load(tmp.name)
+        f3 = torch.load(tmp.name, weights_only=False)
     assert torch.all(f(x) == f3(x))

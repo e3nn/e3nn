@@ -4,14 +4,14 @@ import functools
 import torch
 
 from e3nn import o3
-from e3nn.util.test import assert_auto_jitable, assert_equivariant
+from e3nn.util.test import assert_auto_jitable, assert_equivariant, assert_torch_compile
 
 
 def test_save_load() -> None:
     tp1 = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp1, tmp.name)
-        tp2 = torch.load(tmp.name)
+        tp2 = torch.load(tmp.name, weights_only=False)
 
     xs = (torch.randn(2, 5 + 3), torch.randn(2, 5 + 3))
     assert torch.allclose(tp1(*xs), tp2(*xs))
@@ -27,11 +27,7 @@ def test_antisymmetric_matrix(float_tolerance) -> None:
     x = torch.randn(2, 5 + 3)
 
     assert_equivariant(tp, irreps_in=tp.irreps_in, irreps_out=tp.irreps_out)
-    assert_torch_compile(
-        'inductor',
-        functools.partial(o3.ReducedTensorProducts, "ij=-ji", i="5x0e + 1e"),
-        x
-    )
+    assert_torch_compile("inductor", functools.partial(o3.ReducedTensorProducts, "ij=-ji", i="5x0e + 1e"), *x)
     assert_auto_jitable(tp)
 
     assert (tp(*x) - torch.einsum("xij,i,j", Q, *x)).abs().max() < float_tolerance

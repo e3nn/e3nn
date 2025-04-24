@@ -364,21 +364,15 @@ def test_input_weights_jit() -> None:
     m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
     w = torch.randn(m.weight_numel)
 
-    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
-    jit_mode_before = get_optimization_defaults()["jit_mode"]
-    try:
-        set_optimization_defaults(jit_mode="inductor")
-        m = FullyConnectedTensorProduct(irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True)
-        m_pt2 = torch.compile(m, fullgraph=True)
-        assert torch.allclose(m(x1, x2, w), m_pt2(x1, x2, w))
-    finally:
-        set_optimization_defaults(jit_mode=jit_mode_before)
-
     traced = assert_auto_jitable(m)
     assert_torch_compile(
-        'inductor',
-        functools.partial(FullyConnectedTensorProduct, irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True),
-        x1, x2, w
+        "inductor",
+        functools.partial(
+            FullyConnectedTensorProduct, irreps_in1, irreps_in2, irreps_out, internal_weights=False, shared_weights=True
+        ),
+        x1,
+        x2,
+        w,
     )
     with pytest.raises((RuntimeError, torch.jit.Error)):
         m(x1, x2)  # it should require weights
@@ -451,7 +445,7 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp, tmp.name)
-        tp2 = torch.load(tmp.name)
+        tp2 = torch.load(tmp.name, weights_only=False)
     # JITed, saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         tp_jit = assert_auto_jitable(tp)
@@ -460,7 +454,7 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     # Double-saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         torch.save(tp2, tmp.name)
-        tp4 = torch.load(tmp.name)
+        tp4 = torch.load(tmp.name, weights_only=False)
     x1 = torch.randn(2, tp.irreps_in1.dim)
     x2 = torch.randn(2, tp.irreps_in2.dim)
     res1 = tp(x1, x2)
@@ -482,7 +476,8 @@ def test_triu_mode() -> None:
     assert_equivariant(m, irreps_in=[m.irreps_in1, m.irreps_in2], irreps_out=m.irreps_out)
 
     assert_torch_compile(
-        'inductor',
+        "inductor",
         functools.partial(TensorProduct, "10x0e", "10x0e", "45x0e", [(0, 0, 0, "uvu<v", False)]),
-        torch.randn(2, 10), torch.randn(2, 10))
-
+        torch.randn(2, 10),
+        torch.randn(2, 10),
+    )

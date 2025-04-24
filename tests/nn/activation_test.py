@@ -19,10 +19,8 @@ def test_activation(irreps_in, acts) -> None:
     inp = irreps_in.randn(13, -1)
 
     assert_auto_jitable(a)
-    assert_torch_compile('inductor',
-                        functools.partial(Activation, irreps_in, acts),
-                        inp)
-    
+    assert_torch_compile("inductor", functools.partial(Activation, irreps_in, acts), inp)
+
     assert_equivariant(a)
 
     out = a(inp)

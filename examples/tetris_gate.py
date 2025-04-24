@@ -5,6 +5,7 @@ Exact equivariance to :math:`E(3)`
 
 >>> test()
 """
+
 import logging
 
 import torch

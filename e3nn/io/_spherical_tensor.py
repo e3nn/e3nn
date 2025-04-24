@@ -62,6 +62,7 @@ class SphericalTensor(o3.Irreps):
     >>> SphericalTensor(3, 1, -1)
     1x0e+1x1o+1x2e+1x3o
     """
+
     # pylint: disable=abstract-method
 
     def __new__(

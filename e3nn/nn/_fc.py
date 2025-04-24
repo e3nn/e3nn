@@ -64,6 +64,7 @@ class FullyConnectedNet(torch.nn.Sequential):
 
             \int_{-\infty}^{\infty} \phi(z)^2 \frac{e^{-z^2/2}}{\sqrt{2\pi}} dz = 1
     """
+
     hs: List[int]
 
     def __init__(self, hs, act=None, variance_in: int = 1, variance_out: int = 1, out_act: bool = False) -> None:

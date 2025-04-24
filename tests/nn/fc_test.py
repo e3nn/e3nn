@@ -24,12 +24,9 @@ def test_variance(act, var_in, var_out, out_act) -> None:
     f = assert_auto_jitable(f)
     f(x)
 
-    f_pt2 = assert_torch_compile(
-        'inductor',
-        functools.partial(FullyConnectedNet, hs, act, var_in, var_out, out_act),
-        x
-    )
+    f_pt2 = assert_torch_compile("inductor", functools.partial(FullyConnectedNet, hs, act, var_in, var_out, out_act), x)
     f_pt2(x)
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires cuda")
 def test_data_parallel() -> None:

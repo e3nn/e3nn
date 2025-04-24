@@ -28,6 +28,7 @@ The discrete representation is therefore
 
 .. math:: \{ h_{ij} = f(x_{ij}) \}_{ij}
 """
+
 import math
 
 import torch

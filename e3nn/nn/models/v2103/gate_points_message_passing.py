@@ -1,6 +1,7 @@
 """
 >>> test()
 """
+
 import torch
 from e3nn import o3
 from e3nn.nn import Gate

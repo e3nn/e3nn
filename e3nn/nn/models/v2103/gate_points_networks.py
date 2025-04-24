@@ -2,6 +2,7 @@
 >>> test_simple_network()
 >>> test_network_for_a_graph_with_attributes()
 """
+
 from typing import Dict, Union
 
 import torch

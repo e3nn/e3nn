@@ -88,9 +88,9 @@ def test_norm_activation_equivariant(do_bias, nonlin) -> None:
 
     assert_equivariant(norm_act)
     assert_torch_compile(
-        'inductor',
+        "inductor",
         functools.partial(NormActivation, irreps_in=irreps_in, scalar_nonlinearity=nonlin, bias=do_bias),
-        irreps_in.randn(-1)
+        irreps_in.randn(-1),
     )
     assert_auto_jitable(norm_act)
 

@@ -26,10 +26,8 @@ def test_gate() -> None:
     assert_equivariant(g)
     assert_auto_jitable(g)
     assert_torch_compile(
-        'inductor',
+        "inductor",
         functools.partial(Gate, irreps_scalars, act_scalars, irreps_gates, act_gates, irreps_gated),
-        irreps.randn(-1)
-        
+        irreps.randn(-1),
     )
     assert_normalized(g)
-

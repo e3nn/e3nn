@@ -44,8 +44,6 @@ class CodeGenMixin:
                 # torch.jit.script(jitable(graphmod))
                 scriptmod = e3nn.util.jit.compile(graphmod, recurse=False)
                 assert isinstance(scriptmod, torch.jit.ScriptModule)
-            elif opt_defaults["jit_mode"] == "compile":
-                scriptmod = torch.compile(graphmod, fullgraph=True)
             else:
                 scriptmod = graphmod
 

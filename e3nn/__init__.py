@@ -4,12 +4,8 @@ __version__ = "0.5.6"
 from typing import Dict
 
 
-_OPT_DEFAULTS: Dict[str, bool] = dict(
-    specialized_code=True,
-    optimize_einsums=True,
-    jit_script_fx=True,
-    jit_mode="script"
-)
+_OPT_DEFAULTS: Dict[str, bool] = dict(specialized_code=True, optimize_einsums=True, jit_script_fx=True, jit_mode="script")
+
 
 def _handle_jit_script_fx_legacy(jit_script_fx: bool, current_jit_mode: str) -> str:
     """Handle the legacy jit_script_fx flag mapping to jit_mode.
@@ -38,6 +34,17 @@ def _handle_jit_script_fx_legacy(jit_script_fx: bool, current_jit_mode: str) -> 
     # In all other cases, keep current jit_mode
     return current_jit_mode
 
+
+def _validate_and_set_jit_mode(jit_mode: str) -> None:
+    """Validate and set the jit_mode in _OPT_DEFAULTS."""
+    assert jit_mode in [
+        "script",
+        "inductor",
+        "eager",
+    ], f"Invalid jit_mode: {jit_mode}. Expected 'script', 'inductor', or 'eager'."
+    _OPT_DEFAULTS["jit_mode"] = jit_mode
+
+
 def set_optimization_defaults(**kwargs) -> None:
     r"""Globally set the default optimization settings.
 
@@ -55,7 +62,10 @@ def set_optimization_defaults(**kwargs) -> None:
             _OPT_DEFAULTS[k] = v
             # Update jit_mode based on the legacy mapping
             new_jit_mode = _handle_jit_script_fx_legacy(v, _OPT_DEFAULTS["jit_mode"])
-            _OPT_DEFAULTS["jit_mode"] = new_jit_mode
+            _validate_and_set_jit_mode(new_jit_mode)
+        elif k == "jit_mode":
+            # Validate and set the new jit_mode
+            _validate_and_set_jit_mode(v)
         else:
             _OPT_DEFAULTS[k] = v
 

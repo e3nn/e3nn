@@ -2,6 +2,7 @@
 Compare to v2103
 - replaced the angle trick by a factor alpha inspired by https://arxiv.org/pdf/2002.10444.pdf
 """
+
 import torch
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet

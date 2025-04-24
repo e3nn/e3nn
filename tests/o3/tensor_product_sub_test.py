@@ -20,9 +20,10 @@ def test_fully_connected() -> None:
     assert_equivariant(m)
     assert_auto_jitable(m)
     assert_torch_compile(
-        'inductor',
+        "inductor",
         functools.partial(FullyConnectedTensorProduct, irreps_in1, irreps_in2, irreps_out),
-        torch.randn(irreps_in1.dim), torch.randn(irreps_in2.dim)
+        torch.randn(irreps_in1.dim),
+        torch.randn(irreps_in2.dim),
     )
 
 
@@ -49,11 +50,7 @@ def test_id() -> None:
 
     assert_equivariant(m)
     assert_auto_jitable(m, strict_shapes=False)
-    assert_torch_compile(
-        'inductor',
-        functools.partial(Identity, irreps_in, irreps_out),
-        torch.randn(irreps_in.dim)
-    )
+    assert_torch_compile("inductor", functools.partial(Identity, irreps_in, irreps_out), torch.randn(irreps_in.dim))
 
 
 def test_full() -> None:
@@ -66,10 +63,9 @@ def test_full() -> None:
     assert_equivariant(m)
     assert_auto_jitable(m)
     assert_torch_compile(
-        'inductor',
-        functools.partial(FullTensorProduct, irreps_in1, irreps_in2),
-        irreps_in1.randn(-1), irreps_in2.randn(-1)
+        "inductor", functools.partial(FullTensorProduct, irreps_in1, irreps_in2), irreps_in1.randn(-1), irreps_in2.randn(-1)
     )
+
 
 def test_norm() -> None:
     irreps_in = o3.Irreps("3x0e + 5x1o")
@@ -86,9 +82,9 @@ def test_norm() -> None:
     assert_equivariant(norm)
     assert_auto_jitable(norm)
     assert_torch_compile(
-        'inductor',
+        "inductor",
         functools.partial(Norm, irreps_in=irreps_in),
-        torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1)
+        torch.cat((scalars.reshape(1, -1), vecs.reshape(1, -1)), dim=-1),
     )
 
 

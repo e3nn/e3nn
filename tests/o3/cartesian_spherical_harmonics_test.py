@@ -157,23 +157,20 @@ def test_module(normalization, normalize) -> None:
     sp_jit = assert_auto_jitable(sp)
     assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)
-    
-    sp_pt2 = assert_torch_compile(
-                    'inductor',
-                    functools.partial(o3.SphericalHarmonics, l, normalize, normalization),
-                    xyz)
-        
+
+    sp_pt2 = assert_torch_compile("inductor", functools.partial(o3.SphericalHarmonics, l, normalize, normalization), xyz)
+
     assert torch.allclose(sp_pt2(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
 
 
-@pytest.mark.parametrize("jit_mode", ["script", 'inductor', 'trace'])
-def test_pickle():
+@pytest.mark.parametrize("jit_mode", ["inductor", "eager"])
+def test_pickle(jit_mode):
     l = o3.Irreps("0e + 1o + 3o")
     # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
     jit_mode_before = get_optimization_defaults()["jit_mode"]
     try:
         # Cannot pickle with compiled submodules
-        set_optimization_defaults(jit_mode="eager")
+        set_optimization_defaults(jit_mode=jit_mode)
         sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
         buffer = io.BytesIO()
         torch.save(sp, buffer)
