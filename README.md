@@ -45,7 +45,7 @@ For details and optional dependencies, see [INSTALL.md](https://github.com/e3nn/
 
 ### Breaking changes
 e3nn is under development.
-It is recommanded to install using pip. The main branch is considered as unstable.
+It is recommended to install using pip. The main branch is considered as unstable.
 The second version number is incremented every time a breaking change is made to the code.
 ```
 0.(increment when backwards incompatible release).(increment for backwards compatible release)

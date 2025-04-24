@@ -3,7 +3,9 @@ import collections
 import torch
 from torch import fx
 
-from e3nn import o3
+from e3nn.o3._irreps import Irrep, Irreps
+from e3nn.o3._wigner import wigner_3j
+from e3nn.o3._tensor_product._tensor_product import TensorProduct
 from e3nn.math import germinate_formulas, orthonormalize, reduce_permutation
 from e3nn.util import explicit_default_types
 from e3nn.util.codegen import CodeGenMixin
@@ -14,9 +16,9 @@ _INPUT = collections.namedtuple("input", "tensor, start, stop")
 
 
 def _wigner_nj(*irrepss, normalization: str = "component", filter_ir_mid=None, dtype=None, device=None):
-    irrepss = [o3.Irreps(irreps) for irreps in irrepss]
+    irrepss = [Irreps(irreps) for irreps in irrepss]
     if filter_ir_mid is not None:
-        filter_ir_mid = [o3.Irrep(ir) for ir in filter_ir_mid]
+        filter_ir_mid = [Irrep(ir) for ir in filter_ir_mid]
 
     if len(irrepss) == 1:
         (irreps,) = irrepss
@@ -41,7 +43,7 @@ def _wigner_nj(*irrepss, normalization: str = "component", filter_ir_mid=None, d
                 if filter_ir_mid is not None and ir_out not in filter_ir_mid:
                     continue
 
-                C = o3.wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype, device=device)
+                C = wigner_3j(ir_out.l, ir_left.l, ir.l, dtype=dtype, device=device)
                 if normalization == "component":
                     C *= ir_out.dim**0.5
                 if normalization == "norm":
@@ -134,19 +136,19 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         if filter_ir_out is not None:
             try:
-                filter_ir_out = [o3.Irrep(ir) for ir in filter_ir_out]
+                filter_ir_out = [Irrep(ir) for ir in filter_ir_out]
             except ValueError:
                 raise ValueError(f"filter_ir_out (={filter_ir_out}) must be an iterable of e3nn.o3.Irrep")
 
         if filter_ir_mid is not None:
             try:
-                filter_ir_mid = [o3.Irrep(ir) for ir in filter_ir_mid]
+                filter_ir_mid = [Irrep(ir) for ir in filter_ir_mid]
             except ValueError:
                 raise ValueError(f"filter_ir_mid (={filter_ir_mid}) must be an iterable of e3nn.o3.Irrep")
 
         f0, formulas = germinate_formulas(formula)
 
-        irreps = {i: o3.Irreps(irs) for i, irs in irreps.items()}
+        irreps = {i: Irreps(irs) for i, irs in irreps.items()}
 
         for i in irreps:
             if len(i) != 1:
@@ -235,7 +237,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
 
         tps = list(tps)
         for i, op in enumerate(tps):
-            tp = o3.TensorProduct(op[0], op[1], op[2], [(0, 0, 0, "uuu", False)])
+            tp = TensorProduct(op[0], op[1], op[2], [(0, 0, 0, "uuu", False)])
             setattr(root, f"tp{i}", tp)
 
         graph = fx.Graph()
@@ -243,7 +245,7 @@ class ReducedTensorProducts(CodeGenMixin, torch.nn.Module):
         inputs = [fx.Proxy(graph.placeholder(f"x{i}", torch.Tensor), tracer) for i in f0]
 
         self.irreps_in = [irreps[i] for i in f0]
-        self.irreps_out = o3.Irreps(irreps_out).simplify()
+        self.irreps_out = Irreps(irreps_out).simplify()
 
         values = {}
 

@@ -5,7 +5,7 @@ import torch
 from torch import fx
 
 import e3nn
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
@@ -100,14 +100,15 @@ class Linear(CodeGenMixin, torch.nn.Module):
     True
 
     """
+
     weight_numel: int
     internal_weights: bool
     shared_weights: bool
 
     def __init__(
         self,
-        irreps_in: o3.Irreps,
-        irreps_out: o3.Irreps,
+        irreps_in: Irreps,
+        irreps_out: Irreps,
         *,
         f_in: Optional[int] = None,
         f_out: Optional[int] = None,
@@ -122,8 +123,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
         assert path_normalization in ["element", "path"]
 
-        irreps_in = o3.Irreps(irreps_in)
-        irreps_out = o3.Irreps(irreps_out)
+        irreps_in = Irreps(irreps_in)
+        irreps_out = Irreps(irreps_out)
 
         if instructions is None:
             # By default, make all possible connections
@@ -236,9 +237,11 @@ class Linear(CodeGenMixin, torch.nn.Module):
         if self.irreps_out.dim > 0:
             output_mask = torch.cat(
                 [
-                    torch.ones(mul_ir.dim)
-                    if any((ins.i_out == i_out) and (0 not in ins.path_shape) for ins in self.instructions)
-                    else torch.zeros(mul_ir.dim)
+                    (
+                        torch.ones(mul_ir.dim)
+                        if any((ins.i_out == i_out) and (0 not in ins.path_shape) for ins in self.instructions)
+                        else torch.zeros(mul_ir.dim)
+                    )
                     for i_out, mul_ir in enumerate(self.irreps_out)
                 ]
             )
@@ -332,8 +335,8 @@ class Linear(CodeGenMixin, torch.nn.Module):
 
 
 def _codegen_linear(
-    irreps_in: o3.Irreps,
-    irreps_out: o3.Irreps,
+    irreps_in: Irreps,
+    irreps_out: Irreps,
     instructions: List[Instruction],
     f_in: Optional[int] = None,
     f_out: Optional[int] = None,

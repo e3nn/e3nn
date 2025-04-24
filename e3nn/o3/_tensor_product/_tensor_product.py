@@ -6,7 +6,7 @@ import torch
 from torch import fx
 
 import e3nn
-from e3nn import o3
+from e3nn.o3._irreps import Irreps
 from e3nn.util import prod
 from e3nn.util.codegen import CodeGenMixin
 from e3nn.util.jit import compile_mode
@@ -195,9 +195,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in1: o3.Irreps,
-        irreps_in2: o3.Irreps,
-        irreps_out: o3.Irreps,
+        irreps_in1: Irreps,
+        irreps_in2: Irreps,
+        irreps_out: Irreps,
         instructions: List[tuple],
         in1_var: Optional[Union[List[float], torch.Tensor]] = None,
         in2_var: Optional[Union[List[float], torch.Tensor]] = None,
@@ -228,9 +228,9 @@ class TensorProduct(CodeGenMixin, torch.nn.Module):
         assert irrep_normalization in ["component", "norm", "none"]
         assert path_normalization in ["element", "path", "none"]
 
-        self.irreps_in1 = o3.Irreps(irreps_in1)
-        self.irreps_in2 = o3.Irreps(irreps_in2)
-        self.irreps_out = o3.Irreps(irreps_out)
+        self.irreps_in1 = Irreps(irreps_in1)
+        self.irreps_in2 = Irreps(irreps_in2)
+        self.irreps_out = Irreps(irreps_out)
         del irreps_in1, irreps_in2, irreps_out
 
         instructions = [x if len(x) == 6 else x + (1.0,) for x in instructions]
