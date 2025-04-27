@@ -1,5 +1,5 @@
-r"""Core functions of :math:`SO(3)`
-"""
+r"""Core functions of :math:`SO(3)`"""
+
 import functools
 import math
 from typing import Union
@@ -25,7 +25,9 @@ def su2_generators(j: int) -> torch.Tensor:
         dim=0,
     )
 
-
+# Need to do a graph break since Dynamo 
+# cannot handle power of complex numbers and SymInt in L41
+@torch.compiler.disable
 def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tensor:
     # https://en.wikipedia.org/wiki/Spherical_harmonics#Real_form
     q = torch.zeros((2 * l + 1, 2 * l + 1), dtype=torch.complex128)

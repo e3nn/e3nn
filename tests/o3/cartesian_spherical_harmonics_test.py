@@ -1,13 +1,14 @@
 import math
 import io
 
+import functools
+
 import pytest
 import torch
 
 from e3nn import o3
 from e3nn import set_optimization_defaults, get_optimization_defaults
-from e3nn.util.test import assert_auto_jitable, assert_equivariant
-from e3nn.util.jit import prepare
+from e3nn.util.test import assert_auto_jitable, assert_equivariant, assert_torch_compile
 
 
 def test_weird_call() -> None:
@@ -150,43 +151,28 @@ def test_recurrence_relation(float_tolerance, l) -> None:
 def test_module(normalization, normalize) -> None:
     l = o3.Irreps("0e + 1o + 3o")
 
-    def build_module(l, normalize, normalization):
-        return o3.SphericalHarmonics(l, normalize, normalization)
-
-    sp = build_module(l, normalize, normalization)
-    sp_jit = assert_auto_jitable(sp)
+    sp = o3.SphericalHarmonics(l, normalize, normalization)
     xyz = torch.randn(11, 3)
+
+    sp_jit = assert_auto_jitable(sp)
     assert torch.allclose(sp_jit(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
     assert_equivariant(sp)
-    sp_pt2 = torch.compile(prepare(build_module)(l, normalize, normalization), fullgraph=True)
-    assert torch.allclose(sp_pt2(xyz), sp(xyz))
+
+    sp_pt2 = assert_torch_compile("inductor", functools.partial(o3.SphericalHarmonics, l, normalize, normalization), xyz)
+
+    assert torch.allclose(sp_pt2(xyz), o3.spherical_harmonics(l, xyz, normalize, normalization))
 
 
-def test_internal_jit_flag():
+@pytest.mark.parametrize("jit_mode", ["inductor", "eager"])
+def test_pickle(jit_mode):
     l = o3.Irreps("0e + 1o + 3o")
-    sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
-    # Turning off the JIT in _spherical_harmonics to enable torch.compile.
-    # Note that this is a less invasive way then turning off jit_script_fx globally
-    jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
-    # TODO: Have a more general purpose context manager
+    # Turning off the torch.jit.script in CodeGenMix to enable torch.compile.
+    jit_mode_before = get_optimization_defaults()["jit_mode"]
     try:
-        set_optimization_defaults(jit_script_fx=False)
-        sp_pt2 = torch.compile(o3.SphericalHarmonics(l, normalization="integral", normalize=True), fullgraph=True)
-
-        xyz = torch.randn(11, 3)
-        torch.testing.assert_close(sp(xyz), sp_pt2(xyz))
-    finally:
-        set_optimization_defaults(jit_script_fx=jit_script_fx_before)
-
-
-@pytest.mark.parametrize("jit_script_fx", [False])
-def test_pickle(jit_script_fx):
-    l = o3.Irreps("0e + 1o + 3o")
-    jit_script_fx_before = get_optimization_defaults()["jit_script_fx"]
-    try:
-        set_optimization_defaults(jit_script_fx=jit_script_fx)
+        # Cannot pickle with compiled submodules
+        set_optimization_defaults(jit_mode=jit_mode)
         sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
         buffer = io.BytesIO()
         torch.save(sp, buffer)
     finally:
-        set_optimization_defaults(jit_script_fx=jit_script_fx_before)
+        set_optimization_defaults(jit_mode=jit_mode_before)

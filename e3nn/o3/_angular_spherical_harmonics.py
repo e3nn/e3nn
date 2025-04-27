@@ -1,5 +1,5 @@
-r"""Spherical Harmonics as functions of Euler angles
-"""
+r"""Spherical Harmonics as functions of Euler angles"""
+
 import math
 from typing import List, Tuple
 

@@ -2,6 +2,7 @@ r"""example of a graph convolution when the input and output nodes are different
 
 >>> test()
 """
+
 from typing import Optional
 
 import torch

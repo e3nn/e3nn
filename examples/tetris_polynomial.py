@@ -10,6 +10,7 @@ This example is minimal:
 
 >>> test()
 """
+
 import logging
 
 import torch

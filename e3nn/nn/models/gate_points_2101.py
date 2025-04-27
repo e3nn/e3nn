@@ -4,6 +4,7 @@ Exact equivariance to :math:`E(3)`
 
 version of january 2021
 """
+
 import math
 from typing import Dict, Optional
 

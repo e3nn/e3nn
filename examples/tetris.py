@@ -5,6 +5,7 @@ Exact equivariance to :math:`E(3)`
 
 >>> test()
 """
+
 import torch
 from torch_geometric.data import Data, DataLoader
 

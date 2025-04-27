@@ -10,9 +10,7 @@ class _SoftUnitStep(torch.autograd.Function):
         y = torch.zeros_like(x)
         mask = x > 0.0
         safe_x = torch.where(mask, x, torch.ones_like(x))  # Avoid division by zero
-        y = torch.where(
-            mask, torch.exp(-1.0 / safe_x), torch.zeros_like(x)
-        )
+        y = torch.where(mask, torch.exp(-1.0 / safe_x), torch.zeros_like(x))
         return y
 
     @staticmethod
@@ -20,11 +18,9 @@ class _SoftUnitStep(torch.autograd.Function):
         (x,) = ctx.saved_tensors
         mask = x > 0.0
         safe_x = torch.where(mask, x, torch.ones_like(x))  # Avoid division by zero
-        dx = torch.where(
-            mask, torch.exp(-1.0 / safe_x) / (safe_x * safe_x), torch.zeros_like(x)
-        )
+        dx = torch.where(mask, torch.exp(-1.0 / safe_x) / (safe_x * safe_x), torch.zeros_like(x))
         return dx * dy
-    
+
 
 def soft_unit_step(x):
     r"""smooth :math:`C^\infty` version of the unit step function

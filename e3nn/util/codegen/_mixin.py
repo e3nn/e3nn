@@ -39,7 +39,7 @@ class CodeGenMixin:
         for fname, graphmod in funcs.items():
             assert isinstance(graphmod, fx.GraphModule)
 
-            if opt_defaults["jit_script_fx"]:
+            if opt_defaults["jit_mode"] == "script":
                 # With recurse=False, this more or less is equivalent to
                 # torch.jit.script(jitable(graphmod))
                 scriptmod = e3nn.util.jit.compile(graphmod, recurse=False)
@@ -76,7 +76,7 @@ class CodeGenMixin:
                 smod = getattr(self, fname)
                 buffer_type: str
                 buffer: bytes
-                if isinstance(smod, fx.GraphModule):
+                if isinstance(smod, (fx.GraphModule, torch._dynamo.OptimizedModule)):
                     buffer_type = "fx"
                     # pickle the fx.GraphModule normally
                     buffer = pickle.dumps(smod)
@@ -119,7 +119,7 @@ class CodeGenMixin:
                 assert isinstance(buffer, bytes)
                 if buffer_type == "fx":
                     smod = pickle.loads(buffer)
-                    assert isinstance(smod, fx.GraphModule)
+                    assert isinstance(smod, (fx.GraphModule, torch._dynamo.OptimizedModule))
                 elif buffer_type == "torchscript":
                     # Load the TorchScript IR buffer
                     buffer = io.BytesIO(buffer)

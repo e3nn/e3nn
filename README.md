@@ -9,6 +9,29 @@ It contains fundamental mathematical operations such as [tensor products](https:
 
 ![](https://user-images.githubusercontent.com/333780/79220728-dbe82c00-7e54-11ea-82c7-b3acbd9b2246.gif)
 
+```python
+import torch
+from e3nn import o3
+
+# Create a random array made of scalar (0e) and a vector (1o)
+irreps_in = o3.Irreps("0e + 1o")
+x = irreps_in.randn(-1)
+
+# Apply a linear layer
+irreps_out = o3.Irreps("2x0e + 2x1o")
+linear = o3.Linear(irreps_in=irreps_in, irreps_out=irreps_out)
+y = linear(x)
+
+# Compute a tensor product with itself
+tp = o3.FullTensorProduct(irreps_in1=irreps_in, irreps_in2=irreps_in)
+z = tp(x, x)
+
+# Optionally compile the tensor product
+tp_pt2 = torch.compile(tp, fullgraph=True)
+z_pt2 = tp_pt2(x, x) # Warning: First few calls might be slow due to compilation
+torch.testing.assert_close(z, z_pt2)
+```
+
 ## Installation
 
 **Important:** install pytorch and only then run the command

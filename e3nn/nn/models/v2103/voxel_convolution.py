@@ -3,6 +3,7 @@ This is a tentative implementation of voxel convolution
 
 >>> test()
 """
+
 import torch
 
 from e3nn import o3
