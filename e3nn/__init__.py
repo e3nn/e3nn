@@ -57,12 +57,14 @@ def set_optimization_defaults(**kwargs) -> None:
         if k not in _OPT_DEFAULTS:
             raise ValueError(f"Unknown optimization option: {k}")
 
-        # Handle the legacy jit_script_fx flag
+        # Handles the legacy mapping for jit_script_fx
+        # to jit_mode so that old code can still work
+        # with the new defaults.
         if k == "jit_script_fx":
-            _OPT_DEFAULTS[k] = v
             # Update jit_mode based on the legacy mapping
             new_jit_mode = _handle_jit_script_fx_legacy(v, _OPT_DEFAULTS["jit_mode"])
             _validate_and_set_jit_mode(new_jit_mode)
+            _OPT_DEFAULTS[k] = v
         elif k == "jit_mode":
             # Validate and set the new jit_mode
             _validate_and_set_jit_mode(v)
