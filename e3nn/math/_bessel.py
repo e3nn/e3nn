@@ -15,12 +15,12 @@ def bessel(x: torch.Tensor,
             \int_0^c r^2 B_n(r, c) B_m(r, c) dr = \delta_{nm}
 
         Args:
-            x (jax.Array): input of shape ``[...]``
+            x (torch.Tensor): input of shape ``[...]``
             n (int): number of basis functions
             x_max (float): maximum value of the input
 
         Returns:
-            jax.Array: basis functions of shape ``[..., n]``
+            torch.Tensor: basis functions of shape ``[..., n]``
 
         Klicpera, J.; Groß, J.; Günnemann, S. Directional Message Passing for Molecular Graphs; ICLR 2020.
         Equation (7)
