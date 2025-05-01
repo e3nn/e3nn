@@ -99,6 +99,7 @@ def wigner_D(l: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tenso
     return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
 
 
+@torch._dynamo.disable()
 def wigner_3j(l1: int, l2: int, l3: int, dtype=None, device=None) -> torch.Tensor:
     r"""Wigner 3j symbols :math:`C_{lmn}`.
 

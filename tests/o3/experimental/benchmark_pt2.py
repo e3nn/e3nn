@@ -23,35 +23,42 @@ def main():
     from torch import nn
     import time
 
-    LMAX = 8
+    LMAX = 3
     CHANNEL = 128
     BATCH = 100
 
-    for lmax in range(1, LMAX + 1):
+    for lmax in range(LMAX, LMAX + 1):
         irreps = o3.Irreps.spherical_harmonics(lmax)
         irreps_x = (CHANNEL * irreps).regroup()
-        x = irreps_x.randn(BATCH, -1).to(device=device)
         irreps_y = irreps
-        y = irreps_y.randn(BATCH, -1).to(device=device)
+        # x = irreps_x.randn(BATCH, -1).to(device=device)
+        # y = irreps_y.randn(BATCH, -1).to(device=device)
+        x = o3.experimental.normal(irreps_x, device='cuda')
+        y = o3.experimental.normal(irreps_y, device='cuda')
         print(f"{irreps_x} \otimes {irreps_y}")
 
-        tp = o3.FullTensorProduct(irreps_x, irreps_y)  # Doesnt work with fullgraph=True
+        # tp = o3.FullTensorProduct(irreps_x, irreps_y)  # Doesnt work with fullgraph=True
 
-        tp_jit_compile = util.jit.compile(tp).to(device=device)
+        # tp_jit_compile = util.jit.compile(tp).to(device=device)
 
-        tp_compile = torch.compile(tp, mode=compile_mode).to(device=device)
+        # tp_compile = torch.compile(tp, mode=compile_mode).to(device=device)
+        # print(
+        #     f"TP JIT lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_jit_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
+        # )
+
+        # print(
+        #     f"TP Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
+        # )
+
+        # tp_experimental = o3.experimental.FullTensorProductv2(irreps_x, irreps_y)
+        # tp_experimental_compile = torch.compile(tp_experimental, mocde=compile_mode, fullgraph=True).to(device=device)
+        # print(tlparse /tmp/tracedir
+        #     f"TP Experimental Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_experimental_compile(x.array, y.array), times=100, repeat=10)*1000:.3f}ms"
+        # )
+        
+        tp_compile = torch.compile(o3.experimental.tensor_product, backend='eager', fullgraph=True)
         print(
-            f"TP JIT lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_jit_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
-        )
-
-        print(
-            f"TP Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
-        )
-
-        tp_experimental = o3.experimental.FullTensorProductv2(irreps_x, irreps_y)
-        tp_experimental_compile = torch.compile(tp_experimental, mode=compile_mode, fullgraph=True).to(device=device)
-        print(
-            f"TP Experimental Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_experimental_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
+            f"e3nn.tensor_produt Torch 2.0 lmax {lmax} channel {CHANNEL} batch {BATCH}: {print_performance(lambda: tp_compile(x, y), times=100, repeat=10)*1000:.3f}ms"
         )
 
 
