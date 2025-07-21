@@ -95,7 +95,8 @@ class Activation(torch.nn.Module):
         # - PROFILER - with torch.autograd.profiler.record_function(repr(self)):
         output = []
         index = 0
-        for mul, (l, _), act in self.paths:
+        # for mul, (l, _), act in self.paths:
+        for (mul, (l, _)), act in zip(self.irreps_in, self.acts): # Fix torchscript incompatible error
             ir_dim = 2 * l + 1
             if act is not None:
                 output.append(act(features.narrow(dim, index, mul)))
