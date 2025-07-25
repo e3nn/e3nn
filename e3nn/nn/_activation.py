@@ -5,7 +5,7 @@ from e3nn.math import normalize2mom
 from e3nn.util.jit import compile_mode
 
 
-@compile_mode("trace")
+@compile_mode("script")
 class Activation(torch.nn.Module):
     r"""Scalar activation function.
 
@@ -95,8 +95,7 @@ class Activation(torch.nn.Module):
         # - PROFILER - with torch.autograd.profiler.record_function(repr(self)):
         output = []
         index = 0
-        # for mul, (l, _), act in self.paths:
-        for (mul, (l, _)), act in zip(self.irreps_in, self.acts): # Fix torchscript incompatible error
+        for (mul, (l, _)), act in zip(self.irreps_in, self.acts):
             ir_dim = 2 * l + 1
             if act is not None:
                 output.append(act(features.narrow(dim, index, mul)))
