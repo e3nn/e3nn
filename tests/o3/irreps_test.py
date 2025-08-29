@@ -123,3 +123,10 @@ def test_errors() -> None:
 @pytest.mark.xfail()
 def test_fail1() -> None:
     o3.Irreps([(32, 1)])
+
+def test_slice_by_mul():
+    assert o3.Irreps("10x0e").slice_by_mul[1:4] == o3.Irreps("3x0e")
+    assert o3.Irreps("10x0e + 10x1e").slice_by_mul[5:15] == o3.Irreps("5x0e + 5x1e")
+    assert o3.Irreps("10x0e + 2e + 10x1e").slice_by_mul[5:15] == o3.Irreps(
+        "5x0e + 2e + 4x1e"
+    )
