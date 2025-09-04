@@ -57,7 +57,10 @@ class Irrep(tuple):
         if p is None:
             if isinstance(l, Irrep):
                 return l
-
+            
+            if isinstance(l, _MulIr):
+                return l.ir.l
+            
             if isinstance(l, str):
                 try:
                     name = l.strip()
@@ -670,7 +673,7 @@ class Irreps(tuple):
                 keep = [keep.ir]
             if callable(keep):
                 return Irreps([mul_ir for mul_ir in self if keep(mul_ir)])
-            keep = {Irrep(ir) for mul, ir in keep}
+            keep = {Irrep(ir) for ir in keep}
             return Irreps([(mul, ir) for mul, ir in self if ir in keep])
 
         if drop is not None:
