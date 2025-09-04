@@ -57,7 +57,10 @@ class Irrep(tuple):
         if p is None:
             if isinstance(l, Irrep):
                 return l
-
+            
+            if isinstance(l, _MulIr):
+                return l.ir.l
+            
             if isinstance(l, str):
                 try:
                     name = l.strip()
@@ -689,6 +692,12 @@ class Irreps(tuple):
             return Irreps([(mul, ir) for mul, ir in self if ir.l <= lmax])
 
     @property
+    def slice_by_mul(self):
+        r"""Return the slice with respect to the multiplicities.
+        """
+        return _MulIndexSliceHelper(self)
+
+    @property
     def dim(self) -> int:
         return sum(mul * ir.dim for mul, ir in self)
 
@@ -786,3 +795,27 @@ class Irreps(tuple):
             tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
         """
         return self.D_from_angles(*_rotation.axis_angle_to_angles(axis, angle))
+
+class _MulIndexSliceHelper:
+    irreps: Irreps
+
+    def __init__(self, irreps) -> None:
+        self.irreps = irreps
+
+    def __getitem__(self, index: slice) -> Irreps:
+        if not isinstance(index, slice):
+            raise IndexError("Irreps.slice_by_mul only supports slices.")
+
+        start, stop, stride = index.indices(self.irreps.num_irreps)
+        if stride != 1:
+            raise NotImplementedError("Irreps.slice_by_mul does not support strides.")
+
+        out = []
+        i = 0
+        for mul, ir in self.irreps:
+            if start <= i and i + mul <= stop:
+                out.append((mul, ir))
+            elif start < i + mul and i < stop:
+                out.append((min(stop, i + mul) - max(start, i), ir))
+            i += mul
+        return Irreps(out)
