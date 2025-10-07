@@ -57,10 +57,10 @@ class Irrep(tuple):
         if p is None:
             if isinstance(l, Irrep):
                 return l
-            
+
             if isinstance(l, _MulIr):
                 return l.ir.l
-            
+
             if isinstance(l, str):
                 try:
                     name = l.strip()
@@ -624,7 +624,7 @@ class Irreps(tuple):
         1x0e+2x1e
         """
         return self.sort().irreps.simplify()
-    
+
     def filter(
         self,
         keep: Union["Irreps", List[Irrep], Callable[[_MulIr], bool]] = None,
@@ -740,7 +740,11 @@ class Irreps(tuple):
         `torch.Tensor`
             tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
         """
-        return direct_sum(*[ir.D_from_angles(alpha, beta, gamma, k) for mul, ir in self for _ in range(mul)])
+        blocks = []
+        for mul, ir in self:
+            D = ir.D_from_angles(alpha, beta, gamma, k)
+            blocks.extend([D] * mul)
+        return direct_sum(*blocks)
 
     def D_from_quaternion(self, q, k=None):
         r"""Matrix of the representation
@@ -795,6 +799,7 @@ class Irreps(tuple):
             tensor of shape :math:`(..., \mathrm{dim}, \mathrm{dim})`
         """
         return self.D_from_angles(*_rotation.axis_angle_to_angles(axis, angle))
+
 
 class _MulIndexSliceHelper:
     irreps: Irreps
