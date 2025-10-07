@@ -19,6 +19,10 @@ class Instruction(NamedTuple):
     path_shape: tuple
     path_weight: float
 
+# TODO: Need a better that also accounts for the shape
+class LinearSlices(NamedTuple):
+    slice_1D: slice
+    shape_2D: tuple
 
 @compile_mode("script")
 class Linear(CodeGenMixin, torch.nn.Module):
@@ -248,6 +252,13 @@ class Linear(CodeGenMixin, torch.nn.Module):
         else:
             output_mask = torch.ones(0)
         self.register_buffer("output_mask", output_mask)
+        
+        # Register 2D weight slices
+        self.weight_index_slices = []
+        for i,ins in enumerate(self.instructions):
+            offset = sum(prod(ins_pre.path_shape) for ins_pre in self.instructions[:i])
+            # TODO: Slop
+            self.weight_index_slices.append(LinearSlices(slice(offset, offset + prod(ins.path_shape), None), ins.path_shape))
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.irreps_in} -> {self.irreps_out} | {self.weight_numel} weights)"
