@@ -350,6 +350,11 @@ class Irreps(tuple):
     (, )
     """
 
+    # Marker attribute to identify Irreps instances across different class definitions
+    # (e.g., when using torch.package). This enables isinstance-like checks via hasattr
+    # when the class identity differs between packaged and environment code.
+    _e3nn_irreps_marker = True
+
     def __new__(cls, irreps=None) -> Union[_MulIr, "Irreps"]:
         if isinstance(irreps, Irreps):
             return super().__new__(cls, irreps)

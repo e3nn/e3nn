@@ -8,6 +8,15 @@ import torch
 from e3nn.o3._irreps import Irreps
 
 
+def _is_irreps(obj):
+    """Check if obj is an Irreps instance, even across different class definitions.
+
+    This uses a marker attribute instead of isinstance() to handle cases where
+    the Irreps class from packaged code differs from the environment's Irreps class.
+    """
+    return hasattr(type(obj), '_e3nn_irreps_marker')
+
+
 def _transform(dat, irreps_dat, rot_mat, translation: float = 0.0, output_transform_dtype: bool = False):
     """Transform ``dat`` by ``rot_mat`` and ``translation`` according to ``irreps_dat``."""
     out = []
@@ -52,12 +61,12 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
         else:
             raise ValueError("Cannot infer irreps_out for %r; provide them explicitly" % func)
 
-    if isinstance(irreps_in, Irreps) or irreps_in in SPECIAL_VALS:
+    if _is_irreps(irreps_in) or irreps_in in SPECIAL_VALS:
         irreps_in = [irreps_in]
     elif isinstance(irreps_in, list):
         irreps_in = [i if i in SPECIAL_VALS else Irreps(i) for i in irreps_in]
     else:
-        if isinstance(irreps_in, tuple) and not isinstance(irreps_in, Irreps):
+        if isinstance(irreps_in, tuple) and not _is_irreps(irreps_in):
             warnings.warn(
                 f"Module {func} had irreps_in of type tuple but not Irreps; ambiguous whether the tuple should be interpreted "
                 f"as a tuple representing a single Irreps or a tuple of objects each to be converted to Irreps. Assuming the "
@@ -65,12 +74,12 @@ def _get_io_irreps(func, irreps_in=None, irreps_out=None):
             )
         irreps_in = [Irreps(irreps_in)]
 
-    if isinstance(irreps_out, Irreps) or irreps_out in SPECIAL_VALS:
+    if _is_irreps(irreps_out) or irreps_out in SPECIAL_VALS:
         irreps_out = [irreps_out]
     elif isinstance(irreps_out, list):
         irreps_out = [i if i in SPECIAL_VALS else Irreps(i) for i in irreps_out]
     else:
-        if isinstance(irreps_in, tuple) and not isinstance(irreps_in, Irreps):
+        if isinstance(irreps_out, tuple) and not _is_irreps(irreps_out):
             warnings.warn(
                 f"Module {func} had irreps_out of type tuple but not Irreps; ambiguous whether the tuple should be "
                 f"interpreted as a tuple representing a single Irreps or a tuple of objects each to be converted to Irreps. "
@@ -90,7 +99,7 @@ def _get_args_in(func, args_in=None, irreps_in=None, irreps_out=None):
 
 
 def _rand_args(irreps_in, batch_size: Optional[int] = None):
-    if not all((isinstance(i, Irreps) or i == "cartesian_points") for i in irreps_in):
+    if not all((_is_irreps(i) or i == "cartesian_points") for i in irreps_in):
         raise ValueError(
             "Random arguments cannot be generated when argument types besides Irreps and `'cartesian_points'` are specified; "
             "provide explicit ``args_in``"
