@@ -173,6 +173,6 @@ def test_pickle(jit_mode):
         set_optimization_defaults(jit_mode=jit_mode)
         sp = o3.SphericalHarmonics(l, normalization="integral", normalize=True)
         buffer = io.BytesIO()
-        torch.save(sp, buffer)
+        torch.save(sp.state_dict(), buffer)
     finally:
         set_optimization_defaults(jit_mode=jit_mode_before)
