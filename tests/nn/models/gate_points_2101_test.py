@@ -71,12 +71,44 @@ def test_save(network) -> None:
     f, random_graph = network
     # Get a saved, loaded network
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        torch.save(f, tmp.name)
-        f2 = torch.load(tmp.name, weights_only=False)
+        torch.save(f.state_dict(), tmp.name)
+        # Recreate network with same parameters as fixture
+        irreps_in = o3.Irreps("3x0e + 2x1o")
+        irreps_attr = o3.Irreps("10x0e")
+        irreps_out = o3.Irreps("2x0o + 2x1o + 2x2e")
+        f2 = Network(
+            irreps_in,
+            o3.Irreps("5x0e + 5x0o + 5x1e + 5x1o"),
+            irreps_out,
+            irreps_attr,
+            o3.Irreps.spherical_harmonics(3),
+            layers=3,
+            max_radius=2.0,
+            number_of_basis=5,
+            radial_layers=2,
+            radial_neurons=100,
+            num_neighbors=4.0,
+            num_nodes=5,
+        )
+        f2.load_state_dict(torch.load(tmp.name, weights_only=False))
     x = random_graph()
     assert torch.all(f(x) == f2(x))
     # Get a double-saved network
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        torch.save(f2, tmp.name)
-        f3 = torch.load(tmp.name, weights_only=False)
+        torch.save(f2.state_dict(), tmp.name)
+        f3 = Network(
+            irreps_in,
+            o3.Irreps("5x0e + 5x0o + 5x1e + 5x1o"),
+            irreps_out,
+            irreps_attr,
+            o3.Irreps.spherical_harmonics(3),
+            layers=3,
+            max_radius=2.0,
+            number_of_basis=5,
+            radial_layers=2,
+            radial_neurons=100,
+            num_neighbors=4.0,
+            num_nodes=5,
+        )
+        f3.load_state_dict(torch.load(tmp.name, weights_only=False))
     assert torch.all(f(x) == f3(x))

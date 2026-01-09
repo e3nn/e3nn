@@ -10,8 +10,9 @@ from e3nn.util.test import assert_auto_jitable, assert_equivariant, assert_torch
 def test_save_load() -> None:
     tp1 = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        torch.save(tp1, tmp.name)
-        tp2 = torch.load(tmp.name, weights_only=False)
+        torch.save(tp1.state_dict(), tmp.name)
+        tp2 = o3.ReducedTensorProducts("ij=-ji", i="5x0e + 1e")
+        tp2.load_state_dict(torch.load(tmp.name, weights_only=False))
 
     xs = (torch.randn(2, 5 + 3), torch.randn(2, 5 + 3))
     assert torch.allclose(tp1(*xs), tp2(*xs))

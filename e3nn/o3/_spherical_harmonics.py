@@ -85,7 +85,7 @@ class SphericalHarmonics(torch.nn.Module):
 
         if get_optimization_defaults()["jit_mode"] == "script":
             self.sph_func = torch.jit.script(_spherical_harmonics)
-        elif get_optimization_defaults()["jit_mode"] == "compile":
+        elif get_optimization_defaults()["jit_mode"] == "inductor":
             self.sph_func = torch.compile(_spherical_harmonics, fullgraph=True)
         else:
             self.sph_func = _spherical_harmonics

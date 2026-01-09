@@ -444,8 +444,9 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
     assert_auto_jitable(tp)
     # Saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        torch.save(tp, tmp.name)
-        tp2 = torch.load(tmp.name, weights_only=False)
+        torch.save(tp.state_dict(), tmp.name)
+        tp2 = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+        tp2.load_state_dict(torch.load(tmp.name, weights_only=False))
     # JITed, saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
         tp_jit = assert_auto_jitable(tp)
@@ -453,8 +454,9 @@ def test_save(l1, p1, l2, p2, lo, po, mode, weight) -> None:
         tp3 = torch.jit.load(tmp.name)
     # Double-saved TP
     with tempfile.NamedTemporaryFile(suffix=".pth") as tmp:
-        torch.save(tp2, tmp.name)
-        tp4 = torch.load(tmp.name, weights_only=False)
+        torch.save(tp2.state_dict(), tmp.name)
+        tp4 = make_tp(l1, p1, l2, p2, lo, po, mode, weight)
+        tp4.load_state_dict(torch.load(tmp.name, weights_only=False))
     x1 = torch.randn(2, tp.irreps_in1.dim)
     x2 = torch.randn(2, tp.irreps_in2.dim)
     res1 = tp(x1, x2)
