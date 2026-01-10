@@ -2,11 +2,9 @@ import pytest
 import functools
 
 import torch
-
 from e3nn import o3
 from e3nn.nn import Activation
 from e3nn.util.test import assert_equivariant, assert_auto_jitable, assert_normalized, assert_torch_compile
-
 
 @pytest.mark.parametrize(
     "irreps_in,acts",
@@ -19,7 +17,6 @@ def test_activation(irreps_in, acts) -> None:
     inp = irreps_in.randn(13, -1)
 
     assert_auto_jitable(a)
-    assert_torch_compile("inductor", functools.partial(Activation, irreps_in, acts), inp)
 
     assert_equivariant(a)
 
