@@ -140,6 +140,8 @@ def compile(
             # we need, it should be safe to ignore this warning. The below code suppresses this warning as
             # narrowly as possible to ensure it can still be raised from user code.
             # See also: https://github.com/pytorch/pytorch/issues/89064
+            # Note: In PyTorch 2.10.0+, this warning is raised from ast.py instead of torch/jit/_check.py,
+            # so we don't filter by module to catch both cases.
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
@@ -149,9 +151,8 @@ def compile(
                         "in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type "
                         "in `torch.jit.Attribute`."
                     ),
-                    # Being specific is good form, even though matching the message should be enough:
                     category=UserWarning,
-                    module="torch",
+                    # don't filter by module since in PyTorch 2.10.0+ the warning comes from ast.py instead of torch
                 )
                 mod = torch.jit.script(mod, **script_options)
         else:
