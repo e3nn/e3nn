@@ -1,6 +1,14 @@
 from typing import Tuple
 
 import torch
+from e3nn import get_optimization_defaults
+
+
+def _conditional_script(fn):
+    """apply torch.jit.script only if jit_mode is 'script'"""
+    if get_optimization_defaults()["jit_mode"] == "script":
+        return torch.jit.script(fn)
+    return fn
 
 
 def direct_sum(*matrices):
@@ -19,7 +27,7 @@ def direct_sum(*matrices):
     return out
 
 
-@torch.jit.script
+@_conditional_script
 def orthonormalize(original: torch.Tensor, eps: float = 1e-9) -> Tuple[torch.Tensor, torch.Tensor]:
     r"""orthonomalize vectors
 
@@ -71,7 +79,7 @@ def orthonormalize(original: torch.Tensor, eps: float = 1e-9) -> Tuple[torch.Ten
     return final, matrix
 
 
-@torch.jit.script
+@_conditional_script
 def complete_basis(vecs: torch.Tensor, eps: float = 1e-9) -> torch.Tensor:
     assert vecs.dim() == 2
     dim = vecs.shape[1]
