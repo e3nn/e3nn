@@ -8,7 +8,14 @@ from torch import fx
 from sympy import Integer, Poly, diff, factorial, pi, sqrt, symbols
 
 from e3nn.util.jit import compile_mode
-from e3nn import o3
+from e3nn import o3, get_optimization_defaults
+
+
+def _conditional_script(fn):
+    """apply torch.jit.script only if jit_mode is 'script'"""
+    if get_optimization_defaults()["jit_mode"] == "script":
+        return torch.jit.script(fn)
+    return fn
 
 
 @compile_mode("script")
@@ -87,7 +94,7 @@ def spherical_harmonics_alpha_beta(l, alpha, beta, *, normalization: str = "inte
     return sh(alpha, beta)
 
 
-@torch.jit.script
+@_conditional_script
 def spherical_harmonics_alpha(l: int, alpha: torch.Tensor) -> torch.Tensor:
     r""":math:`S^l(\alpha)` of `spherical_harmonics_alpha_beta`
 
@@ -188,7 +195,7 @@ def _sympy_legendre(l, m) -> float:
     return ex
 
 
-@torch.jit.script
+@_conditional_script
 def _mul_m_lm(mul_l: List[Tuple[int, int]], x_m: torch.Tensor, x_lm: torch.Tensor) -> torch.Tensor:
     """
     multiply tensor [..., l * m] by [..., m]
