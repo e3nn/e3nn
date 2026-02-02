@@ -2,9 +2,14 @@ __version__ = "0.5.9"
 
 
 from typing import Dict
+import torch
+import packaging.version
 
+# torch.jit.script is deprecated in PT 2.10+
+_TORCH_VERSION = packaging.version.parse(torch.__version__.split("+")[0])
+_DEFAULT_JIT_MODE = "eager" if _TORCH_VERSION >= packaging.version.parse("2.10") else "script"
 
-_OPT_DEFAULTS: Dict[str, bool] = dict(specialized_code=True, optimize_einsums=True, jit_script_fx=True, jit_mode="script")
+_OPT_DEFAULTS: Dict[str, bool] = dict(specialized_code=True, optimize_einsums=True, jit_script_fx=True, jit_mode=_DEFAULT_JIT_MODE)
 
 
 def _handle_jit_script_fx_legacy(jit_script_fx: bool, current_jit_mode: str) -> str:
