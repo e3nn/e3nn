@@ -6,9 +6,6 @@ from e3nn.math import soft_one_hot_linspace
 
 @pytest.mark.parametrize("basis", ["gaussian", "cosine", "fourier", "bessel", "smooth_finite"])
 def test_with_compile(basis) -> None:
-    if torch.__version__ < "2.0.0":
-        pytest.skip("torch.compile is not available in this version")
-
     # torch.compile recompiles for every basis and every dtype
     torch._dynamo.config.cache_size_limit = 32
 
