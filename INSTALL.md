@@ -4,17 +4,18 @@
 
 ### PyTorch
 
-e3nn requires PyTorch >=1.8.0 For installation instructions, please see the [PyTorch homepage](https://pytorch.org/).
+e3nn requires PyTorch >=2.2.0. For installation instructions, please see the [PyTorch homepage](https://pytorch.org/).
 
 ### optional: torch_geometric
 
-First you have to install [pytorch_geometric](https://github.com/rusty1s/pytorch_geometric). For `torch` 1.11 and no CUDA support:
+First you have to install [pytorch_geometric](https://github.com/rusty1s/pytorch_geometric). For `torch` 2.2 and no CUDA support:
 
 ```bash
 CUDA=cpu
+TORCH=2.2.0
 
-pip install --upgrade --force-reinstall torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+${CUDA}.html
-pip install --upgrade --force-reinstall torch-sparse -f https://data.pyg.org/whl/torch-1.11.0+${CUDA}.html
+pip install --upgrade --force-reinstall torch-scatter -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
+pip install --upgrade --force-reinstall torch-sparse -f https://data.pyg.org/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-geometric
 ```
 
