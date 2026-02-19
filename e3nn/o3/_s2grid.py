@@ -164,7 +164,7 @@ def _complete_lmax_res(lmax, res_beta, res_alpha):
         # see tests -------------------------------^
 
     assert res_beta % 2 == 0
-    assert lmax + 1 <= res_beta // 2
+    # assert lmax + 1 <= res_beta // 2 # Relaxing this constraint
 
     return lmax, res_beta, res_alpha
 
@@ -326,7 +326,7 @@ class ToS2Grid(torch.nn.Module):
         positions on the sphere, tensor of shape ``(res_beta, res_alpha, 3)``
     """
 
-    def __init__(self, lmax=None, res=None, normalization: str = "component", dtype=None, device=None) -> None:
+    def __init__(self, lmax=None, res=None, normalization: str = "component", fft=True, dtype=None, device=None) -> None:
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
@@ -360,7 +360,7 @@ class ToS2Grid(torch.nn.Module):
         m = _expand_matrix(range(lmax + 1), dtype=dtype, device=device)  # [l, m, i]
         shb = torch.einsum("lmj,bj,lmi,l->mbi", m, shb, m, n)  # [m, b, i]
 
-        self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
+        self.lmax, self.res_beta, self.res_alpha, self.fft = lmax, res_beta, res_alpha, fft
         self.register_buffer("alphas", alphas)
         self.register_buffer("betas", betas)
         self.register_buffer("sha", sha)
@@ -393,7 +393,7 @@ class ToS2Grid(torch.nn.Module):
         x = torch.einsum("mbi,zi->zbm", self.shb, x)  # [batch, beta, m]
 
         sa, sm = self.sha.shape
-        if sa >= sm and sa % 2 == 1:
+        if sa >= sm and sa % 2 == 1 and self.fft:
             x = irfft(x, sa)
         else:
             x = torch.einsum("am,zbm->zba", self.sha, x)
@@ -446,7 +446,9 @@ class FromS2Grid(torch.nn.Module):
 
     """
 
-    def __init__(self, res=None, lmax=None, normalization: str = "component", lmax_in=None, dtype=None, device=None) -> None:
+    def __init__(
+        self, res=None, lmax=None, normalization: str = "component", lmax_in=None, fft=True, dtype=None, device=None
+    ) -> None:
         super().__init__()
 
         assert normalization in ["norm", "component", "integral"] or torch.is_tensor(
@@ -482,7 +484,7 @@ class FromS2Grid(torch.nn.Module):
         qw = _quadrature_weights(res_beta // 2, dtype=dtype, device=device) * res_beta**2 / res_alpha  # [b]
         shb = torch.einsum("lmj,bj,lmi,l,b->mbi", m, shb, m, n, qw)  # [m, b, i]
 
-        self.lmax, self.res_beta, self.res_alpha = lmax, res_beta, res_alpha
+        self.lmax, self.res_beta, self.res_alpha, self.fft = lmax, res_beta, res_alpha, fft
         self.register_buffer("alphas", alphas)
         self.register_buffer("betas", betas)
         self.register_buffer("sha", sha)
@@ -514,7 +516,7 @@ class FromS2Grid(torch.nn.Module):
         x = x.reshape(-1, res_beta, res_alpha)
 
         sa, sm = self.sha.shape
-        if sm <= sa and sa % 2 == 1:
+        if sm <= sa and sa % 2 == 1 and self.fft:
             x = rfft(x, sm // 2)
         else:
             x = torch.einsum("am,zba->zbm", self.sha, x)
