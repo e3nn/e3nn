@@ -7,7 +7,7 @@ import torch
 from e3nn import o3
 from e3nn.util import explicit_default_types
 
-_Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+_Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'), weights_only=False)
 # _Jd is a list of tensors of shape (2l+1, 2l+1)
 # _W3j_flat is a flatten version of W3j symbols
 # _W3j_indices is a dict from (l1, l2, l3) -> slice(i, j) to index the flat tensor
