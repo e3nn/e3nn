@@ -59,6 +59,7 @@ from ._s2grid import (
 from ._so3grid import SO3Grid
 from ._linear import Linear
 from ._norm import Norm
+from ._zemin import ICTD, CartesianHarmonics, CartesianWignerD, cartesian_3j
 
 
 __all__ = [
@@ -121,4 +122,8 @@ __all__ = [
     "SO3Grid",
     "Linear",
     "Norm",
+    "ICTD",
+    "cartesian_3j",
+    "CartesianHarmonics",
+    "CartesianWignerD",
 ]
