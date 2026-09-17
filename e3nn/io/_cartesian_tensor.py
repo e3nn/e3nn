@@ -51,6 +51,7 @@ class CartesianTensor(Irreps):
         ret = super().__new__(cls, rtp.irreps_out)
         ret.formula = formula
         ret.indices = indices
+        ret._rtp_cache = {(None, None): rtp}
         return ret
 
     def from_cartesian(self, data, rtp=None):
@@ -125,7 +126,15 @@ class CartesianTensor(Irreps):
         `e3nn.ReducedTensorProducts`
             reduced tensor products
         """
-        rtp = ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
-        if data is not None:
-            rtp = rtp.to(device=data.device, dtype=data.dtype)
+        cache = getattr(self, "_rtp_cache", None)
+        if cache is None:
+            cache = {}
+            self._rtp_cache = cache
+        key = (None, None) if data is None else (data.device, data.dtype)
+        rtp = cache.get(key)
+        if rtp is None:
+            rtp = ReducedTensorProducts(self.formula, **{i: "1o" for i in self.indices})
+            if data is not None:
+                rtp = rtp.to(device=data.device, dtype=data.dtype)
+            cache[key] = rtp
         return rtp
