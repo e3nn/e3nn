@@ -448,7 +448,36 @@ def matrix_to_quaternion(R) -> torch.Tensor:
     `torch.Tensor`
         tensor of shape :math:`(..., 4)`
     """
-    return axis_angle_to_quaternion(*matrix_to_axis_angle(R))
+    assert torch.allclose(torch.det(R), R.new_tensor(1))
+    r00, r01, r02 = R[..., 0, 0], R[..., 0, 1], R[..., 0, 2]
+    r10, r11, r12 = R[..., 1, 0], R[..., 1, 1], R[..., 1, 2]
+    r20, r21, r22 = R[..., 2, 0], R[..., 2, 1], R[..., 2, 2]
+    four_squared = torch.stack(
+        [
+            1 + r00 + r11 + r22,
+            1 + r00 - r11 - r22,
+            1 - r00 + r11 - r22,
+            1 - r00 - r11 + r22,
+        ],
+        dim=-1,
+    )
+    largest = four_squared.argmax(dim=-1)
+    candidates = torch.stack(
+        [
+            torch.stack([four_squared[..., 0], r21 - r12, r02 - r20, r10 - r01], dim=-1),
+            torch.stack([r21 - r12, four_squared[..., 1], r10 + r01, r02 + r20], dim=-1),
+            torch.stack([r02 - r20, r10 + r01, four_squared[..., 2], r21 + r12], dim=-1),
+            torch.stack([r10 - r01, r02 + r20, r21 + r12, four_squared[..., 3]], dim=-1),
+        ],
+        dim=-2,
+    )
+    # The largest component of a unit quaternion has magnitude at least 1/2.
+    # Select its positive squared magnitude before sqrt/division, so unused
+    # branches never introduce zero denominators or singular derivatives.
+    denominator = 2 * four_squared.gather(-1, largest[..., None]).sqrt()
+    index = largest[..., None, None].expand(candidates.shape[:-2] + (1, 4))
+    q = candidates.gather(-2, index).squeeze(-2) / denominator
+    return torch.where(q[..., :1] < 0, -q, q)
 
 
 def axis_angle_to_quaternion(xyz, angle) -> torch.Tensor:
@@ -511,18 +540,10 @@ def matrix_to_axis_angle(R):
     angle : `torch.Tensor`
         tensor of shape :math:`(...)`
     """
-    assert torch.allclose(torch.det(R), R.new_tensor(1))
-    tr = R[..., 0, 0] + R[..., 1, 1] + R[..., 2, 2]
-    angle = torch.acos(tr.sub(1).div(2).clamp(-1, 1))
-    axis = torch.stack(
-        [
-            R[..., 2, 1] - R[..., 1, 2],
-            R[..., 0, 2] - R[..., 2, 0],
-            R[..., 1, 0] - R[..., 0, 1],
-        ],
-        dim=-1,
-    )
-    axis = torch.nn.functional.normalize(axis, dim=-1)
+    q = matrix_to_quaternion(R)
+    vector_norm = q[..., 1:].norm(dim=-1)
+    angle = 2 * torch.atan2(vector_norm, q[..., 0])
+    axis = torch.nn.functional.normalize(q[..., 1:], dim=-1)
     return axis, angle
 
 
@@ -587,7 +608,16 @@ def quaternion_to_matrix(q) -> torch.Tensor:
     `torch.Tensor`
         tensor of shape :math:`(..., 3, 3)`
     """
-    return axis_angle_to_matrix(*quaternion_to_axis_angle(q))
+    q = torch.nn.functional.normalize(q, dim=-1)
+    w, x, y, z = q.unbind(dim=-1)
+    return torch.stack(
+        [
+            torch.stack([1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)], dim=-1),
+            torch.stack([2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)], dim=-1),
+            torch.stack([2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)], dim=-1),
+        ],
+        dim=-2,
+    )
 
 
 def quaternion_to_angles(q):
