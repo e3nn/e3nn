@@ -59,7 +59,7 @@ class Irrep(tuple):
                 return l
 
             if isinstance(l, _MulIr):
-                return l.ir.l
+                return l.ir
 
             if isinstance(l, str):
                 try:

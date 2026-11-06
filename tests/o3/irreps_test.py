@@ -130,3 +130,20 @@ def test_slice_by_mul():
     assert o3.Irreps("10x0e + 2e + 10x1e").slice_by_mul[5:15] == o3.Irreps(
         "5x0e + 2e + 4x1e"
     )
+
+def test_irrep_from_mul_ir():
+    mul_ir = o3.Irreps("2x1e")[0]
+    ir = o3.Irrep(mul_ir)
+    assert isinstance(ir, o3.Irrep)
+    assert ir == o3.Irrep("1e")
+
+
+def test_filter():
+    irreps = o3.Irreps("1e + 2e + 0e")
+    assert irreps.filter(keep="2e + 2x1e") == o3.Irreps("1x1e + 1x2e")
+    assert irreps.filter(drop="2e + 2x1e") == o3.Irreps("1x0e")
+    assert irreps.filter(keep=o3.Irreps("1e + 2e")) == o3.Irreps("1x1e + 1x2e")
+    assert irreps.filter(drop=o3.Irreps("1e + 2e")) == o3.Irreps("1x0e")
+    assert irreps.filter(keep=["0e", "1e"]) == o3.Irreps("1x1e + 1x0e")
+    assert irreps.filter(drop=["0e", "1e"]) == o3.Irreps("1x2e")
+    assert irreps.filter(lmax=1) == o3.Irreps("1x1e + 1x0e")
