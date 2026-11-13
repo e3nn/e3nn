@@ -132,7 +132,7 @@ def soft_one_hot_linspace(x: torch.Tensor, start, end, number, basis=None, cutof
         x = x[..., None] - start
         c = end - start
         bessel_roots = torch.arange(1, number + 1, dtype=x.dtype, device=x.device) * math.pi
-        out = math.sqrt(2 / c) * torch.sin(bessel_roots * x / c) / x
+        out = math.sqrt(2 / c) * (bessel_roots / c) * torch.sinc(bessel_roots * x / (math.pi * c))
 
         if not cutoff:
             return out

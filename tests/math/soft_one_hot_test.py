@@ -43,3 +43,22 @@ def test_normalized(basis, cutoff) -> None:
 
     assert 0.4 < y.pow(2).sum(1).min()
     assert y.pow(2).sum(1).max() < 2.0
+
+
+@pytest.mark.parametrize("cutoff", [True, False])
+@pytest.mark.parametrize("start,end", [(0.0, 1.0), (-1.0, 2.0)])
+def test_bessel_at_start(cutoff, start, end) -> None:
+    x = torch.tensor([start - 0.25, start, start + 0.25, end, end + 0.25], requires_grad=True)
+    y = soft_one_hot_linspace(x, start, end, 3, basis="bessel", cutoff=cutoff)
+
+    roots = torch.arange(1, 4) * torch.pi
+    c = end - start
+    expected = (2 / c) ** 0.5 * roots / c
+    torch.testing.assert_close(y[1], torch.zeros_like(expected) if cutoff else expected)
+    assert torch.isfinite(y).all()
+    if cutoff:
+        assert (y[[0, 1, 3, 4]] == 0).all()
+
+    gradient = torch.autograd.grad(y.sum(), x)[0]
+    assert torch.isfinite(gradient).all()
+    torch.testing.assert_close(gradient[1], x.new_zeros(()))
