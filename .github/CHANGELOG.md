@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Avoid NaN values and gradients at `x == start` in the Bessel basis of `soft_one_hot_linspace`.
+
 ## [0.5.2] - 2024-07
 ### Added
 - `o3.experimental.FullTensorProductv2` for compatibility with `torch.compile(..., fulgraph=True)`
