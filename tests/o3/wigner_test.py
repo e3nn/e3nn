@@ -32,6 +32,13 @@ def test_cartesian(float_tolerance) -> None:
     assert (R - D).abs().max() < float_tolerance
 
 
+@pytest.mark.parametrize("device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else []))
+def test_irrep_matrix_uses_rotation_precision_and_device(device) -> None:
+    rotation = o3.rand_matrix(6, dtype=torch.float64, device=device)
+    result = o3.Irrep("1o").D_from_matrix(rotation)
+    torch.testing.assert_close(result, rotation, rtol=0, atol=1e-12)
+
+
 def commutator(A, B):
     return A @ B - B @ A
 

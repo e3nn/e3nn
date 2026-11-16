@@ -8,14 +8,15 @@ import torch
 from e3nn.util import explicit_default_types
 
 
-def su2_generators(j: int) -> torch.Tensor:
-    m = torch.arange(-j, j)
+def su2_generators(j: int, dtype=None, device=None) -> torch.Tensor:
+    dtype, device = explicit_default_types(dtype, device)
+    m = torch.arange(-j, j, dtype=dtype, device=device)
     raising = torch.diag(-torch.sqrt(j * (j + 1) - m * (m + 1)), diagonal=-1)
 
-    m = torch.arange(-j + 1, j + 1)
+    m = torch.arange(-j + 1, j + 1, dtype=dtype, device=device)
     lowering = torch.diag(torch.sqrt(j * (j + 1) - m * (m - 1)), diagonal=1)
 
-    m = torch.arange(-j, j + 1)
+    m = torch.arange(-j, j + 1, dtype=dtype, device=device)
     return torch.stack(
         [
             0.5 * (raising + lowering),  # x (usually)
@@ -51,9 +52,9 @@ def change_basis_real_to_complex(l: int, dtype=None, device=None) -> torch.Tenso
     return q.to(dtype=dtype, device=device, copy=True, memory_format=torch.contiguous_format)
 
 
-def so3_generators(l) -> torch.Tensor:
-    X = su2_generators(l)
-    Q = change_basis_real_to_complex(l)
+def so3_generators(l, dtype=None, device=None) -> torch.Tensor:
+    X = su2_generators(l, dtype=dtype, device=device)
+    Q = change_basis_real_to_complex(l, dtype=dtype, device=device)
     X = torch.conj(Q.T) @ X @ Q
     assert torch.all(torch.abs(torch.imag(X)) < 1e-5)
     return torch.real(X)
@@ -95,7 +96,8 @@ def wigner_D(l: int, alpha: torch.Tensor, beta: torch.Tensor, gamma: torch.Tenso
     alpha = alpha[..., None, None] % (2 * math.pi)
     beta = beta[..., None, None] % (2 * math.pi)
     gamma = gamma[..., None, None] % (2 * math.pi)
-    X = so3_generators(l)
+    dtype = torch.promote_types(torch.promote_types(alpha.dtype, beta.dtype), gamma.dtype)
+    X = so3_generators(l, dtype=torch.promote_types(torch.float32, dtype), device=alpha.device)
     return torch.matrix_exp(alpha * X[1]) @ torch.matrix_exp(beta * X[0]) @ torch.matrix_exp(gamma * X[1])
 
 
